@@ -1275,6 +1275,12 @@ struct drm_amdgpu_cs_chunk_cp_gfx_shadow {
 /* query FW object size and alignment */
 #define AMDGPU_INFO_UQ_FW_AREAS			0x24
 
+/* Hybrid Stack Specific Defs*/
+/* gpu capability */
+#define AMDGPU_INFO_CAPABILITY			0x50
+/* virtual range */
+#define AMDGPU_INFO_VIRTUAL_RANGE		0x51
+
 #define AMDGPU_INFO_MMR_SE_INDEX_SHIFT	0
 #define AMDGPU_INFO_MMR_SE_INDEX_MASK	0xff
 #define AMDGPU_INFO_MMR_SH_INDEX_SHIFT	8
@@ -1330,6 +1336,11 @@ struct drm_amdgpu_info {
 			/** For future use, no flags defined so far */
 			__u32 flags;
 		} read_mmr_reg;
+
+		struct {
+			uint32_t aperture;
+			uint32_t _pad;
+		} virtual_range;
 
 		struct drm_amdgpu_query_fw query_fw;
 
@@ -1674,6 +1685,29 @@ struct drm_amdgpu_info_uq_metadata {
 #define AMDGPU_FAMILY_GC_11_5_0			150 /* GC 11.5.0 */
 #define AMDGPU_FAMILY_GC_11_5_4			154 /* GC 11.5.4 */
 #define AMDGPU_FAMILY_GC_12_0_0			152 /* GC 12.0.0 */
+
+/**
+ *  Definition of System Unified Address (SUA) apertures
+ */
+#define AMDGPU_SUA_APERTURE_PRIVATE    1
+#define AMDGPU_SUA_APERTURE_SHARED     2
+struct drm_amdgpu_virtual_range {
+	uint64_t start;
+	uint64_t end;
+};
+
+/*
+ * Definition of free sync enter and exit signals
+ * We may have more options in the future
+ */
+#define AMDGPU_FREESYNC_FULLSCREEN_ENTER                1
+#define AMDGPU_FREESYNC_FULLSCREEN_EXIT                 2
+
+struct drm_amdgpu_freesync {
+        __u32 op;                       /* AMDGPU_FREESYNC_FULLSCREEN_ENTER or */
+                                        /* AMDGPU_FREESYNC_FULLSCREEN_ENTER */
+        __u32 spare[7];
+};
 
 /*
  * Definition of user options
