@@ -347,5 +347,6 @@ AMD_GPU_RAS_PATH := ../ras
 AMD_GPU_RAS_FULL_PATH := $(FULL_AMD_PATH)/ras
 include $(AMD_GPU_RAS_FULL_PATH)/Makefile
 amdgpu-y += $(AMD_GPU_RAS_FILES)
+include $(FULL_AMD_PATH)/backport/Makefile
 
 obj-$(CONFIG_DRM_AMDGPU)+= amdgpu.o
