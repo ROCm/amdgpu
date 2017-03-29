@@ -6,6 +6,8 @@ amdkcl-y += kcl_backlight.o kcl_ioctl.o \
 	kcl_io.o
 	kcl_suspend.o kcl_pci.o kcl_mm.o
 
+CFLAGS_kcl_fence.o := -I$(src)
+
 ccflags-y += \
 	-include $(src)/../dkms/config/config.h \
 	-include $(src)/kcl_common.h
