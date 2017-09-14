@@ -131,6 +131,7 @@
 #define KMS_DRIVER_MINOR	64
 #define KMS_DRIVER_PATCHLEVEL	0
 
+#define AMDGPU_VERSION		"19.10.9.418"
 /*
  * amdgpu.debug module options. Are all disabled by default
  */
@@ -3215,6 +3216,9 @@ static int __init amdgpu_init(void)
 	if (r)
 		return r;
 
+	DRM_INFO("amdgpu version: %s\n", AMDGPU_VERSION);
+	DRM_INFO("OS DRM version: %d.%d.%d\n", DRM_VER, DRM_PATCH, DRM_SUB);
+
 	amdgpu_register_atpx_handler();
 	amdgpu_acpi_detect();
 
@@ -3262,3 +3266,4 @@ module_exit(amdgpu_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL and additional rights");
+MODULE_VERSION(AMDGPU_VERSION);
