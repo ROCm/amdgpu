@@ -3,6 +3,7 @@
 #define AMDTTM_BACKPORT_H
 
 #include <linux/version.h>
+#include <kcl/kcl_kernel.h>
 #include <kcl/kcl_dma_mapping.h>
 #include <kcl/kcl_list.h>
 #include <kcl/backport/kcl_fence_backport.h>
