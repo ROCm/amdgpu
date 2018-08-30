@@ -41,6 +41,7 @@
 #include "amdgpu_gem.h"
 #include "amdgpu_ras.h"
 #include "amdgpu_hmm.h"
+#include "amdgpu_display.h"
 
 /*
  * Maximum IB length (dwords) for rings whose emit_ib packet format
@@ -623,7 +624,7 @@ static int amdgpu_cs_p2_shadow(struct amdgpu_cs_parser *p,
 static int amdgpu_cs_pass2(struct amdgpu_cs_parser *p)
 {
 	unsigned int ce_preempt = 0, de_preempt = 0;
-	int i, r;
+	int i, r = 0;
 
 	for (i = 0; i < p->nchunks; ++i) {
 		struct amdgpu_cs_chunk *chunk;
@@ -670,7 +671,7 @@ static int amdgpu_cs_pass2(struct amdgpu_cs_parser *p)
 		}
 	}
 
-	return 0;
+	return amdgpu_sem_add_cs(p->ctx, p->entity, &p->job->sync);
 }
 
 /* Convert microseconds to bytes. */
