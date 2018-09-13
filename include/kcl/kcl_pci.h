@@ -49,4 +49,15 @@ static inline enum pcie_link_width kcl_pcie_get_width_cap(struct pci_dev *dev)
 #endif
 }
 
+#if !defined(HAVE_PCI_CONFIGURE_EXTENDED_TAGS)
+void _kcl_pci_configure_extended_tags(struct pci_dev *dev);
+#endif
+
+static inline void kcl_pci_configure_extended_tags(struct pci_dev *dev)
+{
+#if !defined(HAVE_PCI_CONFIGURE_EXTENDED_TAGS)
+	_kcl_pci_configure_extended_tags(dev);
+#endif
+}
+
 #endif /* AMDKCL_PCI_H */

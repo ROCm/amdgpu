@@ -97,3 +97,32 @@ void amdkcl_pci_init(void)
 	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap", pcie_get_width_cap);
 #endif
 }
+
+#if !defined(HAVE_PCI_CONFIGURE_EXTENDED_TAGS)
+void _kcl_pci_configure_extended_tags(struct pci_dev *dev)
+{
+	u32 cap;
+	u16 ctl;
+	int ret;
+
+	if (!pci_is_pcie(dev))
+		return;
+
+	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &cap);
+	if (ret)
+		return;
+
+	if (!(cap & PCI_EXP_DEVCAP_EXT_TAG))
+		return;
+
+	ret = pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &ctl);
+	if (ret)
+		return;
+
+	if (!(ctl & PCI_EXP_DEVCTL_EXT_TAG)) {
+		pcie_capability_set_word(dev, PCI_EXP_DEVCTL,
+					PCI_EXP_DEVCTL_EXT_TAG);
+	}
+}
+EXPORT_SYMBOL(_kcl_pci_configure_extended_tags);
+#endif
