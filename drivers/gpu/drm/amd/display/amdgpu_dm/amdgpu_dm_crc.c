@@ -33,6 +33,7 @@
 #include "amdgpu_securedisplay.h"
 #include "amdgpu_dm_psr.h"
 
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES
 static const char *const pipe_crc_sources[] = {
 	"none",
 	"crtc",
@@ -41,6 +42,7 @@ static const char *const pipe_crc_sources[] = {
 	"dprx dither",
 	"auto",
 };
+#endif
 
 static enum amdgpu_dm_pipe_crc_source dm_parse_crc_source(const char *source)
 {
@@ -77,6 +79,7 @@ static bool dm_need_crc_dither(enum amdgpu_dm_pipe_crc_source src)
 	       (src == AMDGPU_DM_PIPE_CRC_SOURCE_NONE);
 }
 
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES
 const char *const *amdgpu_dm_crtc_get_crc_sources(struct drm_crtc *crtc,
 						  size_t *count)
 {
@@ -493,6 +496,7 @@ amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc, const char *src_name,
 	*values_cnt = 3;
 	return 0;
 }
+#endif
 
 int amdgpu_dm_crtc_configure_crc_source(struct drm_crtc *crtc,
 					struct dm_crtc_state *dm_crtc_state,
