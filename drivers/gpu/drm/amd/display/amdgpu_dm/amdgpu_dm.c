@@ -10927,7 +10927,7 @@ static void amdgpu_dm_commit_streams(struct drm_atomic_commit *state,
 	amdgpu_dm_mod_power_update_streams(state, dm);
 
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state,
-				      new_crtc_state, i) {
+						new_crtc_state, i) {
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 
 		dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
@@ -13085,9 +13085,9 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			}
 		}
 	}
+
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
 		dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
-
 		if (!drm_atomic_crtc_needs_modeset(new_crtc_state) &&
 		    !new_crtc_state->color_mgmt_changed &&
 		    old_crtc_state->vrr_enabled == new_crtc_state->vrr_enabled &&
