@@ -25,8 +25,19 @@
 #ifndef AMDKCL_DRM_PRINT_H
 #define AMDKCL_DRM_PRINT_H
 
-#include <kcl/header/kcl_drm_print_h.h>
-#include <kcl/header/kcl_drm_drv_h.h>
+#include <drm/drm_print.h>
+#include <drm/drm_drv.h>
+
+#if !defined(HAVE_DRM_DRM_PRINT_H)
+/* Copied from include/drm/drm_print.h */
+struct drm_printer {
+	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
+	void *arg;
+	const char *prefix;
+};
+
+void drm_printf(struct drm_printer *p, const char *f, ...);
+#endif
 
 #ifndef HAVE_DRM_DEBUG_ENABLED
 /* Copied from v5.3-rc1-708-gf0a8f533adc2 include/drm/drm_print.h */
