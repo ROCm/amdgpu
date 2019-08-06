@@ -1315,6 +1315,7 @@ static void kfd_process_ref_release(struct kref *ref)
 	queue_work(kfd_process_wq, &p->release_work);
 }
 
+#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
 static struct mmu_notifier *kfd_process_alloc_notifier(struct mm_struct *mm)
 {
 	/* This increments p->ref counter if kfd process p exists */
@@ -1327,6 +1328,14 @@ static void kfd_process_free_notifier(struct mmu_notifier *mn)
 {
 	kfd_unref_process(container_of(mn, struct kfd_process, mmu_notifier));
 }
+#else
+static void kfd_process_destroy_delayed(struct rcu_head *rcu)
+{
+	struct kfd_process *p = container_of(rcu, struct kfd_process, rcu);
+
+	kfd_unref_process(p);
+}
+#endif
 
 static void kfd_process_table_remove(struct kfd_process *p)
 {
@@ -1420,8 +1429,10 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 static const struct mmu_notifier_ops kfd_process_mmu_notifier_ops = {
 	.release = kfd_process_notifier_release,
+#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
 	.alloc_notifier = kfd_process_alloc_notifier,
 	.free_notifier = kfd_process_free_notifier,
+#endif
 };
 
 /*
@@ -1599,7 +1610,9 @@ void kfd_process_set_trap_debug_flag(struct qcm_process_device *qpd,
 struct kfd_process *create_process(const struct task_struct *thread, bool primary)
 {
 	struct kfd_process *process;
+#ifdef HAVE_MMU_NOTIFIER_PUT
 	struct mmu_notifier *mn;
+#endif
 	int err = -ENOMEM;
 
 	process = kzalloc_obj(*process);
@@ -1659,12 +1672,20 @@ struct kfd_process *create_process(const struct task_struct *thread, bool primar
 	 */
 	if (primary) {
 		process->context_id = KFD_CONTEXT_ID_PRIMARY;
+#ifdef HAVE_MMU_NOTIFIER_PUT
 		mn = mmu_notifier_get(&kfd_process_mmu_notifier_ops, process->mm);
 		if (IS_ERR(mn)) {
 			err = PTR_ERR(mn);
 			goto err_register_notifier;
 		}
 		BUG_ON(mn != &process->mmu_notifier);
+#else
+		/* Must be last, have to use release destruction after this */
+		process->mmu_notifier.ops = &kfd_process_mmu_notifier_ops;
+		err = mmu_notifier_register(&process->mmu_notifier, process->mm);
+		if (err)
+			goto err_register_notifier;
+#endif
 		ida_init(&process->id_table);
 	}
 

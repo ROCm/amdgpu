@@ -3303,7 +3303,9 @@ static void __exit amdgpu_exit(void)
 	amdgpu_unregister_atpx_handler();
 	amdgpu_acpi_release();
 	amdgpu_sync_fini();
+#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
 	mmu_notifier_synchronize();
+#endif
 	amdgpu_xcp_drv_release();
 }
 
