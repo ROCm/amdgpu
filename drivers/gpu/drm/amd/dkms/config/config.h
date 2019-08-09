@@ -4,6 +4,12 @@
 /* *FLAGS_<basetarget>.o support to take the path relative to $(obj) */
 #define HAVE_AMDKCL_FLAGS_TAKE_PATH 1
 
+/* amd_iommu_pc_get_max_banks() declared */
+#define HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_DECLARED 1
+
+/* amd_iommu_pc_get_max_banks() arg is unsigned int */
+/* #undef HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_UINT */
+
 /* Define to 1 if you have the <asm/fpu/api.h> header file. */
 #define HAVE_ASM_FPU_API_H 1
 
