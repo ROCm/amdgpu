@@ -2969,7 +2969,6 @@ void amdgpu_sdma_set_buffer_funcs_scheds(struct amdgpu_device *adev,
 }
 
 #if defined(CONFIG_DEBUG_FS)
-
 static int amdgpu_ttm_page_pool_show(struct seq_file *m, void *unused)
 {
 	struct amdgpu_device *adev = m->private;
