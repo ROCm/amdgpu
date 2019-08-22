@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include <drm/drm_device.h>
 #include <drm/drm_drv.h>
+#include <linux/console.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_fourcc.h>
