@@ -27,7 +27,7 @@ obj-$(CONFIG_DRM_SCHED) += $(SCHED_NAME).o
 
 obj-$(CONFIG_DRM_SCHED_KUNIT_TEST) += tests/
 
-SCHED_FULL_PATH = $(src)
+SCHED_FULL_PATH := $(src)
 
 ccflags-y := -I$(SCHED_FULL_PATH)
 
