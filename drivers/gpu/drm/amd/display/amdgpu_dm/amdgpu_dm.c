@@ -7030,12 +7030,18 @@ static void fill_stream_properties_from_drm_display_mode(
 
 	if (stream->signal == SIGNAL_TYPE_HDMI_TYPE_A ||
 		stream->signal == SIGNAL_TYPE_HDMI_FRL) {
+#if defined(HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_P)
 		err = drm_hdmi_avi_infoframe_from_display_mode(&avi_frame,
 							       (struct drm_connector *)connector,
 							       mode_in);
 		if (err < 0)
 			drm_warn_once(connector->dev, "Failed to setup avi infoframe on connector %s: %zd\n",
 				      connector->name, err);
+#elif defined(HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_B)
+		drm_hdmi_avi_infoframe_from_display_mode(&avi_frame, mode_in, false);
+#else
+		drm_hdmi_avi_infoframe_from_display_mode(&avi_frame, mode_in);
+#endif /* HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_P */
 		timing_out->vic = avi_frame.video_code;
 		err = drm_hdmi_vendor_infoframe_from_display_mode(&hv_frame,
 								  (struct drm_connector *)connector,
