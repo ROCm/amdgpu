@@ -3159,8 +3159,10 @@ static int force_yuv420_output_get(void *data, u64 *val)
 	return 0;
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(force_yuv420_output_fops, force_yuv420_output_get,
 			 force_yuv420_output_set, "%llu\n");
+#endif
 
 static int force_yuv422_output_set(void *data, u64 val)
 {
@@ -3601,6 +3603,7 @@ static int dmcub_trace_event_state_get(void *data, u64 *val)
 	return 0;
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(dmcub_trace_event_state_fops, dmcub_trace_event_state_get,
 			 dmcub_trace_event_state_set, "%llu\n");
 
@@ -3618,6 +3621,7 @@ DEFINE_DEBUGFS_ATTRIBUTE(allow_edp_hotplug_detection_fops,
 DEFINE_DEBUGFS_ATTRIBUTE(disallow_edp_enter_psr_fops,
 			disallow_edp_enter_psr_get,
 			disallow_edp_enter_psr_set, "%llu\n");
+#endif
 
 DEFINE_DEBUGFS_ATTRIBUTE(disallow_edp_enter_replay_fops,
 			disallow_edp_enter_replay_get,
@@ -3808,6 +3812,8 @@ void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 					    dp_debugfs_entries[i].fops);
 		}
 	}
+
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	if (connector->base.connector_type == DRM_MODE_CONNECTOR_eDP) {
 		debugfs_create_file("replay_capability", 0444, dir, connector,
 					&replay_capability_fops);
@@ -3831,6 +3837,7 @@ void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 		debugfs_create_file("disallow_edp_enter_replay", 0644, dir, connector,
 					&disallow_edp_enter_replay_fops);
 	}
+#endif
 
 	for (i = 0; i < ARRAY_SIZE(connector_debugfs_entries); i++) {
 		debugfs_create_file(connector_debugfs_entries[i].name,
@@ -4307,8 +4314,10 @@ static int force_timing_sync_get(void *data, u64 *val)
 	return 0;
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(force_timing_sync_ops, force_timing_sync_get,
 			 force_timing_sync_set, "%llu\n");
+#endif
 
 
 /*
@@ -4446,8 +4455,10 @@ static int visual_confirm_get(void *data, u64 *val)
 }
 
 DEFINE_SHOW_ATTRIBUTE(mst_topo);
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(visual_confirm_fops, visual_confirm_get,
 			 visual_confirm_set, "%llu\n");
+#endif
 
 
 /*
@@ -4573,6 +4584,7 @@ void dtn_debugfs_init(struct amdgpu_device *adev)
 	debugfs_create_file("amdgpu_dm_dp_ignore_cable_id", 0644, root, adev,
 				&dp_ignore_cable_id_ops);
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file_unsafe("amdgpu_dm_visual_confirm", 0644, root, adev,
 				   &visual_confirm_fops);
 
@@ -4613,4 +4625,5 @@ void dtn_debugfs_init(struct amdgpu_device *adev)
 		debugfs_create_file_unsafe("amdgpu_dm_ips_residency", 0644, root, adev,
 					   &ips_residency_fops);
 	}
+#endif
 }
