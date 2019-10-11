@@ -14,5 +14,6 @@
 #include <kcl/backport/kcl_io_backport.h>
 #include <kcl/backport/kcl_uaccess_backport.h>
 #include <kcl/kcl_seq_file.h>
+#include <kcl/kcl_preempt.h>
 
 #endif /* AMDGPU_BACKPORT_H */
