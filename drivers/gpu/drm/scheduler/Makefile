@@ -20,8 +20,15 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 #
-gpu-sched-y := sched_main.o sched_fence.o sched_entity.o
+SCHED_NAME = gpu-sched
 
-obj-$(CONFIG_DRM_SCHED) += gpu-sched.o
+$(SCHED_NAME)-y := sched_main.o sched_fence.o sched_entity.o
+obj-$(CONFIG_DRM_SCHED) += $(SCHED_NAME).o
 
 obj-$(CONFIG_DRM_SCHED_KUNIT_TEST) += tests/
+
+SCHED_FULL_PATH = $(src)
+
+ccflags-y := -I$(SCHED_FULL_PATH)
+
+include $(SCHED_FULL_PATH)/backport/Makefile
