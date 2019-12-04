@@ -817,7 +817,7 @@ static int amdgpu_cs_bo_validate(void *param, struct amdgpu_bo *bo)
 	struct ttm_operation_ctx ctx = {
 		.interruptible = true,
 		.no_wait_gpu = false,
-		.resv = bo->tbo.base.resv
+		.resv = amdkcl_ttm_resvp(&bo->tbo),
 	};
 	uint32_t domain;
 	int r;
@@ -1221,7 +1221,7 @@ static int amdgpu_cs_sync_rings(struct amdgpu_cs_parser *p)
 	drm_exec_for_each_locked_object(&p->exec, obj) {
 		struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
 
-		struct dma_resv *resv = bo->tbo.base.resv;
+		struct dma_resv *resv = amdkcl_ttm_resvp(&bo->tbo);
 		enum amdgpu_sync_mode sync_mode;
 
 		sync_mode = amdgpu_bo_explicit_sync(bo) ?
