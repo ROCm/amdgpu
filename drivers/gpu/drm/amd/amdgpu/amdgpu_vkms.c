@@ -216,7 +216,7 @@ static int amdgpu_vkms_prepare_fb(struct drm_plane *plane,
 		return r;
 	}
 
-	r = dma_resv_reserve_fences(rbo->tbo.base.resv, TTM_NUM_MOVE_FENCES);
+	r = dma_resv_reserve_fences(amdkcl_ttm_resvp(&rbo->tbo), TTM_NUM_MOVE_FENCES);
 	if (r)
 		goto error_unlock;
 

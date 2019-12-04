@@ -628,7 +628,7 @@ svm_range_vram_node_new(struct kfd_node *node, struct svm_range *prange,
 		}
 	}
 
-	r = dma_resv_reserve_fences(bo->tbo.base.resv, TTM_NUM_MOVE_FENCES);
+	r = dma_resv_reserve_fences(amdkcl_ttm_resvp(&bo->tbo), TTM_NUM_MOVE_FENCES);
 	if (r) {
 		amdgpu_bo_unreserve(bo);
 		goto reserve_bo_failed;

@@ -380,7 +380,7 @@ static int amdgpu_amdkfd_remove_eviction_fence(struct amdgpu_bo *bo,
 	 * table update and TLB flush here directly.
 	 */
 	replacement = dma_fence_get_stub();
-	dma_resv_replace_fences(bo->tbo.base.resv, ef->base.context,
+	dma_resv_replace_fences(amdkcl_ttm_resvp(&bo->tbo), ef->base.context,
 				replacement, DMA_RESV_USAGE_BOOKKEEP);
 	dma_fence_put(replacement);
 	return 0;
@@ -1374,7 +1374,7 @@ static int process_sync_pds_resv(struct amdkfd_process_info *process_info,
 			    vm_list_node) {
 		struct amdgpu_bo *pd = peer_vm->root.bo;
 
-		ret = amdgpu_sync_resv(NULL, sync, pd->tbo.base.resv,
+		ret = amdgpu_sync_resv(NULL, sync, amdkcl_ttm_resvp(&pd->tbo),
 				       AMDGPU_SYNC_NE_OWNER,
 				       AMDGPU_FENCE_OWNER_KFD);
 		if (ret)
@@ -1457,7 +1457,7 @@ static int init_kfd_vm(struct amdgpu_vm *vm, void **process_info,
 				  AMDGPU_FENCE_OWNER_KFD, false);
 	if (ret)
 		goto wait_pd_fail;
-	ret = dma_resv_reserve_fences(vm->root.bo->tbo.base.resv, 1);
+	ret = dma_resv_reserve_fences(amdkcl_ttm_resvp(&vm->root.bo->tbo), 1);
 	if (ret)
 		goto reserve_shared_fail;
 	dma_resv_add_fence(vm->root.bo->tbo.base.resv,
@@ -2983,7 +2983,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info, struct dma_fence __rcu *
 				goto validate_map_fail;
 			}
 		}
-		dma_resv_for_each_fence(&cursor, bo->tbo.base.resv,
+		dma_resv_for_each_fence(&cursor, amdkcl_ttm_resvp(&bo->tbo),
 					DMA_RESV_USAGE_KERNEL, fence) {
 			ret = amdgpu_sync_fence(&sync_obj, fence, GFP_KERNEL);
 			if (ret) {
@@ -3164,7 +3164,7 @@ int amdgpu_amdkfd_add_gws_to_process(void *info, void *gws, struct kgd_mem **mem
 	 * Add process eviction fence to bo so they can
 	 * evict each other.
 	 */
-	ret = dma_resv_reserve_fences(gws_bo->tbo.base.resv, 1);
+	ret = dma_resv_reserve_fences(amdkcl_ttm_resvp(&gws_bo->tbo), 1);
 	if (ret)
 		goto reserve_shared_fail;
 	dma_resv_add_fence(gws_bo->tbo.base.resv,
