@@ -27,6 +27,7 @@
 #include <linux/string_helpers.h>
 #include <linux/uaccess.h>
 #include <media/cec-notifier.h>
+#include <linux/debugfs.h>
 
 #include "dc.h"
 #include "amdgpu.h"
