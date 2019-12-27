@@ -905,6 +905,8 @@ uint32_t dm_mst_get_pbn_divider(struct dc_link *link)
 	return dfixed_const(pbn_div_x100) / 100;
 }
 
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0) && defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
 struct dsc_mst_fairness_params {
 	struct dc_crtc_timing *timing;
 	struct dc_sink *sink;
@@ -1908,6 +1910,7 @@ static bool is_dsc_common_config_possible(struct dc_stream_state *stream,
 	return is_dsc_possible;
 }
 #endif
+#endif /* HAVE_DRM_DP_MST_ATOMIC_CHECK */
 
 #if defined(CONFIG_DRM_AMD_DC_FP)
 static bool dp_get_link_current_set_bw(struct drm_dp_aux *aux, uint32_t *cur_link_bw)
@@ -2101,3 +2104,4 @@ enum dc_status dm_dp_mst_is_port_support_mode(
 #endif
 	return DC_OK;
 }
+#endif
