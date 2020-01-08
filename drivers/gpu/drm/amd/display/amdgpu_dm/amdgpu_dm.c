@@ -6506,11 +6506,13 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 #endif
 
+#if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 		ret = dm_update_mst_vcpi_slots_for_dsc(state, dm_state->context, vars);
 		if (ret) {
 			drm_dbg_atomic(dev, "dm_update_mst_vcpi_slots_for_dsc() failed: %pe\n", ERR_PTR(ret));
 			goto fail;
 		}
+#endif
 
 		/*
 		 * Perform validation of MST topology in the state:
@@ -6519,11 +6521,13 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		 * to get stuck in an infinite loop and hang eventually.
 		 */
 #ifdef HAVE_DRM_DP_MST_ATOMIC_CHECK
+#if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 		ret = drm_dp_mst_atomic_check(state);
 		if (ret) {
 			drm_dbg_atomic(dev, "MST drm_dp_mst_atomic_check() failed: %pe\n", ERR_PTR(ret));
 			goto fail;
 		}
+#endif
 #endif
 		status = dc_validate_global_state(dc, dm_state->context, DC_VALIDATE_MODE_ONLY);
 		if (status != DC_OK) {
