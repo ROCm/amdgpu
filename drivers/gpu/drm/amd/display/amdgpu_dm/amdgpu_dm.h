@@ -1084,8 +1084,10 @@ struct dm_connector_state {
 	bool update_hdcp;
 	bool abm_sysfs_forbidden;
 	uint8_t abm_level;
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	int vcpi_slots;
 	uint64_t pbn;
+#endif
 };
 
 #define to_dm_connector_state(x)\
