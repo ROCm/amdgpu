@@ -6400,7 +6400,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 	}
 
-#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS) && defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE) && defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
 	/* Perform validation of MST topology in the state*/
 	ret = drm_dp_mst_atomic_check(state);
 	if (ret)
