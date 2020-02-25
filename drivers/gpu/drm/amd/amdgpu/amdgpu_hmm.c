@@ -804,6 +804,21 @@ void amdgpu_hmm_unregister(struct amdgpu_bo *bo)
 	bo->notifier.mm = NULL;
 }
 
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+/* flags used by HMM internal, not related to CPU/GPU PTE flags */
+static const uint64_t hmm_range_flags[HMM_PFN_FLAG_MAX] = {
+	(1 << 0), /* HMM_PFN_VALID */
+	(1 << 1), /* HMM_PFN_WRITE */
+	0 /* HMM_PFN_DEVICE_PRIVATE */
+};
+
+static const uint64_t hmm_range_values[HMM_PFN_VALUE_MAX] = {
+	0xfffffffffffffffeUL, /* HMM_PFN_ERROR */
+	0, /* HMM_PFN_NONE */
+	0xfffffffffffffffcUL /* HMM_PFN_SPECIAL */
+};
+#endif
+
 int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 			       uint64_t start, uint64_t npages, bool readonly,
 			       void *owner,
@@ -823,10 +838,20 @@ int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 	}
 
 	hmm_range->notifier = notifier;
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+	hmm_range->flags = hmm_range_flags;
+	hmm_range->values = hmm_range_values;
+	hmm_range->pfn_shift = PAGE_SHIFT;
+	hmm_range->default_flags = hmm_range_flags[HMM_PFN_VALID];
+	if (!readonly)
+		hmm_range->default_flags |= hmm_range->flags[HMM_PFN_WRITE];
+	hmm_range->pfns = (uint64_t *)pfns;
+#else
 	hmm_range->default_flags = HMM_PFN_REQ_FAULT;
 	if (!readonly)
 		hmm_range->default_flags |= HMM_PFN_REQ_WRITE;
 	hmm_range->hmm_pfns = pfns;
+#endif
 	hmm_range->start = start;
 	end = start + npages * PAGE_SIZE;
 	hmm_range->dev_private_owner = owner;
@@ -839,7 +864,11 @@ int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 			hmm_range->start, hmm_range->end);
 
 		r = hmm_range_fault(hmm_range);
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+		if (unlikely(r <= 0))
+#else
 		if (unlikely(r))
+#endif
 			goto out_free_pfns;
 
 		if (hmm_range->end == end)
