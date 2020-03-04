@@ -3642,6 +3642,7 @@ static struct drm_mode_config_helper_funcs amdgpu_dm_mode_config_helperfuncs = {
 };
 #endif
 
+#ifdef HAVE_HDR_SINK_METADATA
 static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 {
 	struct amdgpu_dm_backlight_caps *caps;
@@ -3692,6 +3693,7 @@ static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 	if (min_input_signal_override >= 0)
 		caps->min_input_signal = min_input_signal_override;
 }
+#endif
 
 DEFINE_FREE(sink_release, struct dc_sink *, if (_T) dc_sink_release(_T))
 
@@ -3815,7 +3817,9 @@ void amdgpu_dm_update_connector_after_detect(
 		}
 
 		amdgpu_dm_update_freesync_caps(connector, aconnector->drm_edid);
+#ifdef HAVE_HDR_SINK_METADATA
 		update_connector_ext_caps(aconnector);
+#endif
 	} else {
 		hdmi_cec_unset_edid(aconnector);
 		drm_dp_cec_unset_edid(&aconnector->dm_dp_aux.aux);
@@ -4732,7 +4736,9 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 #define AMDGPU_DM_DEFAULT_MIN_BACKLIGHT 12
 #define AMDGPU_DM_DEFAULT_MAX_BACKLIGHT 255
 #define AMDGPU_DM_MIN_SPREAD ((AMDGPU_DM_DEFAULT_MAX_BACKLIGHT - AMDGPU_DM_DEFAULT_MIN_BACKLIGHT) / 2)
+#ifdef HAVE_HDR_SINK_METADATA
 #define AUX_BL_DEFAULT_TRANSITION_TIME_MS 50
+#endif
 
 static void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm,
 					    int bl_idx)
@@ -4765,8 +4771,10 @@ static void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm,
 		caps->caps_valid = true;
 	}
 #else
+#ifdef HAVE_HDR_SINK_METADATA
 	if (caps->aux_support)
 		return;
+#endif
 
 	caps->min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
 	caps->max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
@@ -4774,6 +4782,7 @@ static void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm,
 #endif
 }
 
+#ifdef HAVE_HDR_SINK_METADATA
 static int get_brightness_range(const struct amdgpu_dm_backlight_caps *caps,
 				unsigned int *min, unsigned int *max)
 {
@@ -4874,19 +4883,25 @@ static u32 convert_brightness_to_user(const struct amdgpu_dm_backlight_caps *cap
 	return DIV_ROUND_CLOSEST_ULL((u64)max * (brightness - min),
 				 max - min);
 }
+#endif
 
 static void amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 					 int bl_idx,
 					 u32 user_brightness)
 {
 	struct amdgpu_dm_backlight_caps *caps;
+#ifdef HAVE_HDR_SINK_METADATA
 	struct dc_link *link;
 	u32 brightness;
+#else
+	uint32_t brightness = user_brightness;
+#endif
 	bool rc, reallow_idle = false;
 
 	amdgpu_dm_update_backlight_caps(dm, bl_idx);
 	caps = &dm->backlight_caps[bl_idx];
 
+#ifdef HAVE_HDR_SINK_METADATA
 	dm->brightness[bl_idx] = user_brightness;
 	/* update scratch register */
 	if (bl_idx == 0)
@@ -4932,6 +4947,30 @@ static void amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 
 	if (rc)
 		dm->actual_brightness[bl_idx] = user_brightness;
+#else
+     /*
+     * The brightness input is in the range 0-255
+     * It needs to be rescaled to be between the
+     * requested min and max input signal
+     *
+     * It also needs to be scaled up by 0x101 to
+     * match the DC interface which has a range of
+     * 0 to 0xffff
+     */
+    brightness =
+            brightness
+            * 0x101
+            * (caps.max_input_signal - caps.min_input_signal)
+            / AMDGPU_MAX_BL_LEVEL
+            + caps.min_input_signal * 0x101;
+
+    rc = dc_link_set_backlight_level(dm->backlight_link[bl_idx], brightness, 0);
+
+    if (!rc)
+	    DRM_ERROR("DM: Failed to update backlight on eDP[%d]\n", bl_idx);
+    if (rc)
+	    dm->actual_brightness[bl_idx] = user_brightness;
+#endif
 }
 
 static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
@@ -4960,6 +4999,7 @@ static u32 amdgpu_dm_backlight_get_level(struct amdgpu_display_manager *dm,
 	amdgpu_dm_update_backlight_caps(dm, bl_idx);
 	caps = dm->backlight_caps[bl_idx];
 
+#ifdef HAVE_HDR_SINK_METADATA
 	if (caps.aux_support) {
 		u32 avg, peak;
 
@@ -4967,13 +5007,18 @@ static u32 amdgpu_dm_backlight_get_level(struct amdgpu_display_manager *dm,
 			return dm->brightness[bl_idx];
 		return convert_brightness_to_user(&caps, avg);
 	}
+#endif
 
 	ret = dc_link_get_backlight_level(link);
 
 	if (ret == DC_ERROR_UNEXPECTED)
 		return dm->brightness[bl_idx];
 
+#ifdef HAVE_HDR_SINK_METADATA
 	return convert_brightness_to_user(&caps, ret);
+#else
+	return ret;
+#endif
 }
 
 static int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
