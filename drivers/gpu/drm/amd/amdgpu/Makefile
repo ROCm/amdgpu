@@ -350,3 +350,5 @@ amdgpu-y += $(AMD_GPU_RAS_FILES)
 include $(FULL_AMD_PATH)/backport/Makefile
 
 obj-$(CONFIG_DRM_AMDGPU)+= amdgpu.o
+
+CFLAGS_amdgpu_trace_points.o := -I$(src)
