@@ -733,5 +733,5 @@ TRACE_EVENT(amdgpu_userq_state_changed,
 
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/amd/amdgpu
+#define TRACE_INCLUDE_PATH .
 #include <trace/define_trace.h>
