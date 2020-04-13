@@ -21,5 +21,6 @@
 #include <kcl/kcl_timekeeping.h>
 #include <kcl/backport/kcl_mm_backport.h>
 #include <kcl/kcl_pm.h>
+#include <kcl/backport/kcl_fence_backport.h>
 
 #endif /* AMDGPU_BACKPORT_H */

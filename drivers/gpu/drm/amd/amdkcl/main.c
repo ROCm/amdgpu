@@ -3,6 +3,7 @@
 #include <linux/module.h>
 
 extern void amdkcl_symbol_init(void);
+extern void amdkcl_fence_init(void);
 extern void amdkcl_io_init(void);
 extern void amdkcl_mm_init(void);
 extern void amdkcl_pci_init(void);
@@ -11,6 +12,7 @@ extern void amdkcl_suspend_init(void);
 int __init amdkcl_init(void)
 {
 	amdkcl_symbol_init();
+	amdkcl_fence_init();
 	amdkcl_io_init();
 	amdkcl_mm_init();
 	amdkcl_pci_init();
