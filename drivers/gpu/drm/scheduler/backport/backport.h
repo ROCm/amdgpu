@@ -3,5 +3,6 @@
 #define AMDSCHED_BACKPORT_H
 
 #include <linux/version.h>
+#include <kcl/backport/kcl_fence_backport.h>
 
 #endif
