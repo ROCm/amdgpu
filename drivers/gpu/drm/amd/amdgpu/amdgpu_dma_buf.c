@@ -113,6 +113,7 @@ static int amdgpu_dma_buf_attach(struct dma_buf *dmabuf,
 	return 0;
 }
 
+#ifdef HAVE_STRUCT_DMA_BUF_OPS_PIN
 /**
  * amdgpu_dma_buf_pin - &dma_buf_ops.pin implementation
  *
@@ -167,6 +168,7 @@ static void amdgpu_dma_buf_unpin(struct dma_buf_attachment *attach)
 
 	amdgpu_bo_unpin(bo);
 }
+#endif
 
 /**
  * amdgpu_dma_buf_map - &dma_buf_ops.map_dma_buf implementation
@@ -191,6 +193,7 @@ static struct sg_table *amdgpu_dma_buf_map(struct dma_buf_attachment *attach,
 	struct sg_table *sgt;
 	long r;
 
+#ifdef HAVE_STRUCT_DMA_BUF_OPS_PIN
 	if (!bo->tbo.pin_count) {
 		/* move buffer into GTT or VRAM */
 		struct ttm_operation_ctx ctx = { false, false };
@@ -208,6 +211,11 @@ static struct sg_table *amdgpu_dma_buf_map(struct dma_buf_attachment *attach,
 		if (r)
 			return ERR_PTR(r);
 	}
+#else
+	r = amdgpu_bo_pin(bo, AMDGPU_GEM_DOMAIN_GTT);
+	if (r)
+		return ERR_PTR(r);
+#endif
 
 	switch (bo->tbo.resource->mem_type) {
 	case TTM_PL_TT:
@@ -283,6 +291,10 @@ static void amdgpu_dma_buf_unmap(struct dma_buf_attachment *attach,
 	} else {
 		amdgpu_vram_mgr_free_sgt(attach->dev, dir, sgt);
 	}
+
+#ifndef HAVE_STRUCT_DMA_BUF_OPS_PIN
+	amdgpu_bo_unpin(bo);
+#endif
 }
 
 /**
@@ -358,8 +370,10 @@ static void amdgpu_dma_buf_vunmap(struct dma_buf *dma_buf, struct iosys_map *map
 
 const struct dma_buf_ops amdgpu_dmabuf_ops = {
 	.attach = amdgpu_dma_buf_attach,
+#ifdef HAVE_STRUCT_DMA_BUF_OPS_PIN
 	.pin = amdgpu_dma_buf_pin,
 	.unpin = amdgpu_dma_buf_unpin,
+#endif
 	.map_dma_buf = amdgpu_dma_buf_map,
 	.unmap_dma_buf = amdgpu_dma_buf_unmap,
 	.release = drm_gem_dmabuf_release,
@@ -459,6 +473,7 @@ error:
 	return ERR_PTR(ret);
 }
 
+#ifdef HAVE_STRUCT_DMA_BUF_OPS_PIN
 /**
  * amdgpu_dma_buf_move_notify - &attach.move_notify implementation
  *
@@ -542,6 +557,7 @@ static const struct dma_buf_attach_ops amdgpu_dma_buf_attach_ops = {
 #endif
 	.move_notify = amdgpu_dma_buf_move_notify
 };
+#endif
 
 /**
  * amdgpu_gem_prime_import - &drm_driver.gem_prime_import implementation
@@ -575,8 +591,12 @@ struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 	if (IS_ERR(obj))
 		return obj;
 
+#ifdef HAVE_STRUCT_DMA_BUF_OPS_PIN
 	attach = dma_buf_dynamic_attach(dma_buf, dev->dev,
 					&amdgpu_dma_buf_attach_ops, obj);
+#else
+	attach = dma_buf_dynamic_attach(dma_buf, dev->dev, true);
+#endif
 	if (IS_ERR(attach)) {
 		drm_gem_object_put(obj);
 		return ERR_CAST(attach);
