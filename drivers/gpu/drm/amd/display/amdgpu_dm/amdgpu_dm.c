@@ -6490,12 +6490,16 @@ static void fill_stream_properties_from_drm_display_mode(
 		drm_hdmi_avi_infoframe_from_display_mode(&avi_frame, mode_in);
 #endif /* HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_P */
 		timing_out->vic = avi_frame.video_code;
+#if defined(HAVE_DRM_HDMI_VENDOR_INFOFRAME_FROM_DISPLAY_MODE_P_P_P)
 		err = drm_hdmi_vendor_infoframe_from_display_mode(&hv_frame,
 								  (struct drm_connector *)connector,
 								  mode_in);
 		if (err < 0)
 			drm_warn_once(connector->dev, "Failed to setup vendor infoframe on connector %s: %zd\n",
 				      connector->name, err);
+#else
+		drm_hdmi_vendor_infoframe_from_display_mode(&hv_frame, mode_in);
+#endif
 		timing_out->hdmi_vic = hv_frame.vic;
 	}
 
