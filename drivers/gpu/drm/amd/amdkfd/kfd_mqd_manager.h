@@ -102,6 +102,8 @@ struct mqd_manager {
 				  u32 *ctl_stack_used_size,
 				  u32 *save_area_used_size);
 
+	bool	(*check_queue_active)(struct queue *q);
+
 	int	(*get_checkpoint_info)(struct mqd_manager *mm, void *mqd,
 				       uint32_t *ctl_stack_size);
 
