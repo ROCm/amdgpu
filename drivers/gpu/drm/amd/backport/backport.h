@@ -10,4 +10,6 @@
 #include <kcl/kcl_i2c.h>
 #include <kcl/kcl_backlight.h>
 #include <kcl/kcl_fs.h>
+#include <kcl/kcl_list.h>
+
 #endif /* AMDGPU_BACKPORT_H */
