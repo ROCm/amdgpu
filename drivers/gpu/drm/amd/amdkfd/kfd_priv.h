@@ -418,7 +418,6 @@ struct kfd_bo {
 	void *mem;
 	struct interval_tree_node it;
 	struct kfd_dev *dev;
-	struct kfd_ipc_obj *kfd_ipc_obj;
 	/* page-aligned VA address */
 	uint64_t cpuva;
 	unsigned int mem_type;
@@ -1182,8 +1181,7 @@ void kfd_process_notifier_release_internal(struct kfd_process *p);
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 					void *mem, uint64_t start,
 					uint64_t length, uint64_t cpuva,
-					unsigned int mem_type,
-					struct kfd_ipc_obj *ipc_obj);
+					unsigned int mem_type);
 void *kfd_process_device_translate_handle(struct kfd_process_device *p,
 					int handle);
 struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,
