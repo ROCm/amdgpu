@@ -1545,9 +1545,9 @@ STATIC_IFN_KUNIT int amdgpu_dm_plane_atomic_check(struct drm_plane *plane,
 	if (!dm_plane_state->dc_state)
 		return 0;
 
-	new_crtc_state =
-		drm_atomic_get_new_crtc_state(state,
-					      new_plane_state->crtc);
+	new_crtc_state = kcl_drm_atomic_get_new_crtc_state_before_commit(
+					state, new_plane_state->crtc);
+
 	if (!new_crtc_state)
 		return -EINVAL;
 
