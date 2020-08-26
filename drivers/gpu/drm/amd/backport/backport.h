@@ -10,6 +10,7 @@
 #include <kcl/kcl_i2c.h>
 #include <kcl/kcl_video.h>
 #include <kcl/kcl_acpi.h>
+#include <kcl/kcl_kthread.h>
 #include <kcl/kcl_backlight.h>
 #include <kcl/kcl_fs.h>
 #include <kcl/kcl_list.h>
