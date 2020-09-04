@@ -869,7 +869,7 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 static void dm_dp_mst_register_connector(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 
 	if (adev->mode_info.rfbdev)
 		drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
