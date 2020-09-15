@@ -1156,7 +1156,7 @@ release_out:
 	amdgpu_hmm_range_free(range);
 #else
 	if (ret)
-		release_pages(mem->user_pages, bo->tbo.ttm->num_pages);
+		amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm, NULL);
 free_out:
 	kvfree(mem->user_pages);
 	mem->user_pages = NULL;
