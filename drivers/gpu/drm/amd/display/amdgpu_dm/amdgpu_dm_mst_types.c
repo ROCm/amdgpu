@@ -504,7 +504,6 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 			amdgpu_dm_update_freesync_caps(
 					connector, aconnector->drm_edid, true);
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 #if defined(CONFIG_DRM_AMD_DC_FP)
 			if (!validate_dsc_caps_on_connector(aconnector))
@@ -515,7 +514,6 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 			if (!retrieve_downstream_port_device(aconnector))
 				memset(&aconnector->mst_downstream_port_present,
 					0, sizeof(aconnector->mst_downstream_port_present));
-#endif
 #endif
 		}
 	}

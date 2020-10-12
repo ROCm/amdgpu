@@ -1272,7 +1272,6 @@ static struct display_stream_compressor *dcn301_dsc_create(
 	return &dsc->base;
 }
 
-
 static void dcn301_destroy_resource_pool(struct resource_pool **pool)
 {
 	struct dcn301_resource_pool *dcn301_pool = TO_DCN301_RES_POOL(*pool);

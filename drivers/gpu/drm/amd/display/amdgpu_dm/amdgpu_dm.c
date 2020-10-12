@@ -8885,7 +8885,6 @@ const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs = {
 	.atomic_check = dm_encoder_helper_atomic_check
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_commit *state,
 					    struct dc_state *dc_state,
@@ -8963,7 +8962,6 @@ static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_commit *state,
 	}
 	return 0;
 }
-#endif
 #endif
 
 static int to_drm_connector_type(enum signal_type st, uint32_t connector_id)
