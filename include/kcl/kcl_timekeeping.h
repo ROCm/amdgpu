@@ -27,4 +27,8 @@ static inline u64 ktime_get_boottime_ns(void)
 #endif /* HAVE_KTIME_GET_NS */
 #endif /* HAVE_KTIME_GET_BOOTTIME_NS */
 
+#ifndef HAVE_JIFFIES64_TO_MSECS
+extern u64 jiffies64_to_msecs(u64 j);
+#endif
+
 #endif
