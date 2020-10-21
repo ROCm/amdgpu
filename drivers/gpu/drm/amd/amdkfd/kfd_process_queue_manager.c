@@ -372,7 +372,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 						     &pdd->proc_ctx_bo,
 						     &pdd->proc_ctx_gpu_addr,
 						     &pdd->proc_ctx_cpu_ptr,
-						     false);
+						     false, true);
 		if (retval) {
 			dev_err(dev->adev->dev, "failed to allocate process context bo\n");
 			return retval;
