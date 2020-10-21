@@ -207,7 +207,7 @@ static struct kfd_mem_obj *allocate_mqd(struct mqd_manager *mm,
 						  AMDGPU_GEM_DOMAIN_GTT,
 			&(mqd_mem_obj->mem),
 			&(mqd_mem_obj->gpu_addr),
-			(void *)&(mqd_mem_obj->cpu_ptr), true);
+			(void *)&(mqd_mem_obj->cpu_ptr), true, true);
 
 		if (retval) {
 			kfree(mqd_mem_obj);

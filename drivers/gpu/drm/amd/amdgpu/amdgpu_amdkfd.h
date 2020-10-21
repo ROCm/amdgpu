@@ -252,7 +252,7 @@ int amdgpu_amdkfd_set_sigbus_delay(struct task_struct *task, u32 ms)
 /* Shared API */
 int amdgpu_amdkfd_alloc_kernel_mem(struct amdgpu_device *adev, size_t size,
 				u32 domain, void **mem_obj, uint64_t *gpu_addr,
-				void **cpu_ptr, bool mqd_gfx9);
+				void **cpu_ptr, bool mqd_gfx9, bool is_uswc_mode);
 void amdgpu_amdkfd_free_kernel_mem(struct amdgpu_device *adev, void **mem_obj);
 int amdgpu_amdkfd_alloc_gws(struct amdgpu_device *adev, size_t size,
 				void **mem_obj);

@@ -839,7 +839,7 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			kfd->adev, size, AMDGPU_GEM_DOMAIN_GTT,
 			&kfd->gtt_mem,
 			&kfd->gtt_start_gpu_addr, &kfd->gtt_start_cpu_ptr,
-			false)) {
+			false, true)) {
 		dev_err(kfd_device, "Could not allocate %d bytes\n", size);
 		goto alloc_kernel_mem_failure;
 	}

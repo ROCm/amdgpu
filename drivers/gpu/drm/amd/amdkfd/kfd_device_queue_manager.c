@@ -3102,7 +3102,7 @@ static int allocate_hiq_sdma_mqd(struct device_queue_manager *dqm)
 	retval = amdgpu_amdkfd_alloc_kernel_mem(dev->adev, size,
 		AMDGPU_GEM_DOMAIN_GTT,
 		&(mem_obj->mem), &(mem_obj->gpu_addr),
-		(void *)&(mem_obj->cpu_ptr), false);
+		(void *)&(mem_obj->cpu_ptr), false, true);
 
 	return retval;
 }
