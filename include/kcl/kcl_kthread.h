@@ -4,9 +4,7 @@
 
 #include <linux/sched.h>
 #include <linux/kthread.h>
-#ifndef HAVE_KTHREAD_USE_MM
 #include <linux/mmu_context.h>
-#endif
 
 #ifndef HAVE_KTHREAD_USE_MM
 static inline
