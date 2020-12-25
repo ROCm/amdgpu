@@ -79,4 +79,20 @@ int drm_connector_init_with_ddc(struct drm_device *dev,
 }
 #endif
 
+#ifndef DP_MAX_DOWNSTREAM_PORTS
+#define DP_MAX_DOWNSTREAM_PORTS    0x10
+#endif
+
+#ifndef HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY
+void drm_connector_attach_dp_subconnector_property(struct drm_connector *connector);
+void drm_dp_set_subconnector_property(struct drm_connector *connector, enum drm_connector_status status,
+				  const u8 *dpcd, const u8 prot_cap[4]);
+
+#define DRM_MODE_SUBCONNECTOR_VGA 1
+#define DRM_MODE_SUBCONNECTOR_DisplayPort 10
+#define DRM_MODE_SUBCONNECTOR_HDMIA 11
+#define DRM_MODE_SUBCONNECTOR_Native 15
+#define DRM_MODE_SUBCONNECTOR_Wireless 18
+#endif /* HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY */
+
 #endif /* AMDKCL_DRM_CONNECTOR_H */
