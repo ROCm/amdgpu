@@ -247,10 +247,11 @@ STATIC_IFN_KUNIT void update_subconnector_property(struct amdgpu_dm_connector *a
 
 	if (aconnector->dc_sink)
 		subconnector = get_subconnector_type(link);
-
+#ifdef HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY
 	drm_object_property_set_value(&connector->base,
 			connector->dev->mode_config.dp_subconnector_property,
 			subconnector);
+#endif
 }
 EXPORT_IF_KUNIT(update_subconnector_property);
 
