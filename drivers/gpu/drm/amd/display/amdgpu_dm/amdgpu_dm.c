@@ -85,9 +85,7 @@
 #include <linux/power_supply.h>
 #include <linux/firmware.h>
 
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 #include <linux/component.h>
-#endif
 #include <linux/sort.h>
 
 #include <drm/drm_privacy_screen_consumer.h>
@@ -480,9 +478,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	mutex_init(&adev->dm.dpia_aux_lock);
 	mutex_init(&adev->dm.dc_lock);
 
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	mutex_init(&adev->dm.audio_lock);
-#endif
 
 	spin_lock_init(&adev->dm.dmub_lock);
 
@@ -957,9 +953,7 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 		adev->dm.power_module = NULL;
 	}
 
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	mutex_destroy(&adev->dm.audio_lock);
-#endif
 	mutex_destroy(&adev->dm.dc_lock);
 	mutex_destroy(&adev->dm.dpia_aux_lock);
 }
@@ -2271,11 +2265,9 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 		return -ENOMEM;
 #endif
 
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	r = amdgpu_dm_audio_init(adev);
 	if (r)
 		return r;
-#endif
 
 	return 0;
 }
@@ -5290,10 +5282,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_commit *state)
 		acrtc->wb_enabled = true;
 	}
 
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	/* Update audio instances for each connector. */
 	amdgpu_dm_commit_audio(dev, state);
-#endif
 
 	/* restore the backlight level */
 	for (i = 0; i < dm->num_of_edps; i++) {
