@@ -56,6 +56,7 @@
 #include <kcl/kcl_drm_prime.h>
 #include <kcl/kcl_acpi_table.h>
 #include <kcl/kcl_drm_fourcc.h>
+#include <kcl/backport/kcl_drm_mm_backport.h>
 #include "kcl/kcl_amdgpu_drm_fb_helper.h"
 #include "kcl/kcl_amdgpu.h"
 #include "kcl/kcl_amdgpu_drm_drv.h"
