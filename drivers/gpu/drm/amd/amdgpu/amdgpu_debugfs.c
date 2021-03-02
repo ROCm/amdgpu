@@ -2140,11 +2140,13 @@ out:
 	return ret;
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(fops_ib_preempt, NULL,
 			amdgpu_debugfs_ib_preempt, "%llu\n");
 
 DEFINE_DEBUGFS_ATTRIBUTE(fops_sclk_set, NULL,
 			amdgpu_debugfs_sclk_set, "%llu\n");
+#endif
 
 int amdgpu_debugfs_init(struct amdgpu_device *adev)
 {
@@ -2155,6 +2157,7 @@ int amdgpu_debugfs_init(struct amdgpu_device *adev)
 	if (!debugfs_initialized())
 		return 0;
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_x32("amdgpu_smu_debug", 0600, root,
 			   &adev->pm.smu_debug_mask);
 
@@ -2176,6 +2179,7 @@ int amdgpu_debugfs_init(struct amdgpu_device *adev)
 			"unable to create amdgpu_set_sclk debugsfs file\n");
 		return PTR_ERR(ent);
 	}
+#endif
 
 	/* Register debugfs entries for amdgpu_ttm */
 	amdgpu_ttm_debugfs_init(adev);
