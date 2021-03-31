@@ -888,8 +888,8 @@
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */
 
-/* timer_setup() is available */
-#define HAVE_TIMER_SETUP 1
+/* sysfs_emit() is available */
+#define HAVE_SYSFS_EMIT 1
 
 /* interval_tree_insert have struct rb_root_cached */
 #define HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED 1
