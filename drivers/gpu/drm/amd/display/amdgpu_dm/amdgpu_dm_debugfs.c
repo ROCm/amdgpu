@@ -576,6 +576,7 @@ static ssize_t dp_phy_settings_read(struct file *f, char __user *buf,
 	return result;
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 static int dp_lttpr_status_show(struct seq_file *m, void *unused)
 {
 	struct drm_connector *connector = m->private;
@@ -610,6 +611,7 @@ static int dp_lttpr_status_show(struct seq_file *m, void *unused)
 	seq_puts(m, "\n");
 	return 0;
 }
+#endif
 
 static ssize_t dp_phy_settings_write(struct file *f, const char __user *buf,
 				 size_t size, loff_t *pos)
@@ -2986,7 +2988,9 @@ static ssize_t hdmi_cec_state_write(struct file *f, const char __user *buf,
 DEFINE_SHOW_ATTRIBUTE(dp_dsc_fec_support);
 DEFINE_SHOW_ATTRIBUTE(dmub_fw_state);
 DEFINE_SHOW_ATTRIBUTE(dmub_tracebuffer);
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_SHOW_ATTRIBUTE(dp_lttpr_status);
+#endif
 DEFINE_SHOW_ATTRIBUTE(hdcp_sink_capability);
 DEFINE_SHOW_ATTRIBUTE(internal_display);
 DEFINE_SHOW_ATTRIBUTE(odm_combine_segments);
@@ -3106,7 +3110,9 @@ static const struct {
 } dp_debugfs_entries[] = {
 		{"link_settings", &dp_link_settings_debugfs_fops},
 		{"phy_settings", &dp_phy_settings_debugfs_fop},
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 		{"lttpr_status", &dp_lttpr_status_fops},
+#endif
 		{"test_pattern", &dp_phy_test_pattern_fops},
 		{"hdcp_sink_capability", &hdcp_sink_capability_fops},
 		{"sdp_message", &sdp_message_fops},
