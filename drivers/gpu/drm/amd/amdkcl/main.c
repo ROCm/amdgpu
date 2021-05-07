@@ -10,6 +10,7 @@ extern void amdkcl_io_init(void);
 extern void amdkcl_mm_init(void);
 extern void amdkcl_pci_init(void);
 extern void amdkcl_suspend_init(void);
+extern void amdkcl_numa_init(void);
 
 int __init amdkcl_init(void)
 {
@@ -21,6 +22,7 @@ int __init amdkcl_init(void)
 	amdkcl_mm_init();
 	amdkcl_pci_init();
 	amdkcl_suspend_init();
+	amdkcl_numa_init();
 
 	return 0;
 }
