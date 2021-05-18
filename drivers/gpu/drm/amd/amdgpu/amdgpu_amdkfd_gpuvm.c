@@ -835,6 +835,7 @@ static int kfd_mem_export_dmabuf(struct kgd_mem *mem)
 	return 0;
 }
 
+#ifdef AMDKCL_AMDGPU_DMABUF_OPS
 static int
 kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 		      struct amdgpu_bo **bo)
@@ -855,6 +856,7 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 
 	return 0;
 }
+#endif
 
 /* kfd_mem_attach - Add a BO to a VM
  *
@@ -946,6 +948,7 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 			ret = create_dmamap_sg_bo(adev, mem, &bo[i]);
 			if (ret)
 				goto unwind;
+#ifdef AMDKCL_AMDGPU_DMABUF_OPS
 		/* Enable acces to GTT and VRAM BOs of peer devices */
 		} else if (mem->domain == AMDGPU_GEM_DOMAIN_GTT ||
 			   mem->domain == AMDGPU_GEM_DOMAIN_VRAM) {
@@ -954,6 +957,7 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 			if (ret)
 				goto unwind;
 			pr_debug("Employ DMABUF mechanism to enable peer GPU access\n");
+#endif
 		} else {
 			WARN_ONCE(true, "Handling invalid ATTACH request");
 			ret = -EINVAL;
