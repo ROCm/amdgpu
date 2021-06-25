@@ -279,6 +279,7 @@ void dcn31_init_hw(struct dc *dc)
 	dc->caps.dmub_caps.mclk_sw = dc->ctx->dmub_srv->dmub->feature_caps.fw_assisted_mclk_switch_ver;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void dcn31_dsc_pg_control(
 		struct dce_hwseq *hws,
 		unsigned int dsc_inst,
@@ -341,6 +342,7 @@ void dcn31_dsc_pg_control(
 	}
 
 }
+#endif
 
 
 void dcn31_enable_power_gating_plane(
