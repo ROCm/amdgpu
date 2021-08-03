@@ -252,7 +252,7 @@ void amdgpu_amdkfd_interrupt(struct amdgpu_device *adev,
 void amdgpu_amdkfd_suspend(struct amdgpu_device *adev, bool suspend_proc)
 {
 	if (adev->kfd.dev)
-		kgd2kfd_suspend(adev->kfd.dev, suspend_proc);
+		kgd2kfd_suspend(adev->kfd.dev, suspend_proc, true);
 }
 
 int amdgpu_amdkfd_resume(struct amdgpu_device *adev, bool resume_proc)
@@ -268,7 +268,7 @@ int amdgpu_amdkfd_resume(struct amdgpu_device *adev, bool resume_proc)
 void amdgpu_amdkfd_suspend_process(struct amdgpu_device *adev)
 {
 	if (adev->kfd.dev)
-		kgd2kfd_suspend_process(adev->kfd.dev);
+		kgd2kfd_suspend_process(adev->kfd.dev, true);
 }
 
 int amdgpu_amdkfd_resume_process(struct amdgpu_device *adev)
