@@ -16,5 +16,6 @@
 #include <kcl/kcl_sched_mm.h>
 #include <kcl/kcl_seq_file.h>
 #include <kcl/kcl_io-mapping.h>
+#include <kcl/kcl_highmem-internal.h>
 
 #endif
