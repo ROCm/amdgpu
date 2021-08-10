@@ -83,4 +83,9 @@ void drm_dp_set_subconnector_property(struct drm_connector *connector, enum drm_
 #define DRM_MODE_SUBCONNECTOR_Wireless 18
 #endif /* HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY */
 
+#ifndef HAVE_DRM_CONNECTOR_ATOMIC_HDR_METADATA_EQUAL
+bool drm_connector_atomic_hdr_metadata_equal(struct drm_connector_state *old_state,
+                                            struct drm_connector_state *new_state);
+#endif
+
 #endif /* AMDKCL_DRM_CONNECTOR_H */
