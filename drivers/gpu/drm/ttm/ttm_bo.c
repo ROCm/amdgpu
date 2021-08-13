@@ -425,8 +425,7 @@ bool ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 {
 	struct ttm_resource *res = bo->resource;
 
-	dma_resv_assert_held(bo->base.resv);
-
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 	if (res->mem_type == TTM_PL_SYSTEM)
 		return true;
 
