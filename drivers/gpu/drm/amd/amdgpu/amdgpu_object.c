@@ -1053,8 +1053,10 @@ void amdgpu_bo_unpin(struct amdgpu_bo *bo)
 	if (bo->tbo.pin_count)
 		return;
 
+#ifdef HAVE_DMA_BUF_UNPIN
 	if (drm_gem_is_imported(&bo->tbo.base))
 		dma_buf_unpin(bo->tbo.base.import_attach);
+#endif
 
 	if (bo->tbo.resource->mem_type == TTM_PL_VRAM) {
 		atomic64_sub(amdgpu_bo_size(bo), &adev->vram_pin_size);
