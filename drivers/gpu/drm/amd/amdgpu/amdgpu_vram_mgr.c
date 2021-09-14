@@ -214,7 +214,11 @@ static DEVICE_ATTR(mem_info_vis_vram_used, S_IRUGO,
 static DEVICE_ATTR(mem_info_vram_vendor, S_IRUGO,
 		   amdgpu_mem_info_vram_vendor, NULL);
 
+#ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 static struct attribute *amdgpu_vram_mgr_attributes[] = {
+#else
+static const struct attribute *amdgpu_vram_mgr_attributes[] = {
+#endif
 	&dev_attr_mem_info_vram_total.attr,
 	&dev_attr_mem_info_vis_vram_total.attr,
 	&dev_attr_mem_info_vram_used.attr,
@@ -223,6 +227,7 @@ static struct attribute *amdgpu_vram_mgr_attributes[] = {
 	NULL
 };
 
+#ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 static umode_t amdgpu_vram_attrs_is_visible(struct kobject *kobj,
 					    struct attribute *attr, int i)
 {
@@ -244,6 +249,7 @@ const struct attribute_group amdgpu_vram_mgr_attr_group = {
 	.attrs = amdgpu_vram_mgr_attributes,
 	.is_visible = amdgpu_vram_attrs_is_visible
 };
+#endif
 
 /**
  * amdgpu_vram_mgr_vis_size - Calculate visible block size
@@ -916,6 +922,9 @@ int amdgpu_vram_mgr_init(struct amdgpu_device *adev)
 	struct amdgpu_vram_mgr *mgr = &adev->mman.vram_mgr;
 	struct ttm_resource_manager *man = &mgr->manager;
 	int err;
+#ifndef HAVE_PCI_DRIVER_DEV_GROUPS
+	int ret;
+#endif
 
 	man->cg = drmm_cgroup_register_region(adev_to_drm(adev), "vram", adev->gmc.real_vram_size);
 	if (IS_ERR(man->cg))
@@ -928,6 +937,12 @@ int amdgpu_vram_mgr_init(struct amdgpu_device *adev)
 	INIT_LIST_HEAD(&mgr->reserved_pages);
 	INIT_LIST_HEAD(&mgr->allocated_vres_list);
 	mgr->default_page_size = PAGE_SIZE;
+#ifndef HAVE_PCI_DRIVER_DEV_GROUPS
+	/* Add the two VRAM-related sysfs files */
+	ret = sysfs_create_files(&adev->dev->kobj, amdgpu_vram_mgr_attributes);
+	if (ret)
+		DRM_ERROR("Failed to register sysfs\n");
+#endif
 
 	man->func = &amdgpu_vram_mgr_func;
 	err = drm_buddy_init(&mgr->mm, man->size, PAGE_SIZE);
@@ -972,6 +987,9 @@ void amdgpu_vram_mgr_fini(struct amdgpu_device *adev)
 		drm_buddy_fini(&mgr->mm);
 	mutex_unlock(&mgr->lock);
 
+#ifndef HAVE_PCI_DRIVER_DEV_GROUPS
+	sysfs_remove_files(&adev->dev->kobj, amdgpu_vram_mgr_attributes);
+#endif
 	ttm_resource_manager_cleanup(man);
 	ttm_set_driver_manager(&adev->mman.bdev, TTM_PL_VRAM, NULL);
 }

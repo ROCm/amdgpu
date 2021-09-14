@@ -1830,6 +1830,7 @@ static DEVICE_ATTR(vbios_version, 0444, amdgpu_atombios_get_vbios_version,
 		   NULL);
 static DEVICE_ATTR(vbios_build, 0444, amdgpu_atombios_get_vbios_build, NULL);
 
+#ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 static struct attribute *amdgpu_vbios_version_attrs[] = {
 	&dev_attr_vbios_version.attr, &dev_attr_vbios_build.attr, NULL
 };
@@ -1853,6 +1854,7 @@ const struct attribute_group amdgpu_vbios_version_attr_group = {
 	.attrs = amdgpu_vbios_version_attrs,
 	.is_visible = amdgpu_vbios_version_attrs_is_visible,
 };
+#endif
 
 int amdgpu_atombios_sysfs_init(struct amdgpu_device *adev)
 {
@@ -1882,6 +1884,9 @@ void amdgpu_atombios_fini(struct amdgpu_device *adev)
 	adev->mode_info.atom_context = NULL;
 	kfree(adev->mode_info.atom_card_info);
 	adev->mode_info.atom_card_info = NULL;
+#ifndef HAVE_PCI_DRIVER_DEV_GROUPS
+	device_remove_file(adev->dev, &dev_attr_vbios_version);
+#endif
 }
 
 /**
@@ -1898,6 +1903,9 @@ int amdgpu_atombios_init(struct amdgpu_device *adev)
 {
 	struct card_info *atom_card_info =
 	    kzalloc(sizeof(struct card_info), GFP_KERNEL);
+#ifndef HAVE_PCI_DRIVER_DEV_GROUPS
+	int ret;
+#endif
 
 	if (!atom_card_info)
 		return -ENOMEM;
@@ -1928,6 +1936,14 @@ int amdgpu_atombios_init(struct amdgpu_device *adev)
 		amdgpu_atombios_scratch_regs_init(adev);
 		amdgpu_atombios_allocate_fb_scratch(adev);
 	}
+
+#ifndef HAVE_PCI_DRIVER_DEV_GROUPS
+	ret = device_create_file(adev->dev, &dev_attr_vbios_version);
+	if (ret) {
+		DRM_ERROR("Failed to create device file for VBIOS version\n");
+		return ret;
+	}
+#endif
 
 	return 0;
 }
