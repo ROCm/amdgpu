@@ -78,6 +78,7 @@ static DEVICE_ATTR(mem_info_gtt_total, S_IRUGO,
 static DEVICE_ATTR(mem_info_gtt_used, S_IRUGO,
 	           amdgpu_mem_info_gtt_used_show, NULL);
 
+#ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 static struct attribute *amdgpu_gtt_mgr_attributes[] = {
 	&dev_attr_mem_info_gtt_total.attr,
 	&dev_attr_mem_info_gtt_used.attr,
@@ -87,6 +88,7 @@ static struct attribute *amdgpu_gtt_mgr_attributes[] = {
 const struct attribute_group amdgpu_gtt_mgr_attr_group = {
 	.attrs = amdgpu_gtt_mgr_attributes
 };
+#endif
 
 /**
  * amdgpu_gtt_mgr_has_gart_addr - Check if mem has address space
@@ -331,6 +333,9 @@ int amdgpu_gtt_mgr_init(struct amdgpu_device *adev, uint64_t gtt_size)
 {
 	struct amdgpu_gtt_mgr *mgr = &adev->mman.gtt_mgr;
 	struct ttm_resource_manager *man = &mgr->manager;
+#ifndef HAVE_PCI_DRIVER_DEV_GROUPS
+	int ret;
+#endif
 
 	man->use_tt = true;
 	man->func = &amdgpu_gtt_mgr_func;
@@ -339,6 +344,19 @@ int amdgpu_gtt_mgr_init(struct amdgpu_device *adev, uint64_t gtt_size)
 
 	drm_mm_init(&mgr->mm, 0, adev->gmc.gart_size >> PAGE_SHIFT);
 	spin_lock_init(&mgr->lock);
+
+#ifndef HAVE_PCI_DRIVER_DEV_GROUPS
+	ret = device_create_file(adev->dev, &dev_attr_mem_info_gtt_total);
+	if (ret) {
+		DRM_ERROR("Failed to create device file mem_info_gtt_total\n");
+		return ret;
+	}
+	ret = device_create_file(adev->dev, &dev_attr_mem_info_gtt_used);
+	if (ret) {
+		DRM_ERROR("Failed to create device file mem_info_gtt_used\n");
+		return ret;
+	}
+#endif
 
 	ttm_set_driver_manager(&adev->mman.bdev, TTM_PL_TT, &mgr->manager);
 	ttm_resource_manager_set_used(man, true);
@@ -368,7 +386,10 @@ void amdgpu_gtt_mgr_fini(struct amdgpu_device *adev)
 	spin_lock(&mgr->lock);
 	drm_mm_takedown(&mgr->mm);
 	spin_unlock(&mgr->lock);
-
+#ifndef HAVE_PCI_DRIVER_DEV_GROUPS
+	device_remove_file(adev->dev, &dev_attr_mem_info_gtt_total);
+	device_remove_file(adev->dev, &dev_attr_mem_info_gtt_used);
+#endif
 	ttm_resource_manager_cleanup(man);
 	ttm_set_driver_manager(&adev->mman.bdev, TTM_PL_TT, NULL);
 }
