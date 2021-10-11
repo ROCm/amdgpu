@@ -2612,6 +2612,9 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	kcl_pci_remove_measure_file(pdev);
 	pci_disable_device(pdev);
 	pci_wait_for_pending_transaction(pdev);
+#ifdef AMDKCL_DEVM_DRM_DEV_ALLOC
+	amdkcl_drm_dev_release(dev);
+#endif
 }
 
 #ifndef HAVE_DRM_DRM_MANAGED_H
