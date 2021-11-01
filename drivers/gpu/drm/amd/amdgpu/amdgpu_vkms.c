@@ -137,6 +137,7 @@ static const struct drm_crtc_funcs amdgpu_vkms_crtc_funcs = {
 #endif
 };
 
+#ifndef DRM_CRTC_VBLANK_TIMER_FUNCS
 static void amdgpu_vkms_crtc_atomic_enable(struct drm_crtc *crtc,
 #if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE)
 					   struct drm_atomic_state *state)
@@ -179,8 +180,40 @@ static void amdgpu_vkms_crtc_atomic_flush(struct drm_crtc *crtc,
 	}
 }
 
+static void amdgpu_vkms_crtc_dpms(struct drm_crtc *crtc, int mode)
+{
+       struct drm_device *dev = crtc->dev;
+       struct amdgpu_device *adev = drm_to_adev(dev);
+       struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
+       unsigned type;
+
+       switch (mode) {
+       case DRM_MODE_DPMS_ON:
+               amdgpu_crtc->enabled = true;
+               /* Make sure VBLANK interrupts are still enabled */
+               type = amdgpu_display_crtc_idx_to_irq_type(adev,
+                                               amdgpu_crtc->crtc_id);
+               amdgpu_irq_update(adev, &adev->crtc_irq, type);
+               drm_crtc_vblank_on(crtc);
+               break;
+       case DRM_MODE_DPMS_STANDBY:
+       case DRM_MODE_DPMS_SUSPEND:
+       case DRM_MODE_DPMS_OFF:
+               drm_crtc_vblank_off(crtc);
+               amdgpu_crtc->enabled = false;
+               break;
+       }
+}
+#endif
+
 static const struct drm_crtc_helper_funcs amdgpu_vkms_crtc_helper_funcs = {
+#ifndef DRM_CRTC_VBLANK_TIMER_FUNCS
+	.atomic_flush	= amdgpu_vkms_crtc_atomic_flush,
+	.atomic_enable	= amdgpu_vkms_crtc_atomic_enable,
+	.atomic_disable	= amdgpu_vkms_crtc_atomic_disable,
+#else
 	DRM_CRTC_HELPER_VBLANK_FUNCS,
+#endif
 };
 
 static int amdgpu_vkms_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
