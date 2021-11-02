@@ -43,6 +43,80 @@ static const u32 amdgpu_vkms_formats[] = {
 	DRM_FORMAT_XRGB8888,
 };
 
+static enum hrtimer_restart amdgpu_vkms_vblank_simulate(struct hrtimer *timer)
+{
+	struct amdgpu_crtc *amdgpu_crtc = container_of(timer, struct amdgpu_crtc, vblank_timer);
+	struct drm_crtc *crtc = &amdgpu_crtc->base;
+	struct amdgpu_vkms_output *output = drm_crtc_to_amdgpu_vkms_output(crtc);
+	u64 ret_overrun;
+	bool ret;
+
+	ret_overrun = hrtimer_forward_now(&amdgpu_crtc->vblank_timer,
+					  output->period_ns);
+	if (ret_overrun != 1)
+		drm_warn(amdgpu_crtc->base.dev,
+			 "%s: vblank timer overrun count: %llu\n",
+			 __func__, ret_overrun);
+
+	ret = drm_crtc_handle_vblank(crtc);
+	/* Don't queue timer again when vblank is disabled. */
+	if (!ret)
+		return HRTIMER_NORESTART;
+
+	return HRTIMER_RESTART;
+}
+
+static int amdgpu_vkms_enable_vblank(struct drm_crtc *crtc)
+{
+	struct drm_vblank_crtc *vblank = drm_crtc_vblank_crtc(crtc);
+	struct amdgpu_vkms_output *out = drm_crtc_to_amdgpu_vkms_output(crtc);
+	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
+
+	drm_calc_timestamping_constants(crtc, &crtc->mode);
+
+	out->period_ns = ktime_set(0, vblank->framedur_ns);
+	hrtimer_start(&amdgpu_crtc->vblank_timer, out->period_ns, HRTIMER_MODE_REL);
+
+	return 0;
+}
+
+static void amdgpu_vkms_disable_vblank(struct drm_crtc *crtc)
+{
+	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
+
+	hrtimer_try_to_cancel(&amdgpu_crtc->vblank_timer);
+}
+
+static bool amdgpu_vkms_get_vblank_timestamp(struct drm_crtc *crtc,
+					     int *max_error,
+					     ktime_t *vblank_time,
+					     bool in_vblank_irq)
+{
+	struct amdgpu_vkms_output *output = drm_crtc_to_amdgpu_vkms_output(crtc);
+	struct drm_vblank_crtc *vblank = drm_crtc_vblank_crtc(crtc);
+	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
+
+	if (!READ_ONCE(vblank->enabled)) {
+		*vblank_time = ktime_get();
+		return true;
+	}
+
+	*vblank_time = READ_ONCE(amdgpu_crtc->vblank_timer.node.expires);
+
+	if (WARN_ON(ktime_to_us(*vblank_time) == ktime_to_us(vblank->time)))
+		return true;
+	/*
+	 * To prevent races we roll the hrtimer forward before we do any
+	 * interrupt processing - this is how real hw works (the interrupt is
+	 * only generated after all the vblank registers are updated) and what
+	 * the vblank core expects. Therefore we need to always correct the
+	 * timestampe by one frame.
+	 */
+
+	*vblank_time  = ktime_sub(*vblank_time, output->period_ns);
+	return true;
+}
+
 static const struct drm_crtc_funcs amdgpu_vkms_crtc_funcs = {
 	.set_config             = drm_atomic_helper_set_config,
 	.destroy                = drm_crtc_cleanup,
