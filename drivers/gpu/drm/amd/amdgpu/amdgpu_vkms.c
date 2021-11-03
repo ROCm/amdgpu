@@ -131,19 +131,31 @@ static const struct drm_crtc_funcs amdgpu_vkms_crtc_funcs = {
 };
 
 static void amdgpu_vkms_crtc_atomic_enable(struct drm_crtc *crtc,
+#if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE)
 					   struct drm_atomic_state *state)
+#else
+					   struct drm_crtc_state *state)
+#endif
 {
 	drm_crtc_vblank_on(crtc);
 }
 
 static void amdgpu_vkms_crtc_atomic_disable(struct drm_crtc *crtc,
-					    struct drm_atomic_state *state)
+#if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE)
+					   struct drm_atomic_state *state)
+#else
+					   struct drm_crtc_state *state)
+#endif
 {
 	drm_crtc_vblank_off(crtc);
 }
 
 static void amdgpu_vkms_crtc_atomic_flush(struct drm_crtc *crtc,
-					  struct drm_atomic_state *state)
+#if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
+					   struct drm_atomic_state *state)
+#else
+					   struct drm_crtc_state *state)
+#endif
 {
 	unsigned long flags;
 	if (crtc->state->event) {
