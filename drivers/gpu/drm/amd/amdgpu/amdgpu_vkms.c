@@ -137,6 +137,48 @@ static const struct drm_crtc_funcs amdgpu_vkms_crtc_funcs = {
 #endif
 };
 
+static void amdgpu_vkms_crtc_atomic_enable(struct drm_crtc *crtc,
+#if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE)
+					   struct drm_atomic_state *state)
+#else
+					   struct drm_crtc_state *state)
+#endif
+{
+	drm_crtc_vblank_on(crtc);
+}
+
+static void amdgpu_vkms_crtc_atomic_disable(struct drm_crtc *crtc,
+#if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE)
+					   struct drm_atomic_state *state)
+#else
+					   struct drm_crtc_state *state)
+#endif
+{
+	drm_crtc_vblank_off(crtc);
+}
+
+static void amdgpu_vkms_crtc_atomic_flush(struct drm_crtc *crtc,
+#if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
+					   struct drm_atomic_state *state)
+#else
+					   struct drm_crtc_state *state)
+#endif
+{
+	unsigned long flags;
+	if (crtc->state->event) {
+		spin_lock_irqsave(&crtc->dev->event_lock, flags);
+
+		if (drm_crtc_vblank_get(crtc) != 0)
+			drm_crtc_send_vblank_event(crtc, crtc->state->event);
+		else
+			drm_crtc_arm_vblank_event(crtc, crtc->state->event);
+
+		spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
+
+		crtc->state->event = NULL;
+	}
+}
+
 static const struct drm_crtc_helper_funcs amdgpu_vkms_crtc_helper_funcs = {
 	DRM_CRTC_HELPER_VBLANK_FUNCS,
 };
