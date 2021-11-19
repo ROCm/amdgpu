@@ -4750,6 +4750,9 @@ fence_driver_init:
 	/* Get a log2 for easy divisions. */
 	adev->mm_stats.log2_max_MBps = ilog2(max(1u, max_MBps));
 
+#ifndef AMDKCL_DRM_FBDEV_GENERIC
+	amdgpu_fbdev_init(adev);
+#endif
 	/*
 	 * Register gpu instance before amdgpu_device_enable_mgpu_fan_boost.
 	 * Otherwise the mgpu fan boost feature will be skipped due to the
@@ -4916,6 +4919,9 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 
 	amdgpu_device_sys_interface_fini(adev);
 
+#ifndef AMDKCL_DRM_FBDEV_GENERIC
+	amdgpu_fbdev_fini(adev);
+#endif
 	/* disable ras feature must before hw fini */
 	amdgpu_ras_pre_fini(adev);
 
