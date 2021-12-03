@@ -135,8 +135,7 @@ err_fences_put:
 	return -ENOMEM;
 }
 
-#if !defined(HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING) && \
-	!defined(HAVE_STRUCT_DMA_BUF_OPS_PIN)
+#if defined(HAVE_DMA_BUF_OPS_LEGACY)
 /**
  * amdgpu_dma_buf_map_attach - &dma_buf_ops.attach implementation
  * @dma_buf: Shared DMA buffer
@@ -555,8 +554,7 @@ static void amdgpu_dma_buf_vunmap(struct dma_buf *dma_buf, struct iosys_map *map
 }
 
 const struct dma_buf_ops amdgpu_dmabuf_ops = {
-#if !defined(HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING) && \
-	!defined(HAVE_STRUCT_DMA_BUF_OPS_PIN)
+#if defined(HAVE_DMA_BUF_OPS_LEGACY)
 	.attach = amdgpu_dma_buf_map_attach,
 	.detach = amdgpu_dma_buf_map_detach,
 	.map_dma_buf = drm_gem_map_dma_buf,
