@@ -87,6 +87,8 @@ static void evict_process_worker(struct work_struct *work);
 static void restore_process_worker(struct work_struct *work);
 
 static void kfd_process_device_destroy_cwsr_dgpu(struct kfd_process_device *pdd);
+static void kfd_sysfs_create_file(struct kobject *kobj, struct attribute *attr,
+				char *name);
 
 struct kfd_procfs_tree {
 	struct kobject *kobj;
@@ -552,6 +554,10 @@ int kfd_procfs_add_queue(struct queue *q)
 		return ret;
 	}
 
+	kfd_sysfs_create_file(&q->kobj, &q->attr_guid, "guid");
+	kfd_sysfs_create_file(&q->kobj, &q->attr_size, "size");
+	kfd_sysfs_create_file(&q->kobj, &q->attr_type, "type");
+
 	return 0;
 }
 
@@ -695,6 +701,10 @@ void kfd_procfs_del_queue(struct queue *q)
 {
 	if (!q || !q->process->kobj)
 		return;
+
+	sysfs_remove_file(&q->kobj, &q->attr_guid);
+	sysfs_remove_file(&q->kobj, &q->attr_size);
+	sysfs_remove_file(&q->kobj, &q->attr_type);
 
 	kobject_del(&q->kobj);
 	kobject_put(&q->kobj);
