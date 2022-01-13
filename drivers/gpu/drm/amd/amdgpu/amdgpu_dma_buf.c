@@ -191,8 +191,6 @@ static int amdgpu_dma_buf_map_attach(struct dma_buf *dma_buf,
 	if (r)
 		goto error_unreserve;
 
-	if (attach->dev->driver != adev->dev->driver)
-		bo->prime_shared_count++;
 
 error_unreserve:
 	amdgpu_bo_unreserve(bo);
@@ -224,8 +222,6 @@ static void amdgpu_dma_buf_map_detach(struct dma_buf *dma_buf,
 		goto error;
 
 	amdgpu_bo_unpin(bo);
-	if (attach->dev->driver != adev->dev->driver && bo->prime_shared_count)
-		bo->prime_shared_count--;
 	amdgpu_bo_unreserve(bo);
 
 error:
@@ -709,11 +705,6 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	bo->tbo.ttm->sg = sg;
 	bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
 	bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
-#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
-	if (attach->dmabuf->ops != &amdgpu_dmabuf_ops)
-#endif
-		bo->prime_shared_count = 1;
-
 	dma_resv_unlock(resv);
 	return &bo->tbo.base;
 
@@ -964,8 +955,6 @@ int amdgpu_gem_prime_pin(struct drm_gem_object *obj)
 
 	/* pin buffer into GTT */
 	ret = amdgpu_bo_pin(bo, AMDGPU_GEM_DOMAIN_GTT);
-	if (likely(ret == 0))
-		bo->prime_shared_count++;
 
 	amdgpu_bo_unreserve(bo);
 	return ret;
@@ -981,8 +970,6 @@ void amdgpu_gem_prime_unpin(struct drm_gem_object *obj)
 		return;
 
 	amdgpu_bo_unpin(bo);
-	if (bo->prime_shared_count)
-		bo->prime_shared_count--;
 	amdgpu_bo_unreserve(bo);
 }
 #endif
