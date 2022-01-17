@@ -642,6 +642,9 @@
 /* drm_driver->gem_free_object_unlocked() is available */
 /* #undef HAVE_GEM_FREE_OBJECT_UNLOCKED_IN_DRM_DRIVER */
 
+/* generic_handle_domain_irq() is available */
+#define HAVE_GENERIC_HANDLE_DOMAIN_IRQ 1
+
 /* get_user_pages() wants 6 args */
 /* #undef HAVE_GET_USER_PAGES_6ARGS */
 
