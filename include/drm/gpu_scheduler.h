@@ -355,8 +355,10 @@ struct drm_sched_job {
 
 	enum drm_sched_priority		s_priority;
 	u32				credits;
+#ifdef HAVE_STRUCT_XARRAY
 	/** @last_dependency: tracks @dependencies as they signal */
 	unsigned int			last_dependency;
+#endif
 	atomic_t			karma;
 
 	struct spsc_node		queue_node;
@@ -380,7 +382,9 @@ struct drm_sched_job {
 	 * drm_sched_job_add_dependency() and
 	 * drm_sched_job_add_implicit_dependencies().
 	 */
+#ifdef HAVE_STRUCT_XARRAY
 	struct xarray			dependencies;
+#endif
 };
 
 enum drm_gpu_sched_stat {
@@ -590,6 +594,7 @@ int drm_sched_job_init(struct drm_sched_job *job,
 		       u32 credits, void *owner);
 void drm_sched_job_arm(struct drm_sched_job *job);
 void drm_sched_entity_push_job(struct drm_sched_job *sched_job);
+
 int drm_sched_job_add_dependency(struct drm_sched_job *job,
 				 struct dma_fence *fence);
 int drm_sched_job_add_syncobj_dependency(struct drm_sched_job *job,
