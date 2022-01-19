@@ -1085,8 +1085,11 @@
 /* zone_managed_pages() is available */
 #define HAVE_ZONE_MANAGED_PAGES 1
 
-/* bitmap_free() is available */
-#define HAVE_BITMAP_FUNCS 1
+/* __dma_fence_is_later() is available and has 2 args */
+/* #undef HAVE__DMA_FENCE_IS_LATER_2ARGS */
+
+/* __dma_fence_is_later() is available and has ops arg */
+#define HAVE__DMA_FENCE_IS_LATER_WITH_OPS_ARG 1
 
 /* __drm_atomic_helper_connector_destroy_state() wants 1 arg */
 #define HAVE___DRM_ATOMIC_HELPER_CONNECTOR_DESTROY_STATE_P 1
