@@ -29,8 +29,7 @@
 #define drm_fb_helper_remove_conflicting_pci_framebuffers _kcl_drm_fb_helper_remove_conflicting_pci_framebuffers
 #endif
 
-#if defined(HAVE_DRM_FBDEV_GENERIC_SETUP) &&			\
-	DRM_VERSION_CODE >= DRM_VERSION(5, 15, 0)
+#if defined(HAVE_DRM_FBDEV_GENERIC_SETUP)
 #define AMDKCL_DRM_FBDEV_GENERIC
 #endif
 
