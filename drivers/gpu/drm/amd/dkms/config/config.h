@@ -479,15 +479,6 @@
 /* whether drm_fb_helper_lastclose() is available */
 #define HAVE_DRM_FB_HELPER_LASTCLOSE 1
 
-/* drm_fb_helper_remove_conflicting_pci_framebuffers() is available */
-/* #undef HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS */
-
-/* drm_fb_helper_remove_conflicting_pci_framebuffers() wants p,i,p args */
-/* #undef HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PIP */
-
-/* drm_fb_helper_remove_conflicting_pci_framebuffers() wants p,p args */
-/* #undef HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP */
-
 /* drm_fb_helper_set_suspend_unlocked() is available */
 #define HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED 1
 
@@ -933,15 +924,14 @@
 /* pxm_to_node() is available */
 #define HAVE_PXM_TO_NODE 1
 
-/* remove_conflicting_framebuffers() returns int */
-#define HAVE_REMOVE_CONFLICTING_FRAMEBUFFERS_RETURNS_INT 1
+/* remove_conflicting_pci_framebuffers() is available */
+/* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS */
 
-/* remove_conflicting_pci_framebuffers() is available and doesn't have res_id
-   arg */
-#define HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_NO_RES_ID_ARG 1
+/* remove_conflicting_pci_framebuffers() wants p,i,p args */
+/* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PIP */
 
-/* remove_conflicting_pci_framebuffers() is available and has res_id arg */
-/* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_WITH_RES_ID_ARG */
+/* remove_conflicting_pci_framebuffers() wants p,p args */
+/* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP */
 
 /* sched_set_fifo_low() is available */
 #define HAVE_SCHED_SET_FIFO_LOW 1
