@@ -78,4 +78,10 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl # dma-buf: add new dma_fence_chain container v7
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/dma-fence-chain.h])
+
+	dnl #
+	dnl # v5.15-272-gd2a8ebbf8192
+	dnl # kernel.h: split out container_of() and typeof_member() macros
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([linux/container_of.h])
 ])
