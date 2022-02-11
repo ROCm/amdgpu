@@ -618,6 +618,12 @@ out_put:
 	return r;
 }
 
+uint64_t amdgpu_amdkfd_get_vram_usage(struct amdgpu_device *adev)
+{
+
+        return amdgpu_vram_mgr_usage(&adev->mman.vram_mgr);
+}
+
 int amdgpu_amdkfd_get_pcie_bandwidth_mbytes(struct amdgpu_device *adev, bool is_min)
 {
 	int num_lanes_shift = (is_min ? ffs(adev->pm.pcie_mlw_mask) :
