@@ -1778,7 +1778,7 @@ struct amdgpu_bo_va *amdgpu_vm_bo_add(struct amdgpu_device *adev,
 	if (!bo)
 		return bo_va;
 
-	dma_resv_assert_held(bo->tbo.base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(&bo->tbo));
 	if (amdgpu_dmabuf_is_xgmi_accessible(adev, bo)) {
 		bo_va->is_xgmi = true;
 		/* Power up XGMI if it can be potentially used */
@@ -2211,10 +2211,10 @@ void amdgpu_vm_bo_del(struct amdgpu_device *adev,
 	struct amdgpu_vm *vm = bo_va->base.vm;
 	struct amdgpu_vm_bo_base **base;
 
-	dma_resv_assert_held(vm->root.bo->tbo.base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(&vm->root.bo->tbo));
 
 	if (bo) {
-		dma_resv_assert_held(bo->tbo.base.resv);
+		dma_resv_assert_held(amdkcl_ttm_resvp(&bo->tbo));
 		if (amdgpu_vm_is_bo_always_valid(vm, bo))
 			ttm_bo_set_bulk_move(&bo->tbo, NULL);
 
