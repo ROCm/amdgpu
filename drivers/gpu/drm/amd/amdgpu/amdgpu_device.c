@@ -1389,7 +1389,11 @@ bool amdgpu_device_should_use_aspm(struct amdgpu_device *adev)
 		return false;
 	if (amdgpu_device_aspm_support_quirk(adev))
 		return false;
+#ifdef HAVE_PCIE_ASPM_ENABLED
 	return pcie_aspm_enabled(adev->pdev);
+#else
+	return false;
+#endif
 }
 
 /* if we get transitioned to only one device, take VGA back */
