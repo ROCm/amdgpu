@@ -81,5 +81,5 @@
 #include <kcl/kcl_pci.h>
 #include <kcl/kcl_cc_platform.h>
 #include <kcl/kcl_module.h>
-
+#include <kcl/kcl_stddef.h>
 #endif /* AMDGPU_BACKPORT_H */
