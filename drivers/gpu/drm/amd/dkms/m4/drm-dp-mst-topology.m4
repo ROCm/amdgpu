@@ -15,7 +15,11 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY], [
 	dnl #
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
+			#ifdef HAVE_DRM_DP_DRM_DP_MST_HELPER_H
+			#include <drm/dp/drm_dp_mst_helper.h>
+			#else
 			#include <drm/drm_dp_mst_helper.h>
+			#endif
 		], [
 			drm_dp_mst_get_port_malloc(NULL);
 			drm_dp_mst_put_port_malloc(NULL);
@@ -30,7 +34,11 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY], [
 	dnl #
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
+			#ifdef HAVE_DRM_DP_DRM_DP_MST_HELPER_H
+			#include <drm/dp/drm_dp_mst_helper.h>
+			#else
 			#include <drm/drm_dp_mst_helper.h>
+			#endif
 		], [
 			drm_dp_mst_connector_early_unregister(NULL, NULL);
 			drm_dp_mst_connector_late_register(NULL, NULL);
