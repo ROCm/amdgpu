@@ -104,9 +104,6 @@
 #include <drm/drm_vblank.h>
 #include <drm/drm_colorop.h>
 #include <drm/drm_gem_atomic_helper.h>
-#ifdef CONFIG_DRM_AMD_DC_HDCP
-#include <drm/drm_hdcp.h>
-#endif
 
 #include <media/cec-notifier.h>
 #include <acpi/video.h>
