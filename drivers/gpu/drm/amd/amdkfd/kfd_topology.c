@@ -1576,7 +1576,6 @@ static int kfd_create_indirect_link_prop(struct kfd_topology_device *kdev, int g
 	return ret;
 }
 
-#if defined(CONFIG_HSA_AMD_P2P)
 static int kfd_add_peer_prop(struct kfd_topology_device *kdev,
 		struct kfd_topology_device *peer, int from, int to)
 {
@@ -1644,16 +1643,12 @@ static int kfd_add_peer_prop(struct kfd_topology_device *kdev,
 
 	return ret;
 }
-#endif
 
 static int kfd_dev_create_p2p_links(void)
 {
 	struct kfd_topology_device *dev;
 	struct kfd_topology_device *new_dev;
-#if defined(CONFIG_HSA_AMD_P2P)
-	uint32_t i;
-#endif
-	uint32_t k;
+	uint32_t i, k;
 	int ret = 0;
 
 	k = 0;
@@ -1674,7 +1669,6 @@ static int kfd_dev_create_p2p_links(void)
 		goto out;
 
 	/* create p2p links */
-#if defined(CONFIG_HSA_AMD_P2P)
 	i = 0;
 	list_for_each_entry(dev, &topology_device_list, list) {
 		if (dev == new_dev)
@@ -1695,7 +1689,6 @@ static int kfd_dev_create_p2p_links(void)
 next:
 		i++;
 	}
-#endif
 
 out:
 	return ret;
