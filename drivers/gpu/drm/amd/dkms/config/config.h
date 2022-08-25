@@ -52,6 +52,9 @@
 /* bitmap_free() is available */
 #define HAVE_BITMAP_FUNCS 1
 
+/* bitmap_to_arr32() is available */
+#define HAVE_BITMAP_TO_ARR32 1
+
 /* cancel_work() is available */
 #define HAVE_CANCEL_WORK 1
 
@@ -544,10 +547,6 @@
 
 /* drm_format_info.block_w and rm_format_info.block_h is available */
 #define HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED 1
-
-/* whether struct drm_framebuffer have format */
-#define HAVE_DRM_FRAMEBUFFER_FORMAT 1
-
 
  /* drm_gem_plane_helper_prepare_fb() is available */
  #define HAVE_DRM_GEM_PLANE_HELPER_PREPARE_FB 1
