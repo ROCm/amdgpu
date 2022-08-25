@@ -103,7 +103,6 @@
 #include <drm/drm_utils.h>
 #include <drm/drm_vblank.h>
 #include <drm/drm_colorop.h>
-#include <drm/drm_gem_atomic_helper.h>
 
 #include <media/cec-notifier.h>
 #include <acpi/video.h>
