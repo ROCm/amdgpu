@@ -999,9 +999,11 @@ static int amdgpu_dm_plane_helper_prepare_fb(struct drm_plane *plane,
 		goto error_unpin;
 	}
 
+#ifdef HAVE_DRM_GEM_PLANE_HELPER_PREPARE_FB
 	r = drm_gem_plane_helper_prepare_fb(plane, new_state);
 	if (unlikely(r != 0))
 		goto error_unpin;
+#endif
 
 	amdgpu_bo_unreserve(rbo);
 
