@@ -42,6 +42,7 @@
 #include "amdgpu_ras.h"
 #include "amdgpu_hmm.h"
 #include "amdgpu_display.h"
+#include "amdgpu_hmm.h"
 
 static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p,
 				 struct amdgpu_device *adev,
