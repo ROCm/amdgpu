@@ -42,6 +42,7 @@
 #include "amdgpu_ras.h"
 #include "amdgpu_hmm.h"
 #include "amdgpu_display.h"
+#include "amdgpu_hmm.h"
 
 /*
  * Maximum IB length (dwords) for rings whose emit_ib packet format
