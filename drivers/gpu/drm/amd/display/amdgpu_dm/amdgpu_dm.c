@@ -4002,7 +4002,9 @@ static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 
 static struct drm_mode_config_helper_funcs amdgpu_dm_mode_config_helperfuncs = {
 	.atomic_commit_tail = amdgpu_dm_atomic_commit_tail,
+#ifdef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT
 	.atomic_commit_setup = amdgpu_dm_atomic_setup_commit,
+#endif
 };
 
 #define DDC_MANUFACTURERNAME_SAMSUNG 0x2D4C
