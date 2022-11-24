@@ -3769,7 +3769,9 @@ static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 	struct amdgpu_dm_backlight_caps *caps;
 	struct drm_connector *conn_base;
 	struct amdgpu_device *adev;
+#ifdef HAVE_DRM_DISPLAY_INFO_LUMINANCE_RANGE
 	struct drm_luminance_range_info *luminance_range;
+#endif
 	int min_input_signal_override;
 
 	if (aconnector->bl_idx == -1 ||
@@ -3798,6 +3800,7 @@ static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 	if (caps->aux_support)
 		aconnector->dc_link->backlight_control_type = BACKLIGHT_CONTROL_AMD_AUX;
 
+#ifdef HAVE_DRM_DISPLAY_INFO_LUMINANCE_RANGE
 	luminance_range = &conn_base->display_info.luminance_range;
 
 	if (luminance_range->max_luminance) {
@@ -3807,6 +3810,7 @@ static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 		caps->aux_min_input_signal = 0;
 		caps->aux_max_input_signal = 512;
 	}
+#endif
 
 	min_input_signal_override = drm_get_panel_min_brightness_quirk(aconnector->drm_edid);
 	if (min_input_signal_override >= 0)
