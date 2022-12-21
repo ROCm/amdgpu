@@ -11351,6 +11351,7 @@ static void amdgpu_dm_update_hdcp(struct drm_atomic_commit *state)
 			if (new_con_state->content_protection == DRM_MODE_CONTENT_PROTECTION_DESIRED)
 				enable_encryption = true;
 
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 			if (aconnector->dc_link && aconnector->dc_sink &&
 				aconnector->dc_link->type == dc_connection_mst_branch) {
 				struct hdcp_workqueue *hdcp_work = adev->dm.hdcp_workqueue;
@@ -11362,6 +11363,7 @@ static void amdgpu_dm_update_hdcp(struct drm_atomic_commit *state)
 				hdcp_w->content_protection[connector->index] =
 					new_con_state->content_protection;
 			}
+#endif
 
 			if (new_crtc_state && new_crtc_state->mode_changed &&
 				new_con_state->content_protection >= DRM_MODE_CONTENT_PROTECTION_DESIRED)
