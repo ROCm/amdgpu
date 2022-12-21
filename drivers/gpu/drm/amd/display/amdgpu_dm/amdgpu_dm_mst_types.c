@@ -514,6 +514,7 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		 * plugged back with same display index, its hdcp properties
 		 * will be retrieved from hdcp_work within dm_dp_mst_get_modes
 		 */
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 		if (connector->state) {
 			struct drm_device *dev = connector->dev;
 			struct amdgpu_device *adev = drm_to_adev(dev);
@@ -530,6 +531,7 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 				hdcp_w->content_protection[connector->index];
 			}
 		}
+#endif
 
 		amdgpu_dm_update_freesync_caps(
 				connector, aconnector->drm_edid, true);
