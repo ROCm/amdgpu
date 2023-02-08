@@ -48,7 +48,6 @@ void dp_set_drive_settings(
 	struct dc_link *link,
 	const struct link_resource *link_res,
 	struct link_training_settings *lt_settings);
-
 enum dc_status dp_set_fec_ready(struct dc_link *link,
 		const struct link_resource *link_res, bool ready);
 
