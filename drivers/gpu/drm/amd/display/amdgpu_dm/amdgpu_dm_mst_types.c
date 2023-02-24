@@ -294,7 +294,6 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 #endif /* HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER */
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 bool needs_dsc_aux_workaround(struct dc_link *link)
 {
 	if (link->dpcd_caps.branch_dev_id == DP_BRANCH_DEVICE_ID_90CC24 &&
@@ -387,7 +386,6 @@ STATIC_IFN_KUNIT bool retrieve_downstream_port_device(struct amdgpu_dm_connector
 	return true;
 }
 EXPORT_IF_KUNIT(retrieve_downstream_port_device);
-#endif
 #endif
 
 STATIC_IFN_KUNIT bool retrieve_branch_specific_data(struct amdgpu_dm_connector *aconnector)
@@ -1040,7 +1038,6 @@ uint32_t dm_mst_get_pbn_divider(struct dc_link *link)
 }
 EXPORT_IF_KUNIT(dm_mst_get_pbn_divider);
 
-#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 #if defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
 struct dsc_mst_fairness_params {
 	struct dc_crtc_timing *timing;
