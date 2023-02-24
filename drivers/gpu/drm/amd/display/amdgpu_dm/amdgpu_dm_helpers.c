@@ -823,7 +823,6 @@ bool dm_helpers_submit_i2c(
 	return result;
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static bool execute_synaptics_rc_command(struct drm_dp_aux *aux,
 		bool is_write_cmd,
 		unsigned char cmd,
@@ -1001,9 +1000,7 @@ static uint8_t write_dsc_enable_synaptics_non_virtual_dpcd_mst(
 
 	return ret;
 }
-#endif
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dm_helpers_dp_write_dsc_enable(
 		struct dc_context *ctx,
 		const struct dc_stream_state *stream,
@@ -1096,7 +1093,6 @@ bool dm_helpers_dp_write_dsc_enable(
 
 	return ret;
 }
-#endif
 
 bool dm_helpers_dp_write_hblank_reduction(struct dc_context *ctx, const struct dc_stream_state *stream)
 {
