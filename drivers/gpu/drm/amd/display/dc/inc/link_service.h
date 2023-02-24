@@ -170,7 +170,6 @@ struct link_service {
 	bool (*update_dsc_config)(struct pipe_ctx *pipe_ctx);
 	void (*wait_for_unlocked)(struct dc_link *link);
 
-
 	/*************************** DDC **************************************/
 	struct ddc_service *(*create_ddc_service)(
 			struct ddc_service_init_data *ddc_init_data);
@@ -235,7 +234,7 @@ struct link_service {
 	void (*dpcd_write_rx_power_ctrl)(struct dc_link *link, bool on);
 
 
-	/*************************** DP IRQ Handler ***************************/
+        /*************************** DP IRQ Handler ***************************/
 	bool (*dp_parse_link_loss_status)(
 		struct dc_link *link,
 		union hpd_irq_data *hpd_irq_dpcd_data);
