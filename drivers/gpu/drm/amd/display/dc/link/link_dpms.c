@@ -769,7 +769,6 @@ static void dsc_optc_config_log(struct display_stream_compressor *dsc,
 	DC_LOG_DSC("\tslice_width %d", config->slice_width);
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable)
 {
 	struct dc *dc = pipe_ctx->stream->ctx->dc;
@@ -782,7 +781,6 @@ static bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable)
 		result = dm_helpers_dp_write_dsc_enable(dc->ctx, stream, enable);
 	return result;
 }
-#endif
 
 static bool dp_set_hblank_reduction_on_rx(struct pipe_ctx *pipe_ctx)
 {
@@ -1009,7 +1007,6 @@ bool link_set_dsc_pps_packet(struct pipe_ctx *pipe_ctx, bool enable, bool immedi
 	return true;
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool link_set_dsc_enable(struct pipe_ctx *pipe_ctx, bool enable)
 {
 	struct display_stream_compressor *dsc = pipe_ctx->stream_res.dsc;
@@ -1033,7 +1030,6 @@ bool link_set_dsc_enable(struct pipe_ctx *pipe_ctx, bool enable)
 out:
 	return result;
 }
-#endif
 
 bool link_update_dsc_config(struct pipe_ctx *pipe_ctx)
 {
@@ -1918,9 +1914,7 @@ static void disable_link_dp(struct dc_link *link,
 		const struct link_resource *link_res,
 		enum signal_type signal)
 {
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct dc_link_settings link_settings = link->cur_link_settings;
-#endif
 
 	if (signal == SIGNAL_TYPE_DISPLAY_PORT_MST &&
 			link->mst_stream_alloc_table.stream_count > 0)
@@ -1937,13 +1931,11 @@ static void disable_link_dp(struct dc_link *link,
 	if (signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		/* set the sink to SST mode after disabling the link */
 		enable_mst_on_sink(link, false);
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (link_dp_get_encoding_format(&link_settings) ==
 			DP_8b_10b_ENCODING) {
 		dp_set_fec_enable(link, link_res, false);
 		dp_set_fec_ready(link, link_res, false);
 	}
-#endif
 }
 
 static void disable_link(struct dc_link *link,
@@ -2570,13 +2562,11 @@ void link_set_dpms_on(
 	 * will be automatically set at a later time when the video is enabled
 	 * (DP_VID_STREAM_EN = 1).
 	 */
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (pipe_ctx->stream->timing.flags.DSC) {
 		if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
 		    dc_is_virtual_signal(pipe_ctx->stream->signal))
 			link_set_dsc_enable(pipe_ctx, true);
 	}
-#endif
 	status = enable_link(state, pipe_ctx);
 
 	if (status != DC_OK) {
@@ -2621,7 +2611,6 @@ void link_set_dpms_on(
 
 	dc->hwss.enable_stream(pipe_ctx);
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Set DPS PPS SDP (AKA "info frames") */
 	if (pipe_ctx->stream->timing.flags.DSC) {
 		if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
@@ -2630,7 +2619,6 @@ void link_set_dpms_on(
 			link_set_dsc_pps_packet(pipe_ctx, true, true);
 		}
 	}
-#endif
 
 	if (dc_is_dp_signal(pipe_ctx->stream->signal))
 		dp_set_hblank_reduction_on_rx(pipe_ctx);
