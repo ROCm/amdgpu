@@ -166,7 +166,7 @@ uint32_t dp_get_closest_lttpr_offset(uint8_t lttpr_count)
 	return DP_REPEATER_CONFIGURATION_AND_STATUS_SIZE * (lttpr_count - 1);
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_FP)
 uint32_t link_bw_kbps_from_raw_frl_link_rate_data(uint8_t bw)
 {
 	switch (bw) {
@@ -251,7 +251,7 @@ static union dp_cable_id intersect_cable_id(
 	return out;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_FP)
 /*
  * Return PCON's post FRL link training supported BW if its non-zero, otherwise return max_supported_frl_bw.
  */
@@ -1250,7 +1250,7 @@ static void get_active_converter_info(
 						translate_dpcd_max_bpc(
 							hdmi_color_caps.bits.MAX_BITS_PER_COLOR_COMPONENT);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_FP)
 					if (link->dc->caps.dp_hdmi21_pcon_support) {
 
 						link->dpcd_caps.dongle_caps.dp_hdmi_frl_max_link_bw_in_kbps =
