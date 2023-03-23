@@ -5129,8 +5129,9 @@ static void setup_backlight_device(struct amdgpu_display_manager *dm,
 	amdgpu_dm_update_backlight_caps(dm, bl_idx);
 	dm->backlight_link[bl_idx] = link;
 	dm->num_of_edps++;
-
+#ifdef HAVE_HDR_SINK_METADATA
 	update_connector_ext_caps(aconnector);
+#endif
 }
 
 static void amdgpu_set_panel_orientation(struct drm_connector *connector);
