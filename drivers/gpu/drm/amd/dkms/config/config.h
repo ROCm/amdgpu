@@ -1072,6 +1072,9 @@
 /* is_device_page is available */
 /* #undef HAVE_ZONE_DEVICE_PUBLIC */
 
+/* zone_device_page_init() is available */
+#define HAVE_ZONE_DEVICE_PAGE_INIT 1
+
 /* zone_managed_pages() is available */
 #define HAVE_ZONE_MANAGED_PAGES 1
 
