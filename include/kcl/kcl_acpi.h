@@ -23,4 +23,12 @@
 #define ACPI_HANDLE(dev) DEVICE_ACPI_HANDLE(dev)
 #endif
 
+#ifndef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
+static inline struct acpi_device *
+acpi_dev_get_first_match_dev(const char *hid, const char *uid, s64 hrv)
+{
+	return NULL;
+}
+#endif
+
 #endif /* AMDKCL_ACPI_H */
