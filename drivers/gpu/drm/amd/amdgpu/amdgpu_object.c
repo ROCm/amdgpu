@@ -1374,7 +1374,7 @@ void amdgpu_bo_release_notify(struct ttm_buffer_object *bo)
 		goto out;
 
 	amdgpu_vram_mgr_set_cleared(bo->resource);
-	dma_resv_add_fence(&bo->base._resv, fence, DMA_RESV_USAGE_KERNEL);
+	dma_resv_add_fence(&amdkcl_ttm_resv(bo), fence, DMA_RESV_USAGE_KERNEL);
 	dma_fence_put(fence);
 
 out:
