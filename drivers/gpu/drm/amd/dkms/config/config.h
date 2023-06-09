@@ -487,6 +487,21 @@
 /* drm_dsc_compute_rc_parameters() is available */
 #define HAVE_DRM_DSC_COMPUTE_RC_PARAMETERS 1
 
+/* drm_connector_attach_colorspace_property() is available */
+#define HAVE_DRM_CONNECT_ATTACH_COLORSPACE_PROPERTY 1
+
+/* drm_mode_create_hdmi_colorspace_property() has 2 args */
+#define HAVE_DRM_MODE_CREATE_HDMI_COLORSPACE_PROPERTY_2ARGS 1
+
+/* drm_mode_create_dp_colorspace_property() has 2 args */
+#define HAVE_DRM_MODE_CREATE_DP_COLORSPACE_PROPERTY_2ARGS 1
+
+/* struct drm_dsc_config has member simple_422 */
+#define HAVE_DRM_DSC_CONFIG_SIMPLE_422 1
+
+/* drm_dsc_pps_payload_pack() is available */
+#define HAVE_DRM_DSC_PPS_PAYLOAD_PACK 1
+
 /* drm_fb_helper_single_add_all_connectors() &&
    drm_fb_helper_remove_one_connector() are symbol */
 /* #undef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS */
