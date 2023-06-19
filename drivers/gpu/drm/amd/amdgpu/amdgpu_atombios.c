@@ -1854,7 +1854,6 @@ const struct attribute_group amdgpu_vbios_version_attr_group = {
 	.attrs = amdgpu_vbios_version_attrs,
 	.is_visible = amdgpu_vbios_version_attrs_is_visible,
 };
-#endif
 
 int amdgpu_atombios_sysfs_init(struct amdgpu_device *adev)
 {
@@ -1864,6 +1863,7 @@ int amdgpu_atombios_sysfs_init(struct amdgpu_device *adev)
 
 	return 0;
 }
+#endif
 
 /**
  * amdgpu_atombios_fini - free the driver info and callbacks for atombios
