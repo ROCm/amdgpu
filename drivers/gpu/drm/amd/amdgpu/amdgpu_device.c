@@ -3657,11 +3657,12 @@ static int amdgpu_device_sys_interface_init(struct amdgpu_device *adev)
 {
 	int r;
 
+#ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 	r = amdgpu_atombios_sysfs_init(adev);
 	if (r)
 		drm_err(&adev->ddev,
 			"registering atombios sysfs failed (%d).\n", r);
-
+#endif
 	r = amdgpu_pm_sysfs_init(adev);
 	if (r)
 		dev_err(adev->dev, "registering pm sysfs failed (%d).\n", r);
