@@ -367,6 +367,12 @@
 /* drm_dp_mst_{get,put}_port_malloc() is available */
 #define HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC 1
 
+/* drm_dp_mst_hpd_irq_handle_event() is available */
+#define HAVE_DRM_DP_MST_HPD_IRQ_HANDLE_EVENT 1
+
+/* drm_dp_mst_port struct has full_pbn member */
+#define HAVE_DRM_DP_MST_PORT_FULL_PBN 1
+
 /* struct drm_dp_mst_port has passthrough_aux member */
 /* #undef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX */
 
