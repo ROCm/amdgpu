@@ -43,6 +43,7 @@
 #include "kfd_svm.h"
 #include "kfd_ipc.h"
 #include "kfd_trace.h"
+#include "kfd_pc_sampling.h"
 
 #include "amdgpu_amdkfd.h"
 #include "kfd_smi_events.h"
@@ -2011,6 +2012,39 @@ static int kfd_ioctl_rlc_spm(struct file *filep,
 	return kfd_rlc_spm(p, data);
 }
 
+static int kfd_ioctl_pc_sample(struct file *filep,
+				   struct kfd_process *p, void __user *data)
+{
+	struct kfd_ioctl_pc_sample_args *args = data;
+	struct kfd_process_device *pdd;
+	int ret = 0;
+
+	if (sched_policy == KFD_SCHED_POLICY_NO_HWS) {
+		pr_err("PC Sampling does not support sched_policy %i", sched_policy);
+		return -EINVAL;
+	}
+
+	mutex_lock(&p->mutex);
+	pdd = kfd_process_device_data_by_id(p, args->gpu_id);
+
+	if (!pdd) {
+		pr_debug("could not find gpu id 0x%x.", args->gpu_id);
+		ret = -EINVAL;
+	} else if (args->op == KFD_IOCTL_PCS_OP_START) {
+		pdd = kfd_bind_process_to_device(pdd->dev, p);
+		if (IS_ERR(pdd)) {
+			pr_debug("failed to bind process %p with gpu id 0x%x", p, args->gpu_id);
+			ret = -ESRCH;
+		}
+	}
+
+	if (!ret)
+		ret = kfd_pc_sample(pdd, args);
+	mutex_unlock(&p->mutex);
+
+	return ret;
+}
+
 static int criu_checkpoint_process(struct kfd_process *p,
 			     uint8_t __user *user_priv_data,
 			     uint64_t *priv_offset)
@@ -3661,6 +3695,8 @@ static int kfd_ioctl_profiler(struct file *filep, struct kfd_process *p, void *d
 	case KFD_IOC_PROFILER_VERSION:
 		args->version = KFD_IOC_PROFILER_VERSION_NUM;
 		return 0;
+	case KFD_IOC_PROFILER_PC_SAMPLE:
+		return kfd_ioctl_pc_sample(filep, p, &args->pc_sample);
 	case KFD_IOC_PROFILER_PMC:
 		return kfd_profiler_pmc(p, &args->pmc);
 	case KFD_IOC_PROFILER_PTL_CONTROL:
@@ -3813,6 +3849,10 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CROSS_MEMORY_COPY_DEPRECATED,
 			kfd_ioctl_cross_memory_copy_deprecated, 0),
+
+	/* TODO: KFD_IOC_FLAG_PERFMON is not required for host-trap, disable first */
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_PC_SAMPLE,
+			kfd_ioctl_pc_sample, 0),
 };
 
 static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
@@ -3882,6 +3922,14 @@ static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	if (unlikely(ioctl->flags & KFD_IOC_FLAG_CHECKPOINT_RESTORE)) {
 		if (!capable(CAP_CHECKPOINT_RESTORE) &&
 						!capable(CAP_SYS_ADMIN)) {
+			retcode = -EACCES;
+			goto err_i1;
+		}
+	}
+
+	/* PC Sampling Monitor */
+	if (unlikely(ioctl->flags & KFD_IOC_FLAG_PERFMON)) {
+		if (!capable(CAP_PERFMON) && !capable(CAP_SYS_ADMIN)) {
 			retcode = -EACCES;
 			goto err_i1;
 		}
