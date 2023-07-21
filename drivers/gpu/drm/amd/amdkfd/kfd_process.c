@@ -45,6 +45,7 @@ struct mm_struct;
 #include "kfd_trace.h"
 #include "kfd_smi_events.h"
 #include "kfd_debug.h"
+#include "kfd_pc_sampling.h"
 
 /*
  * List of struct kfd_process (field kfd_process).
@@ -1142,7 +1143,9 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 
 		pr_debug("Releasing pdd (topology id %d, for pid %d)\n",
 			pdd->dev->id, p->lead_thread->pid);
+
 		kfd_process_profiler_release(p, pdd);
+		kfd_pc_sample_release(pdd);
 
 		if (pdd->ptl_disable_req)
 			kfd_ptl_disable_release(pdd, p);
