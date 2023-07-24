@@ -1665,7 +1665,7 @@ u64 amdgpu_bo_print_info(int id, struct amdgpu_bo *bo, struct seq_file *m)
 	unsigned int pin_count;
 	u64 size;
 
-	if (dma_resv_trylock(bo->tbo.base.resv)) {
+	if (dma_resv_trylock(amdkcl_ttm_resvp(&bo->tbo))) {
 		if (!bo->tbo.resource) {
 			placement = "NONE";
 		} else {
@@ -1709,7 +1709,7 @@ u64 amdgpu_bo_print_info(int id, struct amdgpu_bo *bo, struct seq_file *m)
 				break;
 			}
 		}
-		dma_resv_unlock(bo->tbo.base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(&bo->tbo));
 	} else {
 		placement = "UNKNOWN";
 	}
