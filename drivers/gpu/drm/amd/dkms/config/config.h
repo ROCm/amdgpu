@@ -461,6 +461,9 @@
 /* Define to 1 if you have the <drm/drm_irq.h> header file. */
 #define HAVE_DRM_DRM_IRQ_H 1
 
+/* Define to 1 if you have the <drm/drm_gem_atomic_helper.h> header file. */
+#define HAVE_DRM_DRM_GEM_ATOMIC_HELPER_H 1
+
 /* Define to 1 if you have the <drm/drm_managed.h> header file. */
 #define HAVE_DRM_DRM_MANAGED_H 1
 
