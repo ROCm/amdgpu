@@ -1034,8 +1034,8 @@
 /* sysfs_emit() and sysfs_emit_at() are available */
 #define HAVE_SYSFS_EMIT 1
 
-/* interval_tree_insert have struct rb_root_cached */
-#define HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED 1
+/* totalram_pages() is available */
+#define HAVE_TOTALRAM_PAGES 1
 
 /* __poll_t is available */
 #define HAVE_TYPE__POLL_T 1
