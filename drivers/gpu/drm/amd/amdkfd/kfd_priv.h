@@ -292,6 +292,11 @@ struct kfd_vmid_info {
 
 struct kfd_dev;
 
+/* Per device PC Sampling data */
+struct kfd_dev_pc_sampling {
+	struct mutex mutex;
+};
+
 struct kfd_node {
 	unsigned int node_id;
 	struct amdgpu_device *adev;     /* Duplicated here along with keeping
@@ -347,6 +352,8 @@ struct kfd_node {
 	/* Track per device allocated watch points */
 	uint32_t alloc_watch_ids;
 	spinlock_t watch_points_lock;
+
+	struct kfd_dev_pc_sampling pcs_data;
 };
 
 struct kfd_dev {
