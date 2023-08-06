@@ -340,6 +340,11 @@ int kfd_reset_queue_mes(struct device_queue_manager *dqm, int queue_type,
 size_t mqd_size_from_queue_type(struct device_queue_manager *dqm,
 				enum kfd_queue_type type);
 
+void remap_queue(struct device_queue_manager *dqm,
+				enum kfd_unmap_queues_filter filter,
+				uint32_t filter_param,
+				uint32_t grace_period);
+
 static inline unsigned int get_sh_mem_bases_32(struct kfd_process_device *pdd)
 {
 	return (pdd->lds_base >> 16) & 0xFF;

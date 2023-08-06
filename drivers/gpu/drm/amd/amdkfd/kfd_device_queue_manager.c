@@ -3908,6 +3908,17 @@ int debug_refresh_runlist(struct device_queue_manager *dqm)
 	return debug_map_and_unlock(dqm);
 }
 
+void remap_queue(struct device_queue_manager *dqm,
+				enum kfd_unmap_queues_filter filter,
+				uint32_t filter_param,
+				uint32_t grace_period)
+{
+	dqm_lock(dqm);
+	if (!dqm->dev->kfd->shared_resources.enable_mes)
+		execute_queues_cpsch(dqm, filter, filter_param, grace_period);
+	dqm_unlock(dqm);
+}
+
 bool kfd_dqm_is_queue_in_process(struct device_queue_manager *dqm,
 				 struct qcm_process_device *qpd,
 				 int doorbell_off, u32 *queue_format)
