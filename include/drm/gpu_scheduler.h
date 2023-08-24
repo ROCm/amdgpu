@@ -30,7 +30,6 @@
 #include <linux/completion.h>
 #include <linux/xarray.h>
 #include <linux/workqueue.h>
-#include <kcl/kcl_rbtree.h>
 
 DECLARE_EWMA(drm_sched_avgtime, 6, 4);
 
