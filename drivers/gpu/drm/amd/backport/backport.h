@@ -107,4 +107,5 @@
 #include <kcl/kcl_pci_ids.h>
 #include <kcl/kcl_drm_suballoc.h>
 #include <kcl/kcl_drm_edid.h>
+#include <kcl/kcl_local64.h>
 #endif /* AMDGPU_BACKPORT_H */
