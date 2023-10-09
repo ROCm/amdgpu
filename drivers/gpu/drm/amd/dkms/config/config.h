@@ -640,6 +640,12 @@
 /* drm_vblank->time uses ktime_t type */
 #define HAVE_DRM_VBLANK_USE_KTIME_T 1
 
+/* struct drm_vma_offset_node has readonly field */
+/* #undef HAVE_DRM_VMA_OFFSET_NODE_READONLY_FIELD */
+
+/* drm_writeback_connector_init() has 7 args */
+#define HAVE_DRM_WRITEBACK_CONNECTOR_INIT_7_ARGS 1
+
 /* fault_flag_allow_retry_first() is available */
 #define HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST 1
 
