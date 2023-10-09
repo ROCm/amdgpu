@@ -1359,6 +1359,7 @@ out:
 		return copy_to_user(out, max_ibs,
 				    min((size_t)size, sizeof(max_ibs))) ? -EFAULT : 0;
 	}
+#ifdef HAVE_STRUCT_XARRAY
 	case AMDGPU_INFO_GPUVM_FAULT: {
 		struct amdgpu_fpriv *fpriv = filp->driver_priv;
 		struct amdgpu_vm *vm = &fpriv->vm;
@@ -1379,6 +1380,8 @@ out:
 		return copy_to_user(out, &gpuvm_fault,
 				    min((size_t)size, sizeof(gpuvm_fault))) ? -EFAULT : 0;
 	}
+#endif
+
 	case AMDGPU_INFO_UQ_FW_AREAS: {
 		struct drm_amdgpu_info_uq_metadata meta_info = {};
 
