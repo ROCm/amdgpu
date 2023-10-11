@@ -585,6 +585,12 @@ static void schedule_dc_vmin_vmax(struct amdgpu_device *adev,
 
 	queue_work(system_percpu_wq, &offload_work->work);
 }
+#ifndef HAVE_KTIME_IS_UNION
+static inline ktime_t get_drm_vblank_crtc_time(struct drm_vblank_crtc *vblank)
+{
+	return kcl_amdgpu_get_vblank_time_ns(vblank);
+}
+#endif
 
 static void dm_vupdate_high_irq(void *interrupt_params)
 {
@@ -607,13 +613,14 @@ static void dm_vupdate_high_irq(void *interrupt_params)
 		drm_dev = acrtc->base.dev;
 		vblank = drm_crtc_vblank_crtc(&acrtc->base);
 		previous_timestamp = atomic64_read(&irq_params->previous_timestamp);
-		frame_duration_ns = vblank->time - previous_timestamp;
+		frame_duration_ns = get_drm_vblank_crtc_time(vblank) - previous_timestamp;
 
 		if (frame_duration_ns > 0) {
 			trace_amdgpu_refresh_rate_track(acrtc->base.index,
 						frame_duration_ns,
 						ktime_divns(NSEC_PER_SEC, frame_duration_ns));
-			atomic64_set(&irq_params->previous_timestamp, vblank->time);
+			atomic64_set(&irq_params->previous_timestamp,
+				     get_drm_vblank_crtc_time(vblank));
 		}
 #endif
 
