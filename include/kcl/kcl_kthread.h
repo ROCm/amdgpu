@@ -6,6 +6,7 @@
 #include <linux/kthread.h>
 #include <linux/mmu_context.h>
 
+/* Copied from v5.7-13665-g9bf5b9eb232b kernel/kthread.c */
 #ifndef HAVE_KTHREAD_USE_MM
 static inline
 void kthread_use_mm(struct mm_struct *mm)
