@@ -149,6 +149,7 @@ EXPORT_SYMBOL_GPL(_kcl_pci_pr3_present);
 #endif /* HAVE_PCI_PR3_PRESENT */
 
 #ifdef AMDKCL_CREATE_MEASURE_FILE
+/* Copied from drivers/pci/pci-sysfs.c */
 static ssize_t max_link_speed_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {
