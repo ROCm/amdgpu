@@ -131,6 +131,7 @@ static inline void kcl_pci_configure_extended_tags(struct pci_dev *dev)
 #endif
 }
 
+/* Copied from v5.1-rc1-5-g4e544bac8267 include/linux/pci.h */
 #if !defined(HAVE_PCI_DEV_ID)
 static inline u16 pci_dev_id(struct pci_dev *dev)
 {
