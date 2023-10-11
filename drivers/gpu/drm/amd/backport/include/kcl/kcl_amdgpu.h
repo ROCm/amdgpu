@@ -44,17 +44,9 @@ static inline bool kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, u
 }
 #endif /* HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP */
 
-#if defined(HAVE_DRM_VBLANK_USE_KTIME_T)
-static inline ktime_t kcl_amdgpu_get_vblank_time_ns(struct drm_vblank_crtc *vblank) {
+static inline ktime_t kcl_amdgpu_get_vblank_time_ns(struct drm_vblank_crtc *vblank)
+{
 	return vblank->time;
 }
-#else
-static inline ktime_t kcl_amdgpu_get_vblank_time_ns(struct drm_vblank_crtc *vblank) {
-	struct timeval tv;
-	drm_crtc_vblank_count_and_time(vblank, &tv);
-	return timeval_to_ktime(tv);
-}
-#endif /* HAVE_DRM_VBLANK_USE_KTIME_T */
-
 
 #endif /* AMDGPU_BACKPORT_KCL_AMDGPU_H */
