@@ -27,6 +27,11 @@
  */
 struct amdgpu_usermode_queue;
 
+#if defined(CONFIG_DEBUG_FS)
+#if defined(AMDKCL_AMDGPU_DEBUGFS_CLEANUP)
+void amdgpu_debugfs_cleanup(struct drm_minor *minor);
+#endif
+#endif
 int amdgpu_debugfs_regs_init(struct amdgpu_device *adev);
 int amdgpu_debugfs_init(struct amdgpu_device *adev);
 void amdgpu_debugfs_fini(struct amdgpu_device *adev);
