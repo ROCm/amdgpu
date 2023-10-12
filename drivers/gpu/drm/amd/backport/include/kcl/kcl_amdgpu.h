@@ -4,6 +4,7 @@
 
 #include <drm/drm_vblank.h>
 #include "amdgpu.h"
+#include <drm/drm_drv.h>
 
 #ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
 static inline u32 kcl_amdgpu_get_vblank_counter_kms(struct drm_device *dev, unsigned int crtc)
@@ -42,4 +43,5 @@ static inline bool kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, u
 	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time, in_vblank_irq);
 }
 #endif /* HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP */
+
 #endif /* AMDGPU_BACKPORT_KCL_AMDGPU_H */
