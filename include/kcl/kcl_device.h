@@ -45,4 +45,13 @@ do {									\
 #define dev_err_ratelimited(dev, fmt, ...)				\
 	dev_level_ratelimited(dev_err, dev, fmt, ##__VA_ARGS__)
 #endif
+
+#ifndef HAVE_DEV_IS_REMOVABLE
+static inline bool _kcl_dev_is_removable(struct device *dev)
+{
+	return false;
+}
+#define dev_is_removable _kcl_dev_is_removable
+#endif
+
 #endif /* AMDKCL_DEVICE_H */
