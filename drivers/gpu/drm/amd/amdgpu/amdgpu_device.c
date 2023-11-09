@@ -5541,6 +5541,8 @@ static inline void amdgpu_device_stop_pending_resets(struct amdgpu_device *adev)
 {
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 
+	amdgpu_reset_domain_clear_pending(adev->reset_domain);
+
 #if defined(CONFIG_DEBUG_FS)
 	if (!amdgpu_sriov_vf(adev))
 		cancel_work(&adev->reset_work);
@@ -5575,6 +5577,9 @@ static void amdgpu_device_recovery_prepare(struct amdgpu_device *adev,
 					  struct amdgpu_hive_info *hive)
 {
 	struct amdgpu_device *tmp_adev = NULL;
+
+	if (amdgpu_reset_domain_in_drain_mode(adev->reset_domain))
+		return 0;
 
 	/*
 	 * Build list of devices to reset.
