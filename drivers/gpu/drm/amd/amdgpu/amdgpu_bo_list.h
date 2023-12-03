@@ -56,7 +56,12 @@ struct amdgpu_bo_list {
 	unsigned first_userptr;
 	unsigned num_entries;
 
+#ifdef __counted_by
 	struct amdgpu_bo_list_entry entries[] __counted_by(num_entries);
+#else
+	struct amdgpu_bo_list_entry entries[];
+#endif
+
 };
 
 struct amdgpu_bo_list *amdgpu_bo_list_get(struct amdgpu_fpriv *fpriv, u32 id);
