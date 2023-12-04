@@ -563,7 +563,7 @@ static inline void kgd2kfd_suspend(struct kfd_dev *kfd, bool suspend_proc, bool 
 {
 }
 
-static inline int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm, bool sync)
+static inline int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm)
 {
 	return 0;
 }
