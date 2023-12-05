@@ -829,6 +829,9 @@
 /* list_bulk_move_tail() is available */
 #define HAVE_LIST_BULK_MOVE_TAIL 1
 
+/* list_cmp_func() is const param */
+#define HAVE_LIST_CMP_FUNC_IS_CONST_PARAM 1
+
 /* list_is_first() is available */
 #define HAVE_LIST_IS_FIRST 1
 
