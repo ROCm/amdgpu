@@ -1115,6 +1115,9 @@ struct kfd_process {
 
 	/* if gpu page fault sent to KFD */
 	bool gpu_page_fault;
+
+	/* Indicates process' PC Sampling ref cnt*/
+	uint32_t pc_sampling_ref;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */
