@@ -1147,6 +1147,8 @@ struct kfd_process {
 	/* The primary kfd_process allocating IDs for its secondary kfd_process, 0 for primary kfd_process */
 	struct ida id_table;
 
+	/* Indicates process' PC Sampling ref cnt*/
+	uint32_t pc_sampling_ref;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 8 /* bits: 256 entries */
