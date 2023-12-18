@@ -1670,6 +1670,7 @@ struct drm_amdgpu_info_uq_metadata {
 #define AMDGPU_FAMILY_GC_11_5_0			150 /* GC 11.5.0 */
 #define AMDGPU_FAMILY_GC_12_0_0			152 /* GC 12.0.0 */
 
+#ifndef HAVE_DRM_COLOR_CTM_3X4
 /* FIXME wrong namespace! */
 struct drm_color_ctm_3x4 {
 	/*
@@ -1678,6 +1679,7 @@ struct drm_color_ctm_3x4 {
 	 */
 	__u64 matrix[12];
 };
+#endif
 
 /**
  *  Definition of System Unified Address (SUA) apertures
