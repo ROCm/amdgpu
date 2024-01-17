@@ -879,11 +879,12 @@ out:
  */
 static struct dma_fence *
 amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
-			struct amdgpu_vm *vm,
+			struct amdgpu_fpriv *fpriv,
 			struct amdgpu_bo_va *bo_va,
 			uint32_t operation)
 {
 	struct dma_fence *fence;
+	struct amdgpu_vm *vm = &fpriv->vm;
 	int r = 0;
 
 	/* Always start from the VM's existing last update fence. */
@@ -915,6 +916,23 @@ amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
 	r = amdgpu_vm_update_pdes(adev, vm, false);
 	if (r)
 		goto error;
+
+	if (vm->is_compute_context) {
+		if (bo_va->last_pt_update)
+			r = dma_fence_wait(bo_va->last_pt_update, true);
+		if (!r && vm->last_update)
+			r = dma_fence_wait(vm->last_update, true);
+		if (!r) {
+			uint32_t xcc_mask = (!adev->xcp_mgr ||
+					     fpriv->xcp_id == ~0) ? 1 :
+				adev->xcp_mgr->xcp[fpriv->xcp_id]
+					.ip[AMDGPU_XCP_GFX].inst_mask;
+
+			r = amdgpu_vm_flush_compute_tlb(adev, vm,
+							TLB_FLUSH_LEGACY,
+							xcc_mask);
+		}
+	}
 
 	/*
 	 * Decide which fence best represents the last update:
@@ -1119,7 +1137,7 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 	 * fence can then be exported to the user-visible VM timeline.
 	 */
 	if (!r && !(args->flags & AMDGPU_VM_DELAY_UPDATE) && !adev->debug_vm) {
-		fence = amdgpu_gem_va_update_vm(adev, &fpriv->vm, bo_va,
+		fence = amdgpu_gem_va_update_vm(adev, fpriv, bo_va,
 						args->operation);
 
 		if (timeline_syncobj && fence) {
