@@ -590,6 +590,17 @@ static int kgd_gfx_v9_4_3_hqd_sdma_get_counter(struct amdgpu_device *adev,
 	return 0;
 }
 
+static uint32_t kgd_v9_4_3_trigger_pc_sample_trap(struct amdgpu_device *adev,
+					    uint32_t vmid,
+					    uint32_t *target_simd,
+					    uint32_t *target_wave_slot,
+					    enum kfd_ioctl_pc_sample_method method,
+					    uint32_t inst)
+{
+	return kgd_gfx_v9_trigger_pc_sample_trap(adev, vmid, 8, 4,
+					target_simd, target_wave_slot, method, inst);
+}
+
 const struct kfd2kgd_calls gc_9_4_3_kfd2kgd = {
 	.program_sh_mem_settings = kgd_gfx_v9_program_sh_mem_settings,
 	.set_pasid_vmid_mapping = kgd_gfx_v9_4_3_set_pasid_vmid_mapping,
@@ -627,5 +638,7 @@ const struct kfd2kgd_calls gc_9_4_3_kfd2kgd = {
 	.hqd_reset = kgd_gfx_v9_hqd_reset,
 	.hqd_sdma_get_doorbell = kgd_gfx_v9_4_3_hqd_sdma_get_doorbell,
 	.ptl_ctrl = kgd_v9_4_3_ptl_ctrl,
-	.hqd_sdma_get_counter = kgd_gfx_v9_4_3_hqd_sdma_get_counter
+	.hqd_sdma_get_counter = kgd_gfx_v9_4_3_hqd_sdma_get_counter,
+	.trigger_pc_sample_trap = kgd_v9_4_3_trigger_pc_sample_trap,
+	.override_core_cg = kgd_gfx_v9_override_core_cg,
 };
