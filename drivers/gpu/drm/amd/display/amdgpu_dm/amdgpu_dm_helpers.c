@@ -764,6 +764,7 @@ bool dm_helpers_execute_fused_io(
 }
 EXPORT_IF_KUNIT(dm_helpers_execute_fused_io);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 STATIC_IFN_KUNIT bool execute_synaptics_rc_command(struct drm_dp_aux *aux,
 		bool is_write_cmd,
 		unsigned char cmd,
@@ -944,7 +945,9 @@ STATIC_IFN_KUNIT uint8_t write_dsc_enable_synaptics_non_virtual_dpcd_mst(
 	return ret;
 }
 EXPORT_IF_KUNIT(write_dsc_enable_synaptics_non_virtual_dpcd_mst);
+#endif
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dm_helpers_dp_write_dsc_enable(
 		struct dc_context *ctx,
 		const struct dc_stream_state *stream,
@@ -1028,6 +1031,7 @@ bool dm_helpers_dp_write_dsc_enable(
 	return ret;
 }
 EXPORT_IF_KUNIT(dm_helpers_dp_write_dsc_enable);
+#endif
 
 #if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 uint dm_helpers_get_dc_debug_mask(void)

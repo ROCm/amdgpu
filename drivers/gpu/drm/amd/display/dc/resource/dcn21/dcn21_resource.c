@@ -382,6 +382,7 @@ static const struct dcn20_vmid_mask vmid_masks = {
 		DCN20_VMID_MASK_SH_LIST(_MASK)
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #define dsc_regsDCN20(id)\
 [id] = {\
 	DSC_REG_LIST_DCN20(id)\
@@ -403,6 +404,7 @@ static const struct dcn20_dsc_shift dsc_shift = {
 static const struct dcn20_dsc_mask dsc_mask = {
 	DSC_REG_LIST_SH_MASK_DCN20(_MASK)
 };
+#endif
 
 #define ipp_regs(id)\
 [id] = {\
@@ -598,7 +600,9 @@ static const struct resource_caps res_cap_rn = {
 		.num_dwb = 1,
 		.num_ddc = 5,
 		.num_vmid = 16,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.num_dsc = 3,
+#endif
 };
 
 static const struct dc_plane_cap plane_cap = {
@@ -933,12 +937,14 @@ bool dcn21_fast_validate_bw(struct dc *dc,
 			ASSERT(0);
 		}
 	}
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Actual dsc count per stream dsc validation*/
 	if (!dcn20_validate_dsc(dc, context)) {
 		context->bw_ctx.dml.vba.ValidationStatus[context->bw_ctx.dml.vba.soc.num_states] =
 				DML_FAIL_DSC_VALIDATION_FAILURE;
 		goto validate_fail;
 	}
+#endif
 
 	*vlevel_out = vlevel;
 
@@ -1118,7 +1124,7 @@ static void read_dce_straps(
 
 }
 
-
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static struct display_stream_compressor *dcn21_dsc_create(struct dc_context *ctx,
 							  uint32_t inst)
 {
@@ -1133,6 +1139,7 @@ static struct display_stream_compressor *dcn21_dsc_create(struct dc_context *ctx
 	dsc2_construct(dsc, ctx, inst, &dsc_regs[inst], &dsc_shift, &dsc_mask);
 	return &dsc->base;
 }
+#endif
 
 static struct pp_smu_funcs *dcn21_pp_smu_create(struct dc_context *ctx)
 {
@@ -1409,7 +1416,9 @@ static const struct resource_funcs dcn21_res_pool_funcs = {
 	.validate_bandwidth = dcn21_validate_bandwidth,
 	.populate_dml_pipes = dcn21_populate_dml_pipes_from_context,
 	.add_stream_to_ctx = dcn20_add_stream_to_ctx,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.add_dsc_to_stream_resource = dcn20_add_dsc_to_stream_resource,
+#endif
 	.remove_stream_from_ctx = dcn20_remove_stream_from_ctx,
 	.acquire_free_pipe_as_secondary_dpp_pipe = dcn20_acquire_free_pipe_for_layer,
 	.release_pipe = dcn20_release_pipe,

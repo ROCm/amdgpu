@@ -21,6 +21,7 @@
  * Authors: AMD
  *
  */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #ifndef __DCN20_DSC_H__
 #define __DCN20_DSC_H__
 
@@ -616,4 +617,4 @@ void dsc2_disconnect(struct display_stream_compressor *dsc);
 void dsc2_wait_disconnect_pending_clear(struct display_stream_compressor *dsc);
 
 #endif
-
+#endif
