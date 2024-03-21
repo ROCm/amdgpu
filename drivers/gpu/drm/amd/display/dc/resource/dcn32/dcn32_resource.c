@@ -480,6 +480,7 @@ static const struct dcn30_mmhubbub_mask mcif_wb30_mask = {
 #define dsc_regsDCN20_init(id)\
 	DSC_REG_LIST_DCN20_RI(id)
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static struct dcn20_dsc_registers dsc_regs[4];
 
 static const struct dcn20_dsc_shift dsc_shift = {
@@ -489,6 +490,7 @@ static const struct dcn20_dsc_shift dsc_shift = {
 static const struct dcn20_dsc_mask dsc_mask = {
 	DSC_REG_LIST_SH_MASK_DCN20(_MASK)
 };
+#endif
 
 static struct dcn30_mpc_registers mpc_regs;
 
@@ -1726,6 +1728,7 @@ static bool dcn32_mmhubbub_create(struct dc_context *ctx, struct resource_pool *
 	return true;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static struct display_stream_compressor *dcn32_dsc_create(
 	struct dc_context *ctx, uint32_t inst)
 {
@@ -1750,6 +1753,7 @@ static struct display_stream_compressor *dcn32_dsc_create(
 
 	return &dsc->base;
 }
+#endif
 
 static void dcn32_destroy_resource_pool(struct resource_pool **pool)
 {
@@ -2272,7 +2276,9 @@ static struct resource_funcs dcn32_res_pool_funcs = {
 	.acquire_free_pipe_as_secondary_opp_head = dcn32_acquire_free_pipe_as_secondary_opp_head,
 	.release_pipe = dcn20_release_pipe,
 	.add_stream_to_ctx = dcn30_add_stream_to_ctx,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.add_dsc_to_stream_resource = dcn20_add_dsc_to_stream_resource,
+#endif
 	.remove_stream_from_ctx = dcn20_remove_stream_from_ctx,
 	.populate_dml_writeback_from_context = dcn30_populate_dml_writeback_from_context,
 	.set_mcif_arb_params = dcn30_set_mcif_arb_params,
@@ -2631,6 +2637,7 @@ static bool dcn32_resource_construct(
 		goto create_fail;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* DSCs */
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		pool->base.dscs[i] = dcn32_dsc_create(ctx, i);
@@ -2640,6 +2647,7 @@ static bool dcn32_resource_construct(
 			goto create_fail;
 		}
 	}
+#endif
 
 	/* DWB */
 	if (!dcn32_dwbc_create(ctx, &pool->base)) {

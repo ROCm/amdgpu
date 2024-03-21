@@ -2794,6 +2794,7 @@ struct dc_container_id {
 };
 
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 struct dc_sink_dsc_caps {
 	// 'true' if these are virtual DPCD's DSC caps (immediately upstream of sink in MST topology),
 	// 'false' if they are sink's DSC caps
@@ -2803,6 +2804,7 @@ struct dc_sink_dsc_caps {
 	bool is_dsc_passthrough_supported;
 	struct dsc_dec_dpcd_caps dsc_dec_caps;
 };
+#endif
 
 struct dc_sink_hblank_expansion_caps {
 	// 'true' if these are virtual DPCD's HBlank expansion caps (immediately upstream of sink in MST topology),
