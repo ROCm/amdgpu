@@ -101,7 +101,9 @@ static enum link_training_result dpia_configure_link(
 		struct link_training_settings *lt_settings)
 {
 	enum dc_status status;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool fec_enable;
+#endif
 
 	DC_LOG_HW_LINK_TRAINING("%s\n DPIA(%d) configuring\n - LTTPR mode(%d)\n",
 		__func__,
