@@ -2629,9 +2629,11 @@ int amdgpu_amdkfd_gpuvm_get_sg_table(struct amdgpu_device *adev,
 		cur_page++;
 	}
 
-	ret = dma_map_sgtable(dma_dev, sg, dir, DMA_ATTR_SKIP_CPU_SYNC);
-	if (ret)
-		goto out_of_range;
+	if (dma_dev) {
+		ret = dma_map_sgtable(dma_dev, sg, dir, DMA_ATTR_SKIP_CPU_SYNC);
+		if (ret)
+			goto out_of_range;
+	}
 
 	*ret_sg = sg;
 	return 0;
@@ -2655,7 +2657,8 @@ void amdgpu_amdkfd_gpuvm_put_sg_table(struct amdgpu_bo *bo,
 	}
 
 	/* Unmap system memory */
-	dma_unmap_sgtable(dma_dev, sgt, dir, DMA_ATTR_SKIP_CPU_SYNC);
+	if (dma_dev)
+		dma_unmap_sgtable(dma_dev, sgt, dir, DMA_ATTR_SKIP_CPU_SYNC);
 	sg_free_table(sgt);
 	kfree(sgt);
 }
