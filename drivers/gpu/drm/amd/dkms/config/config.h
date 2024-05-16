@@ -915,8 +915,8 @@
 /* whether smca_get_bank_type(x, x) is available */
 #define HAVE_SMCA_GET_BANK_TYPE_WITH_TWO_ARGUMENTS 1
 
-/* is_smca_umc_v2() is available */
-/* #undef HAVE_SMCA_UMC_V2 */
+/* enum SMCA_UMC_V2 is available */
+#define HAVE_SMCA_UMC_V2 1
 
 /* strscpy() is available */
 #define HAVE_STRSCPY 1
