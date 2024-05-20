@@ -4810,6 +4810,7 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 		dev_info(adev->dev, "overdrive feature is not supported\n");
 	}
 
+#ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 	if (amdgpu_dpm_get_pm_policy_info(adev, PP_PM_POLICY_NONE, NULL) !=
 	    -EOPNOTSUPP) {
 		ret = devm_device_add_group(adev->dev,
@@ -4817,6 +4818,7 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 		if (ret)
 			goto err_out1;
 	}
+#endif
 
 	if (amdgpu_dpm_is_temp_metrics_supported(adev, SMU_TEMP_METRIC_GPUBOARD)) {
 		ret = devm_device_add_group(adev->dev,
