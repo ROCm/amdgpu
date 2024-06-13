@@ -183,6 +183,9 @@
 /* drm_atomic_helper_calc_timestamping_constants() is available */
 #define HAVE_DRM_ATOMIC_HELPER_CALC_TIMESTAMPING_CONSTANTS 1
 
+/* drm_atomic_plane_enabling() is available */
+#define HAVE_DRM_ATOMIC_PLANE_ENABLING 1
+
 /* drm_client_register() is available */
 #define HAVE_DRM_CLIENT_REGISTER 1
 
