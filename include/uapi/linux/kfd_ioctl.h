@@ -1730,7 +1730,7 @@ struct kfd_ioctl_pc_sample_args {
 	__u32 gpu_id;
 	__u32 trace_id;
 	__u32 flags;             /* kfd_ioctl_pcs_query flags */
-	__u32 reserved;
+	__u32 version;
 };
 
 #define KFD_IOC_PROFILER_VERSION_NUM 1
