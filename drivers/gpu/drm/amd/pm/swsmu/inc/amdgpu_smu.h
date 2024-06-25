@@ -2031,6 +2031,7 @@ int smu_set_phase_det_param(struct smu_context *smu,
 int smu_get_phase_det_param(struct smu_context *smu,
 			    enum pp_pm_phase_det_param_id id, uint32_t *val);
 int smu_phase_det_enable(struct smu_context *smu, bool enable);
+void amdgpu_smu_phase_det_debugfs_init(struct amdgpu_device *adev);
 
 int amdgpu_smu_ras_send_msg(struct amdgpu_device *adev, enum smu_message_type msg,
 			    uint32_t param, uint32_t *readarg);

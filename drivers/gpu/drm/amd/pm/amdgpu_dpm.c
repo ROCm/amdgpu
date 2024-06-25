@@ -2111,6 +2111,14 @@ ssize_t amdgpu_dpm_get_xcp_metrics(struct amdgpu_device *adev, int xcp_id,
 	return ret;
 }
 
+void amdgpu_dpm_phase_det_debugfs_init(struct amdgpu_device *adev)
+{
+	if (!is_support_sw_smu(adev))
+	return;
+	
+	amdgpu_smu_phase_det_debugfs_init(adev);
+}
+
 const struct ras_smu_drv *amdgpu_dpm_get_ras_smu_driver(struct amdgpu_device *adev)
 {
 	void *pp_handle = adev->powerplay.pp_handle;
