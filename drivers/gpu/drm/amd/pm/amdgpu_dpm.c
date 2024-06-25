@@ -2068,3 +2068,11 @@ ssize_t amdgpu_dpm_get_xcp_metrics(struct amdgpu_device *adev, int xcp_id,
 
 	return ret;
 }
+
+void amdgpu_dpm_phase_det_debugfs_init(struct amdgpu_device *adev)
+{
+	if (!is_support_sw_smu(adev))
+		return;
+
+	amdgpu_smu_phase_det_debugfs_init(adev);
+}
