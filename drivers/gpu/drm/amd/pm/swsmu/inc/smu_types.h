@@ -276,6 +276,12 @@
 	__SMU_DUMMY_MAP(SetThrottlingPolicy), \
 	__SMU_DUMMY_MAP(MALLPowerController), \
 	__SMU_DUMMY_MAP(MALLPowerState), \
+	__SMU_DUMMY_MAP(SetPhsDetWRbwThreshold), \
+	__SMU_DUMMY_MAP(SetPhsDetWRbwFreqHigh), \
+	__SMU_DUMMY_MAP(SetPhsDetWRbwFreqLow), \
+	__SMU_DUMMY_MAP(SetPhsDetWRbwHystDown), \
+	__SMU_DUMMY_MAP(SetPhsDetWRbwAlpha), \
+	__SMU_DUMMY_MAP(SetPhsDetOnOff), \
 	__SMU_DUMMY_MAP(ResetSDMA), \
 	__SMU_DUMMY_MAP(ResetVCN), \
 	__SMU_DUMMY_MAP(GetStaticMetricsTable), \
