@@ -93,6 +93,12 @@
 #define PPSMC_MSG_SelectPLPDMode                    0x40
 #define PPSMC_MSG_RmaDueToBadPageThreshold          0x43
 #define PPSMC_MSG_SetThrottlingPolicy               0x44
+#define PPSMC_MSG_SetPhsDetWRbwThreshold            0x45
+#define PPSMC_MSG_SetPhsDetWRbwFreqHigh             0x46
+#define PPSMC_MSG_SetPhsDetWRbwFreqLow              0x47
+#define PPSMC_MSG_SetPhsDetWRbwHystDown             0x48
+#define PPSMC_MSG_SetPhsDetWRbwAlpha                0x49
+#define PPSMC_MSG_SetPhsDetOnOff                    0x4A
 #define PPSMC_MSG_ResetSDMA                         0x4D
 #define PPSMC_MSG_GetStaticMetricsTable             0x59
 #define PPSMC_MSG_ResetVCN                          0x5B
