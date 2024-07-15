@@ -99,6 +99,7 @@
 #define PPSMC_MSG_SetPhsDetWRbwHystDown             0x48
 #define PPSMC_MSG_SetPhsDetWRbwAlpha                0x49
 #define PPSMC_MSG_SetPhsDetOnOff                    0x4A
+#define PPSMC_MSG_GetPhsDetResidency                0x4B
 #define PPSMC_MSG_ResetSDMA                         0x4D
 #define PPSMC_MSG_GetStaticMetricsTable             0x59
 #define PPSMC_MSG_ResetVCN                          0x5B
