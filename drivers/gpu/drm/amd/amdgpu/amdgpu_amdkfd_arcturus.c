@@ -433,5 +433,6 @@ const struct kfd2kgd_calls arcturus_kfd2kgd = {
 	.hqd_get_pq_addr = kgd_gfx_v9_hqd_get_pq_addr,
 	.hqd_reset = kgd_gfx_v9_hqd_reset,
 	.hqd_sdma_get_doorbell = kgd_gfx_v9_hqd_sdma_get_doorbell,
-	.trigger_pc_sample_trap = kgd_arcturus_trigger_pc_sample_trap
+	.trigger_pc_sample_trap = kgd_arcturus_trigger_pc_sample_trap,
+	.override_core_cg = kgd_gfx_v9_override_core_cg
 };
