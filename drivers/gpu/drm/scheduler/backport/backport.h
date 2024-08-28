@@ -8,5 +8,5 @@
 #include <kcl/backport/kcl_drm_print.h>
 #include <kcl/kcl_rbtree.h>
 #include <kcl/kcl_drm_print.h>
-
+#include <kcl/kcl_tracepoint.h>
 #endif
