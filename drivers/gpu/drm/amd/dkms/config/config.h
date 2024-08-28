@@ -618,6 +618,12 @@
 /* drm_print_bits() has 4 args */
 #define HAVE_DRM_PRINT_BITS_4ARGS 1
 
+/* drm_show_fdinfo() is available */
+#define HAVE_DRM_SHOW_FDINFO 1
+
+/* follow_pfn() is available */
+/* #undef HAVE_FOLLOW_PFN */
+
 /* drm_simple_encoder is available */
 #define HAVE_DRM_SIMPLE_ENCODER_INIT 1
 
