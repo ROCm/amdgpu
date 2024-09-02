@@ -844,13 +844,13 @@ static bool ttm_lru_walk_trylock(struct ttm_bo_lru_cursor *curs,
 
 	curs->needs_unlock = false;
 
-	if (dma_resv_trylock(bo->base.resv)) {
+	if (dma_resv_trylock(amdkcl_ttm_resvp(bo))) {
 		curs->needs_unlock = true;
 		return true;
 	}
 
-	if (bo->base.resv == ctx->resv && ctx->allow_res_evict) {
-		dma_resv_assert_held(bo->base.resv);
+	if (amdkcl_ttm_resvp(bo) == ctx->resv && ctx->allow_res_evict) {
+		dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 		return true;
 	}
 
@@ -864,9 +864,9 @@ static int ttm_lru_walk_ticketlock(struct ttm_bo_lru_cursor *curs,
 	int ret;
 
 	if (arg->ctx->interruptible)
-		ret = dma_resv_lock_interruptible(bo->base.resv, arg->ticket);
+		ret = dma_resv_lock_interruptible(amdkcl_ttm_resvp(bo), arg->ticket);
 	else
-		ret = dma_resv_lock(bo->base.resv, arg->ticket);
+		ret = dma_resv_lock(amdkcl_ttm_resvp(bo), arg->ticket);
 
 	if (!ret) {
 		curs->needs_unlock = true;
