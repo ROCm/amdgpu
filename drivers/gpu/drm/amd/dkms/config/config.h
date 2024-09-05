@@ -358,6 +358,9 @@
 /* drm_dp_mst_atomic_enable_dsc() wants 5args */
 /* #undef HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC_WITH_5_ARGS */
 
+/* the guid of struct drm_dp_mst_branch is guid_t */
+#define HAVE_DRM_DP_MST_BRANCH_GUID_T 1
+
 /* drm_dp_mst_detect_port() wants p,p,p,p args */
 #define HAVE_DRM_DP_MST_DETECT_PORT_PPPP 1
 
