@@ -9826,6 +9826,7 @@ static void manage_dm_interrupts(struct amdgpu_device *adev,
 	 * backend index - some even map to more than one.
 	 * So we have to go through the CRTC to find the right IRQ.
 	 */
+#ifdef HAVE_DRM_VBLANK_CRTC_CONFIG
 	int irq_type = amdgpu_display_crtc_idx_to_irq_type(
 			adev,
 			acrtc->crtc_id);
@@ -9902,6 +9903,12 @@ static void manage_dm_interrupts(struct amdgpu_device *adev,
 
 		drm_crtc_vblank_off(&acrtc->base);
 	}
+#else
+	if (acrtc_state)
+		drm_crtc_vblank_on(&acrtc->base);
+	else
+		drm_crtc_vblank_off(&acrtc->base);
+#endif
 }
 
 static void dm_update_pflip_irq_state(struct amdgpu_device *adev,
