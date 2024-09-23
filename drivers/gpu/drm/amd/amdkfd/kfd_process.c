@@ -1146,6 +1146,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 
 		kfd_process_profiler_release(p, pdd);
 		kfd_pc_sample_release(pdd);
+		kfd_release_spm(pdd, pdd->dev->adev);
 
 		if (pdd->ptl_disable_req)
 			kfd_ptl_disable_release(pdd, p);
