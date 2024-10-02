@@ -941,7 +941,7 @@ bool amdgpu_amdkfd_compute_active(struct amdgpu_device *adev, uint32_t node_id)
 }
 
 /* Config CGTT_SQ_CLK_CTRL */
-int amdgpu_amdkfd_config_sq_perfmon(struct amdgpu_device *adev, uint32_t xcp_id,
+int amdgpu_amdkfd_config_sq_perfmon(struct amdgpu_device *adev, uint32_t xcc_id,
 	bool core_override_enable, bool reg_override_enable, bool perfmon_override_enable)
 {
 	int r;
@@ -949,7 +949,7 @@ int amdgpu_amdkfd_config_sq_perfmon(struct amdgpu_device *adev, uint32_t xcp_id,
 	if (!adev->kfd.init_complete)
 		return 0;
 
-	r = psp_config_sq_perfmon(&adev->psp, xcp_id, core_override_enable,
+	r = psp_config_sq_perfmon(&adev->psp, xcc_id, core_override_enable,
 					reg_override_enable, perfmon_override_enable);
 
 	return r;
