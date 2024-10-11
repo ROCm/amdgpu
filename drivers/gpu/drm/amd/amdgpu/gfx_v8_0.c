@@ -5279,7 +5279,7 @@ static void gfx_v8_0_write_data_to_reg(struct amdgpu_ring *ring, int eng_sel,
 	amdgpu_ring_write(ring, val);
 }
 
-static void gfx_v8_0_spm_start(struct amdgpu_device *adev)
+static void gfx_v8_0_spm_start(struct amdgpu_device *adev, int xcc_id)
 {
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[0].ring;
 	uint32_t data = 0;
@@ -5304,7 +5304,7 @@ static void gfx_v8_0_spm_start(struct amdgpu_device *adev)
 	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false, mmRLC_SPM_INT_CNTL, 1);
 }
 
-static void gfx_v8_0_spm_stop(struct amdgpu_device *adev)
+static void gfx_v8_0_spm_stop(struct amdgpu_device *adev, int xcc_id)
 {
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[0].ring;
 	uint32_t data = 0;
@@ -5318,7 +5318,7 @@ static void gfx_v8_0_spm_stop(struct amdgpu_device *adev)
 	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false, mmCP_PERFMON_CNTL, data);
 }
 
-static void gfx_v8_0_spm_set_rdptr(struct amdgpu_device *adev,  u32 rptr)
+static void gfx_v8_0_spm_set_rdptr(struct amdgpu_device *adev, int xcc_id,  u32 rptr)
 {
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[0].ring;
 
@@ -5326,7 +5326,7 @@ static void gfx_v8_0_spm_set_rdptr(struct amdgpu_device *adev,  u32 rptr)
 }
 
 static void gfx_v8_0_set_spm_perfmon_ring_buf(struct amdgpu_device *adev,
-		u64 gpu_addr, u32 size)
+		int xcc_id, u64 gpu_addr, u32 size)
 {
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[0].ring;
 
@@ -6915,7 +6915,7 @@ static int gfx_v8_0_spm_irq(struct amdgpu_device *adev,
 			     struct amdgpu_irq_src *source,
 			     struct amdgpu_iv_entry *entry)
 {
-	amdgpu_amdkfd_rlc_spm_interrupt(adev);
+	amdgpu_amdkfd_rlc_spm_interrupt(adev, 0);
 	return 0;
 }
 
