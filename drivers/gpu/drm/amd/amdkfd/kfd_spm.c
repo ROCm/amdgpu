@@ -698,7 +698,7 @@ int kfd_rlc_spm(struct kfd_process *p,  void *data)
 	return -EINVAL;
 }
 
-void kgd2kfd_spm_interrupt(struct kfd_dev *kfd)
+void kgd2kfd_spm_interrupt(struct kfd_dev *kfd, int xcc_id)
 {
 	struct kfd_process_device *pdd;
 	struct kfd_node *dev;
