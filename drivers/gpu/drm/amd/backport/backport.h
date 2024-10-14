@@ -122,4 +122,5 @@
 #include <kcl/backport/kcl_drm_fbdev_ttm.h>
 #include <kcl/kcl_drm_vblank.h>
 #include <kcl/kcl_uuid.h>
+#include <kcl/kcl_pm_runtime.h>
 #endif /* AMDGPU_BACKPORT_H */

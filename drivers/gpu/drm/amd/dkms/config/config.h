@@ -906,8 +906,14 @@
 /* vm_insert_mixed() wants pfn_t arg */
 /* #undef HAVE_PFN_T_VM_INSERT_MIXED */
 
-/* pm_genpd_remove_device() wants 2 arguments */
-/* #undef HAVE_PM_GENPD_REMOVE_DEVICE_2ARGS */
+/* PIDTYPE is availablea */
+#define HAVE_PIDTYPE_TGID 1
+
+/* pm_runtime_resume_and_get() is available */
+#define HAVE_PM_RUNTIME_RESUME_AND_GET 1
+
+/* pm_suspend_target_state is available */
+#define HAVE_PM_SUSPEND_TARGET_STATE 1
 
 /* pm_suspend_via_firmware() is available */
 #define HAVE_PM_SUSPEND_VIA_FIRMWARE 1
