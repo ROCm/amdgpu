@@ -1971,6 +1971,7 @@ gmc_v9_0_init_acpi_mem_ranges(struct amdgpu_device *adev,
 
 	adev->gmc.num_mem_partitions = num_ranges;
 }
+#endif
 
 static void
 gmc_v9_0_init_sw_mem_ranges(struct amdgpu_device *adev,
@@ -2043,6 +2044,7 @@ gmc_v9_0_init_sw_mem_ranges(struct amdgpu_device *adev,
 		((u64)mem_ranges[l].range.fpfn << AMDGPU_GPU_PAGE_SHIFT);
 }
 
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 static int gmc_v9_0_init_mem_ranges(struct amdgpu_device *adev)
 {
 	bool valid;
