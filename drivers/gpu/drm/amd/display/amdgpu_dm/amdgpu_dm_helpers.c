@@ -1297,6 +1297,7 @@ bool dm_helpers_is_dp_sink_present(struct dc_link *link)
 }
 EXPORT_IF_KUNIT(dm_helpers_is_dp_sink_present);
 
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 STATIC_IFN_KUNIT int
 dm_helpers_probe_acpi_edid(void *data, u8 *buf, unsigned int block, size_t len)
 {
@@ -1359,6 +1360,7 @@ dm_helpers_read_acpi_edid(struct amdgpu_dm_connector *aconnector)
 	return drm_edid_read_custom(connector, dm_helpers_probe_acpi_edid, connector);
 }
 EXPORT_IF_KUNIT(dm_helpers_read_acpi_edid);
+#endif
 
 STATIC_IFN_KUNIT const struct drm_edid *
 dm_helpers_read_vbios_hardcoded_edid(struct dc_link *link, struct amdgpu_dm_connector *aconnector)
@@ -1481,7 +1483,9 @@ enum dc_edid_status dm_helpers_read_local_edid(
 	struct i2c_adapter *ddc;
 	int retry = 25;
 	enum dc_edid_status edid_status = EDID_NO_RESPONSE;
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	const struct drm_edid *drm_edid;
+#endif
 	const struct edid *edid;
 
 	if (link->aux_mode)
@@ -1499,6 +1503,7 @@ enum dc_edid_status dm_helpers_read_local_edid(
 	 * do check sum and retry to make sure read correct edid.
 	 */
 	do {
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		drm_edid = dm_helpers_read_acpi_edid(aconnector);
 		if (drm_edid)
 			drm_info(connector->dev, "Using ACPI provided EDID for %s\n", connector->name);
@@ -1507,22 +1512,35 @@ enum dc_edid_status dm_helpers_read_local_edid(
 		else
 			drm_edid = drm_edid_read_ddc(connector, ddc);
 		drm_edid_connector_update(connector, drm_edid);
+#else
+		edid = drm_get_edid(&aconnector->base, ddc);
+#endif
 
 #ifdef HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM
 		/* DP Compliance Test 4.2.2.6 */
 		if (link->aux_mode && connector->edid_corrupt)
 			drm_dp_send_real_edid_checksum(&aconnector->dm_dp_aux.aux, connector->real_edid_checksum);
 
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		if (!drm_edid && connector->edid_corrupt) {
+#else
+		if (!edid && connector->edid_corrupt) {
+#endif
 			connector->edid_corrupt = false;
 			return EDID_BAD_CHECKSUM;
 		}
 #endif
 
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		if (!drm_edid)
+#else
+		if (!edid)
+#endif
 			continue;
 
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		edid = drm_edid_raw(drm_edid); // FIXME: Get rid of drm_edid_raw()
+#endif
 		/*
 		 * Use the length of the EDID property blob populated by
 		 * drm_edid_connector_update() above. It reflects the true number
@@ -1545,7 +1563,11 @@ enum dc_edid_status dm_helpers_read_local_edid(
 		memmove(sink->dc_edid.raw_edid, (uint8_t *)edid, sink->dc_edid.length);
 
 		/* We don't need the original edid anymore */
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		drm_edid_free(drm_edid);
+#else
+		kfree(edid);
+#endif
 
 		edid_status = dm_helpers_parse_edid_caps(
 						link,
