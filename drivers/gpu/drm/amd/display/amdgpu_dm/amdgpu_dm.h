@@ -800,7 +800,11 @@ struct amdgpu_dm_connector {
 
 	/* we need to mind the EDID between detect
 	   and get modes due to analog/digital/tvencoder */
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	const struct drm_edid *drm_edid;
+#else
+	struct edid *edid;
+#endif
 
 	/* shared with amdgpu */
 	struct amdgpu_hpd hpd;
@@ -1098,7 +1102,11 @@ void dm_restore_drm_connector_state(struct drm_device *dev,
 				    struct drm_connector *connector);
 
 void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 				    const struct drm_edid *drm_edid, bool do_mccs);
+#else
+					struct edid *edid, bool do_mccs);
+#endif
 
 void amdgpu_dm_trigger_timing_sync(struct drm_device *dev);
 
