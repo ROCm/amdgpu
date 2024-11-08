@@ -1117,7 +1117,7 @@ static void gmc_v9_0_get_coherence_flags(struct amdgpu_device *adev,
 	bool snoop = false;
 	bool is_local;
 
-	dma_resv_assert_held(bo->tbo.base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(&bo->tbo));
 
 	switch (gc_ip_version) {
 	case IP_VERSION(9, 4, 1):
