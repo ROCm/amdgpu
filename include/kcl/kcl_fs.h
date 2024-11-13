@@ -19,4 +19,11 @@ static inline long compat_ptr_ioctl(struct file *file, unsigned int cmd,
 #define compat_ptr_ioctl NULL
 #endif /* CONFIG_COMPAT */
 #endif /* HAVE_COMPAT_PTR_IOCTL */
+
+#ifdef HAVE_FILE_OPERATION_FOP_FLAGS
+#ifndef FOP_UNSIGNED_OFFSET
+#define FOP_UNSIGNED_OFFSET ((__force fop_flags_t)(1 << 5))
+#endif
+#endif
+
 #endif
