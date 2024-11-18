@@ -116,4 +116,16 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
     dnl # move asm/unaligned.h to linux/unaligned.h
     dnl #
     AC_KERNEL_CHECK_HEADERS([linux/unaligned.h])
+
+    dnl #
+    dnl # v6.11-rc7-1514-gd07fdf922592
+    dnl # drm: Add client-agnostic setup helper
+    dnl #
+    AC_KERNEL_CHECK_HEADERS([drm/drm_client_setup.h])
+
+    dnl #
+    dnl # v6.12-rc6-1222-gb86711c6d6e2
+    dnl # drm/client: Move public client header to clients/ subdirectory
+    dnl #
+    AC_KERNEL_CHECK_HEADERS([drm/clients/drm_client_setup.h])
 ])
