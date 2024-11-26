@@ -153,7 +153,7 @@ void amdgpu_evf_mgr_detach_fence(struct amdgpu_eviction_fence_mgr *evf_mgr,
 {
 	struct dma_fence *stub = dma_fence_get_stub();
 
-	dma_resv_replace_fences(bo->tbo.base.resv, evf_mgr->ev_fence_ctx,
+	dma_resv_replace_fences(amdkcl_ttm_resvp(&bo->tbo), evf_mgr->ev_fence_ctx,
 				stub, DMA_RESV_USAGE_BOOKKEEP);
 	dma_fence_put(stub);
 }
