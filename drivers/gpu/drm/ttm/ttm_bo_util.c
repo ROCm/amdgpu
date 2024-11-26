@@ -945,7 +945,7 @@ static void ttm_bo_lru_cursor_cleanup_bo(struct ttm_bo_lru_cursor *curs)
 
 	if (bo) {
 		if (curs->needs_unlock)
-			dma_resv_unlock(bo->base.resv);
+			dma_resv_unlock(amdkcl_ttm_resvp(bo));
 		ttm_bo_put(bo);
 		curs->bo = NULL;
 	}
@@ -1003,7 +1003,7 @@ ttm_bo_from_res_reserved(struct ttm_resource *res, struct ttm_bo_lru_cursor *cur
 
 	if (!ttm_bo_get_unless_zero(bo)) {
 		if (curs->needs_unlock)
-			dma_resv_unlock(bo->base.resv);
+			dma_resv_unlock(amdkcl_ttm_resvp(bo));
 		return NULL;
 	}
 
@@ -1157,7 +1157,7 @@ bool ttm_bo_shrink_suitable(struct ttm_buffer_object *bo, struct ttm_operation_c
 {
 	return bo->ttm && ttm_tt_is_populated(bo->ttm) && !bo->pin_count &&
 		(!ctx->no_wait_gpu ||
-		 dma_resv_test_signaled(bo->base.resv, DMA_RESV_USAGE_BOOKKEEP));
+		 dma_resv_test_signaled(amdkcl_ttm_resvp(bo), DMA_RESV_USAGE_BOOKKEEP));
 }
 EXPORT_SYMBOL(ttm_bo_shrink_suitable);
 
