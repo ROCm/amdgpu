@@ -520,7 +520,7 @@ static uint32_t kgd_gfx_v9_4_3_hqd_sdma_get_doorbell(struct amdgpu_device *adev,
 	return is_active ? doorbell_off >> 2 : 0;
 }
 
-void kgd_gfx_v9_4_3_override_core_cg(struct amdgpu_device *adev,
+static void kgd_gfx_v9_4_3_override_core_cg(struct amdgpu_device *adev,
 					    uint32_t value,
 					    uint32_t inst)
 {
