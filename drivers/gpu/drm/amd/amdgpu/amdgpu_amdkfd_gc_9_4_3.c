@@ -590,7 +590,7 @@ static int kgd_gfx_v9_4_3_hqd_sdma_get_counter(struct amdgpu_device *adev,
 	return 0;
 }
 
-void kgd_gfx_v9_4_3_override_core_cg(struct amdgpu_device *adev,
+static void kgd_gfx_v9_4_3_override_core_cg(struct amdgpu_device *adev,
 					    uint32_t value,
 					    uint32_t inst)
 {
