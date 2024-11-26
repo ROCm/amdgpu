@@ -36,9 +36,10 @@
  * 0.3 - Fix gfx9_4_3 SQ hang issue
  * 1.1 - Support gfx9_4_3 Stochastic PC sampling
  * 1.2 - Support gfx9_5_0 Host Trap PC sampling
+ * 1.3 - Update 1st level trap handler for Stochastic PC sampling
  */
 #define KFD_IOCTL_PCS_MAJOR_VERSION	1
-#define KFD_IOCTL_PCS_MINOR_VERSION	1
+#define KFD_IOCTL_PCS_MINOR_VERSION	3
 
 struct supported_pc_sample_info {
 	uint32_t ip_version;
