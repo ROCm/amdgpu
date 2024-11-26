@@ -399,7 +399,7 @@ static int amdgpu_amdkfd_remove_eviction_fence(struct amdgpu_bo *bo,
  */
 void amdgpu_amdkfd_remove_all_eviction_fences(struct amdgpu_bo *bo)
 {
-	struct dma_resv *resv = &bo->tbo.base._resv;
+	struct dma_resv *resv = &amdkcl_ttm_resv(&bo->tbo);
 	struct dma_fence *fence, *stub;
 	struct dma_resv_iter cursor;
 
