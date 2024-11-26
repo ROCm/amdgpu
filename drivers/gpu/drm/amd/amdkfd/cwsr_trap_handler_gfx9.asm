@@ -113,6 +113,8 @@ var SQ_WAVE_TRAPSTS_POST_SAVECTX_SIZE	=   21
 var SQ_WAVE_TRAPSTS_ILLEGAL_INST_MASK	=   0x800
 var SQ_WAVE_TRAPSTS_EXCP_HI_MASK	=   0x7000
 var SQ_WAVE_TRAPSTS_XNACK_ERROR_MASK	=   0x10000000
+var SQ_WAVE_TRAPSTS_PERF_SNAPSHOT_MASK  =   0x4000000
+var SQ_WAVE_TRAPSTS_PERF_SNAPSHOT_SHIFT  =   26
 
 var SQ_WAVE_MODE_EXCP_EN_SHIFT		=   12
 var SQ_WAVE_MODE_EXCP_EN_ADDR_WATCH_SHIFT	= 19
@@ -129,7 +131,9 @@ var TTMP_DEBUG_TRAP_ENABLED_MASK	=   0x800000
 var TTMP_HOST_TRAP_ENABLED_SHIFT	=   24
 var TTMP_HOST_TRAP_ENABLED_MASK		=   0x1000000
 var TTMP_FEATURES_ENABLED_FLAGS_SHIFT	=   TTMP_DEBUG_TRAP_ENABLED_SHIFT
-var TTMP_FEATURES_ENABLED_FLAGS_MASK	=   TTMP_DEBUG_TRAP_ENABLED_MASK | TTMP_HOST_TRAP_ENABLED_MASK
+var TTMP_STOCHASTIC_TRAP_ENABLED_SHIFT   =   25
+var TTMP_STOCHASTIC_TRAP_ENABLED_MASK    =   0x2000000
+var TTMP_FEATURES_ENABLED_FLAGS_MASK     =   TTMP_DEBUG_TRAP_ENABLED_MASK | TTMP_HOST_TRAP_ENABLED_MASK | TTMP_STOCHASTIC_TRAP_ENABLED_MASK
 
 /*	Save	    */
 var S_SAVE_BUF_RSRC_WORD1_STRIDE	=   0x00040000		//stride is 4 bytes
@@ -137,10 +141,10 @@ var S_SAVE_BUF_RSRC_WORD3_MISC		=   0x00807FAC		//SQ_SEL_X/Y/Z/W, BUF_NUM_FORMAT
 var S_SAVE_PC_HI_TRAP_ID_MASK		=   0x00FF0000
 var S_SAVE_PC_HI_HT_MASK		=   0x01000000
 var S_SAVE_PC_HI_HT_SHIFT		=   24
-var S_SAVE_PC_HI_NON_DRIVER_MASKABLE_TRAP	=   29	// Only used by the 1st level trap handler to remember if
-							// we saw a trap type that the driver could not mask, so that
-							// we can still go to the 2nd-level handler if we driver-mask another
-							// simultaneous trap.
+var S_SAVE_PC_HI_NEED_2ND_LVL_TH	=   29	// Only used by the 1st level trap handler to remember if
+						// we saw a trap type that the driver could not mask, or
+						// a maskable trap that should not be masked.  This is
+						// indicates that we must go to the 2nd level trap handler.
 var S_SAVE_SPI_INIT_FIRST_WAVE_MASK	=   0x04000000		//bit[26]: FirstWaveInTG
 var S_SAVE_SPI_INIT_FIRST_WAVE_SHIFT	=   26
 
@@ -245,6 +249,10 @@ L_HALTED:
     // Host trap may occur while wave is halted.
     s_bitcmp1_b32   s_save_pc_hi, S_SAVE_PC_HI_HT_SHIFT
     s_cbranch_scc1  L_FETCH_2ND_TRAP_DRIVER_MASKABLE
+#if ASIC_FAMILY >= CHIP_GC_9_4_3
+    s_bitcmp1_b32   s_save_trapsts, SQ_WAVE_TRAPSTS_PERF_SNAPSHOT_SHIFT
+    s_cbranch_scc1  L_FETCH_2ND_TRAP_DRIVER_MASKABLE
+#endif
 
 L_CHECK_SAVE:
     s_and_b32       ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK    //check whether this is for save
@@ -311,11 +319,17 @@ end
     s_bitcmp1_b32   s_save_pc_hi, S_SAVE_PC_HI_HT_SHIFT
     s_cbranch_scc1  L_FETCH_2ND_TRAP_DRIVER_MASKABLE
 
+#if ASIC_FAMILY >= CHIP_GC_9_4_3
+    // Check for perf snapshot
+    s_bitcmp1_b32   s_save_trapsts, SQ_WAVE_TRAPSTS_PERF_SNAPSHOT_SHIFT
+    s_cbranch_scc1  L_FETCH_2ND_TRAP_DRIVER_MASKABLE
+#endif
+
     s_and_b32       ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK
     s_cbranch_scc1  L_SAVE
 
 L_FETCH_2ND_TRAP:
-    s_bitset1_b32   s_save_pc_hi, S_SAVE_PC_HI_NON_DRIVER_MASKABLE_TRAP
+    s_bitset1_b32   s_save_pc_hi, S_SAVE_PC_HI_NEED_2ND_LVL_TH
 L_FETCH_2ND_TRAP_DRIVER_MASKABLE:
     // Preserve and clear scalar XNACK state before issuing scalar reads.
     save_and_clear_ib_sts(ttmp14)
@@ -336,8 +350,8 @@ L_NO_SIGN_EXTEND_TMA:
     s_load_dwordx2  [ttmp14, ttmp15], [ttmp14, ttmp15], 0x8 glc:1 // second-level TMA
     s_waitcnt       lgkmcnt(0)
 
-    // Put debug enable bit and host trap bit into SAVE_IB_STS register, bits
-    // 23 and 24, respectively.
+    // Put debug enable bit, stochastic trap bit, and host trap bit into SAVE_IB_STS register, bits
+    // 23-25, respectively
     s_lshl_b32      s_tma_flags, s_tma_flags, TTMP_FEATURES_ENABLED_FLAGS_SHIFT
     s_andn2_b32     s_save_ib_sts, s_save_ib_sts, TTMP_FEATURES_ENABLED_FLAGS_MASK
     s_or_b32        s_save_ib_sts, s_save_ib_sts, s_tma_flags
@@ -345,28 +359,51 @@ L_NO_SIGN_EXTEND_TMA:
     // If not a host trap, then driver cannot mask this. Go to the 2nd-level
     // trap handler now.
     s_bitcmp1_b32   s_save_pc_hi, S_SAVE_PC_HI_HT_SHIFT
-    s_cbranch_scc0  L_GOTO_2ND_TRAP
+    s_cbranch_scc0  L_CHECK_STOC
 
     // If driver said host traps are OK, go to the 2nd-level handler now.
     s_bitcmp1_b32   s_save_ib_sts, TTMP_HOST_TRAP_ENABLED_SHIFT
-    s_cbranch_scc1  L_GOTO_2ND_TRAP
+    s_cbranch_scc0  L_MASKED_HT
+    s_bitset1_b32   s_save_pc_hi, S_SAVE_PC_HI_NEED_2ND_LVL_TH
+    s_branch        L_CHECK_STOC
 
+L_MASKED_HT:
     // The driver said host traps are masked, zero out host trap and trapID.
     s_andn2_b32     s_save_pc_hi, s_save_pc_hi, (S_SAVE_PC_HI_TRAP_ID_MASK|S_SAVE_PC_HI_HT_MASK)
+#if ASIC_FAMILY >= CHIP_GC_9_4_3
     s_setreg_imm32_b32 hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_HOST_TRAP_SHIFT, 1), 0x0
+#endif
 
-    // If there was another trap besides this masked host trap, go handle it in
-    // 2nd-level handler.
-    s_bitcmp1_b32   s_save_pc_hi, S_SAVE_PC_HI_NON_DRIVER_MASKABLE_TRAP
-    s_bitset0_b32   s_save_pc_hi, S_SAVE_PC_HI_NON_DRIVER_MASKABLE_TRAP // zero this out
-    s_cbranch_scc0  L_EXIT_TRAP // Otherwise, exit the trap handler
+L_CHECK_STOC:
+#if ASIC_FAMILY >= CHIP_GC_9_4_3
+    // If TRAPSTS says we did not have a stochastic sampling trap, then driver cannot mask this
+    s_getreg_b32     ttmp7, hwreg(HW_REG_TRAPSTS)
+    s_bitcmp1_b32    ttmp7, SQ_WAVE_TRAPSTS_PERF_SNAPSHOT_SHIFT
+    s_cbranch_scc0   L_CHECK_REMAINING_EXCP
+    // If stochastic sampling trap was requested, should it be masked by the driver?
+    s_bitcmp1_b32    s_save_ib_sts, TTMP_STOCHASTIC_TRAP_ENABLED_SHIFT
+    // If driver said stochastic traps are OK, allow the 2nd-level handler to take host trap
+    s_cbranch_scc0   L_MASKED_STOC
+    s_bitset1_b32    s_save_pc_hi, S_SAVE_PC_HI_NEED_2ND_LVL_TH
+    s_branch         L_CHECK_REMAINING_EXCP
+
+L_MASKED_STOC:
+    // Otherwise, zero out TRAPSTS.stochastic_perf_snapshot bit, so possible 2nd level does not handle it
+    s_setreg_imm32_b32 hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_PERF_SNAPSHOT_SHIFT, 1), 0x0
+#endif
+
+L_CHECK_REMAINING_EXCP:
+    // Check if we found any reason to go to the 2nd level trap handler.
+    s_bitcmp1_b32    s_save_pc_hi, S_SAVE_PC_HI_NEED_2ND_LVL_TH
+    s_bitset0_b32    s_save_pc_hi, S_SAVE_PC_HI_NEED_2ND_LVL_TH // zero this out
+    s_cbranch_scc0   L_EXIT_TRAP // Otherwise, exit the trap handler
 
 L_GOTO_2ND_TRAP:
     // Reset bits used temporarily by 1st level trap handler so they do not
     // leak to the 2nd level trap handler.
     s_bitset0_b32   s_save_ib_sts, TTMP_HOST_TRAP_ENABLED_SHIFT
-    s_bitset0_b32   s_save_pc_hi, S_SAVE_PC_HI_NON_DRIVER_MASKABLE_TRAP
-
+    s_bitset0_b32   s_save_ib_sts, TTMP_STOCHASTIC_TRAP_ENABLED_SHIFT
+    s_bitset0_b32   s_save_pc_hi,  S_SAVE_PC_HI_NEED_2ND_LVL_TH
     s_and_b64       [ttmp2, ttmp3], [ttmp2, ttmp3], [ttmp2, ttmp3]
     s_cbranch_scc0  L_NO_NEXT_TRAP // second-level trap handler not been set
     s_setpc_b64     [ttmp2, ttmp3] // jump to second-level trap handler
