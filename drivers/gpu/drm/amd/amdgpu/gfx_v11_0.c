@@ -6454,14 +6454,24 @@ static int gfx_v11_0_eop_irq(struct amdgpu_device *adev,
 
 	if (adev->enable_mes && doorbell_offset) {
 		struct amdgpu_userq_fence_driver *fence_drv = NULL;
-		struct xarray *xa = &adev->userq_xa;
 		unsigned long flags;
+#ifdef HAVE_STRUCT_XARRAY
+		struct xarray *xa = &adev->userq_xa;
 
 		xa_lock_irqsave(xa, flags);
 		fence_drv = xa_load(xa, doorbell_offset);
 		if (fence_drv)
 			amdgpu_userq_fence_driver_process(fence_drv);
 		xa_unlock_irqrestore(xa, flags);
+#else
+		struct idr *idr = &adev->userq_idr;
+
+		spin_lock_irqsave(&adev->userq_lock, flags);
+		fence_drv = idr_find(idr, doorbell_offset);
+		if (fence_drv)
+			amdgpu_userq_fence_driver_process(fence_drv);
+		spin_unlock_irqrestore(&adev->userq_lock, flags);
+#endif
 	} else {
 		me_id = (entry->ring_id & 0x0c) >> 2;
 		pipe_id = (entry->ring_id & 0x03) >> 0;

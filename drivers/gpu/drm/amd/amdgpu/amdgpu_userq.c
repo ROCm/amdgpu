@@ -475,7 +475,12 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
 	}
 
 	queue->doorbell_index = index;
+#ifdef HAVE_STRUCT_XARRAY
 	xa_init_flags(&queue->fence_drv_xa, XA_FLAGS_ALLOC);
+#else
+	idr_init(&queue->fence_drv_idr);
+	spin_lock_init(&queue->fence_drv_lock);
+#endif
 	r = amdgpu_userq_fence_driver_alloc(adev, queue);
 	if (r) {
 		drm_file_err(uq_mgr->file, "Failed to alloc fence driver\n");
