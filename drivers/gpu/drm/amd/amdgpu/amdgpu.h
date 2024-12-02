@@ -1117,6 +1117,7 @@ struct amdgpu_device {
 	 * in the EOP interrupt handler to signal the particular user
 	 * queue fence.
 	 */
+#ifdef HAVE_STRUCT_XARRAY
 	struct xarray			userq_xa;
 	/**
 	 * @userq_doorbell_xa: Global user queue map (doorbell index → queue)
@@ -1124,6 +1125,10 @@ struct amdgpu_device {
 	 * Value: struct amdgpu_usermode_queue
 	 */
 	struct xarray userq_doorbell_xa;
+#else
+	struct idr			userq_idr;
+	spinlock_t			userq_lock;
+#endif
 
 	/* df */
 	struct amdgpu_df                df;
