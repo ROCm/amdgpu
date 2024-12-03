@@ -2388,15 +2388,9 @@ static int amdgpu_debugfs_gfx_sched_mask_get(void *data, u64 *val)
 	return 0;
 }
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(amdgpu_debugfs_gfx_sched_mask_fops,
 			 amdgpu_debugfs_gfx_sched_mask_get,
 			 amdgpu_debugfs_gfx_sched_mask_set, "%llx\n");
-#else
-DEFINE_SIMPLE_ATTRIBUTE(amdgpu_debugfs_gfx_sched_mask_fops,
-			 amdgpu_debugfs_gfx_sched_mask_get,
-			 amdgpu_debugfs_gfx_sched_mask_set, "%llx\n");
-#endif
 
 #endif
 
@@ -2465,15 +2459,9 @@ static int amdgpu_debugfs_compute_sched_mask_get(void *data, u64 *val)
 	return 0;
 }
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(amdgpu_debugfs_compute_sched_mask_fops,
 			 amdgpu_debugfs_compute_sched_mask_get,
 			 amdgpu_debugfs_compute_sched_mask_set, "%llx\n");
-#else
-DEFINE_SIMPLE_ATTRIBUTE(amdgpu_debugfs_compute_sched_mask_fops,
-			 amdgpu_debugfs_compute_sched_mask_get,
-			 amdgpu_debugfs_compute_sched_mask_set, "%llx\n");
-#endif
 
 #endif
 
