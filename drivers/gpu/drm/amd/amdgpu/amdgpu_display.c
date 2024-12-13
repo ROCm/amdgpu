@@ -1896,6 +1896,7 @@ int amdgpu_display_resume_helper(struct amdgpu_device *adev)
  */
 static struct amdgpu_bo *panic_abo;
 
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER
 /* Use the indirect MMIO to write each pixel to the GPU VRAM,
  * This is a simplified version of amdgpu_device_mm_access()
  */
@@ -1975,3 +1976,4 @@ int amdgpu_display_get_scanout_buffer(struct drm_plane *plane,
 
 	return 0;
 }
+#endif
