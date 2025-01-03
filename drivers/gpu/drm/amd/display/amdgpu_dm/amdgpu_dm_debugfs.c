@@ -346,7 +346,6 @@ static ssize_t dp_link_settings_write(struct file *f, const char __user *buf,
 	return size;
 }
 
-#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
 static bool dp_mst_is_end_device(struct amdgpu_dm_connector *aconnector)
 {
 	bool is_end_device = false;
@@ -357,11 +356,20 @@ static bool dp_mst_is_end_device(struct amdgpu_dm_connector *aconnector)
 		mgr = &aconnector->mst_root->mst_mgr;
 		port = aconnector->mst_output_port;
 
+		/* The base.lock was introduced in version 4.20, while the write
+		 * lock was added in DRM version 5.4.0. Since RHEL 7.9 uses DRM version
+		 * 5.0.10, write operations do not include locking. Consequently, read
+		 * operations here also do not require locking.
+		*/
+#ifdef HAVE_DRM_PRIVATE_OBJ_LOCK
 		drm_modeset_lock(&mgr->base.lock, NULL);
+#endif
 		if (port->pdt == DP_PEER_DEVICE_SST_SINK ||
 			port->pdt == DP_PEER_DEVICE_DP_LEGACY_CONV)
 			is_end_device = true;
+#ifdef HAVE_DRM_PRIVATE_OBJ_LOCK
 		drm_modeset_unlock(&mgr->base.lock);
+#endif
 	}
 
 	return is_end_device;
@@ -493,7 +501,6 @@ static ssize_t dp_mst_link_setting(struct file *f, const char __user *buf,
 	kfree(wr_buf);
 	return size;
 }
-#endif
 /* function: get current DP PHY settings: voltage swing, pre-emphasis,
  * post-cursor2 (defined by VESA DP specification)
  *
@@ -2830,7 +2837,6 @@ static int target_backlight_show(struct seq_file *m, void *unused)
  *	cat /sys/kernel/debug/dri/0/DP-X/is_mst_connector
  *
  */
-#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
 static int dp_is_mst_connector_show(struct seq_file *m, void *unused)
 {
 	struct drm_connector *connector = m->private;
@@ -2851,11 +2857,15 @@ static int dp_is_mst_connector_show(struct seq_file *m, void *unused)
 		mgr = &aconnector->mst_root->mst_mgr;
 		port = aconnector->mst_output_port;
 
+#ifdef HAVE_DRM_PRIVATE_OBJ_LOCK
 		drm_modeset_lock(&mgr->base.lock, NULL);
+#endif
 		if (port->pdt == DP_PEER_DEVICE_MST_BRANCHING &&
 			port->mcs)
 			role = "branch";
+#ifdef HAVE_DRM_PRIVATE_OBJ_LOCK
 		drm_modeset_unlock(&mgr->base.lock);
+#endif
 
 	} else {
 		role = "no";
@@ -2867,7 +2877,6 @@ static int dp_is_mst_connector_show(struct seq_file *m, void *unused)
 
 	return 0;
 }
-#endif
 
 /*
  * function description: Read out the mst progress status
@@ -2996,9 +3005,7 @@ DEFINE_SHOW_ATTRIBUTE(internal_display);
 DEFINE_SHOW_ATTRIBUTE(odm_combine_segments);
 DEFINE_SHOW_ATTRIBUTE(replay_capability);
 DEFINE_SHOW_ATTRIBUTE(psr_capability);
-#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
 DEFINE_SHOW_ATTRIBUTE(dp_is_mst_connector);
-#endif
 DEFINE_SHOW_ATTRIBUTE(dp_mst_progress_status);
 DEFINE_SHOW_ATTRIBUTE(is_dpia_link);
 DEFINE_SHOW_STORE_ATTRIBUTE(hdmi_cec_state);
@@ -3099,13 +3106,12 @@ static const struct file_operations dp_dsc_disable_passthrough_debugfs_fops = {
 	.write = dp_dsc_passthrough_set,
 	.llseek = default_llseek
 };
-#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
+
 static const struct file_operations dp_mst_link_settings_debugfs_fops = {
 	.owner = THIS_MODULE,
 	.write = dp_mst_link_setting,
 	.llseek = default_llseek
 };
-#endif
 
 static const struct {
 	char *name;
@@ -3128,14 +3134,10 @@ static const struct {
 		{"dp_dsc_fec_support", &dp_dsc_fec_support_fops},
 		{"max_bpc", &dp_max_bpc_debugfs_fops},
 		{"dsc_disable_passthrough", &dp_dsc_disable_passthrough_debugfs_fops},
-#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
 		{"is_mst_connector", &dp_is_mst_connector_fops},
-#endif
 		{"mst_progress_status", &dp_mst_progress_status_fops},
 		{"is_dpia_link", &is_dpia_link_fops},
-#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
 		{"mst_link_settings", &dp_mst_link_settings_debugfs_fops}
-#endif
 };
 
 static const struct {
