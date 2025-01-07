@@ -2,10 +2,6 @@
 #ifndef AMDKCL_DRM_BACKPORT_H
 #define AMDKCL_DRM_BACKPORT_H
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
-#define AMDKCL_AMDGPU_DMABUF_OPS
-#endif
-
 /*
  * commit v5.4-rc4-1120-gb3fac52c5193
  * drm: share address space for dma bufs
