@@ -1336,7 +1336,7 @@ static void smu_init_power_profile(struct smu_context *smu)
 	if (smu->power_profile_mode == PP_SMC_POWER_PROFILE_UNKNOWN)
 		smu->power_profile_mode =
 			PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
-	smu_power_profile_mode_get(smu, smu->power_profile_mode);
+
 }
 
 void smu_feature_cap_set(struct smu_context *smu, enum smu_feature_cap_id fea_id)
