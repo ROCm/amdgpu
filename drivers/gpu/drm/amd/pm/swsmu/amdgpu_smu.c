@@ -1309,7 +1309,7 @@ static void smu_init_power_profile(struct smu_context *smu)
 	if (smu->power_profile_mode == PP_SMC_POWER_PROFILE_UNKNOWN)
 		smu->power_profile_mode =
 			PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
-	smu_power_profile_mode_get(smu, smu->power_profile_mode);
+
 }
 
 static int smu_sw_init(struct amdgpu_ip_block *ip_block)
