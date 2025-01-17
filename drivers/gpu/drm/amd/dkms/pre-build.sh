@@ -37,6 +37,10 @@ if [ "$CC" == "gcc" ]; then
 		for f in $(find /opt/rh -type f -a -name gcc); do
 			[[ -f /boot/config-$KERNELVER ]] || continue
 			config_gcc_version=$(. /boot/config-$KERNELVER && echo $CONFIG_GCC_VERSION)
+			# CONFIG_GCC_VERSION is included in kernel v4.17-6936-ga4353898980c
+			if [ ! "$config_gcc_version" ]; then
+				config_gcc_version=$(strings /boot/vmlinuz-$KERNELVER | grep -F $KERNELVER | grep gcc | grep -oP 'gcc version \K[\d.]+')
+			fi
 			IFS='.' read -ra ver <<<$($f -dumpfullversion)
 			gcc_version=$(printf "%d%02d%02d\n" ${ver[@]})
 			if [[ "$config_gcc_version" = "$gcc_version" ]]; then
