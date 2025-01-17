@@ -25,14 +25,6 @@ endif
 
 endif
 
-include  $(src)/amd/dkms/Makefile.compiler
-
-# gcc 4.8.5 is too old for kernel >= 5.4, which will cause the compile failure.
-ifneq ($(call gcc-min-version, 40805), y)
-ifeq ($(call kernel-version, -ge, 0504, y), y)
-$(error "The GCC is too old for this kernel, please update the GCC to higher than 9.3")
-endif
-endif
 
 _is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n")
 
