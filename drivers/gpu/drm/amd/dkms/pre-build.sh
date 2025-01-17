@@ -30,6 +30,23 @@ version_le () {
     [ "$KERNELVER_BASE" = "$oldest" ]
 }
 
+if [ "$CC" == "gcc" ]; then
+	# Enable gcc-toolset for kernels that are built with non-default compiler
+	# perform this check only when permissions allow
+	if [[ -d /opt/rh && `id -u` -eq 0 ]]; then
+		for f in $(find /opt/rh -type f -a -name gcc); do
+			[[ -f /boot/config-$KERNELVER ]] || continue
+			config_gcc_version=$(. /boot/config-$KERNELVER && echo $CONFIG_GCC_VERSION)
+			IFS='.' read -ra ver <<<$($f -dumpfullversion)
+			gcc_version=$(printf "%d%02d%02d\n" ${ver[@]})
+			if [[ "$config_gcc_version" = "$gcc_version" ]]; then
+				. ${f%/*}/../../../enable
+				break
+			fi
+		done
+	fi
+fi
+
 source $KCL/files
 
 sed -i -e '/DEFINE_WD_CLASS(reservation_ww_class)/,/EXPORT_SYMBOL(reservation_ww_class)/d' \
@@ -62,23 +79,6 @@ done
 
 export KERNELVER
 ln -s $DKMS_TREE $MODULE_BUILD_DIR
-
-if [ "$CC" == "gcc" ]; then
-	# Enable gcc-toolset for kernels that are built with non-default compiler
-	# perform this check only when permissions allow
-	if [[ -d /opt/rh && `id -u` -eq 0 ]]; then
-		for f in $(find /opt/rh -type f -a -name gcc); do
-			[[ -f /boot/config-$KERNELVER ]] || continue
-			config_gcc_version=$(. /boot/config-$KERNELVER && echo $CONFIG_GCC_VERSION)
-			IFS='.' read -ra ver <<<$($f -dumpfullversion)
-			gcc_version=$(printf "%d%02d%02d\n" ${ver[@]})
-			if [[ "$config_gcc_version" = "$gcc_version" ]]; then
-				. ${f%/*}/../../../enable
-				break
-			fi
-		done
-	fi
-fi
 echo "PATH=$PATH" >$MODULE_BUILD_DIR/.env
 
 (cd $SRC && ./configure)
