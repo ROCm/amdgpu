@@ -39,10 +39,11 @@ ifneq ($(CONFIG_LD_IS_LLD),)
 module_build_flags += LD=ld.lld
 endif
 
+dkms-config ?= amd/dkms/dkms-config.mk
 config-file ?= amd/dkms/config/config.h
 KCL_MACRO_CHECK_COMMAND=$(shell grep $(1) $(config-file) | grep -q "define" && echo "y")
 
-modules: sanity-check
+modules: sanity-check $(dkms-config)
 	$(Q)$(shell cat $(module_build_dir)/.env) make -j$(num_cpu_cores) \
 		TTM_NAME=amdttm \
 		SCHED_NAME=amd-sched \
@@ -53,6 +54,9 @@ modules: sanity-check
 sanity-check: pre-build $(config-file)
 	$(if $(call KCL_MACRO_CHECK_COMMAND, HAVE_DMA_RESV_SEQ_BUG), $(error dma_resv->seq is missing. exit...))
 	$(if $(call KCL_MACRO_CHECK_COMMAND, HAVE_RESERVATION_WW_CLASS_BUG), $(error reservation_ww_class is missing. exit...))
+
+$(dkms-config): pre-build
+	$(Q)amd/dkms/dkms-config.sh $@ $(KERNELVER)
 
 pre-build:
 	$(Q)amd/dkms/pre-build.sh $(KERNELVER) $(module_src_dir) $(module_build_dir) $(CC)
