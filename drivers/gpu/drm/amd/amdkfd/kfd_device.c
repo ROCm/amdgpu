@@ -896,6 +896,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	dev_info(kfd_device, "Total number of KFD nodes to be created: %d\n",
 				kfd->num_nodes);
 
+	kfd->profiler_process = NULL;
+	mutex_init(&kfd->profiler_lock);
 	/* Allocate the KFD nodes */
 	for (i = 0, xcp_idx = 0; i < kfd->num_nodes; i++) {
 		node = kzalloc_obj(struct kfd_node);
@@ -983,6 +985,7 @@ node_init_error:
 node_alloc_error:
 	kfd_cleanup_nodes(kfd, i);
 	kfd_doorbell_fini(kfd);
+	mutex_destroy(&kfd->profiler_lock);
 kfd_doorbell_error:
 	kfd_gtt_sa_fini(kfd);
 kfd_gtt_sa_init_error:
