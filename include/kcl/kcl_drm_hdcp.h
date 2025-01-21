@@ -8,7 +8,6 @@
 #ifndef AMDKCL_DRM_HDCP_H
 #define AMDKCL_DRM_HDCP_H
 
-#ifdef CONFIG_DRM_AMD_DC_HDCP
 #include <drm/display/drm_hdcp.h>
 #include <kcl/kcl_drm_connector.h>
 
@@ -318,6 +317,5 @@ void drm_hdcp_update_content_protection(struct drm_connector *connector,
 }
 #endif /* HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION */
 
-#endif /* CONFIG_DRM_AMD_DC_HDCP */
 
 #endif /* AMDKCL_DRM_HDCP_H */
