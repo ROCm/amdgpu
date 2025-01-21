@@ -25,6 +25,7 @@ endif
 
 endif
 
+include $(src)/amd/dkms/dkms-config.mk
 
 _is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n")
 
@@ -139,20 +140,10 @@ LINUXINCLUDE := \
 	-I$(src)/include/uapi \
 	$(USER_INCLUDE)
 
-export CONFIG_HSA_AMD=y
 export CONFIG_DRM_TTM=m
 export CONFIG_DRM_AMDGPU=m
 export CONFIG_DRM_SCHED=m
-export CONFIG_DRM_AMDGPU_CIK=y
-export CONFIG_DRM_AMDGPU_SI=y
-export CONFIG_DRM_AMDGPU_USERPTR=y
-export CONFIG_DRM_AMD_DC=y
 
-subdir-ccflags-y += -DCONFIG_HSA_AMD
-subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_CIK
-subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_SI
-subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
-subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 subdir-ccflags-y += -Wno-error
 
 ifeq ($(call _is_kcl_macro_defined,HAVE_AMDKCL_HMM_MIRROR_ENABLED),y)
