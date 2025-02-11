@@ -153,13 +153,6 @@ subdir-ccflags-y += -DCONFIG_HSA_AMD_SVM
 endif
 endif
 
-ifeq (y,$(CONFIG_PCI_P2PDMA))
-  ifeq (y,$(CONFIG_DMABUF_MOVENOTIFY))
-    export CONFIG_HSA_AMD_P2P=y
-    subdir-ccflags-y += -DCONFIG_HSA_AMD_P2P
-  endif
-endif
-
 # Trying to enable DCN2/3 with core2 optimizations will result in
 # older versions of GCC hanging during building/installing. Check
 # if the compiler is using core2 optimizations and only build DCN2/3
