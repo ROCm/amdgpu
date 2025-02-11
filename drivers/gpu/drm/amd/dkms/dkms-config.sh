@@ -27,6 +27,12 @@ is_enabled() {
     grep -q "^$1=\[ym]" "${config_file}"
 }
 
+if [[ "$(get_config CONFIG_PCI_P2PDMA)" == "y" ]]; then
+    if [[ "$(get_config CONFIG_DMABUF_MOVENOTIFY)" == "y" ]]; then
+        export_macro_mk CONFIG_HSA_AMD_P2P
+    fi
+fi
+
 export_macro_mk CONFIG_HSA_AMD
 export_macro_mk CONFIG_DRM_AMDGPU_CIK
 export_macro_mk CONFIG_DRM_AMDGPU_SI
