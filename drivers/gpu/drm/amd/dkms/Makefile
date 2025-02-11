@@ -62,5 +62,7 @@ pre-build:
 	$(Q)amd/dkms/pre-build.sh $(KERNELVER) $(module_src_dir) $(module_build_dir) $(CC)
 
 clean:
+	$(Q)echo "Cleaning build files..."
 	$(Q)make -C $(kernel_build_dir) M=$(module_src_dir) clean
+	$(Q)rm -f $(dkms-config) $(config-file)
 endif
