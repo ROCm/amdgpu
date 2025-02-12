@@ -6,7 +6,6 @@ CC=$3
 local_config_tmp=${local_config}.tmp
 config_file="/lib/modules/$KERNELVER/build/include/config/auto.conf"
 kcl_config_file="amd/dkms/config/config.h"
-kernel_include="/lib/modules/$KERNELVER/build/include"
 
 rm -f ${local_config_tmp}
 
@@ -34,21 +33,9 @@ is_kcl_macro_defined() {
     grep -q "define $1" "${kcl_config_file}" && echo "y" || echo "n"
 }
 
-# Get RHEL version
-get_rhel_version() {
-    printf "#include <linux/version.h>\n$1" | $CC -I${kernel_include} -E -x c - | tail -n 1 | grep -v "$1"
-}
-
-# Get RHEL major and minor version
-RHEL_MAJOR=$(get_rhel_version "RHEL_MAJOR")
-RHEL_MINOR=$(get_rhel_version "RHEL_MINOR")
-
-# Determine OS name and version
-if [[ -n "${RHEL_MAJOR}" ]]; then
-    OS_NAME="rhel"
-    OS_VERSION="${RHEL_MAJOR}.${RHEL_MINOR}"
-elif [[ -f /etc/os-release ]]; then
+if [[ -f /etc/os-release ]]; then
     OS_NAME=$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
+    OS_VERSION=$(grep -oP '(?<=^VERSION_ID=).+' /etc/os-release | tr -d '"')
 
     # Handle special cases
     case "${OS_NAME}" in
@@ -62,12 +49,13 @@ elif [[ -f /etc/os-release ]]; then
             OS_NAME="ubuntu"
             ;;
     esac
-    OS_VERSION=$(grep -oP '(?<=^VERSION_ID=).+' /etc/os-release | tr -d '"')
 else
     OS_NAME="unknown"
     OS_VERSION="0.0"
 fi
 
+VERSION_MAJOR=$(echo ${OS_VERSION}.0 | cut -d. -f1)
+VERSION_MINOR=$(echo ${OS_VERSION}.0 | cut -d. -f2)
 OS_VERSION_STR=${OS_VERSION//./_}
 
 # Add OS specific defines
@@ -96,8 +84,8 @@ case "${OS_NAME}" in
 esac
 
 # Add OS specific compile flags
-append_mk "subdir-ccflags-y += -DOS_VERSION_MAJOR=$(echo ${OS_VERSION}.0 | cut -d. -f1)"
-append_mk "subdir-ccflags-y += -DOS_VERSION_MINOR=$(echo ${OS_VERSION}.0 | cut -d. -f2)"
+append_mk "subdir-ccflags-y += -DOS_VERSION_MAJOR=${VERSION_MAJOR}"
+append_mk "subdir-ccflags-y += -DOS_VERSION_MINOR=${VERSION_MINOR}"
 
 # Add additional OS specific configurations
 case "${OS_NAME}" in
@@ -115,10 +103,10 @@ case "${OS_NAME}" in
         ;;
     "rhel")
         append_mk "subdir-ccflags-y += -DOS_NAME_RHEL_${OS_VERSION_STR}"
-        if [[ "${RHEL_MAJOR}" == "7" ]]; then
+        if [[ "${VERSION_MAJOR}" == "7" ]]; then
             append_mk "subdir-ccflags-y += -DOS_NAME_RHEL_7_X"
             append_mk "-include /usr/src/kernels/${KERNELVER}/include/drm/drm_backport.h"
-        elif [[ "${RHEL_MAJOR}" == "8" ]]; then
+        elif [[ "${VERSION_MAJOR}" == "8" ]]; then
             append_mk "subdir-ccflags-y += -DOS_NAME_RHEL_8_X"
         fi
         ;;
