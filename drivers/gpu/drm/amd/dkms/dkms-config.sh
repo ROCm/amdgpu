@@ -4,6 +4,7 @@ local_config=$1
 KERNELVER=$2
 local_config_tmp=${local_config}.tmp
 config_file="/lib/modules/$KERNELVER/build/include/config/auto.conf"
+kcl_config_file="amd/dkms/config/config.h"
 
 rm -f ${local_config_tmp}
 
@@ -27,9 +28,20 @@ is_enabled() {
     grep -q "^$1=" "${config_file}"
 }
 
+is_kcl_macro_defined() {
+    grep -q "define $1" "${kcl_config_file}" && echo "y" || echo "n"
+}
+
 if [[ "$(get_config CONFIG_PCI_P2PDMA)" == "y" ]]; then
     if [[ "$(get_config CONFIG_DMABUF_MOVENOTIFY)" == "y" ]]; then
         export_macro_mk CONFIG_HSA_AMD_P2P
+    fi
+fi
+
+# Check for HMM mirror configuration
+if [[ "$(is_kcl_macro_defined HAVE_AMDKCL_HMM_MIRROR_ENABLED)" == "y" ]]; then
+    if is_enabled CONFIG_DEVICE_PRIVATE; then
+        export_macro_mk CONFIG_HSA_AMD_SVM
     fi
 fi
 
