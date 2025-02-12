@@ -27,8 +27,6 @@ endif
 
 include $(src)/amd/dkms/dkms-config.mk
 
-_is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n")
-
 DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(srctree)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(srctree)/Makefile)
 ifeq ($(DRM_VER),)
@@ -145,13 +143,6 @@ export CONFIG_DRM_AMDGPU=m
 export CONFIG_DRM_SCHED=m
 
 subdir-ccflags-y += -Wno-error
-
-ifeq ($(call _is_kcl_macro_defined,HAVE_AMDKCL_HMM_MIRROR_ENABLED),y)
-ifdef CONFIG_DEVICE_PRIVATE
-export CONFIG_HSA_AMD_SVM=y
-subdir-ccflags-y += -DCONFIG_HSA_AMD_SVM
-endif
-endif
 
 # Trying to enable DCN2/3 with core2 optimizations will result in
 # older versions of GCC hanging during building/installing. Check
