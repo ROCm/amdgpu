@@ -33,55 +33,25 @@ is_kcl_macro_defined() {
     grep -q "define $1" "${kcl_config_file}" && echo "y" || echo "n"
 }
 
+# Export OS variables
 if [[ -f /etc/os-release ]]; then
     OS_NAME=$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
     OS_VERSION=$(grep -oP '(?<=^VERSION_ID=).+' /etc/os-release | tr -d '"')
-
-    # Handle special cases
-    case "${OS_NAME}" in
-        "centos")
-            OS_NAME="custom-rhel"
-            ;;
-        "rhel")
-            OS_NAME="custom-rhel"
-            ;;
-        "linuxmint")
-            OS_NAME="ubuntu"
-            ;;
-    esac
 else
     OS_NAME="unknown"
     OS_VERSION="0.0"
 fi
+append_mk "export OS_NAME=${OS_NAME}"
+append_mk "export OS_VERSION=${OS_VERSION}"
 
 VERSION_MAJOR=$(echo ${OS_VERSION}.0 | cut -d. -f1)
 VERSION_MINOR=$(echo ${OS_VERSION}.0 | cut -d. -f2)
 OS_VERSION_STR=${OS_VERSION//./_}
+OS_NAME_STR=$(echo ${OS_NAME} | tr a-z A-Z)
 
-# Add OS specific defines
-case "${OS_NAME}" in
-    "ubuntu")
-        append_mk "subdir-ccflags-y += -DOS_NAME_UBUNTU"
-        ;;
-    "rhel")
-        append_mk "subdir-ccflags-y += -DOS_NAME_RHEL"
-        ;;
-    "steamos")
-        append_mk "subdir-ccflags-y += -DOS_NAME_STEAMOS"
-        ;;
-    "sled"|"sles")
-        append_mk "subdir-ccflags-y += -DOS_NAME_SLE"
-        ;;
-    "amzn")
-        append_mk "subdir-ccflags-y += -DOS_NAME_AMZ"
-        ;;
-    "debian")
-        append_mk "subdir-ccflags-y += -DOS_NAME_DEBIAN"
-        ;;
-    *)
-        append_mk "subdir-ccflags-y += -DOS_NAME_UNKNOWN"
-        ;;
-esac
+# Generate macros related to the operating system to support compilation.
+# The OS name is converted to uppercase and appended as a flag, e.g., -DOS_NAME_UBUNTU, -DOS_NAME_RHEL.
+append_mk "subdir-ccflags-y += -DOS_NAME_${OS_NAME_STR}"
 
 # Add OS specific compile flags
 append_mk "subdir-ccflags-y += -DOS_VERSION_MAJOR=${VERSION_MAJOR}"
@@ -111,10 +81,6 @@ case "${OS_NAME}" in
         fi
         ;;
 esac
-
-# Export variables
-append_mk "export OS_NAME=${OS_NAME}"
-append_mk "export OS_VERSION=${OS_VERSION}"
 
 if [[ "$(get_config CONFIG_PCI_P2PDMA)" == "y" ]]; then
     if [[ "$(get_config CONFIG_DMABUF_MOVENOTIFY)" == "y" ]]; then
