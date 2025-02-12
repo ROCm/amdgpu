@@ -56,7 +56,7 @@ sanity-check: pre-build $(config-file)
 	$(if $(call KCL_MACRO_CHECK_COMMAND, HAVE_RESERVATION_WW_CLASS_BUG), $(error reservation_ww_class is missing. exit...))
 
 $(dkms-config): pre-build
-	$(Q)amd/dkms/dkms-config.sh $@ $(KERNELVER)
+	$(Q)amd/dkms/dkms-config.sh $@ $(KERNELVER) $(CC)
 
 pre-build:
 	$(Q)amd/dkms/pre-build.sh $(KERNELVER) $(module_src_dir) $(module_build_dir) $(CC)
