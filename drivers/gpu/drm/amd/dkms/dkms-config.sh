@@ -24,7 +24,7 @@ get_config() {
 }
 
 is_enabled() {
-    grep -q "^$1=\[ym]" "${config_file}"
+    grep -q "^$1=" "${config_file}"
 }
 
 if [[ "$(get_config CONFIG_PCI_P2PDMA)" == "y" ]]; then
