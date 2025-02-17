@@ -1105,6 +1105,12 @@
 /* sysfs_emit() and sysfs_emit_at() are available */
 #define HAVE_SYSFS_EMIT 1
 
+/* time64_to_tm() is available */
+#define HAVE_TIME64_TO_TM 1
+
+/* topology_num_cores_per_package is availablea */
+#define HAVE_TOPOLOGY_NUM_CORES_PER_PACKAGE 1
+
 /* totalram_pages() is available */
 #define HAVE_TOTALRAM_PAGES 1
 
