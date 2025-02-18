@@ -1557,7 +1557,7 @@ static ssize_t amdgpu_gfx_set_run_cleaner_shader(struct device *dev,
 		return -EPERM;
 
 	if (adev->gfx.disable_kq)
-		return -ENOTSUPP;
+		return -EPERM;
 
 	ret = kstrtol(buf, 0, &value);
 
