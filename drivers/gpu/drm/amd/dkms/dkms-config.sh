@@ -75,7 +75,7 @@ case "${OS_NAME}" in
         append_mk "subdir-ccflags-y += -DOS_NAME_RHEL_${OS_VERSION_STR}"
         if [[ "${VERSION_MAJOR}" == "7" ]]; then
             append_mk "subdir-ccflags-y += -DOS_NAME_RHEL_7_X"
-            append_mk "-include /usr/src/kernels/${KERNELVER}/include/drm/drm_backport.h"
+            append_mk "subdir-ccflags-y += -include /usr/src/kernels/${KERNELVER}/include/drm/drm_backport.h"
         elif [[ "${VERSION_MAJOR}" == "8" ]]; then
             append_mk "subdir-ccflags-y += -DOS_NAME_RHEL_8_X"
         fi
