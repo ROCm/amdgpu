@@ -134,4 +134,5 @@
 #include <kcl/kcl_cec.h>
 #include <kcl/kcl_const.h>
 #include <kcl/kcl_time.h>
+#include <kcl/kcl_minmax.h>
 #endif /* AMDGPU_BACKPORT_H */
