@@ -370,7 +370,7 @@ static int amdgpu_cs_p2_ib(struct amdgpu_cs_parser *p,
 
 	/* submissions to kernel queues are disabled */
 	if (ring->no_user_submission)
-		return -ENOTSUPP;
+		return -EINVAL;
 
 	/* MM engine doesn't support user fences */
 	if (p->uf_bo && ring->funcs->no_user_fence)
