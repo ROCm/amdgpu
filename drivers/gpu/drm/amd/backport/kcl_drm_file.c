@@ -67,6 +67,7 @@ void drm_show_fdinfo(struct seq_file *m, struct file *f)
 
 	amdgpu_show_fdinfo(&p, file);
 }
+#endif
 
 #ifndef HAVE_DRM_PRINT_MEMORY_STATS
 static void print_size(struct drm_printer *p, const char *stat,
@@ -100,6 +101,4 @@ void _kcl_drm_print_memory_stats(struct drm_printer *p,
 		print_size(p, "purgeable", region, stats->purgeable);
 }
 EXPORT_SYMBOL(_kcl_drm_print_memory_stats);
-#endif
-
 #endif
