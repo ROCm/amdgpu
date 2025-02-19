@@ -4,7 +4,8 @@ local_config=$1
 KERNELVER=$2
 CC=$3
 local_config_tmp=${local_config}.tmp
-config_file="/lib/modules/$KERNELVER/build/include/config/auto.conf"
+kernel_build_dir="/lib/modules/$KERNELVER/build"
+kconfig_file="${kernel_build_dir}/include/config/auto.conf"
 kcl_config_file="amd/dkms/config/config.h"
 
 rm -f ${local_config_tmp}
@@ -22,11 +23,11 @@ _DKMS_CONFIG
 }
 
 get_config() {
-    grep "^$1=" "${config_file}" | awk -F= '{print $2}'
+    grep "^$1=" "${kconfig_file}" | awk -F= '{print $2}'
 }
 
 is_enabled() {
-    grep -q "^$1=" "${config_file}"
+    grep -q "^$1=" "${kconfig_file}"
 }
 
 is_kcl_macro_defined() {
@@ -81,6 +82,17 @@ case "${OS_NAME}" in
         fi
         ;;
 esac
+
+# Extract DRM version and patch level from the main Makefile
+DRM_VER=$(sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' ${kernel_build_dir}/Makefile)
+DRM_PATCH=$(sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' ${kernel_build_dir}/Makefile)
+
+if [ -z "${DRM_VER}" ]; then
+    DRM_VER=$(echo ${KERNELVER} | cut -d. -f1)
+    DRM_PATCH=$(echo ${KERNELVER} | cut -d. -f2)
+fi
+
+append_mk "subdir-ccflags-y += -DDRM_VER=${DRM_VER} -DDRM_PATCH=${DRM_PATCH} -DDRM_SUB=\"0\""
 
 if [[ "$(get_config CONFIG_PCI_P2PDMA)" == "y" ]]; then
     if [[ "$(get_config CONFIG_DMABUF_MOVENOTIFY)" == "y" ]]; then
