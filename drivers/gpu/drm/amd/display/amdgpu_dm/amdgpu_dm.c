@@ -8469,10 +8469,10 @@ static void create_eml_sink(struct amdgpu_dm_connector *aconnector)
 			.link = aconnector->dc_link,
 			.sink_signal = SIGNAL_TYPE_VIRTUAL
 	};
+	struct i2c_adapter *ddc;
 #ifdef HAVE_DRM_DP_MST_EDID_READ
 	const struct drm_edid *drm_edid;
 	const struct edid *edid;
-	struct i2c_adapter *ddc;
 
 	if (dc_link && dc_link->aux_mode)
 		ddc = &aconnector->dm_dp_aux.aux.ddc;
@@ -8483,9 +8483,7 @@ static void create_eml_sink(struct amdgpu_dm_connector *aconnector)
 	drm_edid_connector_update(connector, drm_edid);
 	if (!drm_edid) {
 #else
-	struct dc_link *dc_link = aconnector->dc_link;
 	struct edid *edid;
-	struct i2c_adapter *ddc;
 
 	if (dc_link->aux_mode)
 		ddc = &aconnector->dm_dp_aux.aux.ddc;
