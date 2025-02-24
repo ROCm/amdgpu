@@ -4277,11 +4277,12 @@ void amdgpu_dm_update_connector_after_detect(
 				drm_dp_cec_unset_edid(&aconnector->dm_dp_aux.aux);
 			}
 		} else {
-			const struct edid *edid = (const struct edid *)sink->dc_edid.raw_edid;
 #ifdef HAVE_DRM_DP_MST_EDID_READ
+			const struct edid *edid = (const struct edid *)sink->dc_edid.raw_edid;
 			aconnector->drm_edid = drm_edid_alloc(edid, sink->dc_edid.length);
 			drm_edid_connector_update(connector, aconnector->drm_edid);
 #else
+			struct edid *edid = (struct edid *)sink->dc_edid.raw_edid;
 			aconnector->edid = edid;
 #endif
 
