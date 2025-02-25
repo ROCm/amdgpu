@@ -93,6 +93,10 @@ export KERNELVER
 ln -s $DKMS_TREE $MODULE_BUILD_DIR
 echo "PATH=$PATH" >$MODULE_BUILD_DIR/.env
 
+# unset TMPDIR in this shell
+# otherwise conflicting package libpam-tmpdir incorrectly generates config
+unset TMPDIR
+
 (cd $SRC && ./configure)
 
 # rename CFLAGS_<path>target.o / CFLAGS_REMOVE_<path> to CFLAGS_target.o
