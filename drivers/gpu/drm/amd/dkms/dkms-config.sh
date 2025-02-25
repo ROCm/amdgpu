@@ -3,21 +3,32 @@
 local_config=$1
 KERNELVER=$2
 CC=$3
-local_config_tmp=${local_config}.tmp
 kernel_build_dir="/lib/modules/$KERNELVER/build"
 kconfig_file="${kernel_build_dir}/include/config/auto.conf"
 kcl_config_file="amd/dkms/config/config.h"
+local_config_tmp=${local_config}.tmp
+disabled_config_tmp=${local_config}.disabled.tmp
 
-rm -f ${local_config_tmp}
+echo "" > ${local_config_tmp}
+echo "" > ${disabled_config_tmp}
 
 append_mk () {
     echo $1 >> ${local_config_tmp}
 }
 
-export_macro_mk  () {
-cat <<_DKMS_CONFIG >> ${local_config_tmp}
-export $1=y
-subdir-ccflags-y += -D$1
+export_macro_mk() {
+    local config_name=$1
+    local enable=${2:-1}
+
+    if [ "$enable" -eq 1 ]; then
+        output=${local_config_tmp}
+    else
+        output=${disabled_config_tmp}
+    fi
+
+    cat <<_DKMS_CONFIG >> ${output}
+export ${config_name}=y
+subdir-ccflags-y += -D${config_name}
 
 _DKMS_CONFIG
 }
@@ -94,18 +105,23 @@ fi
 
 append_mk "subdir-ccflags-y += -DDRM_VER=${DRM_VER} -DDRM_PATCH=${DRM_PATCH} -DDRM_SUB=\"0\""
 
+# Check for P2PDMA configuration
+_enable=0
 if [[ "$(get_config CONFIG_PCI_P2PDMA)" == "y" ]]; then
     if [[ "$(get_config CONFIG_DMABUF_MOVENOTIFY)" == "y" ]]; then
-        export_macro_mk CONFIG_HSA_AMD_P2P
+        _enable=1
     fi
 fi
+export_macro_mk CONFIG_HSA_AMD_P2P ${_enable}
 
 # Check for HMM mirror configuration
+_enable=0
 if [[ "$(is_kcl_macro_defined HAVE_AMDKCL_HMM_MIRROR_ENABLED)" == "y" ]]; then
     if is_enabled CONFIG_DEVICE_PRIVATE; then
-        export_macro_mk CONFIG_HSA_AMD_SVM
+        _enable=1
     fi
 fi
+export_macro_mk CONFIG_HSA_AMD_SVM ${_enable}
 
 export_macro_mk CONFIG_HSA_AMD
 export_macro_mk CONFIG_DRM_AMDGPU_CIK
@@ -113,5 +129,12 @@ export_macro_mk CONFIG_DRM_AMDGPU_SI
 export_macro_mk CONFIG_DRM_AMDGPU_USERPTR
 export_macro_mk CONFIG_DRM_AMD_DC
 
+echo "Enabled configurations:"
 cat ${local_config_tmp}
+echo "****************"
+echo "Disabled configurations:"
+cat ${disabled_config_tmp}
+echo "****************"
+
+rm -f ${disabled_config_tmp}
 mv ${local_config_tmp} ${local_config}
