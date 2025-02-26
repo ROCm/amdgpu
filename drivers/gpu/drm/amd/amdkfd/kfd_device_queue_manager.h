@@ -334,8 +334,7 @@ bool kfd_dqm_is_queue_in_process(struct device_queue_manager *dqm,
 
 void remap_queue(struct device_queue_manager *dqm,
 				enum kfd_unmap_queues_filter filter,
-				uint32_t filter_param,
-				uint32_t grace_period);
+				uint32_t filter_param);
 
 static inline unsigned int get_sh_mem_bases_32(struct kfd_process_device *pdd)
 {
