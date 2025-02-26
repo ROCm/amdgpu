@@ -3804,12 +3804,11 @@ int debug_refresh_runlist(struct device_queue_manager *dqm)
 
 void remap_queue(struct device_queue_manager *dqm,
 				enum kfd_unmap_queues_filter filter,
-				uint32_t filter_param,
-				uint32_t grace_period)
+				uint32_t filter_param)
 {
 	dqm_lock(dqm);
 	if (!dqm->dev->kfd->shared_resources.enable_mes)
-		execute_queues_cpsch(dqm, filter, filter_param, grace_period);
+		execute_queues_cpsch(dqm, filter, filter_param, USE_DEFAULT_GRACE_PERIOD);
 	dqm_unlock(dqm);
 }
 

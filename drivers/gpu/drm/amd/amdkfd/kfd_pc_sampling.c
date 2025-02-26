@@ -310,7 +310,7 @@ static int kfd_pc_sample_stop(struct kfd_process_device *pdd,
 
 	kfd_process_set_trap_pc_sampling_flag(&pdd->qpd, pcs_entry->method, false);
 	remap_queue(pdd->dev->dqm,
-		KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0, USE_DEFAULT_GRACE_PERIOD);
+		KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0);
 
 	if (pc_sampling_stop) {
 		if (pcs_entry->method == KFD_IOCTL_PCS_METHOD_HOSTTRAP) {
