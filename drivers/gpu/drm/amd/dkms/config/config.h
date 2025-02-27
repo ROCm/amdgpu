@@ -504,9 +504,6 @@
 /* Define to 1 if you have the <drm/drm_eld.h> header file. */
 #define HAVE_DRM_DRM_ELD_H 1
 
-/* Define to 1 if you have the <drm/drm_exec.h> header file. */
-#define HAVE_DRM_DRM_EXEC_H 1
-
 /* Define to 1 if you have the <drm/drm_fbdev_generic.h> header file. */
 /* #undef HAVE_DRM_DRM_FBDEV_GENERIC_H */
 
@@ -836,9 +833,6 @@
 
 /* Define to 1 if you have the <kunit/test-bug.h> header file. */
 #define HAVE_KUNIT_TEST_BUG_H 1
-
-/* kvrealloc() is available */
-/* #undef HAVE_KVREALLOC */
 
 /* Define to 1 if you have the <linux/acpi_amd_wbrf.h> header file. */
 #define HAVE_LINUX_ACPI_AMD_WBRF_H 1

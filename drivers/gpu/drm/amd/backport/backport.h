@@ -113,7 +113,6 @@
 #include <kcl/kcl_pci_ids.h>
 #include <kcl/kcl_drm_suballoc.h>
 #include <kcl/kcl_drm_edid.h>
-#include <kcl/kcl_drm_exec.h>
 #include <kcl/kcl_local64.h>
 #include <kcl/kcl_class.h>
 #include <kcl/kcl_build_bug.h>
