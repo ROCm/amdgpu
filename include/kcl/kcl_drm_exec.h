@@ -6,11 +6,6 @@
 #include <linux/compiler.h>
 #include <linux/ww_mutex.h>
 
-#ifdef HAVE_DRM_GEM_OBJECT_RESV
-#define amdkcl_gem_resvp(bo) (bo->resv)
-#else
-#define amdkcl_gem_resvp(bo) (container_of(bo, struct ttm_buffer_object, base)->resv)
-#endif
 #ifndef HAVE_DRM_DRM_EXEC_H
 #include <kcl/kcl_mm_types.h>
 #include <kcl/kcl_mmzone.h>
