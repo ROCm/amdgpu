@@ -36,6 +36,12 @@
 
 #include <drm/drm_gem.h>
 
+#ifdef HAVE_DRM_GEM_OBJECT_RESV
+#define amdkcl_gem_resvp(bo) (bo->resv)
+#else
+#define amdkcl_gem_resvp(bo) (container_of(bo, struct ttm_buffer_object, base)->resv)
+#endif
+
 #ifndef HAVE_DRM_PRINT_MEMORY_STATS
 enum drm_gem_object_status {
 	DRM_GEM_OBJECT_RESIDENT  = BIT(0),
