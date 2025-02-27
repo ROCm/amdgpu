@@ -2117,7 +2117,7 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 
 	if (amdgpu_direct_gma_size > 0) {
 		struct iommu_domain *dom = iommu_get_domain_for_dev(adev->dev);
-		if (dom && domain->type != IOMMU_DOMAIN_IDENTITY) {
+		if (dom && dom->type != IOMMU_DOMAIN_IDENTITY) {
 			DRM_INFO("IOMMU is enabled and not in pass through mode, disable direct GMA\n");
 			amdgpu_direct_gma_size = 0;
 		}
