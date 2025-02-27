@@ -599,19 +599,6 @@ static int kfd_gws_init(struct kfd_node *node)
 				node->adev->gds.gws_size, &node->gws);
 	}
 
-	if ((KFD_GC_VERSION(kfd) == IP_VERSION(9, 0, 1)
-			&& kfd->mec2_fw_version < 0x81b6) ||
-		(KFD_GC_VERSION(kfd) >= IP_VERSION(9, 1, 0)
-			&& KFD_GC_VERSION(kfd) <= IP_VERSION(9, 2, 2)
-			&& kfd->mec2_fw_version < 0x1b6) ||
-		(KFD_GC_VERSION(kfd) == IP_VERSION(9, 4, 0)
-			&& kfd->mec2_fw_version < 0x1b6) ||
-		(KFD_GC_VERSION(kfd) == IP_VERSION(9, 4, 1)
-			&& kfd->mec2_fw_version < 0x30) ||
-		(KFD_GC_VERSION(kfd) >= IP_VERSION(11, 0, 0) &&
-			KFD_GC_VERSION(kfd) < IP_VERSION(12, 0, 0)))
-		node->gws_debug_workaround = true;
-
 	return ret;
 }
 
