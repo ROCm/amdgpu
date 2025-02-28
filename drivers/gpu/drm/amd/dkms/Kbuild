@@ -73,7 +73,7 @@ $(warning "The local C standard(gnu89) doesn't match kernel default C standard(g
 endif
 
 include  $(src)/amd/dkms/Makefile.drm_ttm_helper
-
+include  $(src)/amd/dkms/Makefile.drm_exec
 include  $(src)/amd/dkms/Makefile.drm_buddy
 
 obj-m += scheduler/ amd/amdgpu/ amd/amdxcp/ ttm/ amd/amdkcl/
