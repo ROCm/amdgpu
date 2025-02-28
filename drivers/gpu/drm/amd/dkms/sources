@@ -33,3 +33,5 @@ drivers/gpu/drm/drm_gem_ttm_helper.c .
 include/drm/drm_gem_ttm_helper.h include/drm/
 drivers/gpu/drm/drm_buddy.c .
 include/drm/drm_buddy.h include/drm/
+drivers/gpu/drm/drm_exec.c .
+include/drm/drm_exec.h include/drm/
