@@ -22,4 +22,12 @@
 #endif
 #endif
 
+#ifndef  __cleanup
+#ifdef __clang__
+#define __cleanup(func) __maybe_unused __attribute__((__cleanup__(func)))
+#else
+#define __cleanup(func)			__attribute__((__cleanup__(func)))
+#endif
+#endif
+
 #endif /* AMDKCL_COMPILER_ATTRIBUTES_H */
