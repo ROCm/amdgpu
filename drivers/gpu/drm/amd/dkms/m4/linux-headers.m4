@@ -159,4 +159,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #kernel/cgroup: Add "dmem" memory accounting cgroup
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/cgroup_dmem.h])
+	
+	dnl #v6.5-rc3-2-g85be6d842447
+	dnl #locking: Introduce __cleanup() based infrastructure
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/cleanup.h])
 ])
