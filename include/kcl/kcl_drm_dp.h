@@ -84,4 +84,8 @@
 #define DP_LINK_BW_20                      0x02    /* 2.0 128b/132b Link Layer */
 #endif
 
+#ifndef DP_EDP_MSO_LINK_CAPABILITIES
+#define DP_EDP_MSO_LINK_CAPABILITIES        0x7a4    /* eDP 1.4 */
+#endif
+
 #endif
