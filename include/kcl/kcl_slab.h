@@ -13,6 +13,7 @@
 
 #include <linux/gfp.h>
 #include <linux/slab.h>
+#include <kcl/kcl_cleanup.h>
 
 #ifndef HAVE_KREALLOC_ARRAY
 /**
@@ -36,6 +37,10 @@ krealloc_array(void *p, size_t new_n, size_t new_size, gfp_t flags)
 
 #ifndef HAVE_KMALLOC_SIZE_ROUNDUP
 size_t kmalloc_size_roundup(size_t size);
+#endif
+
+#ifndef HAVE_LINUX_CLEANUP_H
+DEFINE_FREE(kfree, void *, if (_T) kfree(_T))
 #endif
 
 #endif
