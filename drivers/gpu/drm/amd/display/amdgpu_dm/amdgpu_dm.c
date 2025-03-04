@@ -4989,9 +4989,9 @@ static void amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
     brightness =
             brightness
             * 0x101
-            * (caps.max_input_signal - caps.min_input_signal)
+            * (caps->max_input_signal - caps->min_input_signal)
             / AMDGPU_MAX_BL_LEVEL
-            + caps.min_input_signal * 0x101;
+            + caps->min_input_signal * 0x101;
 
     struct set_backlight_level_params backlight_level_params = { 0 };
 	
