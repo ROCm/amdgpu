@@ -10,6 +10,31 @@
 
 #define __free(_name)	__cleanup(__free_##_name)
 
+#define DEFINE_CLASS(_name, _type, _exit, _init, _init_args...)		\
+typedef _type class_##_name##_t;					\
+static inline void class_##_name##_destructor(_type *p)			\
+{ _type _T = *p; _exit; }						\
+static inline _type class_##_name##_constructor(_init_args)		\
+{ _type t = _init; return t; }
+
+#define DEFINE_GUARD(_name, _type, _lock, _unlock) \
+	DEFINE_CLASS(_name, _type, if (_T) { _unlock; }, ({ _lock; _T; }), _type _T); \
+	static inline void * class_##_name##_lock_ptr(class_##_name##_t *_T) \
+	{ return *_T; }
+
+#define CLASS(_name, var)						\
+	class_##_name##_t var __cleanup(class_##_name##_destructor) =	\
+		class_##_name##_constructor
+
+#define guard(_name) \
+	CLASS(_name, __UNIQUE_ID(guard))
+
+#define __guard_ptr(_name) class_##_name##_lock_ptr
+
+#define scoped_guard(_name, args...)					\
+	for (CLASS(_name, scope)(args),					\
+	     *done = NULL; __guard_ptr(_name)(&scope) && !done; done = (void *)1)
+
 #endif
 
 #endif /* KCL_CLEANUP_H_ */
