@@ -1,0 +1,51 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * linux/ipc/util.c
+ * Copyright (C) 1992 Krishna Balasubramanian
+ *   For kvmalloc/kvzalloc
+ */
+#ifndef AMDKCL_CGROUP_DMEM_H
+#define AMDKCL_CGROUP_DMEM_H
+
+#ifndef HAVE_LINUX_CGROUP_DMEM_H
+struct dmem_cgroup_pool_state;
+
+/* Opaque definition of a cgroup region, used internally */
+struct dmem_cgroup_region;
+static inline __printf(2,3) struct dmem_cgroup_region *
+dmem_cgroup_register_region(u64 size, const char *name_fmt, ...)
+{
+        return NULL;
+}
+
+static inline void dmem_cgroup_unregister_region(struct dmem_cgroup_region *region)
+{ }
+
+static inline int dmem_cgroup_try_charge(struct dmem_cgroup_region *region, u64 size,
+                                         struct dmem_cgroup_pool_state **ret_pool,
+                                         struct dmem_cgroup_pool_state **ret_limit_pool)
+{
+        *ret_pool = NULL;
+
+        if (ret_limit_pool)
+                *ret_limit_pool = NULL;
+
+        return 0;
+}
+
+static inline void dmem_cgroup_uncharge(struct dmem_cgroup_pool_state *pool, u64 size)
+{ }
+
+static inline
+bool dmem_cgroup_state_evict_valuable(struct dmem_cgroup_pool_state *limit_pool,
+                                      struct dmem_cgroup_pool_state *test_pool,
+                                      bool ignore_low, bool *ret_hit_low)
+{
+        return true;
+}
+
+static inline void dmem_cgroup_pool_state_put(struct dmem_cgroup_pool_state *pool)
+{ }
+#endif /*HAVE_LINUX_CGROUP_DMEM_H*/
+
+#endif

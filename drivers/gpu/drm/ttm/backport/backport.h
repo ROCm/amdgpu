@@ -21,5 +21,6 @@
 #include <kcl/kcl_cc_platform.h>
 #include <kcl/backport/kcl_workqueue_backport.h>
 #include <kcl/kcl_mmzone.h>
+#include <kcl/kcl_cgroup_dmem.h>
 
 #endif
