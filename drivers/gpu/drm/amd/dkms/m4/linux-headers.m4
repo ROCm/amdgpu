@@ -154,4 +154,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #kernel.h: split out min()/max() et al. helpers
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/minmax.h])
+
+	dnl #v6.13-rc6-1-gb168ed458dde
+	dnl #kernel/cgroup: Add "dmem" memory accounting cgroup
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/cgroup_dmem.h])
 ])
