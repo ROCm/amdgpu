@@ -8,4 +8,11 @@
 #define fd_file(f) ((f).file)
 #endif
 
+#ifndef HAVE_FD_EMPTY
+static inline bool fd_empty(struct fd f)
+{
+        return !fd_file(f);
+}
+#endif
+
 #endif
