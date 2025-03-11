@@ -16,5 +16,19 @@ AC_DEFUN([AC_AMDGPU_DRM_CONNECTOR_EDID_OVERRIDE], [
         ])
 ])
 
-
-
+dnl #
+dnl # v6.13-rc2-201-g1d985ddabbe0
+dnl # drm/connector: Add a way to init/add a connector in separate steps
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_CONNECTOR_DYNAMIC_INIT], [
+    AC_KERNEL_DO_BACKGROUND([
+        AC_KERNEL_TRY_COMPILE([
+            #include <drm/drm_connector.h>
+        ],[
+            drm_connector_dynamic_init(NULL, NULL, NULL, 0, NULL);
+        ],[
+            AC_DEFINE(HAVE_DRM_CONNECTOR_DYNAMIC_INIT, 1,
+                [drm_connector_dynamic_init is available])
+        ])
+    ])
+])
