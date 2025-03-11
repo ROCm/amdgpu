@@ -3652,7 +3652,9 @@ static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 #ifdef HAVE_DRM_DISPLAY_INFO_LUMINANCE_RANGE
 	struct drm_luminance_range_info *luminance_range;
 #endif
+#ifdef HAVE_DRM_GET_PANEL_MIN_BRIGHTNESS_QUIRK
 	int min_input_signal_override;
+#endif
 
 	if (aconnector->bl_idx == -1 ||
 	    aconnector->dc_link->connector_signal != SIGNAL_TYPE_EDP)
@@ -3694,9 +3696,11 @@ static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 		caps->aux_min_input_signal = 1;
 #endif
 
+#ifdef HAVE_DRM_GET_PANEL_MIN_BRIGHTNESS_QUIRK
 	min_input_signal_override = drm_get_panel_min_brightness_quirk(aconnector->drm_edid);
 	if (min_input_signal_override >= 0)
 		caps->min_input_signal = min_input_signal_override;
+#endif
 }
 #endif
 
