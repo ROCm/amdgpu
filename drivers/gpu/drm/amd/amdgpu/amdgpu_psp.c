@@ -4775,7 +4775,10 @@ static umode_t amdgpu_flash_attr_is_visible(struct kobject *kobj, struct attribu
 }
 
 static umode_t amdgpu_bin_flash_attr_is_visible(struct kobject *kobj,
-						const struct bin_attribute *attr,
+#ifdef HAVE_CONSTANT_ARGUMENT_IN_IS_BIN_VISIBLE
+						const
+#endif
+						struct bin_attribute *attr,
 						int idx)
 {
 	struct device *dev = kobj_to_dev(kobj);
