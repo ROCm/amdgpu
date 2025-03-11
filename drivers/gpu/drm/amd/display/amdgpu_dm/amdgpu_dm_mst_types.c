@@ -760,12 +760,20 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	amdgpu_dm_set_mst_status(&aconnector->mst_status,
 			MST_PROBE, true);
 
+#ifdef HAVE_DRM_CONNECTOR_DYNAMIC_INIT
 	if (drm_connector_dynamic_init(
+#else
+	if (drm_connector_init(
+#endif
 		dev,
 		connector,
 		&dm_dp_mst_connector_funcs,
+#ifdef HAVE_DRM_CONNECTOR_DYNAMIC_INIT
 		DRM_MODE_CONNECTOR_DisplayPort,
 		NULL)) {
+#else
+		DRM_MODE_CONNECTOR_DisplayPort)) {
+#endif
 		kfree(aconnector);
 		return NULL;
 	}
