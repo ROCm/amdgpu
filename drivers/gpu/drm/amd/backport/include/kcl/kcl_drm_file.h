@@ -25,4 +25,8 @@ void _kcl_drm_print_memory_stats(struct drm_printer *p,
 #define drm_print_memory_stats _kcl_drm_print_memory_stats;
 #endif
 
+#ifndef HAVE_DRM_MEMORY_STATS_IS_ZERO
+int drm_memory_stats_is_zero(const struct drm_memory_stats *stats);
+#endif
+
 #endif
