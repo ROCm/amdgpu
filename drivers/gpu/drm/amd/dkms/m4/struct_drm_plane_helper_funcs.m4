@@ -32,8 +32,24 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER], [
         ])
 ])
 
+dnl # commit v6.14-rc1-243-gfd40a63c63a1
+dnl # drm/atomic: Let drivers decide which planes to async flip
+AC_DEFUN([AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK_THREE_ARGUMENTS], [
+    AC_KERNEL_DO_BACKGROUND([
+        AC_KERNEL_TRY_COMPILE([
+            #include <drm/drm_modeset_helper_vtables.h>
+        ], [
+            struct drm_plane_helper_funcs* funcs = NULL;
+            funcs->atomic_async_check(NULL, NULL, true);
+        ], [
+            AC_DEFINE(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK_THREE_ARGUMENTS, 1,
+                [drm_plane_helper_funcs->atomic_async_check() have three arguments])
+        ])
+    ])
+])
 
 AC_DEFUN([AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS], [
 	AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
 	AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER
+	AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK_THREE_ARGUMENTS
 ])

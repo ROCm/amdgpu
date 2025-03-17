@@ -1609,12 +1609,18 @@ STATIC_IFN_KUNIT int amdgpu_dm_plane_atomic_async_check(struct drm_plane *plane,
 	struct drm_plane_state *new_plane_state;
 	struct dm_crtc_state *dm_new_crtc_state;
 
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK_THREE_ARGUMENTS
 	if (flip) {
 		if (plane->type != DRM_PLANE_TYPE_OVERLAY)
 			return -EINVAL;
 	} else if (plane->type != DRM_PLANE_TYPE_CURSOR) {
 		return -EINVAL;
 	}
+#else
+	/* Only support async updates on cursor planes. */
+	if (plane->type != DRM_PLANE_TYPE_CURSOR)
+		return -EINVAL;
+#endif
 
 #ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
 	new_plane_state = drm_atomic_get_new_plane_state(state, plane);
@@ -1624,7 +1630,11 @@ STATIC_IFN_KUNIT int amdgpu_dm_plane_atomic_async_check(struct drm_plane *plane,
 #endif
 	dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 	/* Reject overlay cursors for now*/
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK_THREE_ARGUMENTS
 	if (!flip && dm_new_crtc_state->cursor_mode == DM_CURSOR_OVERLAY_MODE)
+#else
+	if (dm_new_crtc_state->cursor_mode == DM_CURSOR_OVERLAY_MODE)
+#endif
 		return -EINVAL;
 
 	return 0;
