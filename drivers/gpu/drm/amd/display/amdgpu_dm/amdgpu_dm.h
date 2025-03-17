@@ -1096,7 +1096,11 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 				     int link_index);
 
 enum drm_mode_status amdgpu_dm_connector_mode_valid(struct drm_connector *connector,
+#ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_MODE_VALID_CONST_ARGUMENT
 				   const struct drm_display_mode *mode);
+#else
+				   struct drm_display_mode *mode);
+#endif
 
 void dm_restore_drm_connector_state(struct drm_device *dev,
 				    struct drm_connector *connector);

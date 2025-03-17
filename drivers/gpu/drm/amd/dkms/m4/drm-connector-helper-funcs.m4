@@ -36,7 +36,27 @@ AC_DEFUN([AC_AMDGPU_CONNECTOR_HELPER_FUNCTS_ATOMIC_BEST_ENCODER], [
 	])
 ])
 
+dnl #
+dnl # v6.13-rc2-288-g26d6fd81916e
+dnl # drm/connector: make mode_valid take a const struct drm_display_mode
+dnl #
+AC_DEFUN([AC_AMDGPU_CONNECTOR_HELPER_FUNCTS_MODE_VALID_CONST_ARGUMENT], [
+    AC_KERNEL_DO_BACKGROUND([
+        AC_KERNEL_TRY_COMPILE([
+                #include <drm/drm_modeset_helper_vtables.h>
+            ], [
+                struct drm_connector_helper_funcs test_funcs = {
+                .mode_valid = (enum drm_mode_status (*)(struct drm_connector *, const struct drm_display_mode *))0
+            };
+            ], [
+                AC_DEFINE(HAVE_DRM_CONNECTOR_HELPER_FUNCS_MODE_VALID_CONST_ARGUMENT, 1,
+                    [.mode_valid need a const drm_display_mode argument])
+            ])
+    ])
+])
+
 AC_DEFUN([AC_AMDGPU_DRM_CONNECTOR_HELPER_FUNCS], [
 	AC_AMDGPU_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK
 	AC_AMDGPU_CONNECTOR_HELPER_FUNCTS_ATOMIC_BEST_ENCODER
+	AC_AMDGPU_CONNECTOR_HELPER_FUNCTS_MODE_VALID_CONST_ARGUMENT
 ])
