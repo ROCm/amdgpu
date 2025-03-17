@@ -137,4 +137,5 @@
 #include <kcl/kcl_minmax.h>
 #include <kcl/kcl_cleanup.h>
 #include <kcl/kcl_mutex.h>
+#include <kcl/kcl_drm_drv.h>
 #endif /* AMDGPU_BACKPORT_H */
