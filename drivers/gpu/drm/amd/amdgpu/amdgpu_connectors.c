@@ -704,7 +704,11 @@ static int amdgpu_connector_lvds_get_modes(struct drm_connector *connector)
 }
 
 static enum drm_mode_status amdgpu_connector_lvds_mode_valid(struct drm_connector *connector,
+#ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_MODE_VALID_CONST_ARGUMENT
 					     const struct drm_display_mode *mode)
+#else
+					     struct drm_display_mode *mode)
+#endif
 {
 	struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector);
 
@@ -867,7 +871,11 @@ static int amdgpu_connector_vga_get_modes(struct drm_connector *connector)
 }
 
 static enum drm_mode_status amdgpu_connector_vga_mode_valid(struct drm_connector *connector,
+#ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_MODE_VALID_CONST_ARGUMENT
 					    const struct drm_display_mode *mode)
+#else
+					    struct drm_display_mode *mode)
+#endif
 {
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = drm_to_adev(dev);
@@ -1270,7 +1278,11 @@ static int amdgpu_max_hdmi_pixel_clock(const struct amdgpu_device *adev)
  * Return: drm_mode_status indicating whether the mode is valid.
  */
 static enum drm_mode_status amdgpu_connector_dvi_mode_valid(struct drm_connector *connector,
+#ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_MODE_VALID_CONST_ARGUMENT
 					    const struct drm_display_mode *mode)
+#else
+					    struct drm_display_mode *mode)
+#endif
 {
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = drm_to_adev(dev);
@@ -1571,7 +1583,11 @@ out:
 }
 
 static enum drm_mode_status amdgpu_connector_dp_mode_valid(struct drm_connector *connector,
-					   const struct drm_display_mode *mode)
+#ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_MODE_VALID_CONST_ARGUMENT
+					    const struct drm_display_mode *mode)
+#else
+					    struct drm_display_mode *mode)
+#endif
 {
 	struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
 	struct amdgpu_connector_atom_dig *amdgpu_dig_connector = amdgpu_connector->con_priv;
