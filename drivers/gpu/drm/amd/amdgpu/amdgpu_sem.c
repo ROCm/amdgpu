@@ -408,7 +408,7 @@ int amdgpu_sem_add_cs(struct amdgpu_ctx *ctx, struct drm_sched_entity *entity,
 	mutex_lock(&centity->sem_lock);
 	list_for_each_entry_safe(dep, tmp, &centity->sem_dep_list,
 				 list) {
-		r = amdgpu_sync_fence(sync, dep->fence);
+		r = amdgpu_sync_fence(sync, dep->fence, GFP_KERNEL);
 		if (r)
 			goto err;
 		dma_fence_put(dep->fence);
