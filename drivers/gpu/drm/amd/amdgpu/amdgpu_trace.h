@@ -483,7 +483,7 @@ TRACE_EVENT(amdgpu_cleaner_shader,
 			     ),
 
 	    TP_fast_assign(
-			   __assign_str(ring);
+			   __amdkcl_assign_str(ring, ring->name);
 			   __entry->seqno = fence->seqno;
 			   ),
 	    TP_printk("ring=%s, seqno=%Lu", __get_str(ring), __entry->seqno)
