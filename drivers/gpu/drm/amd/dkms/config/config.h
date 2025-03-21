@@ -832,6 +832,12 @@
 /* Define to 1 if you have the <kunit/test-bug.h> header file. */
 #define HAVE_KUNIT_TEST_BUG_H 1
 
+/* kvrealloc() has 3 arguments */
+#define HAVE_KVREALLOC_3ARG 1
+
+/* kvrealloc() has 4 arguments */
+/* #undef HAVE_KVREALLOC_4ARG */
+
 /* Define to 1 if you have the <linux/acpi_amd_wbrf.h> header file. */
 #define HAVE_LINUX_ACPI_AMD_WBRF_H 1
 
@@ -975,6 +981,9 @@
 
 /* MODULE_IMPORT_NS() wants a string arguments */
 #define HAVE_MODULE_IMPORT_NS_NEED_A_STRING 1
+
+/* kvrealloc() isn't available */
+/* #undef HAVE_NO_KVREALLOC */
 
 /* class_create has one argument */
 #define HAVE_ONE_ARGUMENT_OF_CLASS_CREATE 1

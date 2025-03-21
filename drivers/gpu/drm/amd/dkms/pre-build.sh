@@ -106,3 +106,13 @@ if ! grep -q 'define HAVE_AMDKCL_FLAGS_TAKE_PATH' $SRC/config/config.h; then
 		sed -i 's|\(CFLAGS_[A-Z_]*\)$(AMDDALPATH)/.*/\(.*\.o\)|\1\2|' $file
 	done
 fi
+
+# v6.11-rc6-3-g590b9d576cae mm: kvmalloc: align kvrealloc() with krealloc()
+# Hardcoded modification for `drm_exec.c` to adapt `kvrealloc` function usage to four arguments.
+# WARNING: Do NOT optimize this section. The change is essential to guarantee that if there are
+# any semantic changes to 'size', it will trigger a DKMS installation failure.
+# This ensures any changes to 'size' usage must be manually reviewed and addressed in this context.
+if ! grep -q 'define HAVE_KVREALLOC_3ARG ' $SRC/config/config.h; then
+	sed -i -e 's/kvrealloc(exec->objects, size + PAGE_SIZE, GFP_KERNEL)/kvrealloc(exec->objects, size, size + PAGE_SIZE, GFP_KERNEL)/' \
+		drm_exec.c
+fi
