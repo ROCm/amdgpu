@@ -29,6 +29,7 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 #include <kcl/kcl_mm.h>
+#include <linux/vmalloc.h>
 
 /* Copied from drivers/gpu/drm/ttm/ttm_bo_vm.c and modified for KCL */
 #ifndef HAVE_VMF_INSERT_MIXED_PROT
@@ -70,4 +71,21 @@ vm_fault_t _kcl_vmf_insert_pfn_prot(struct vm_area_struct *vma, unsigned long ad
 	return VM_FAULT_NOPAGE;
 }
 EXPORT_SYMBOL(_kcl_vmf_insert_pfn_prot);
+#endif
+
+/* Copied from mm/util.c and modified for KCL */
+#ifdef HAVE_NO_KVREALLOC
+void *kvrealloc(const void *p, size_t oldsize, size_t newsize, gfp_t flags)
+{
+    void *newp;
+    if (oldsize >= newsize)
+            return (void *)p;
+    newp = kvmalloc(newsize, flags);
+    if (!newp)
+            return NULL;
+    memcpy(newp, p, oldsize);
+    kvfree(p);
+    return newp;
+}
+EXPORT_SYMBOL(kvrealloc);
 #endif
