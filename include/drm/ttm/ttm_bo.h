@@ -249,8 +249,10 @@ struct ttm_bo_shrink_flags {
 	u32 allow_move : 1;
 };
 
+#ifdef HAVE_SHMEM_READ_FOLIO
 long ttm_bo_shrink(struct ttm_operation_ctx *ctx, struct ttm_buffer_object *bo,
 		   const struct ttm_bo_shrink_flags flags);
+#endif
 
 bool ttm_bo_shrink_suitable(struct ttm_buffer_object *bo, struct ttm_operation_ctx *ctx);
 

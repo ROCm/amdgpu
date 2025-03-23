@@ -92,8 +92,10 @@ int ttm_pool_debugfs(struct ttm_pool *pool, struct seq_file *m);
 
 void ttm_pool_drop_backed_up(struct ttm_tt *tt);
 
+#ifdef HAVE_SHMEM_READ_FOLIO
 long ttm_pool_backup(struct ttm_pool *pool, struct ttm_tt *ttm,
 		     const struct ttm_backup_flags *flags);
+#endif
 int ttm_pool_restore_and_alloc(struct ttm_pool *pool, struct ttm_tt *tt,
 			       const struct ttm_operation_ctx *ctx);
 

@@ -1072,6 +1072,7 @@ struct ttm_buffer_object *ttm_bo_lru_cursor_first(struct ttm_bo_lru_cursor *curs
 }
 EXPORT_SYMBOL(ttm_bo_lru_cursor_first);
 
+#ifdef HAVE_SHMEM_READ_FOLIO
 /**
  * ttm_bo_shrink() - Helper to shrink a ttm buffer object.
  * @ctx: The struct ttm_operation_ctx used for the shrinking operation.
@@ -1141,6 +1142,7 @@ long ttm_bo_shrink(struct ttm_operation_ctx *ctx, struct ttm_buffer_object *bo,
 	return lret;
 }
 EXPORT_SYMBOL(ttm_bo_shrink);
+#endif /* HAVE_SHMEM_READ_FOLIO */
 
 /**
  * ttm_bo_shrink_suitable() - Whether a bo is suitable for shinking

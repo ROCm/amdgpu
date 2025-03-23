@@ -49,6 +49,7 @@ void ttm_backup_drop(struct ttm_backup *backup, pgoff_t handle)
 			     start + PAGE_SIZE - 1);
 }
 
+#ifdef HAVE_SHMEM_READ_FOLIO
 /**
  * ttm_backup_copy_page() - Copy the contents of a previously backed
  * up page
@@ -154,6 +155,7 @@ ttm_backup_backup_page(struct ttm_backup *backup, struct page *page,
 
 	return handle;
 }
+#endif /* HAVE_SHMEM_READ_FOLIO */
 
 /**
  * ttm_backup_fini() - Free the struct backup resources after last use.

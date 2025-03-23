@@ -292,8 +292,10 @@ struct ttm_backup_flags {
 	u32 writeback : 1;
 };
 
+#ifdef HAVE_SHMEM_READ_FOLIO
 long ttm_tt_backup(struct ttm_device *bdev, struct ttm_tt *tt,
 		   const struct ttm_backup_flags flags);
+#endif
 
 int ttm_tt_restore(struct ttm_device *bdev, struct ttm_tt *tt,
 		   const struct ttm_operation_ctx *ctx);

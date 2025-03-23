@@ -523,6 +523,7 @@ static int ttm_pool_restore_commit(struct ttm_pool_tt_restore *restore,
 
 	for (i = restore->restored_pages; i < nr; ++i) {
 		p = first_page[i];
+#ifdef HAVE_SHMEM_READ_FOLIO
 		if (ttm_backup_page_ptr_is_handle(p)) {
 			unsigned long handle = ttm_backup_page_ptr_to_handle(p);
 
@@ -544,6 +545,7 @@ static int ttm_pool_restore_commit(struct ttm_pool_tt_restore *restore,
 
 			ttm_backup_drop(backup, handle);
 		} else if (p) {
+#endif /* HAVE_SHMEM_READ_FOLIO */
 			/*
 			 * We could probably avoid splitting the old page
 			 * using clever logic, but ATM we don't care, as
@@ -554,7 +556,9 @@ static int ttm_pool_restore_commit(struct ttm_pool_tt_restore *restore,
 			ttm_pool_split_for_swap(restore->pool, p);
 			copy_highpage(restore->alloced_page + i, p);
 			__free_pages(p, 0);
+#ifdef HAVE_SHMEM_READ_FOLIO
 		}
+#endif
 
 		restore->restored_pages++;
 		first_page[i] = ttm_backup_handle_to_page_ptr(0);
@@ -667,17 +671,21 @@ static void ttm_pool_free_range(struct ttm_pool *pool, struct ttm_tt *tt,
 		struct page *p = *pages;
 
 		nr = 1;
+#ifdef HAVE_SHMEM_READ_FOLIO
 		if (ttm_backup_page_ptr_is_handle(p)) {
 			unsigned long handle = ttm_backup_page_ptr_to_handle(p);
 
 			if (handle != 0)
 				ttm_backup_drop(backup, handle);
 		} else if (p) {
+#endif
 			dma_addr_t *dma_addr = tt->dma_address ?
 				tt->dma_address + i : NULL;
 
 			nr = ttm_pool_unmap_and_free(pool, p, dma_addr, caching);
+#ifdef HAVE_SHMEM_READ_FOLIO
 		}
+#endif
 	}
 }
 
@@ -944,6 +952,7 @@ void ttm_pool_drop_backed_up(struct ttm_tt *tt)
 	ttm_pool_free_range(NULL, tt, ttm_cached, start_page, tt->num_pages);
 }
 
+#ifdef HAVE_SHMEM_READ_FOLIO
 /**
  * ttm_pool_backup() - Back up or purge a struct ttm_tt
  * @pool: The pool used when allocating the struct ttm_tt.
@@ -1055,6 +1064,7 @@ long ttm_pool_backup(struct ttm_pool *pool, struct ttm_tt *tt,
 
 	return shrunken ? shrunken : ret;
 }
+#endif /* HAVE_SHMEM_READ_FOLIO */
 
 /**
  * ttm_pool_init - Initialize a pool

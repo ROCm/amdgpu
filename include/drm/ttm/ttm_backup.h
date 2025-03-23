@@ -57,6 +57,7 @@ ttm_backup_page_ptr_to_handle(const struct page *page)
 
 void ttm_backup_drop(struct ttm_backup *backup, pgoff_t handle);
 
+#ifdef HAVE_SHMEM_READ_FOLIO
 int ttm_backup_copy_page(struct ttm_backup *backup, struct page *dst,
 			 pgoff_t handle, bool intr);
 
@@ -64,6 +65,7 @@ s64
 ttm_backup_backup_page(struct ttm_backup *backup, struct page *page,
 		       bool writeback, pgoff_t idx, gfp_t page_gfp,
 		       gfp_t alloc_gfp);
+#endif
 
 void ttm_backup_fini(struct ttm_backup *backup);
 
