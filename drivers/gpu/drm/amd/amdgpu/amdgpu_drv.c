@@ -3098,6 +3098,9 @@ static struct drm_driver amdgpu_kms_driver = {
 
 	.name = DRIVER_NAME,
 	.desc = DRIVER_DESC,
+#ifdef HAVE_DRM_DRIVER_DATE
+	.date = DRIVER_DATE,
+#endif
 	.major = KMS_DRIVER_MAJOR,
 	.minor = KMS_DRIVER_MINOR,
 	.patchlevel = KMS_DRIVER_PATCHLEVEL,
@@ -3131,6 +3134,9 @@ const struct drm_driver amdgpu_partition_driver = {
 
 	.name = DRIVER_NAME,
 	.desc = DRIVER_DESC,
+#ifdef HAVE_DRM_DRIVER_DATE
+	.date = DRIVER_DATE,
+#endif
 	.major = KMS_DRIVER_MAJOR,
 	.minor = KMS_DRIVER_MINOR,
 	.patchlevel = KMS_DRIVER_PATCHLEVEL,
