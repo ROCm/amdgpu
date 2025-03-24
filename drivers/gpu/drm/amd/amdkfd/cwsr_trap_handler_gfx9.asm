@@ -242,6 +242,28 @@ L_SKIP_RESTORE:
 
     s_getreg_b32    s_save_trapsts, hwreg(HW_REG_TRAPSTS)
 
+#if ASIC_FAMILY >= CHIP_GC_9_4_3
+    // Ignore PERF_SNAPSHOT if SAVECTX is also present
+    s_and_b32       ttmp2, s_save_trapsts, (SQ_WAVE_TRAPSTS_SAVECTX_MASK | SQ_WAVE_TRAPSTS_PERF_SNAPSHOT_MASK)
+    s_cmp_eq_u32    ttmp2, (SQ_WAVE_TRAPSTS_SAVECTX_MASK | SQ_WAVE_TRAPSTS_PERF_SNAPSHOT_MASK)
+    s_cbranch_scc0  L_NO_SAVE_AND_PERF_SNAP
+    s_bitset0_b32   s_save_trapsts, SQ_WAVE_TRAPSTS_PERF_SNAPSHOT_SHIFT
+    s_setreg_imm32_b32 hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_PERF_SNAPSHOT_SHIFT, 1), 0
+L_NO_SAVE_AND_PERF_SNAP:
+#endif
+
+    // Ignore Host Trap if SAVECTX is also present
+    s_bitcmp0_b32   s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_SHIFT
+    s_cbranch_scc1  L_NO_SAVE_AND_HT
+    s_bitcmp0_b32   s_save_pc_hi, S_SAVE_PC_HI_HT_SHIFT
+    s_cbranch_scc1  L_NO_SAVE_AND_HT
+#if ASIC_FAMILY >= CHIP_GC_9_4_3
+    s_bitset0_b32   s_save_trapsts, SQ_WAVE_TRAPSTS_HOST_TRAP_SHIFT
+    s_setreg_imm32_b32 hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_HOST_TRAP_SHIFT, 1), 0
+#endif
+    s_andn2_b32     s_save_pc_hi, s_save_pc_hi, (S_SAVE_PC_HI_HT_MASK | S_SAVE_PC_HI_TRAP_ID_MASK)
+L_NO_SAVE_AND_HT:
+
     s_and_b32       ttmp2, s_save_status, SQ_WAVE_STATUS_HALT_MASK
     s_cbranch_scc0  L_NOT_HALTED
 
