@@ -6,6 +6,10 @@
 #include <linux/dma-resv.h>
 #include <linux/export.h>
 
+#ifndef amdkcl_gem_resvp
+#define amdkcl_gem_resvp(obj) ((obj)->resv)
+#endif
+
 /**
  * DOC: Overview
  *
@@ -59,7 +63,7 @@ static void drm_exec_unlock_all(struct drm_exec *exec)
 	unsigned long index;
 
 	drm_exec_for_each_locked_object_reverse(exec, index, obj) {
-		dma_resv_unlock(obj->resv);
+		dma_resv_unlock(amdkcl_gem_resvp(obj));
 		drm_gem_object_put(obj);
 	}
 
@@ -172,12 +176,12 @@ static int drm_exec_lock_contended(struct drm_exec *exec)
 	/* Always cleanup the contention so that error handling can kick in */
 	exec->contended = NULL;
 	if (exec->flags & DRM_EXEC_INTERRUPTIBLE_WAIT) {
-		ret = dma_resv_lock_slow_interruptible(obj->resv,
+		ret = dma_resv_lock_slow_interruptible(amdkcl_gem_resvp(obj),
 						       &exec->ticket);
 		if (unlikely(ret))
 			goto error_dropref;
 	} else {
-		dma_resv_lock_slow(obj->resv, &exec->ticket);
+		dma_resv_lock_slow(amdkcl_gem_resvp(obj), &exec->ticket);
 	}
 
 	ret = drm_exec_obj_locked(exec, obj);
@@ -188,7 +192,7 @@ static int drm_exec_lock_contended(struct drm_exec *exec)
 	return 0;
 
 error_unlock:
-	dma_resv_unlock(obj->resv);
+	dma_resv_unlock(amdkcl_gem_resvp(obj));
 
 error_dropref:
 	drm_gem_object_put(obj);
@@ -221,9 +225,9 @@ int drm_exec_lock_obj(struct drm_exec *exec, struct drm_gem_object *obj)
 	}
 
 	if (exec->flags & DRM_EXEC_INTERRUPTIBLE_WAIT)
-		ret = dma_resv_lock_interruptible(obj->resv, &exec->ticket);
+		ret = dma_resv_lock_interruptible(amdkcl_gem_resvp(obj), &exec->ticket);
 	else
-		ret = dma_resv_lock(obj->resv, &exec->ticket);
+		ret = dma_resv_lock(amdkcl_gem_resvp(obj), &exec->ticket);
 
 	if (unlikely(ret == -EDEADLK)) {
 		drm_gem_object_get(obj);
@@ -245,7 +249,7 @@ int drm_exec_lock_obj(struct drm_exec *exec, struct drm_gem_object *obj)
 	return 0;
 
 error_unlock:
-	dma_resv_unlock(obj->resv);
+	dma_resv_unlock(amdkcl_gem_resvp(obj));
 	return ret;
 }
 EXPORT_SYMBOL(drm_exec_lock_obj);
@@ -265,7 +269,7 @@ void drm_exec_unlock_obj(struct drm_exec *exec, struct drm_gem_object *obj)
 
 	for (i = exec->num_objects; i--;) {
 		if (exec->objects[i] == obj) {
-			dma_resv_unlock(obj->resv);
+			dma_resv_unlock(amdkcl_gem_resvp(obj));
 			for (++i; i < exec->num_objects; ++i)
 				exec->objects[i - 1] = exec->objects[i];
 			--exec->num_objects;
@@ -297,7 +301,7 @@ int drm_exec_prepare_obj(struct drm_exec *exec, struct drm_gem_object *obj,
 	if (ret)
 		return ret;
 
-	ret = dma_resv_reserve_fences(obj->resv, num_fences);
+	ret = dma_resv_reserve_fences(amdkcl_gem_resvp(obj), num_fences);
 	if (ret) {
 		drm_exec_unlock_obj(exec, obj);
 		return ret;
