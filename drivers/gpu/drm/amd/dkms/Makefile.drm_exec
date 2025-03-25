@@ -1,6 +1,7 @@
 export CONFIG_DRM_EXEC=m
 
 subdir-ccflags-y += -DCONFIG_DRM_EXEC
-CFLAGS_drm_exec.o += -include linux/module.h -DHAVE_CONFIG_H
+CFLAGS_drm_exec.o +=  -include $(src)/amd/dkms/backport_drm_exec.h \
+                        -include linux/module.h -DHAVE_CONFIG_H
 amddrm_exec-y := drm_exec.o
 obj-$(CONFIG_DRM_EXEC) += amddrm_exec.o
