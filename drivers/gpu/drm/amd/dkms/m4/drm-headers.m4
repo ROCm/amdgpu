@@ -128,4 +128,10 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
     dnl # drm/client: Move public client header to clients/ subdirectory
     dnl #
     AC_KERNEL_CHECK_HEADERS([drm/clients/drm_client_setup.h])
+	
+    dnl #
+    dnl # v6.12-rc2-586-gdf7e8b522a60
+    dnl # drm/client: Move client event handlers to drm_client_event.c
+    dnl #
+    AC_KERNEL_CHECK_HEADERS([drm/drm_client_event.h])
 ])
