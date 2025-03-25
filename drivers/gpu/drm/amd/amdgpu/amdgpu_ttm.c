@@ -65,7 +65,11 @@
 #include "bif/bif_4_1_d.h"
 #include "kfd_svm.h"
 
+#ifdef HAVE_MODULE_IMPORT_NS_NEED_A_STRING
 MODULE_IMPORT_NS("DMA_BUF");
+#else
+MODULE_IMPORT_NS(DMA_BUF);
+#endif
 
 #define AMDGPU_TTM_VRAM_MAX_DW_READ	((size_t)128)
 
