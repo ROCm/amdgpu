@@ -91,6 +91,9 @@
 /* compat_ptr_ioctl() is available */
 #define HAVE_COMPAT_PTR_IOCTL 1
 
+/* need a const argument in member func .is_bin_visible */
+#define HAVE_CONSTANT_ARGUMENT_IN_IS_BIN_VISIBLE 1
+
 /* cpuinfo_x86.topo is available */
 #define HAVE_CPUINFO_TOPOLOGY_IN_CPUINFO_X86_STRUCT 1
 
@@ -197,6 +200,10 @@
 /* drm_atomic_private_obj_init() wants 4 args */
 #define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_4ARGS 1
 
+/* Define to 1 if you have the <drm/clients/drm_client_setup.h> header file.
+   */
+#define HAVE_DRM_CLIENTS_DRM_CLIENT_SETUP_H 1
+
 /* drm_client_dev_resume() is available */
 #define HAVE_DRM_CLIENT_DEV_RESUME 1
 
@@ -215,8 +222,14 @@
 /* drm_connector_attach_hdr_output_metadata_property() is available */
 #define HAVE_DRM_CONNECTOR_ATTACH_HDR_OUTPUT_METADATA_PROPERTY 1
 
+/* drm_connector_dynamic_init is available */
+#define HAVE_DRM_CONNECTOR_DYNAMIC_INIT 1
+
 /* drm_connector->edid_override is available */
 #define HAVE_DRM_CONNECTOR_EDID_OVERRIDE 1
+
+/* drm_connector->eld_mutex is available */
+#define HAVE_DRM_CONNECTOR_ELD_MUTEX 1
 
 /* drm_connector_for_each_possible_encoder() wants 2 arguments */
 #define HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS 1
@@ -228,6 +241,9 @@
 /* drm_connector_helper_funcs->atomic_check() wants struct drm_atomic_state
    arg */
 #define HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE 1
+
+/* .mode_valid need a const drm_display_mode argument */
+#define HAVE_DRM_CONNECTOR_HELPER_FUNCS_MODE_VALID_CONST_ARGUMENT 1
 
 /* drm_connector_helper_funcs->prepare_writeback_job is available */
 #define HAVE_DRM_CONNECTOR_HELPER_FUNCS_PREPARE_WRITEBACK_JOB 1
@@ -275,6 +291,9 @@
 
 /* struct drm_device has pdev member */
 /* #undef HAVE_DRM_DEVICE_PDEV */
+
+/* drm_dev_wedged_event() is available */
+#define HAVE_DRM_DEV_WEDGED_EVENT 1
 
 /* Define to 1 if you have the <drm/display/drm_dp.h> header file. */
 #define HAVE_DRM_DISPLAY_DRM_DP_H 1
@@ -455,6 +474,9 @@
 /* drm_dp_update_payload_part1() function has start_slot argument */
 /* #undef HAVE_DRM_DP_UPDATE_PAYLOAD_PART1_START_SLOT_ARG */
 
+/* drm_driver->date is available */
+/* #undef HAVE_DRM_DRIVER_DATE */
+
 /* drm_driver->gem_prime_mmap() is available */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_MMAP */
 
@@ -477,7 +499,7 @@
 #define HAVE_DRM_DRM_CLIENT_EVENT_H 1
 
 /* Define to 1 if you have the <drm/drm_client_setup.h> header file. */
-#define HAVE_DRM_DRM_CLIENT_SETUP_H 1
+/* #undef HAVE_DRM_DRM_CLIENT_SETUP_H */
 
 /* Define to 1 if you have the <drm/drm_eld.h> header file. */
 #define HAVE_DRM_DRM_ELD_H 1
@@ -584,6 +606,9 @@
 /* drm_gem_prime_handle_to_fd() is available */
 #define HAVE_DRM_GEM_PRIME_HANDLE_TO_FD 1
 
+/* drm_get_panel_min_brightness_quirk() is available */
+#define HAVE_DRM_GET_PANEL_MIN_BRIGHTNESS_QUIRK 1
+
 /* drm_hdcp_update_content_protection is available */
 #define HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION 1
 
@@ -604,6 +629,9 @@
 
 /* drm_memcpy_from_wc() is availablea and has struct iosys_map* arg */
 #define HAVE_DRM_MEMCPY_FROM_WC_IOSYS_MAP_ARG 1
+
+/* drm_memory_stats_is_zero() is available */
+#define HAVE_DRM_MEMORY_STATS_IS_ZERO 1
 
 /* drm_mode_config->dp_subconnector_property is available */
 #define HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY 1
@@ -673,6 +701,9 @@
 
 /* fault_flag_allow_retry_first() is available */
 #define HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST 1
+
+/* fd_empty is available */
+#define HAVE_FD_EMPTY 1
 
 /* file_operation->fop_flags is available */
 #define HAVE_FILE_OPERATION_FOP_FLAGS 1
@@ -806,6 +837,9 @@
 /* ktime_t is union */
 /* #undef HAVE_KTIME_IS_UNION */
 
+/* Define to 1 if you have the <kunit/test-bug.h> header file. */
+#define HAVE_KUNIT_TEST_BUG_H 1
+
 /* kvrealloc() is available */
 /* #undef HAVE_KVREALLOC */
 
@@ -829,6 +863,9 @@
 
 /* Define to 1 if you have the <linux/cc_platform.h> header file. */
 #define HAVE_LINUX_CC_PLATFORM_H 1
+
+/* Define to 1 if you have the <linux/cgroup_dmem.h> header file. */
+#define HAVE_LINUX_CGROUP_DMEM_H 1
 
 /* Define to 1 if you have the <linux/cleanup.h> header file. */
 #define HAVE_LINUX_CLEANUP_H 1
@@ -872,11 +909,11 @@
 /* local_try_cmpchg() is available */
 #define HAVE_LINUX_LOCAL_TRY_CMPXCHG 1
 
-/* Define to 1 if you have the <linux/mmap_lock.h> header file. */
-#define HAVE_LINUX_MMAP_LOCK_H 1
-
 /* Define to 1 if you have the <linux/minmax.h> header file. */
 #define HAVE_LINUX_MINMAX_H 1
+
+/* Define to 1 if you have the <linux/mmap_lock.h> header file. */
+#define HAVE_LINUX_MMAP_LOCK_H 1
 
 /* Define to 1 if you have the <linux/pci-p2pdma.h> header file. */
 #define HAVE_LINUX_PCI_P2PDMA_H 1
@@ -946,6 +983,9 @@
 
 /* release_pages() wants 2 args */
 #define HAVE_MM_RELEASE_PAGES_2ARGS 1
+
+/* MODULE_IMPORT_NS() wants a string arguments */
+#define HAVE_MODULE_IMPORT_NS_NEED_A_STRING 1
 
 /* class_create has one argument */
 #define HAVE_ONE_ARGUMENT_OF_CLASS_CREATE 1
@@ -1028,6 +1068,9 @@
 /* sg_alloc_table_from_pages_segment() is available */
 #define HAVE_SG_ALLOC_TABLE_FROM_PAGES_SEGMENT 1
 
+/* shmem_read_folio() is available */
+#define HAVE_SHMEM_READ_FOLIO 1
+
 /* shrinker_register() is available */
 #define HAVE_SHRINKER_REGISTER 1
 
@@ -1069,6 +1112,12 @@
 
 /* drm_gem_open_object is defined in struct drm_drv */
 /* #undef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK */
+
+/* struct drm_memory_stats is defined */
+#define HAVE_STRUCT_DRM_MEMORY_STATS 1
+
+/* drm_plane_helper_funcs->atomic_async_check() have three arguments */
+#define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK_THREE_ARGUMENTS 1
 
 /* drm_plane_helper_funcs->atomic_check() second param wants drm_atomic_state
    arg */
@@ -1192,7 +1241,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 6.12.0"
+#define PACKAGE_STRING "amdgpu-dkms 6.14.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
@@ -1201,7 +1250,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "6.12.0"
+#define PACKAGE_VERSION "6.14.0"
 
 #include "config-amd-chips.h"
 
