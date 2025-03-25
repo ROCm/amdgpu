@@ -126,4 +126,5 @@
 #include <kcl/kcl_pm_runtime.h>
 #include <kcl/kcl_file.h>
 #include <kcl/kcl_drm_syncobj.h>
+#include <kcl/kcl_drm_client_event.h>
 #endif /* AMDGPU_BACKPORT_H */
