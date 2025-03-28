@@ -32,6 +32,15 @@ LINUX_SRCTREE_INCLUDE := \
 	$(filter-out -I%/uapi "-include %/kconfig.h",$(_KCL_LINUXINCLUDE))
 USER_INCLUDE := $(filter-out $(LINUX_SRCTREE_INCLUDE), $(_KCL_LINUXINCLUDE))
 
+# In the peerdirect m4, we determine if the p2p symbols are in the ofa_kernel's Module.symvers
+# If so, we need to include the path for the function pointers, as well as the include path for
+# rdma/peer_mem.h, since the ofa_kernel isn't integrated into the base kernel in that configuration
+_is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n")
+ifeq ($(call _is_kcl_macro_defined,HAVE_KFD_PEERDIRECT_SUPPORT_NEED_OFAPATH),y)
+KBUILD_EXTRA_SYMBOLS += /usr/src/ofa_kernel/x86_64/$(KERNELRELEASE)/Module.symvers
+USER_INCLUDE += -I/usr/src/ofa_kernel/x86_64/$(KERNELRELEASE)/include
+endif
+
 LINUXINCLUDE := \
 	-I$(src)/include \
 	-I$(src)/include/kcl/header \
