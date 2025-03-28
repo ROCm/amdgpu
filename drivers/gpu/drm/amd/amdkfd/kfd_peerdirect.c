@@ -86,7 +86,6 @@
  */
 #define IB_PEER_MEMORY_NAME_MAX 64
 #define IB_PEER_MEMORY_VER_MAX 16
-
 struct peer_memory_client {
 	char	name[IB_PEER_MEMORY_NAME_MAX];
 	char	version[IB_PEER_MEMORY_VER_MAX];
@@ -116,7 +115,6 @@ typedef int (*invalidate_peer_memory)(void *reg_handle,
 void *ib_register_peer_memory_client(struct peer_memory_client *peer_client,
 				  invalidate_peer_memory *invalidate_callback);
 void ib_unregister_peer_memory_client(void *reg_handle);
-
 
 /*------------------- PeerDirect bridge driver ------------------------------*/
 
@@ -442,6 +440,10 @@ void kfd_init_peer_direct(void)
 
 	pr_debug("Try to initialize PeerDirect support\n");
 
+#if defined(HAVE_KFD_PEERDIRECT_SUPPORT)
+	pfn_ib_register_peer_memory_client = ib_register_peer_memory_client;
+	pfn_ib_unregister_peer_memory_client = ib_unregister_peer_memory_client;
+#else
 	pfn_ib_register_peer_memory_client =
 		(void *(*)(struct peer_memory_client *,
 			  invalidate_peer_memory *))
@@ -450,6 +452,7 @@ void kfd_init_peer_direct(void)
 	pfn_ib_unregister_peer_memory_client = (void (*)(void *))
 		symbol_request(ib_unregister_peer_memory_client);
 
+#endif
 	if (!pfn_ib_register_peer_memory_client ||
 		!pfn_ib_unregister_peer_memory_client) {
 		pr_debug("PeerDirect interface was not detected\n");
@@ -482,13 +485,15 @@ void kfd_close_peer_direct(void)
 	if (pfn_ib_unregister_peer_memory_client) {
 		if (ib_reg_handle)
 			pfn_ib_unregister_peer_memory_client(ib_reg_handle);
-
+#if !defined(HAVE_KFD_PEERDIRECT_SUPPORT)
 		symbol_put(ib_unregister_peer_memory_client);
+#endif
 	}
 
+#if !defined(HAVE_KFD_PEERDIRECT_SUPPORT)
 	if (pfn_ib_register_peer_memory_client)
 		symbol_put(ib_register_peer_memory_client);
-
+#endif
 
 	/* Reset pointers to be safe */
 	pfn_ib_unregister_peer_memory_client = NULL;
