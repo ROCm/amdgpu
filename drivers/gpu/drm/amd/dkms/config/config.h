@@ -798,6 +798,9 @@
 /* kernel_write() take arg type of position as pointer */
 #define HAVE_KERNEL_WRITE_PPOS 1
 
+/* HAVE_KFD_PEERDIRECT_SUPPORT is available */
+/* #undef HAVE_KFD_PEERDIRECT_SUPPORT */
+
 /* kfifo_out_linear() available */
 #define HAVE_KFIFO_OUT_LINEAR 1
 
