@@ -942,7 +942,6 @@
 /* release_pages() wants 2 args */
 #define HAVE_MM_RELEASE_PAGES_2ARGS 1
 
->>>>>>> 2bee6dffc998 (drm/amdkcl: fake kvrealloc for drm_exec)
 /* pcie_aspm_enabled() is available */
 #define HAVE_PCIE_ASPM_ENABLED 1
 
@@ -1036,11 +1035,8 @@
 /* enum SMCA_UMC_V2 is available */
 #define HAVE_SMCA_UMC_V2 1
 
-/* strscpy() is available */
-#define HAVE_STRSCPY 1
-
-/* struct dma_buf_ops->allow_peer2peer is available */
-#define HAVE_STRUCT_DMA_BUF_OPS_ALLOW_PEER2PEER 1
+/* strscpy() allows two arguments */
+#define HAVE_STRSCPY_ALLOW_TWO_ARGUMENTS 1
 
 /* struct dma_buf_attach_ops->allow_peer2peer is available */
 #define HAVE_STRUCT_DMA_BUF_ATTACH_OPS_ALLOW_PEER2PEER 1
