@@ -1092,6 +1092,9 @@
 /* enum SMCA_UMC_V2 is available */
 #define HAVE_SMCA_UMC_V2 1
 
+/* strscpy() allows two arguments */
+#define HAVE_STRSCPY_ALLOW_TWO_ARGUMENTS 1
+
 /* struct dma_buf_attach_ops->allow_peer2peer is available */
 #define HAVE_STRUCT_DMA_BUF_ATTACH_OPS_ALLOW_PEER2PEER 1
 
