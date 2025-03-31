@@ -834,6 +834,9 @@
 /* Define to 1 if you have the <linux/compiler_attributes.h> header file. */
 #define HAVE_LINUX_COMPILER_ATTRIBUTES_H 1
 
+/* Define to 1 if you have the <linux/compiler_types.h> header file. */
+#define HAVE_LINUX_COMPILER_TYPES_H 1
+
 /* Define to 1 if you have the <linux/container_of.h> header file. */
 #define HAVE_LINUX_CONTAINER_OF_H 1
 
