@@ -164,4 +164,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #locking: Introduce __cleanup() based infrastructure
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/cleanup.h])
+	
+	dnl #v6.5-rc4-31-gb229baa374db
+	dnl #kernel.h: split out COUNT_ARGS() and CONCATENATE() to args.h
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/args.h])
 ])
