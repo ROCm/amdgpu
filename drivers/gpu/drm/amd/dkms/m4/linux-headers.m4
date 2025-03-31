@@ -169,4 +169,10 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #kunit: support failure from dynamic analysis tools
 	dnl
 	AC_KERNEL_CHECK_HEADERS([kunit/test-bug.h])
+	
+	dnl #v6.5-rc4-31-gb229baa374db
+	dnl #kernel.h: split out COUNT_ARGS() and CONCATENATE() to args.h
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/args.h])
+
 ])
