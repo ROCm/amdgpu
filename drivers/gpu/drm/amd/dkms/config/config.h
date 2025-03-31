@@ -831,6 +831,9 @@
 /* Define to 1 if you have the <linux/cleanup.h> header file. */
 #define HAVE_LINUX_CLEANUP_H 1
 
+/* Define to 1 if you have the <linux/compiler.h> header file. */
+#define HAVE_LINUX_COMPILER_H 1
+
 /* Define to 1 if you have the <linux/compiler_attributes.h> header file. */
 #define HAVE_LINUX_COMPILER_ATTRIBUTES_H 1
 
