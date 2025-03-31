@@ -175,4 +175,8 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/args.h])
 
+	dnl #v4.14-rc6-20-gd15155824c50
+	dnl #linux/compiler.h: Split into compiler.h and compiler_types.h
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/compiler_types.h])
 ])
