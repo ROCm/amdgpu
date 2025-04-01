@@ -6,6 +6,7 @@
 #include <kcl/kcl_mmzone.h>
 #include <drm/ttm/ttm_bo.h>
 #include <kcl/kcl_drm_gem.h>
+#include <kcl/backport/kcl_drm_gem.h>
 #include <kcl/kcl_memory.h>
 
 #endif
