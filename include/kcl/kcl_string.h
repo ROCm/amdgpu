@@ -3,11 +3,12 @@
 #define _KCL_KCL_STRING_H
 
 #include <linux/string.h>
+#include <kcl/kcl_fortify_string.h>
 #include <kcl/kcl_args.h>
 #include <kcl/kcl_compiler.h>
 
 #ifndef HAVE_STRSCPY_ALLOW_TWO_ARGUMENTS
-extern ssize_t real_kcl_strscpy(char *, const char *, size_t) __asm__("strscpy");
+extern ssize_t real_kcl_strscpy(char *, const char *, size_t) __RENAME(strscpy);
 
 /*
  * The 2 argument style can only be used when dst is an array with a
