@@ -97,7 +97,7 @@ echo "PATH=$PATH" >$MODULE_BUILD_DIR/.env
 # otherwise conflicting package libpam-tmpdir incorrectly generates config
 unset TMPDIR
 
-(cd $SRC && ./configure)
+(cd $SRC && ./configure CC=${CC})
 
 # rename CFLAGS_<path>target.o / CFLAGS_REMOVE_<path> to CFLAGS_target.o
 # for kernel version < 5.3
