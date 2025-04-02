@@ -454,7 +454,7 @@ AC_DEFUN([AC_KERNEL_COMPILE_MODULE_IFELSE], [
 	kbuild_cc=''
 	if test -s ${LINUX_OBJ}/.config; then
 		if grep -q 'CONFIG_CC_IS_CLANG=y' "${LINUX_OBJ}/.config"; then
-			kbuild_cc='CC=clang'
+			kbuild_cc='CC=clang LD=ld.lld LLVM=1'
 		fi
 	fi
 	test "x$enable_linux_builtin" = xyes && kbuild_src_flag='KBUILD_SRC=' # override KBUILD_SRC
