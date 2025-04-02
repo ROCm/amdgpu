@@ -64,13 +64,21 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 		if (vmf->flags & FAULT_FLAG_RETRY_NOWAIT)
 			return VM_FAULT_RETRY;
 
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 		drm_gem_object_get(&bo->base);
+#else
+		ttm_bo_get(bo);
+#endif
 		mmap_read_unlock(vma->vm_mm);
 		(void)dma_resv_wait_timeout(amdkcl_ttm_resvp(bo),
 					    DMA_RESV_USAGE_KERNEL, true,
 					    MAX_SCHEDULE_TIMEOUT);
 		dma_resv_unlock(amdkcl_ttm_resvp(bo));
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 		drm_gem_object_put(&bo->base);
+#else
+		ttm_bo_put(bo);
+#endif
 		return VM_FAULT_RETRY;
 	}
 
@@ -137,12 +145,20 @@ vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 		 */
 		if (fault_flag_allow_retry_first(vmf->flags)) {
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 				drm_gem_object_get(&bo->base);
+#else
+				ttm_bo_get(bo);
+#endif
 				mmap_read_unlock(vma->vm_mm);
 				if (!dma_resv_lock_interruptible(amdkcl_ttm_resvp(bo),
 								 NULL))
 					dma_resv_unlock(amdkcl_ttm_resvp(bo));
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 				drm_gem_object_put(&bo->base);
+#else
+				ttm_bo_put(bo);
+#endif
 			}
 
 			return VM_FAULT_RETRY;
@@ -374,7 +390,11 @@ void ttm_bo_vm_open(struct vm_area_struct *vma)
 
 	WARN_ON(bo->bdev->dev_mapping != vma->vm_file->f_mapping);
 
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 	drm_gem_object_get(&bo->base);
+#else
+	ttm_bo_get(bo);
+#endif
 }
 EXPORT_SYMBOL(ttm_bo_vm_open);
 
@@ -382,7 +402,11 @@ void ttm_bo_vm_close(struct vm_area_struct *vma)
 {
 	struct ttm_buffer_object *bo = vma->vm_private_data;
 
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 	drm_gem_object_put(&bo->base);
+#else
+	ttm_bo_put(bo);
+#endif
 	vma->vm_private_data = NULL;
 }
 EXPORT_SYMBOL(ttm_bo_vm_close);
@@ -584,7 +608,11 @@ int ttm_bo_mmap_obj(struct vm_area_struct *vma, struct ttm_buffer_object *bo)
 	if (is_cow_mapping(vma->vm_flags))
 		return -EINVAL;
 
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 	drm_gem_object_get(&bo->base);
+#else
+	ttm_bo_get(bo);
+#endif
 
 	/*
 	 * Drivers may want to override the vm_ops field. Otherwise we
