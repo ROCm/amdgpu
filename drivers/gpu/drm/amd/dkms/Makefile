@@ -34,9 +34,8 @@ endif
 ifneq ($(CONFIG_CC_IS_CLANG),)
 CC := clang
 module_build_flags += CC=clang
-endif
-ifneq ($(CONFIG_LD_IS_LLD),)
 module_build_flags += LD=ld.lld
+module_build_flags += LLVM=1
 endif
 
 dkms-config ?= amd/dkms/dkms-config.mk
