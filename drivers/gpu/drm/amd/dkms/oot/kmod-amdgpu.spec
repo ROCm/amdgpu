@@ -32,7 +32,7 @@ popd
 
 %install
 mkdir -p %{buildroot}/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu
-%{__install} -D -t %{buildroot}/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu src/amddrm_buddy.ko src/amddrm_ttm_helper.ko src/scheduler/amd-sched.ko src/ttm/amdttm.ko src/amd/amdxcp/amdxcp.ko src/amd/amdgpu/amdgpu.ko src/amd/amdkcl/amdkcl.ko
+%{__install} -D -t %{buildroot}/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu src/amddrm_buddy.ko src/amddrm_ttm_helper.ko src/scheduler/amd-sched.ko src/ttm/amdttm.ko src/amd/amdxcp/amdxcp.ko src/amd/amdgpu/amdgpu.ko src/amd/amdkcl/amdkcl.ko src/amddrm_exec.ko
 
 # Make .ko objects temporarily executable for automatic stripping
 find %{buildroot}/lib/modules -type f -name \*.ko -exec chmod u+x \{\} \+
@@ -59,6 +59,7 @@ if [ -x "/usr/sbin/weak-modules" ]; then
     printf '%s\n' "/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amddrm_ttm_helper.ko" | /usr/sbin/weak-modules --no-initramfs --add-modules
     printf '%s\n' "/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amd-sched.ko" | /usr/sbin/weak-modules --no-initramfs --add-modules
     printf '%s\n' "/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amdttm.ko" | /usr/sbin/weak-modules --no-initramfs --add-modules
+    printf '%s\n' "/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amddrm_exec.ko" | /usr/sbin/weak-modules --no-initramfs --add-modules
 fi
 dracut -f --kver %{kernel}.%{_arch}
 
@@ -70,6 +71,7 @@ echo "/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amddrm_buddy.
 echo "/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amddrm_ttm_helper.ko" >> /var/run/rpm-%{pkg}-modules.list
 echo "/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amd-sched.ko" >> /var/run/rpm-%{pkg}-modules.list
 echo "/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amdttm.ko" >> /var/run/rpm-%{pkg}-modules.list
+echo "/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amddrm_exec.ko" >> /var/run/rpm-%{pkg}-modules.list
 
 %postun
 depmod -a > /dev/null 2>&1
@@ -89,6 +91,7 @@ dracut -f --kver %{kernel}.%{_arch}
 /lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amddrm_ttm_helper.ko
 /lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amd-sched.ko
 /lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amdttm.ko
+/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amddrm_exec.ko
 %defattr(644,root,root,755)
 %license licenses
 %config(noreplace) %{_sysconfdir}/depmod.d/%{pkg}.conf
