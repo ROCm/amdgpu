@@ -8228,7 +8228,7 @@ static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 	if (IS_ERR(mst_state))
 		return PTR_ERR(mst_state);
 #ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION
-	mst_state->pbn_div.full = dfixed_const(dm_mst_get_pbn_divider(aconnector->mst_root->dc_link));
+	mst_state->pbn_div.full = dm_mst_get_pbn_divider(aconnector->mst_root->dc_link);
 #else
 	mst_state->pbn_div = dm_mst_get_pbn_divider(aconnector->mst_root->dc_link);
 #endif
