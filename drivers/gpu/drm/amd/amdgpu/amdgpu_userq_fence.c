@@ -218,7 +218,7 @@ void amdgpu_userq_fence_driver_destroy(struct kref *ref)
 	unsigned long index, flags;
 	struct dma_fence *f;
 
-	spin_lock(&fence_drv->fence_list_lock);
+	spin_lock_irqsave(&fence_drv->fence_list_lock, flags);
 	list_for_each_entry_safe(fence, tmp, &fence_drv->fences, link) {
 		f = &fence->base;
 
@@ -230,7 +230,7 @@ void amdgpu_userq_fence_driver_destroy(struct kref *ref)
 		list_del(&fence->link);
 		dma_fence_put(f);
 	}
-	spin_unlock(&fence_drv->fence_list_lock);
+	spin_unlock_irqrestore(&fence_drv->fence_list_lock, flags);
 
 #ifdef HAVE_STRUCT_XARRAY
 	xa_lock_irqsave(xa, flags);
