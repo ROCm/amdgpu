@@ -2300,7 +2300,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 
 		if (!register_dmub_notify_callback(adev, DMUB_NOTIFICATION_FUSED_IO,
 			dmub_aux_fused_io_callback, false)) {
-			drm_err(adev, "amdgpu: fail to register dmub fused io callback");
+			drm_err(adev_to_drm(adev), "amdgpu: fail to register dmub fused io callback");
 			goto error;
 		}
 		/* Enable outbox notification only after IRQ handlers are registered and DMUB is alive.
