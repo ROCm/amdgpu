@@ -58,6 +58,7 @@ struct amdgpu_usermode_queue {
 #endif
 	struct amdgpu_userq_fence_driver *fence_drv;
 	struct dma_fence	*last_fence;
+	u32			xcp_id;
 };
 
 struct amdgpu_userq_funcs {
