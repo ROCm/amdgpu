@@ -1460,7 +1460,7 @@ static int amdgpu_gfx_run_cleaner_shader_job(struct amdgpu_ring *ring)
 	 * the cleaner shader on each submission. The value just need to change
 	 * for each submission and is otherwise meaningless.
 	 */
-	owner = (void *)(unsigned long)atomic_inc_return(&counter),
+	owner = (void *)(unsigned long)atomic_inc_return(&counter);
 
 	r = amdgpu_job_alloc_with_ib(ring->adev, &entity, owner,
 				     64, 0, &job);
