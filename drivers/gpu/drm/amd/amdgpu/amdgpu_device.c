@@ -5578,9 +5578,6 @@ static void amdgpu_device_recovery_prepare(struct amdgpu_device *adev,
 {
 	struct amdgpu_device *tmp_adev = NULL;
 
-	if (amdgpu_reset_domain_in_drain_mode(adev->reset_domain))
-		return 0;
-
 	/*
 	 * Build list of devices to reset.
 	 * In case we are in XGMI hive mode, resort the device list
@@ -5850,6 +5847,9 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 	bool need_emergency_restart = false;
 	/* save the pasid here as the job may be freed before the end of the reset */
 	int pasid = job ? job->pasid : -EINVAL;
+
+	if (amdgpu_reset_domain_in_drain_mode(adev->reset_domain))
+		return 0;
 
 	/*
 	 * If it reaches here because of hang/timeout and a RAS error is
