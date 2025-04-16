@@ -25,6 +25,8 @@
 #include "gc/gc_12_0_0_offset.h"
 #include "gc/gc_12_0_0_sh_mask.h"
 #include "soc24.h"
+#include "navi10_enum.h"
+
 #include <uapi/linux/kfd_ioctl.h>
 
 static void lock_srbm(struct amdgpu_device *adev, uint32_t mec, uint32_t pipe,
@@ -367,6 +369,73 @@ static uint32_t kgd_gfx_v12_hqd_sdma_get_doorbell(struct amdgpu_device *adev,
 	return 0;
 }
 
+static uint32_t kgd_gfx_v12_get_hosttrap_status(struct amdgpu_device *adev,
+		uint32_t inst)
+{
+	uint32_t sq_debug_hosttrap_status = 0x0;
+	int i, j;
+
+	mutex_lock(&adev->grbm_idx_mutex);
+	for (i = 0; i < adev->gfx.config.max_shader_engines; i++) {
+		for (j = 0; j < adev->gfx.config.max_sh_per_se; j++) {
+			amdgpu_gfx_select_se_sh(adev, i, j, 0xffffffff, inst);
+			sq_debug_hosttrap_status =
+				RREG32_SOC15(GC, GET_INST(GC, inst), regSQ_DEBUG_HOST_TRAP_STATUS);
+
+			if (sq_debug_hosttrap_status)
+				goto out;
+		}
+	}
+
+out:
+	amdgpu_gfx_select_se_sh(adev, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, inst);
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return sq_debug_hosttrap_status;
+}
+
+/*
+ * gfx12 has no way to broadcast to all WGPs but only a single SIMD within
+ * that WGP. Here we broadcast to 1 wave-slot on all 4 SIMDs within all WGPs,
+ * so target_simd is not really used for gfx12.
+*/
+static uint32_t kgd_v12_trigger_pc_sample_trap(struct amdgpu_device *adev,
+					    uint32_t vmid,
+					    uint32_t __always_unused *target_simd,
+					    uint32_t *target_wave_slot,
+					    enum kfd_ioctl_pc_sample_method method,
+					    uint32_t inst)
+{
+	if (method == KFD_IOCTL_PCS_METHOD_HOSTTRAP) {
+		uint32_t value = 0;
+		uint32_t sq_hosttrap_status = 0x0;
+
+		sq_hosttrap_status = kgd_gfx_v12_get_hosttrap_status(adev, inst);
+		/* skip when last host trap request is still pending to complete */
+		if (sq_hosttrap_status)
+			return 0;
+
+		value = REG_SET_FIELD(value, SQ_CMD, CMD, SQ_IND_CMD_CMD_TRAP);
+		value = REG_SET_FIELD(value, SQ_CMD, MODE, SQ_IND_CMD_MODE_SINGLE);
+
+		/* select *target_wave_slot */
+		value = REG_SET_FIELD(value, SQ_CMD, WAVE_ID, (*target_wave_slot)++);
+		/* set TrapID 4 for HOSTTRAP */
+		value = REG_SET_FIELD(value, SQ_CMD, DATA, 0x4);
+
+		mutex_lock(&adev->grbm_idx_mutex);
+		amdgpu_gfx_select_se_sh(adev, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, inst);
+		WREG32_SOC15(GC, GET_INST(GC, inst), regSQ_CMD, value);
+		mutex_unlock(&adev->grbm_idx_mutex);
+
+		*target_wave_slot %= 16;
+	} else {
+		dev_dbg(adev->dev, "PC Sampling method %d not supported.", method);
+		return -EOPNOTSUPP;
+	}
+	return 0;
+}
+
 const struct kfd2kgd_calls gfx_v12_kfd2kgd = {
 	.init_interrupts = init_interrupts_v12,
 	.hqd_dump = hqd_dump_v12,
@@ -380,5 +449,6 @@ const struct kfd2kgd_calls gfx_v12_kfd2kgd = {
 	.set_wave_launch_mode = kgd_gfx_v12_set_wave_launch_mode,
 	.set_address_watch = kgd_gfx_v12_set_address_watch,
 	.clear_address_watch = kgd_gfx_v12_clear_address_watch,
-	.hqd_sdma_get_doorbell = kgd_gfx_v12_hqd_sdma_get_doorbell
+	.hqd_sdma_get_doorbell = kgd_gfx_v12_hqd_sdma_get_doorbell,
+	.trigger_pc_sample_trap = kgd_v12_trigger_pc_sample_trap,
 };
