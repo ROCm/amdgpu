@@ -438,6 +438,33 @@ static uint32_t kgd_v12_1_trigger_pc_sample_trap(struct amdgpu_device *adev,
 	return 0;
 }
 
+static uint32_t kgd_v12_setup_stoch_sampling(struct amdgpu_device *adev,
+					uint32_t compute_vmid_bitmap,
+					bool enable,
+					enum kfd_ioctl_pc_sample_type type,
+					uint64_t intval,
+					uint32_t inst)
+{
+	uint32_t value = 0;
+	uint8_t random_seed = 0;
+
+	get_random_bytes(&random_seed, sizeof(random_seed));
+	/* turn on all VMID for this instance */
+	value = REG_SET_FIELD(value, SQ_PERF_SNAPSHOT_CTRL, VMID_MASK, compute_vmid_bitmap);
+
+	value = REG_SET_FIELD(value, SQ_PERF_SNAPSHOT_CTRL, TIMER_ON_OFF, enable ? 1:0);
+	value = REG_SET_FIELD(value, SQ_PERF_SNAPSHOT_CTRL, COUNT_INTERVAL, ffs(intval >> 9));
+	value = REG_SET_FIELD(value, SQ_PERF_SNAPSHOT_CTRL, COUNT_SEL, type - 1);
+	value = REG_SET_FIELD(value, SQ_PERF_SNAPSHOT_CTRL, RANDOM_SEED, random_seed);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+	amdgpu_gfx_select_se_sh(adev, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, inst);
+	WREG32_SOC15(GC, GET_INST(GC, inst), regSQ_PERF_SNAPSHOT_CTRL, value);
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
 const struct kfd2kgd_calls gfx_v12_1_kfd2kgd = {
 	.init_interrupts = init_interrupts_v12_1,
 	.hqd_dump = hqd_dump_v12_1,
@@ -453,4 +480,5 @@ const struct kfd2kgd_calls gfx_v12_1_kfd2kgd = {
 	.clear_address_watch = kgd_gfx_v12_1_clear_address_watch,
 	.hqd_sdma_get_doorbell = kgd_gfx_v12_1_hqd_sdma_get_doorbell,
 	.trigger_pc_sample_trap = kgd_v12_1_trigger_pc_sample_trap,
+	.setup_stoch_sampling = kgd_v12_setup_stoch_sampling,
 };
