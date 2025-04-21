@@ -6,6 +6,7 @@ AC_DEFUN([AC_KERNEL_SINGLE_TARGET_CFLAGS], [
 		_conftest_cmd=$(head -1 .conftest.o.cmd)
 
 		CC=$(echo $_conftest_cmd | awk -F ' ' '{print $[3]}')
+		CPP="$CC -E"
 
 		CFLAGS=$(echo $_conftest_cmd | \
 			 cut -d ' ' -f 4- | \
@@ -27,6 +28,7 @@ AC_DEFUN([AC_KERNEL_SINGLE_TARGET_CFLAGS], [
 			sed -e "s|nostdinc|nostdinc -I../tiny_wrapper/include|")
 
 		AC_SUBST(CC)
+		AC_SUBST(CPP)
 		AC_SUBST(CFLAGS)
 		AC_SUBST(CPPFLAGS)
 	], [
