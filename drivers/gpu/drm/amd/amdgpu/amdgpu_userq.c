@@ -134,7 +134,6 @@ amdgpu_userq_active(struct amdgpu_userq_mgr *uq_mgr)
 	return ret;
 }
 
-#ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
 static struct amdgpu_usermode_queue *
 amdgpu_userq_find(struct amdgpu_userq_mgr *uq_mgr, int qid)
 {
@@ -527,13 +526,6 @@ int amdgpu_userq_ioctl(struct drm_device *dev, void *data,
 
 	return r;
 }
-#else
-int amdgpu_userq_ioctl(struct drm_device *dev, void *data,
-		       struct drm_file *filp)
-{
-	return -ENOTSUPP;
-}
-#endif
 
 static int
 amdgpu_userq_restore_all(struct amdgpu_userq_mgr *uq_mgr)

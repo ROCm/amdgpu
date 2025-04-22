@@ -241,7 +241,6 @@ void amdgpu_userq_fence_driver_put(struct amdgpu_userq_fence_driver *fence_drv)
 	kref_put(&fence_drv->refcount, amdgpu_userq_fence_driver_destroy);
 }
 
-#ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
 static int amdgpu_userq_fence_alloc(struct amdgpu_userq_fence **userq_fence)
 {
 	*userq_fence = kmem_cache_alloc(amdgpu_userq_fence_slab, GFP_ATOMIC);
@@ -315,7 +314,6 @@ static int amdgpu_userq_fence_create(struct amdgpu_usermode_queue *userq,
 
 	return 0;
 }
-#endif
 
 static const char *amdgpu_userq_fence_get_driver_name(struct dma_fence *f)
 {
@@ -374,8 +372,8 @@ static const struct dma_fence_ops amdgpu_userq_fence_ops = {
 	.release = amdgpu_userq_fence_release,
 };
 
+
 #ifdef HAVE_STRUCT_XARRAY
-#ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
 /**
  * amdgpu_userq_fence_read_wptr - Read the userq wptr value
  *
@@ -626,15 +624,7 @@ free_syncobj_handles:
 
 	return r;
 }
-#else
-int amdgpu_userq_signal_ioctl(struct drm_device *dev, void *data,
-			      struct drm_file *filp)
-{
-	return -ENOTSUPP;
-}
-#endif
 
-#ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
 int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
 			    struct drm_file *filp)
 {
@@ -1000,11 +990,5 @@ free_bo_handles_read:
 
 	return r;
 }
-#else
-int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
-			    struct drm_file *filp)
-{
-	return -ENOTSUPP;
-}
-#endif
+
 #endif
