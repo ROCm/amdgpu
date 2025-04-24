@@ -1269,6 +1269,23 @@ static int sdma_v6_0_early_init(struct amdgpu_ip_block *ip_block)
 	struct amdgpu_device *adev = ip_block->adev;
 	int r;
 
+	switch (amdgpu_user_queue) {
+	case -1:
+	case 0:
+	default:
+		adev->sdma.no_user_submission = false;
+		adev->sdma.disable_uq = true;
+		break;
+	case 1:
+		adev->sdma.no_user_submission = false;
+		adev->sdma.disable_uq = false;
+		break;
+	case 2:
+		adev->sdma.no_user_submission = true;
+		adev->sdma.disable_uq = false;
+		break;
+	}
+
 	r = amdgpu_sdma_init_microcode(adev, 0, true);
 	if (r)
 		return r;
@@ -1303,6 +1320,7 @@ static int sdma_v6_0_sw_init(struct amdgpu_ip_block *ip_block)
 		ring->ring_obj = NULL;
 		ring->use_doorbell = true;
 		ring->me = i;
+		ring->no_user_submission = adev->sdma.no_user_submission;
 
 		DRM_DEBUG("SDMA %d use_doorbell being set to: [%s]\n", i,
 				ring->use_doorbell?"true":"false");
@@ -1347,7 +1365,7 @@ static int sdma_v6_0_sw_init(struct amdgpu_ip_block *ip_block)
 
 #ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
 	/* add firmware version checks here */
-	if (0)
+	if (0 && !adev->sdma.disable_uq)
 		adev->userq_funcs[AMDGPU_HW_IP_DMA] = &userq_mes_funcs;
 #endif
 	r = amdgpu_sdma_sysfs_reset_mask_init(adev);
@@ -1373,11 +1391,39 @@ static int sdma_v6_0_sw_fini(struct amdgpu_ip_block *ip_block)
 	return 0;
 }
 
+static int sdma_v6_0_set_userq_trap_interrupts(struct amdgpu_device *adev,
+					       bool enable)
+{
+	unsigned int irq_type;
+	int i, r;
+
+	if (adev->userq_funcs[AMDGPU_HW_IP_DMA]) {
+		for (i = 0; i < adev->sdma.num_instances; i++) {
+			irq_type = AMDGPU_SDMA_IRQ_INSTANCE0 + i;
+			if (enable)
+				r = amdgpu_irq_get(adev, &adev->sdma.trap_irq,
+						   irq_type);
+			else
+				r = amdgpu_irq_put(adev, &adev->sdma.trap_irq,
+						   irq_type);
+			if (r)
+				return r;
+		}
+	}
+
+	return 0;
+}
+
 static int sdma_v6_0_hw_init(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
+	int r;
 
-	return sdma_v6_0_start(adev);
+	r = sdma_v6_0_start(adev);
+	if (r)
+		return r;
+
+	return sdma_v6_0_set_userq_trap_interrupts(adev, true);
 }
 
 static int sdma_v6_0_hw_fini(struct amdgpu_ip_block *ip_block)
@@ -1389,6 +1435,7 @@ static int sdma_v6_0_hw_fini(struct amdgpu_ip_block *ip_block)
 
 	sdma_v6_0_ctxempty_int_enable(adev, false);
 	sdma_v6_0_enable(adev, false);
+	sdma_v6_0_set_userq_trap_interrupts(adev, false);
 
 	return 0;
 }

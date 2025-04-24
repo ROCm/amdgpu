@@ -1498,6 +1498,9 @@ int amdgpu_ras_reset_error_count(struct amdgpu_device *adev,
 	    !amdgpu_ras_get_aca_debug_mode(adev))
 		return -EOPNOTSUPP;
 
+	if (amdgpu_sriov_vf(adev))
+		return -EOPNOTSUPP;
+
 	/* skip ras error reset in gpu reset */
 	if ((amdgpu_in_reset(adev) || amdgpu_ras_in_recovery(adev)) &&
 	    ((smu_funcs && smu_funcs->set_debug_mode) ||
@@ -3809,10 +3812,12 @@ init_ras_enabled_flag:
 		adev->ras_hw_enabled & amdgpu_ras_mask;
 
 	/* aca is disabled by default except for psp v13_0_6/v13_0_12/v13_0_14 */
-	adev->aca.is_enabled =
-		(amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(13, 0, 6) ||
-		 amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(13, 0, 12) ||
-		 amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(13, 0, 14));
+	if (!amdgpu_sriov_vf(adev)) {
+		adev->aca.is_enabled =
+			(amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(13, 0, 6) ||
+			amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(13, 0, 12) ||
+			amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(13, 0, 14));
+	}
 
 	/* bad page feature is not applicable to specific app platform */
 	if (adev->gmc.is_app_apu &&

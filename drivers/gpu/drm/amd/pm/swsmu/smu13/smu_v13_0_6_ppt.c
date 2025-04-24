@@ -183,6 +183,7 @@ static const struct cmn2asic_msg_mapping smu_v13_0_6_message_map[SMU_MSG_MAX_COU
 	MSG_MAP(SetPhsDetWRbwAlpha,                  PPSMC_MSG_SetPhsDetWRbwAlpha,              0),
 	MSG_MAP(SetPhsDetOnOff,                      PPSMC_MSG_SetPhsDetOnOff,                  0),
 	MSG_MAP(GetPhsDetResidency,                  PPSMC_MSG_GetPhsDetResidency,              0),
+	MSG_MAP(ResetVCN,                            PPSMC_MSG_ResetVCN,                       0),
 };
 
 // clang-format on
@@ -343,6 +344,8 @@ static void smu_v13_0_12_init_caps(struct smu_context *smu)
 	if (fw_ver >= 0x00561E00)
 		smu_v13_0_6_cap_set(smu, SMU_CAP(STATIC_METRICS));
 
+	if (fw_ver >= 0x00562500)
+		smu_v13_0_6_cap_set(smu, SMU_CAP(HST_LIMIT_METRICS));
 }
 
 static void smu_v13_0_6_init_caps(struct smu_context *smu)
@@ -392,6 +395,9 @@ static void smu_v13_0_6_init_caps(struct smu_context *smu)
 			smu_v13_0_6_cap_clear(smu, SMU_CAP(RMA_MSG));
 		if (fw_ver < 0x00555600)
 			smu_v13_0_6_cap_clear(smu, SMU_CAP(ACA_SYND));
+		if ((pgm == 7 && fw_ver >= 0x7550E00) ||
+		    (pgm == 0 && fw_ver >= 0x00557E00))
+			smu_v13_0_6_cap_set(smu, SMU_CAP(HST_LIMIT_METRICS));
 	}
 	if (((pgm == 7) && (fw_ver >= 0x7550700)) ||
 	    ((pgm == 0) && (fw_ver >= 0x00557900)) ||
@@ -3116,6 +3122,19 @@ static int smu_v13_0_6_post_init(struct smu_context *smu)
 	return 0;
 }
 
+static int smu_v13_0_6_reset_vcn(struct smu_context *smu, uint32_t inst_mask)
+{
+	int ret = 0;
+
+	ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_ResetVCN, inst_mask, NULL);
+	if (ret)
+		dev_err(smu->adev->dev,
+			"failed to send ResetVCN event with mask 0x%x\n",
+			inst_mask);
+	return ret;
+}
+
+
 static int mca_smu_set_debug_mode(struct amdgpu_device *adev, bool enable)
 {
 	struct smu_context *smu = adev->powerplay.pp_handle;
@@ -3791,6 +3810,7 @@ static const struct pptable_funcs smu_v13_0_6_ppt_funcs = {
 	.reset_sdma = smu_v13_0_6_reset_sdma,
 	.reset_sdma_is_supported = smu_v13_0_6_reset_sdma_is_supported,
 	.post_init = smu_v13_0_6_post_init,
+	.dpm_reset_vcn = smu_v13_0_6_reset_vcn,
 };
 
 void smu_v13_0_6_set_ppt_funcs(struct smu_context *smu)

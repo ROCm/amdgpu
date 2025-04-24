@@ -53,7 +53,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.327"
+#define DC_VER "3.2.328"
 
 /**
  * MAX_SURFACES - representative of the upper bound of surfaces that can be piped to a single CRTC
@@ -282,6 +282,7 @@ struct dc_caps {
 	bool edp_dsc_support;
 	bool vbios_lttpr_aware;
 	bool vbios_lttpr_enable;
+	bool fused_io_supported;
 	uint32_t max_otg_num;
 	uint32_t max_cab_allocation_bytes;
 	uint32_t cache_line_size;
@@ -902,6 +903,9 @@ struct dc_debug_options {
 	bool force_single_disp_pipe_split;
 	bool voltage_align_fclk;
 	bool disable_min_fclk;
+
+	bool hdcp_lc_force_fw_enable;
+	bool hdcp_lc_enable_sw_fallback;
 
 	bool disable_dfs_bypass;
 	bool disable_dpp_power_gate;

@@ -87,6 +87,7 @@
 
 #if IS_ENABLED(CONFIG_X86)
 #include <asm/intel-family.h>
+#include <asm/cpu_device_id.h>
 #endif
 
 MODULE_FIRMWARE("amdgpu/vega10_gpu_info.bin");
@@ -1876,6 +1877,35 @@ static bool amdgpu_device_pcie_dynamic_switching_supported(struct amdgpu_device 
 	return true;
 }
 
+static bool amdgpu_device_aspm_support_quirk(struct amdgpu_device *adev)
+{
+#if IS_ENABLED(CONFIG_X86)
+	struct cpuinfo_x86 *c = &cpu_data(0);
+
+	if (!(amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(12, 0, 0) ||
+		  amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(12, 0, 1)))
+		return false;
+
+	if (c->x86 == 6 &&
+		adev->pm.pcie_gen_mask & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN5) {
+		switch (c->x86_model) {
+		case VFM_MODEL(INTEL_ALDERLAKE):
+		case VFM_MODEL(INTEL_ALDERLAKE_L):
+		case VFM_MODEL(INTEL_RAPTORLAKE):
+		case VFM_MODEL(INTEL_RAPTORLAKE_P):
+		case VFM_MODEL(INTEL_RAPTORLAKE_S):
+			return true;
+		default:
+			return false;
+		}
+	} else {
+		return false;
+	}
+#else
+	return false;
+#endif
+}
+
 /**
  * amdgpu_device_should_use_aspm - check if the device should program ASPM
  *
@@ -1900,7 +1930,7 @@ bool amdgpu_device_should_use_aspm(struct amdgpu_device *adev)
 	}
 	if (adev->flags & AMD_IS_APU)
 		return false;
-	if (!(adev->pm.pp_feature & PP_PCIE_DPM_MASK))
+	if (amdgpu_device_aspm_support_quirk(adev))
 		return false;
 #ifdef HAVE_PCIE_ASPM_ENABLED
 	return pcie_aspm_enabled(adev->pdev);
@@ -2130,8 +2160,26 @@ static int amdgpu_device_check_arguments(struct amdgpu_device *adev)
 	adev->firmware.load_type = amdgpu_ucode_get_load_type(adev, amdgpu_fw_load_type);
 	amdgpu_direct_gma_size = min(amdgpu_direct_gma_size, 96);
 
-	for (i = 0; i < MAX_XCP; i++)
-		adev->enforce_isolation[i] = !!enforce_isolation;
+	for (i = 0; i < MAX_XCP; i++) {
+		switch (amdgpu_enforce_isolation) {
+		case -1:
+		case 0:
+		default:
+			/* disable */
+			adev->enforce_isolation[i] = AMDGPU_ENFORCE_ISOLATION_DISABLE;
+			break;
+		case 1:
+			/* enable */
+			adev->enforce_isolation[i] =
+				AMDGPU_ENFORCE_ISOLATION_ENABLE;
+			break;
+		case 2:
+			/* enable legacy mode */
+			adev->enforce_isolation[i] =
+				AMDGPU_ENFORCE_ISOLATION_ENABLE_LEGACY;
+			break;
+		}
+	}
 
 	return 0;
 }
@@ -2711,6 +2759,13 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 		break;
 	}
 
+	/* Check for IP version 9.4.3 with A0 hardware */
+	if (amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 3) &&
+	    !amdgpu_device_get_rev_id(adev)) {
+		dev_err(adev->dev, "Unsupported A0 hardware\n");
+		return -ENODEV;	/* device unsupported - no device error */
+	}
+
 	if (amdgpu_has_atpx() &&
 	    (amdgpu_is_atpx_hybrid() ||
 	     amdgpu_has_atpx_dgpu_power_cntl()) &&
@@ -2722,7 +2777,6 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 		parent = pcie_find_root_port(adev->pdev);
 		adev->has_pr3 = parent ? pci_pr3_present(parent) : false;
 	}
-
 
 	adev->pm.pp_feature = amdgpu_pp_feature_mask;
 	if (amdgpu_sriov_vf(adev) || sched_policy == KFD_SCHED_POLICY_NO_HWS)
@@ -3478,6 +3532,9 @@ static int amdgpu_device_ip_fini_early(struct amdgpu_device *adev)
 	amdgpu_device_set_cg_state(adev, AMD_CG_STATE_UNGATE);
 
 	amdgpu_amdkfd_suspend(adev, false);
+#ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
+	amdgpu_userq_suspend(adev);
+#endif
 
 	/* Workaround for ASICs need to disable SMC first */
 	amdgpu_device_smu_fini_early(adev);
@@ -3533,6 +3590,7 @@ static int amdgpu_device_ip_fini(struct amdgpu_device *adev)
 			amdgpu_device_mem_scratch_fini(adev);
 			amdgpu_ib_pool_fini(adev);
 			amdgpu_seq64_fini(adev);
+			amdgpu_doorbell_fini(adev);
 		}
 		if (adev->ip_blocks[i].version->funcs->sw_fini) {
 			r = adev->ip_blocks[i].version->funcs->sw_fini(&adev->ip_blocks[i]);
@@ -3666,6 +3724,13 @@ static int amdgpu_device_ip_suspend_phase2(struct amdgpu_device *adev)
 			    adev, adev->ip_blocks[i].version->type))
 			continue;
 
+		/* Since we skip suspend for S0i3, we need to cancel the delayed
+		 * idle work here as the suspend callback never gets called.
+		 */
+		if (adev->in_s0ix &&
+		    adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_GFX &&
+		    amdgpu_ip_version(adev, GC_HWIP, 0) >= IP_VERSION(10, 0, 0))
+			cancel_delayed_work_sync(&adev->gfx.idle_work);
 		/* skip suspend of gfx/mes and psp for S0ix
 		 * gfx is in gfxoff state, so on resume it will exit gfxoff just
 		 * like at runtime. PSP is also part of the always on hardware
@@ -4324,9 +4389,10 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		amdgpu_sync_create(&adev->isolation[i].active);
 		amdgpu_sync_create(&adev->isolation[i].prev);
 	}
-	mutex_init(&adev->gfx.kfd_sch_mutex);
+	mutex_init(&adev->gfx.userq_sch_mutex);
 	mutex_init(&adev->gfx.workload_profile_mutex);
 	mutex_init(&adev->vcn.workload_profile_mutex);
+	mutex_init(&adev->userq_mutex);
 
 	amdgpu_device_init_apu_flags(adev);
 
@@ -4355,6 +4421,8 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	INIT_LIST_HEAD(&adev->ras_list);
 
 	INIT_LIST_HEAD(&adev->pm.od_kobj_list);
+
+	INIT_LIST_HEAD(&adev->userq_mgr_list);
 
 	INIT_DELAYED_WORK(&adev->delayed_init_work,
 			  amdgpu_device_delayed_init_work_handler);
@@ -4892,7 +4960,6 @@ void amdgpu_device_fini_sw(struct amdgpu_device *adev)
 
 		iounmap(adev->rmmio);
 		adev->rmmio = NULL;
-		amdgpu_doorbell_fini(adev);
 		drm_dev_exit(idx);
 	}
 
@@ -5017,8 +5084,12 @@ int amdgpu_device_suspend(struct drm_device *dev, bool notify_clients)
 
 	amdgpu_device_ip_suspend_phase1(adev);
 
-	if (!adev->in_s0ix)
+	if (!adev->in_s0ix) {
 		amdgpu_amdkfd_suspend(adev, adev->in_runpm);
+#ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
+		amdgpu_userq_suspend(adev);
+#endif
+	}
 
 	r = amdgpu_device_evict_resources(adev);
 	if (r)
@@ -5085,6 +5156,11 @@ int amdgpu_device_resume(struct drm_device *dev, bool notify_clients)
 		r = amdgpu_amdkfd_resume(adev, adev->in_runpm);
 		if (r)
 			goto exit;
+#ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
+		r = amdgpu_userq_resume(adev);
+		if (r)
+			goto exit;
+#endif
 	}
 
 	r = amdgpu_device_ip_late_init(adev);
@@ -5369,6 +5445,7 @@ static int amdgpu_device_reset_sriov(struct amdgpu_device *adev,
 	if (amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 2) ||
 	    amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 3) ||
 	    amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 4) ||
+	    amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 5, 0) ||
 	    amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(11, 0, 3))
 		amdgpu_ras_resume(adev);
 
@@ -5969,9 +6046,6 @@ static int amdgpu_device_halt_activities(struct amdgpu_device *adev,
 	struct amdgpu_device *tmp_adev = NULL;
 	int i, r = 0;
 
-	if (amdgpu_reset_domain_in_drain_mode(adev->reset_domain))
-		return 0;
-
 	/*
 	 * Build list of devices to reset.
 	 * In case we are in XGMI hive mode, resort the device list
@@ -6218,6 +6292,9 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 	struct amdgpu_hive_info *hive = NULL;
 	int r = 0;
 	bool need_emergency_restart = false;
+
+	if (amdgpu_reset_domain_in_drain_mode(adev->reset_domain))
+		return 0;
 
 	/*
 	 * If it reaches here because of hang/timeout and a RAS error is
@@ -6758,8 +6835,8 @@ pci_ers_result_t amdgpu_pci_slot_reset(struct pci_dev *pdev)
 	struct drm_device *dev = pci_get_drvdata(pdev);
 	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct amdgpu_reset_context reset_context;
-	struct amdgpu_device *tmp_adev = NULL;
-	struct amdgpu_hive_info *hive = NULL;
+	struct amdgpu_device *tmp_adev;
+	struct amdgpu_hive_info *hive;
 	struct list_head device_list;
 	int r = 0, i;
 	u32 memsize;
@@ -6820,7 +6897,7 @@ out:
 		dev_info(adev->dev, "PCIe error recovery succeeded\n");
 	} else {
 		dev_err(adev->dev, "PCIe error recovery failed, err:%d\n", r);
-		if (tmp_adev) {
+		if (hive) {
 			list_for_each_entry(tmp_adev, &device_list, reset_list)
 				amdgpu_device_unset_mp1_state(tmp_adev);
 			amdgpu_device_unlock_reset_domain(adev->reset_domain);

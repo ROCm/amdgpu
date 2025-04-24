@@ -125,9 +125,10 @@
  * - 3.61.0 - Contains fix for RV/PCO compute queues
  * - 3.62.0 - Add AMDGPU_IDS_FLAGS_MODE_PF, AMDGPU_IDS_FLAGS_MODE_VF & AMDGPU_IDS_FLAGS_MODE_PT
  * - 3.63.0 - GFX12 display DCC supports 256B max compressed block size
+ * - 3.64.0 - Userq IP support query
  */
 #define KMS_DRIVER_MAJOR	3
-#define KMS_DRIVER_MINOR	63
+#define KMS_DRIVER_MINOR	64
 #define KMS_DRIVER_PATCHLEVEL	0
 
 /*
@@ -180,7 +181,7 @@ uint amdgpu_pg_mask = 0xffffffff;
 uint amdgpu_sdma_phase_quantum = 32;
 char *amdgpu_disable_cu;
 char *amdgpu_virtual_display;
-bool enforce_isolation;
+int amdgpu_enforce_isolation = -1;
 int amdgpu_modeset = -1;
 
 /* Specifies the default granularity for SVM, used in buffer
@@ -243,6 +244,7 @@ int amdgpu_wbrf = -1;
 int amdgpu_damage_clips = -1; /* auto */
 int amdgpu_umsch_mm_fwlog;
 int amdgpu_rebar = -1; /* auto */
+int amdgpu_user_queue = -1;
 
 DECLARE_DYNDBG_CLASSMAP(drm_debug_classes, DD_CLASS_TYPE_DISJOINT_BITS, 0,
 			"DRM_UT_CORE",
@@ -1056,11 +1058,13 @@ module_param_named(user_partt_mode, amdgpu_user_partt_mode, uint, 0444);
 
 
 /**
- * DOC: enforce_isolation (bool)
- * enforce process isolation between graphics and compute via using the same reserved vmid.
+ * DOC: enforce_isolation (int)
+ * enforce process isolation between graphics and compute.
+ * (-1 = auto, 0 = disable, 1 = enable, 2 = enable legacy mode)
  */
-module_param(enforce_isolation, bool, 0444);
-MODULE_PARM_DESC(enforce_isolation, "enforce process isolation between graphics and compute . enforce_isolation = on");
+module_param_named(enforce_isolation, amdgpu_enforce_isolation, int, 0444);
+MODULE_PARM_DESC(enforce_isolation,
+"enforce process isolation between graphics and compute. (-1 = auto, 0 = disable, 1 = enable, 2 = enable legacy mode)");
 
 /**
  * DOC: modeset (int)
@@ -1128,6 +1132,17 @@ module_param_named(wbrf, amdgpu_wbrf, int, 0444);
  */
 MODULE_PARM_DESC(rebar, "Resizable BAR (-1 = auto (default), 0 = disable, 1 = enable)");
 module_param_named(rebar, amdgpu_rebar, int, 0444);
+
+/**
+ * DOC: user_queue (int)
+ * Enable user queues on systems that support user queues.
+ * -1 = auto (ASIC specific default)
+ *  0 = user queues disabled
+ *  1 = user queues enabled and kernel queues enabled (if supported)
+ *  2 = user queues enabled and kernel queues disabled
+ */
+MODULE_PARM_DESC(user_queue, "Enable user queues (-1 = auto (default), 0 = disable, 1 = enable, 2 = enable UQs and disable KQs)");
+module_param_named(user_queue, amdgpu_user_queue, int, 0444);
 
 /* These devices are not supported by amdgpu.
  * They are supported by the mach64, r128, radeon drivers
@@ -2625,8 +2640,24 @@ static int amdgpu_pmops_suspend(struct device *dev)
 		adev->in_s0ix = true;
 	else if (amdgpu_acpi_is_s3_active(adev))
 		adev->in_s3 = true;
-	if (!adev->in_s0ix && !adev->in_s3)
+	if (!adev->in_s0ix && !adev->in_s3) {
+#ifdef HAVE_PM_SUSPEND_TARGET_STATE
+		/* don't allow going deep first time followed by s2idle the next time */
+		if (adev->last_suspend_state != PM_SUSPEND_ON &&
+		    adev->last_suspend_state != pm_suspend_target_state) {
+			drm_err_once(drm_dev, "Unsupported suspend state %d\n",
+				     pm_suspend_target_state);
+			return -EINVAL;
+		}
+#endif
 		return 0;
+	}
+
+#ifdef HAVE_PM_SUSPEND_TARGET_STATE
+	/* cache the state last used for suspend */
+	adev->last_suspend_state = pm_suspend_target_state;
+#endif
+
 	return amdgpu_device_suspend(drm_dev, true);
 }
 
@@ -2774,6 +2805,29 @@ static int amdgpu_runtime_idle_check_display(struct device *dev)
 	return 0;
 }
 
+static int amdgpu_runtime_idle_check_userq(struct device *dev)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct drm_device *drm_dev = pci_get_drvdata(pdev);
+	struct amdgpu_device *adev = drm_to_adev(drm_dev);
+	struct amdgpu_usermode_queue *queue;
+	struct amdgpu_userq_mgr *uqm, *tmp;
+	int queue_id;
+	int ret = 0;
+
+	mutex_lock(&adev->userq_mutex);
+	list_for_each_entry_safe(uqm, tmp, &adev->userq_mgr_list, list) {
+		idr_for_each_entry(&uqm->userq_idr, queue, queue_id) {
+			ret = -EBUSY;
+			goto done;
+		}
+	}
+done:
+	mutex_unlock(&adev->userq_mutex);
+
+	return ret;
+}
+
 static int amdgpu_pmops_runtime_suspend(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
@@ -2787,6 +2841,9 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 	}
 
 	ret = amdgpu_runtime_idle_check_display(dev);
+	if (ret)
+		return ret;
+	ret = amdgpu_runtime_idle_check_userq(dev);
 	if (ret)
 		return ret;
 
@@ -2910,7 +2967,11 @@ static int amdgpu_pmops_runtime_idle(struct device *dev)
 	}
 
 	ret = amdgpu_runtime_idle_check_display(dev);
+	if (ret)
+		goto done;
 
+	ret = amdgpu_runtime_idle_check_userq(dev);
+done:
 	pm_runtime_mark_last_busy(dev);
 	pm_runtime_autosuspend(dev);
 	return ret;

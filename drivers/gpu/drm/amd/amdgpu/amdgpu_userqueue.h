@@ -58,6 +58,8 @@ struct amdgpu_usermode_queue {
 #endif
 	struct amdgpu_userq_fence_driver *fence_drv;
 	struct dma_fence	*last_fence;
+	u32			xcp_id;
+	int			priority;
 };
 
 struct amdgpu_userq_funcs {
@@ -66,10 +68,10 @@ struct amdgpu_userq_funcs {
 			  struct amdgpu_usermode_queue *queue);
 	void (*mqd_destroy)(struct amdgpu_userq_mgr *uq_mgr,
 			    struct amdgpu_usermode_queue *uq);
-	int (*suspend)(struct amdgpu_userq_mgr *uq_mgr,
-		       struct amdgpu_usermode_queue *queue);
-	int (*resume)(struct amdgpu_userq_mgr *uq_mgr,
-		      struct amdgpu_usermode_queue *queue);
+	int (*unmap)(struct amdgpu_userq_mgr *uq_mgr,
+		     struct amdgpu_usermode_queue *queue);
+	int (*map)(struct amdgpu_userq_mgr *uq_mgr,
+		   struct amdgpu_usermode_queue *queue);
 };
 
 /* Usermode queues for gfx */
@@ -78,6 +80,7 @@ struct amdgpu_userq_mgr {
 	struct mutex			userq_mutex;
 	struct amdgpu_device		*adev;
 	struct delayed_work		resume_work;
+	struct list_head		list;
 };
 
 struct amdgpu_db_info {
@@ -111,5 +114,13 @@ void amdgpu_userqueue_ensure_ev_fence(struct amdgpu_userq_mgr *userq_mgr,
 uint64_t amdgpu_userqueue_get_doorbell_index(struct amdgpu_userq_mgr *uq_mgr,
 					     struct amdgpu_db_info *db_info,
 					     struct drm_file *filp);
+
+int amdgpu_userq_suspend(struct amdgpu_device *adev);
+int amdgpu_userq_resume(struct amdgpu_device *adev);
+
+int amdgpu_userq_stop_sched_for_enforce_isolation(struct amdgpu_device *adev,
+						  u32 idx);
+int amdgpu_userq_start_sched_for_enforce_isolation(struct amdgpu_device *adev,
+						   u32 idx);
 
 #endif

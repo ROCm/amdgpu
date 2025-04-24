@@ -106,7 +106,7 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 
 	adev->mes.total_max_queue = AMDGPU_FENCE_MES_QUEUE_ID_MASK;
 	adev->mes.vmid_mask_mmhub = 0xffffff00;
-	adev->mes.vmid_mask_gfxhub = 0xffffff00;
+	adev->mes.vmid_mask_gfxhub = adev->gfx.disable_kq ? 0xfffffffe : 0xffffff00;
 
 	num_pipes = adev->gfx.me.num_pipe_per_me * adev->gfx.me.num_me;
 	if (num_pipes > AMDGPU_MES_MAX_GFX_PIPES)
@@ -124,14 +124,14 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 			 * Set GFX pipe 0 queue 1-7 for MES scheduling
 			 * mask = 1111 1110b
 			 */
-			adev->mes.gfx_hqd_mask[i] = 0xFE;
+			adev->mes.gfx_hqd_mask[i] = adev->gfx.disable_kq ? 0xFF : 0xFE;
 		else
 			/*
 			 * GFX pipe 0 queue 0 is being used by Kernel queue.
 			 * Set GFX pipe 0 queue 1 for MES scheduling
 			 * mask = 10b
 			 */
-			adev->mes.gfx_hqd_mask[i] = 0x2;
+			adev->mes.gfx_hqd_mask[i] = adev->gfx.disable_kq ? 0x3 : 0x2;
 	}
 
 	num_pipes = adev->gfx.mec.num_pipe_per_mec * adev->gfx.mec.num_mec;
@@ -142,7 +142,7 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 	for (i = 0; i < AMDGPU_MES_MAX_COMPUTE_PIPES; i++) {
 		if (i >= num_pipes)
 			break;
-		adev->mes.compute_hqd_mask[i] = 0xc;
+		adev->mes.compute_hqd_mask[i] = adev->gfx.disable_kq ? 0xF : 0xC;
 	}
 
 	num_pipes = adev->sdma.num_instances;
@@ -768,7 +768,7 @@ int amdgpu_mes_update_enforce_isolation(struct amdgpu_device *adev)
 	if (adev->enable_mes && adev->gfx.enable_cleaner_shader) {
 		mutex_lock(&adev->enforce_isolation_mutex);
 		for (i = 0; i < (adev->xcp_mgr ? adev->xcp_mgr->num_xcps : 1); i++) {
-			if (adev->enforce_isolation[i])
+			if (adev->enforce_isolation[i] == AMDGPU_ENFORCE_ISOLATION_ENABLE)
 				r |= amdgpu_mes_set_enforce_isolation(adev, i, true);
 			else
 				r |= amdgpu_mes_set_enforce_isolation(adev, i, false);

@@ -849,6 +849,9 @@
 /* Define to 1 if you have the <linux/apple-gmux.h> header file. */
 #define HAVE_LINUX_APPLE_GMUX_H 1
 
+/* Define to 1 if you have the <linux/args.h> header file. */
+#define HAVE_LINUX_ARGS_H 1
+
 /* atomic_long_try_cmpxchg() is available */
 #define HAVE_LINUX_ATOMIC_LONG_TRY_CMPXCHG 1
 
@@ -867,8 +870,14 @@
 /* Define to 1 if you have the <linux/cleanup.h> header file. */
 #define HAVE_LINUX_CLEANUP_H 1
 
+/* Define to 1 if you have the <linux/compiler.h> header file. */
+#define HAVE_LINUX_COMPILER_H 1
+
 /* Define to 1 if you have the <linux/compiler_attributes.h> header file. */
 #define HAVE_LINUX_COMPILER_ATTRIBUTES_H 1
+
+/* Define to 1 if you have the <linux/compiler_types.h> header file. */
+#define HAVE_LINUX_COMPILER_TYPES_H 1
 
 /* Define to 1 if you have the <linux/container_of.h> header file. */
 #define HAVE_LINUX_CONTAINER_OF_H 1
@@ -1082,6 +1091,9 @@
 
 /* enum SMCA_UMC_V2 is available */
 #define HAVE_SMCA_UMC_V2 1
+
+/* strscpy() allows two arguments */
+#define HAVE_STRSCPY_ALLOW_TWO_ARGUMENTS 1
 
 /* struct dma_buf_attach_ops->allow_peer2peer is available */
 #define HAVE_STRUCT_DMA_BUF_ATTACH_OPS_ALLOW_PEER2PEER 1

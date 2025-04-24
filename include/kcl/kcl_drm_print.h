@@ -108,6 +108,11 @@ void kcl_drm_err(const char *format, ...);
 	dev_warn_once((drm)->dev, "[drm] " fmt, ##__VA_ARGS__)
 #endif /* drm_warn_once */
 
+#ifndef drm_err_once
+#define drm_err_once(drm, fmt, ...)				\
+	__drm_printk((drm), err, _once, "*ERROR* " fmt, ##__VA_ARGS__)
+#endif
+
 #if !defined(DRM_UT_VBL)
 #define DRM_UT_VBL		0x20
 #endif

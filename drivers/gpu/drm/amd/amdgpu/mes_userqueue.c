@@ -25,8 +25,6 @@
 #include "amdgpu_gfx.h"
 #include "mes_userqueue.h"
 #include "amdgpu_userq_fence.h"
-#include "v11_structs.h"
-#include <linux/pm_runtime.h>
 
 #define AMDGPU_USERQ_PROC_CTX_SZ PAGE_SIZE
 #define AMDGPU_USERQ_GANG_CTX_SZ PAGE_SIZE
@@ -98,14 +96,32 @@ mes_userq_create_wptr_mapping(struct amdgpu_userq_mgr *uq_mgr,
 	return 0;
 }
 
+static int convert_to_mes_priority(int priority)
+{
+	switch (priority) {
+	case AMDGPU_USERQ_CREATE_FLAGS_QUEUE_PRIORITY_NORMAL_LOW:
+	default:
+		return AMDGPU_MES_PRIORITY_LEVEL_NORMAL;
+	case AMDGPU_USERQ_CREATE_FLAGS_QUEUE_PRIORITY_LOW:
+		return AMDGPU_MES_PRIORITY_LEVEL_LOW;
+	case AMDGPU_USERQ_CREATE_FLAGS_QUEUE_PRIORITY_NORMAL_HIGH:
+		return AMDGPU_MES_PRIORITY_LEVEL_MEDIUM;
+	case AMDGPU_USERQ_CREATE_FLAGS_QUEUE_PRIORITY_HIGH:
+		return AMDGPU_MES_PRIORITY_LEVEL_HIGH;
+	}
+}
+
 static int mes_userq_map(struct amdgpu_userq_mgr *uq_mgr,
-			 struct amdgpu_usermode_queue *queue,
-			 struct amdgpu_mqd_prop *userq_props)
+			 struct amdgpu_usermode_queue *queue)
 {
 	struct amdgpu_device *adev = uq_mgr->adev;
 	struct amdgpu_userq_obj *ctx = &queue->fw_obj;
+	struct amdgpu_mqd_prop *userq_props = queue->userq_prop;
 	struct mes_add_queue_input queue_input;
 	int r;
+
+	if (queue->queue_active)
+		return 0;
 
 	memset(&queue_input, 0x0, sizeof(struct mes_add_queue_input));
 
@@ -120,7 +136,7 @@ static int mes_userq_map(struct amdgpu_userq_mgr *uq_mgr,
 	queue_input.process_context_addr = ctx->gpu_addr;
 	queue_input.gang_context_addr = ctx->gpu_addr + AMDGPU_USERQ_PROC_CTX_SZ;
 	queue_input.inprocess_gang_priority = AMDGPU_MES_PRIORITY_LEVEL_NORMAL;
-	queue_input.gang_global_priority_level = AMDGPU_MES_PRIORITY_LEVEL_NORMAL;
+	queue_input.gang_global_priority_level = convert_to_mes_priority(queue->priority);
 
 	queue_input.process_id = queue->vm->pasid;
 	queue_input.queue_type = queue->queue_type;
@@ -144,13 +160,16 @@ static int mes_userq_map(struct amdgpu_userq_mgr *uq_mgr,
 	return 0;
 }
 
-static void mes_userq_unmap(struct amdgpu_userq_mgr *uq_mgr,
-			    struct amdgpu_usermode_queue *queue)
+static int mes_userq_unmap(struct amdgpu_userq_mgr *uq_mgr,
+			   struct amdgpu_usermode_queue *queue)
 {
 	struct amdgpu_device *adev = uq_mgr->adev;
 	struct mes_remove_queue_input queue_input;
 	struct amdgpu_userq_obj *ctx = &queue->fw_obj;
 	int r;
+
+	if (!queue->queue_active)
+		return 0;
 
 	memset(&queue_input, 0x0, sizeof(struct mes_remove_queue_input));
 	queue_input.doorbell_offset = queue->doorbell_index;
@@ -162,6 +181,7 @@ static void mes_userq_unmap(struct amdgpu_userq_mgr *uq_mgr,
 	if (r)
 		DRM_ERROR("Failed to unmap queue in HW, err (%d)\n", r);
 	queue->queue_active = false;
+	return r;
 }
 
 static int mes_userq_create_ctx_space(struct amdgpu_userq_mgr *uq_mgr,
@@ -288,12 +308,6 @@ static int mes_userq_mqd_create(struct amdgpu_userq_mgr *uq_mgr,
 
 	queue->userq_prop = userq_props;
 
-	r = pm_runtime_get_sync(adev_to_drm(adev)->dev);
-	if (r < 0) {
-		dev_err(adev->dev, "pm_runtime_get_sync() failed for userqueue mqd create\n");
-		goto deference_pm;
-	}
-
 	r = mqd_hw_default->init_mqd(adev, (void *)queue->mqd.cpu_ptr, userq_props);
 	if (r) {
 		DRM_ERROR("Failed to initialize MQD for userqueue\n");
@@ -314,13 +328,6 @@ static int mes_userq_mqd_create(struct amdgpu_userq_mgr *uq_mgr,
 		goto free_ctx;
 	}
 
-	/* Map userqueue into FW using MES */
-	r = mes_userq_map(uq_mgr, queue, userq_props);
-	if (r) {
-		DRM_ERROR("Failed to init MQD\n");
-		goto free_ctx;
-	}
-
 	return 0;
 
 free_ctx:
@@ -328,9 +335,6 @@ free_ctx:
 
 free_mqd:
 	amdgpu_userqueue_destroy_object(uq_mgr, &queue->mqd);
-	pm_runtime_mark_last_busy(adev_to_drm(adev)->dev);
-deference_pm:
-	pm_runtime_put_autosuspend(adev_to_drm(adev)->dev);
 
 free_props:
 	kfree(userq_props);
@@ -342,51 +346,14 @@ static void
 mes_userq_mqd_destroy(struct amdgpu_userq_mgr *uq_mgr,
 		      struct amdgpu_usermode_queue *queue)
 {
-	struct amdgpu_device *adev = uq_mgr->adev;
-
-	if (queue->queue_active)
-		mes_userq_unmap(uq_mgr, queue);
-
 	amdgpu_userqueue_destroy_object(uq_mgr, &queue->fw_obj);
 	kfree(queue->userq_prop);
 	amdgpu_userqueue_destroy_object(uq_mgr, &queue->mqd);
-
-	pm_runtime_mark_last_busy(adev_to_drm(adev)->dev);
-	pm_runtime_put_autosuspend(adev_to_drm(adev)->dev);
-}
-
-static int mes_userq_suspend(struct amdgpu_userq_mgr *uq_mgr,
-				   struct amdgpu_usermode_queue *queue)
-{
-	if (queue->queue_active) {
-		mes_userq_unmap(uq_mgr, queue);
-		queue->queue_active = false;
-	}
-
-	return 0;
-}
-
-static int mes_userq_resume(struct amdgpu_userq_mgr *uq_mgr,
-				  struct amdgpu_usermode_queue *queue)
-{
-	int ret;
-
-	if (queue->queue_active)
-		return 0;
-
-	ret = mes_userq_map(uq_mgr, queue, queue->userq_prop);
-	if (ret) {
-		DRM_ERROR("Failed to resume queue\n");
-		return ret;
-	}
-
-	queue->queue_active = true;
-	return 0;
 }
 
 const struct amdgpu_userq_funcs userq_mes_funcs = {
 	.mqd_create = mes_userq_mqd_create,
 	.mqd_destroy = mes_userq_mqd_destroy,
-	.suspend = mes_userq_suspend,
-	.resume = mes_userq_resume,
+	.unmap = mes_userq_unmap,
+	.map = mes_userq_map,
 };

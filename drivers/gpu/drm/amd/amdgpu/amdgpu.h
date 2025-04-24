@@ -234,7 +234,7 @@ extern int amdgpu_smartshift_bias;
 extern int amdgpu_use_xgmi_p2p;
 extern bool pcie_p2p;
 extern int amdgpu_mtype_local;
-extern bool enforce_isolation;
+extern int amdgpu_enforce_isolation;
 #ifdef CONFIG_HSA_AMD
 extern int sched_policy;
 extern bool debug_evictions;
@@ -272,6 +272,7 @@ extern int amdgpu_agp;
 extern int amdgpu_rebar;
 
 extern int amdgpu_wbrf;
+extern int amdgpu_user_queue;
 
 #define AMDGPU_VM_MAX_NUM_CTX			4096
 #define AMDGPU_SG_THRESHOLD			(256*1024*1024)
@@ -357,7 +358,6 @@ enum amdgpu_kiq_irq {
 	AMDGPU_CP_KIQ_IRQ_DRIVER0 = 0,
 	AMDGPU_CP_KIQ_IRQ_LAST
 };
-#define SRIOV_USEC_TIMEOUT  1200000 /* wait 12 * 100ms for SRIOV */
 #define MAX_KIQ_REG_WAIT       5000 /* in usecs, 5ms */
 #define MAX_KIQ_REG_BAILOUT_INTERVAL   5 /* in msecs, 5ms */
 #define MAX_KIQ_REG_TRY 1000
@@ -851,6 +851,7 @@ struct amdgpu_mqd_prop {
 	uint64_t gds_bkup_addr;
 	uint64_t csa_addr;
 	uint64_t fence_address;
+	bool tmz_queue;
 };
 
 struct amdgpu_mqd {
@@ -888,6 +889,13 @@ struct amdgpu_init_level {
 #define AMDGPU_MAX_DF_PERFMONS 4
 struct amdgpu_reset_domain;
 struct amdgpu_fru_info;
+
+enum amdgpu_enforce_isolation_mode {
+	AMDGPU_ENFORCE_ISOLATION_DISABLE = 0,
+	AMDGPU_ENFORCE_ISOLATION_ENABLE = 1,
+	AMDGPU_ENFORCE_ISOLATION_ENABLE_LEGACY = 2,
+};
+
 
 /*
  * Non-zero (true) if the GPU has VRAM. Zero (false) otherwise.
@@ -1171,6 +1179,7 @@ struct amdgpu_device {
 	bool				in_s3;
 	bool				in_s4;
 	bool				in_s0ix;
+	suspend_state_t			last_suspend_state;
 
 	enum pp_mp1_state               mp1_state;
 	struct amdgpu_doorbell_index doorbell_index;
@@ -1247,7 +1256,7 @@ struct amdgpu_device {
 
 	/* Protection for the following isolation structure */
 	struct mutex                    enforce_isolation_mutex;
-	bool				enforce_isolation[MAX_XCP];
+	enum amdgpu_enforce_isolation_mode	enforce_isolation[MAX_XCP];
 	struct amdgpu_isolation {
 		void			*owner;
 		struct dma_fence	*spearhead;
@@ -1261,6 +1270,10 @@ struct amdgpu_device {
 	 * in KFD: VRAM or GTT.
 	 */
 	bool                            apu_prefer_gtt;
+
+	struct list_head		userq_mgr_list;
+	struct mutex                    userq_mutex;
+	bool                            userq_halt_for_enforce_isolation;
 };
 
 static inline uint32_t amdgpu_ip_version(const struct amdgpu_device *adev,
