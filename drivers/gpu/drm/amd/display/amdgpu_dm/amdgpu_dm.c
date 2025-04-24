@@ -6655,7 +6655,7 @@ static void fill_stream_properties_from_drm_display_mode(
 							       (struct drm_connector *)connector,
 							       mode_in);
 		if (err < 0)
-			drm_err(connector->dev, "Failed to setup avi infoframe: %zd\n", err);
+			drm_warn_once(connector->dev, "Failed to setup avi infoframe on connector %s: %zd \n", connector->name, err);
 #elif defined(HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_B)
 		drm_hdmi_avi_infoframe_from_display_mode(&avi_frame, mode_in, false);
 #else
@@ -6666,7 +6666,7 @@ static void fill_stream_properties_from_drm_display_mode(
 								  (struct drm_connector *)connector,
 								  mode_in);
 		if (err < 0)
-			drm_err(connector->dev, "Failed to setup vendor infoframe: %zd\n", err);
+			drm_warn_once(connector->dev, "Failed to setup vendor infoframe on connector %s: %zd \n", connector->name, err);
 		timing_out->hdmi_vic = hv_frame.vic;
 	}
 
