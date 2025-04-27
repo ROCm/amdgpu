@@ -134,16 +134,18 @@ static void amdgpu_userq_walk_and_drop_fence_drv(struct xarray *xa)
 
 	xa_unlock(xa);
 }
+#endif
 
 void
 amdgpu_userq_fence_driver_free(struct amdgpu_usermode_queue *userq)
 {
+#ifdef HAVE_STRUCT_XARRAY
 	amdgpu_userq_walk_and_drop_fence_drv(&userq->fence_drv_xa);
 	xa_destroy(&userq->fence_drv_xa);
+#endif
 	/* Drop the fence_drv reference held by user queue */
 	amdgpu_userq_fence_driver_put(userq->fence_drv);
 }
-#endif
 
 void amdgpu_userq_fence_driver_process(struct amdgpu_userq_fence_driver *fence_drv)
 {

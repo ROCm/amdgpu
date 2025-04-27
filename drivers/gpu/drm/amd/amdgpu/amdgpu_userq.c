@@ -108,12 +108,7 @@ amdgpu_userq_cleanup(struct amdgpu_userq_mgr *uq_mgr,
 	const struct amdgpu_userq_funcs *uq_funcs = adev->userq_funcs[queue->queue_type];
 
 	uq_funcs->mqd_destroy(uq_mgr, queue);
-
-#ifdef HAVE_STRUCT_XARRAY
 	amdgpu_userq_fence_driver_free(queue);
-#else
-	amdgpu_userq_fence_driver_put(queue->fence_drv);
-#endif
 	idr_remove(&uq_mgr->userq_idr, queue_id);
 	kfree(queue);
 }
