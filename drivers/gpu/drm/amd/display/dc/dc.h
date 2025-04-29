@@ -53,7 +53,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.328"
+#define DC_VER "3.2.329"
 
 /**
  * MAX_SURFACES - representative of the upper bound of surfaces that can be piped to a single CRTC
@@ -249,6 +249,7 @@ struct dc_caps {
 	uint32_t i2c_speed_in_khz_hdcp;
 	uint32_t dmdata_alloc_size;
 	unsigned int max_cursor_size;
+	unsigned int max_buffered_cursor_size;
 	unsigned int max_video_width;
 	/*
 	 * max video plane width that can be safely assumed to be always
@@ -1439,6 +1440,7 @@ struct dc_scratch_space {
 	enum signal_type connector_signal;
 	enum dc_irq_source irq_source_hpd;
 	enum dc_irq_source irq_source_hpd_rx;/* aka DP Short Pulse  */
+	enum dc_irq_source irq_source_read_request;/* Read Request */
 
 	bool is_hpd_filter_disabled;
 	bool dp_ss_off;
@@ -2608,5 +2610,8 @@ void dc_disable_accelerated_mode(struct dc *dc);
 
 bool dc_is_timing_changed(struct dc_stream_state *cur_stream,
 		       struct dc_stream_state *new_stream);
+
+bool dc_is_cursor_limit_pending(struct dc *dc);
+bool dc_can_clear_cursor_limit(struct dc *dc);
 
 #endif /* DC_INTERFACE_H_ */

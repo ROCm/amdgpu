@@ -33,6 +33,7 @@
 #include "amdgpu_reset.h"
 #include "amdgpu_xcp.h"
 #include "amdgpu_xgmi.h"
+#include "nvd.h"
 
 /* delay 0.1 second to enable gfx off feature */
 #define GFX_OFF_DELAY_ENABLE         msecs_to_jiffies(100)
@@ -1353,6 +1354,10 @@ static ssize_t amdgpu_gfx_get_current_compute_partition(struct device *dev,
 	struct amdgpu_device *adev = drm_to_adev(ddev);
 	int mode;
 
+	/* Only minimal precaution taken to reject requests while in reset.*/
+	if (amdgpu_in_reset(adev))
+		return -EPERM;
+
 	mode = amdgpu_xcp_query_partition_mode(adev->xcp_mgr,
 					       AMDGPU_XCP_FL_NONE);
 
@@ -1396,7 +1401,13 @@ static ssize_t amdgpu_gfx_set_compute_partition(struct device *dev,
 		return -EINVAL;
 	}
 
+	/* Don't allow a switch while under reset */
+	if (!down_read_trylock(&adev->reset_domain->sem))
+		return -EPERM;
+
 	ret = amdgpu_xcp_switch_partition_mode(adev->xcp_mgr, mode);
+
+	up_read(&adev->reset_domain->sem);
 
 	if (ret)
 		return ret;
@@ -2245,6 +2256,74 @@ void amdgpu_gfx_profile_ring_end_use(struct amdgpu_ring *ring)
 	atomic_dec(&ring->adev->gfx.total_submission_cnt);
 
 	schedule_delayed_work(&ring->adev->gfx.idle_work, GFX_PROFILE_IDLE_TIMEOUT);
+}
+
+/**
+ * amdgpu_gfx_csb_preamble_start - Set CSB preamble start
+ *
+ * @buffer: This is an output variable that gets the PACKET3 preamble setup.
+ *
+ * Return:
+ * return the latest index.
+ */
+u32 amdgpu_gfx_csb_preamble_start(volatile u32 *buffer)
+{
+	u32 count = 0;
+
+	buffer[count++] = cpu_to_le32(PACKET3(PACKET3_PREAMBLE_CNTL, 0));
+	buffer[count++] = cpu_to_le32(PACKET3_PREAMBLE_BEGIN_CLEAR_STATE);
+
+	buffer[count++] = cpu_to_le32(PACKET3(PACKET3_CONTEXT_CONTROL, 1));
+	buffer[count++] = cpu_to_le32(0x80000000);
+	buffer[count++] = cpu_to_le32(0x80000000);
+
+	return count;
+}
+
+/**
+ * amdgpu_gfx_csb_data_parser - Parser CS data
+ *
+ * @adev: amdgpu_device pointer used to get the CS data and other gfx info.
+ * @buffer: This is an output variable that gets the PACKET3 preamble end.
+ * @count: Index to start set the preemble end.
+ *
+ * Return:
+ * return the latest index.
+ */
+u32 amdgpu_gfx_csb_data_parser(struct amdgpu_device *adev, volatile u32 *buffer, u32 count)
+{
+	const struct cs_section_def *sect = NULL;
+	const struct cs_extent_def *ext = NULL;
+	u32 i;
+
+	for (sect = adev->gfx.rlc.cs_data; sect->section != NULL; ++sect) {
+		for (ext = sect->section; ext->extent != NULL; ++ext) {
+			if (sect->id == SECT_CONTEXT) {
+				buffer[count++] = cpu_to_le32(PACKET3(PACKET3_SET_CONTEXT_REG, ext->reg_count));
+				buffer[count++] = cpu_to_le32(ext->reg_index - PACKET3_SET_CONTEXT_REG_START);
+
+				for (i = 0; i < ext->reg_count; i++)
+					buffer[count++] = cpu_to_le32(ext->extent[i]);
+			}
+		}
+	}
+
+	return count;
+}
+
+/**
+ * amdgpu_gfx_csb_preamble_end - Set CSB preamble end
+ *
+ * @buffer: This is an output variable that gets the PACKET3 preamble end.
+ * @count: Index to start set the preemble end.
+ */
+void amdgpu_gfx_csb_preamble_end(volatile u32 *buffer, u32 count)
+{
+	buffer[count++] = cpu_to_le32(PACKET3(PACKET3_PREAMBLE_CNTL, 0));
+	buffer[count++] = cpu_to_le32(PACKET3_PREAMBLE_END_CLEAR_STATE);
+
+	buffer[count++] = cpu_to_le32(PACKET3(PACKET3_CLEAR_STATE, 0));
+	buffer[count++] = cpu_to_le32(0);
 }
 
 /*

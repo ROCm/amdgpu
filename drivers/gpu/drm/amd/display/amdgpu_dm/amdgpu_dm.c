@@ -1345,6 +1345,7 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 	case IP_VERSION(3, 5, 1):
 	case IP_VERSION(3, 6, 0):
 		hw_params.ips_sequential_ono = adev->external_rev_id > 0x10;
+		hw_params.lower_hbr3_phy_ssc = true;
 		break;
 	default:
 		break;
@@ -1976,26 +1977,6 @@ static enum dmub_ips_disable_type dm_get_default_ips_mode(
 	switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 	case IP_VERSION(3, 5, 0):
 	case IP_VERSION(3, 6, 0):
-		/*
-		 * On DCN35 systems with Z8 enabled, it's possible for IPS2 + Z8 to
-		 * cause a hard hang. A fix exists for newer PMFW.
-		 *
-		 * As a workaround, for non-fixed PMFW, force IPS1+RCG as the deepest
-		 * IPS state in all cases, except for s0ix and all displays off (DPMS),
-		 * where IPS2 is allowed.
-		 *
-		 * When checking pmfw version, use the major and minor only.
-		 */
-		if ((adev->pm.fw_version & 0x00FFFF00) < 0x005D6300)
-			ret = DMUB_IPS_RCG_IN_ACTIVE_IPS2_IN_OFF;
-		else if (amdgpu_ip_version(adev, GC_HWIP, 0) > IP_VERSION(11, 5, 0))
-			/*
-			 * Other ASICs with DCN35 that have residency issues with
-			 * IPS2 in idle.
-			 * We want them to use IPS2 only in display off cases.
-			 */
-			ret =  DMUB_IPS_RCG_IN_ACTIVE_IPS2_IN_OFF;
-		break;
 	case IP_VERSION(3, 5, 1):
 		ret =  DMUB_IPS_RCG_IN_ACTIVE_IPS2_IN_OFF;
 		break;
@@ -3451,16 +3432,16 @@ static void dm_gpureset_commit_state(struct dc_state *dc_state,
 	for (k = 0; k < dc_state->stream_count; k++) {
 		bundle->stream_update.stream = dc_state->streams[k];
 
-		for (m = 0; m < dc_state->stream_status->plane_count; m++) {
+		for (m = 0; m < dc_state->stream_status[k].plane_count; m++) {
 			bundle->surface_updates[m].surface =
-				dc_state->stream_status->plane_states[m];
+				dc_state->stream_status[k].plane_states[m];
 			bundle->surface_updates[m].surface->force_full_update =
 				true;
 		}
 
 		update_planes_and_stream_adapter(dm->dc,
 					 UPDATE_TYPE_FULL,
-					 dc_state->stream_status->plane_count,
+					 dc_state->stream_status[k].plane_count,
 					 dc_state->streams[k],
 					 &bundle->stream_update,
 					 bundle->surface_updates);
@@ -6674,7 +6655,7 @@ static void fill_stream_properties_from_drm_display_mode(
 							       (struct drm_connector *)connector,
 							       mode_in);
 		if (err < 0)
-			drm_err(connector->dev, "Failed to setup avi infoframe: %zd\n", err);
+			drm_warn_once(connector->dev, "Failed to setup avi infoframe on connector %s: %zd \n", connector->name, err);
 #elif defined(HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_B)
 		drm_hdmi_avi_infoframe_from_display_mode(&avi_frame, mode_in, false);
 #else
@@ -6685,7 +6666,7 @@ static void fill_stream_properties_from_drm_display_mode(
 								  (struct drm_connector *)connector,
 								  mode_in);
 		if (err < 0)
-			drm_err(connector->dev, "Failed to setup vendor infoframe: %zd\n", err);
+			drm_warn_once(connector->dev, "Failed to setup vendor infoframe on connector %s: %zd \n", connector->name, err);
 		timing_out->hdmi_vic = hv_frame.vic;
 	}
 
@@ -6798,12 +6779,12 @@ decide_crtc_timing_for_drm_display_mode(struct drm_display_mode *drm_mode,
 					const struct drm_display_mode *native_mode,
 					bool scale_enabled)
 {
-	if (scale_enabled) {
-		copy_crtc_timing_for_drm_display_mode(native_mode, drm_mode);
-	} else if (native_mode->clock == drm_mode->clock &&
-			native_mode->htotal == drm_mode->htotal &&
-			native_mode->vtotal == drm_mode->vtotal) {
-		copy_crtc_timing_for_drm_display_mode(native_mode, drm_mode);
+	if (scale_enabled || (
+	    native_mode->clock == drm_mode->clock &&
+	    native_mode->htotal == drm_mode->htotal &&
+	    native_mode->vtotal == drm_mode->vtotal)) {
+		if (native_mode->crtc_clock)
+			copy_crtc_timing_for_drm_display_mode(native_mode, drm_mode);
 	} else {
 		/* no scaling nor amdgpu inserted, no need to patch */
 	}
@@ -11018,16 +10999,20 @@ static int dm_force_atomic_commit(struct drm_connector *connector)
 	 */
 	conn_state = drm_atomic_get_connector_state(state, connector);
 
-	ret = PTR_ERR_OR_ZERO(conn_state);
-	if (ret)
+	/* Check for error in getting connector state */
+	if (IS_ERR(conn_state)) {
+		ret = PTR_ERR(conn_state);
 		goto out;
+	}
 
 	/* Attach crtc to drm_atomic_state*/
 	crtc_state = drm_atomic_get_crtc_state(state, &disconnected_acrtc->base);
 
-	ret = PTR_ERR_OR_ZERO(crtc_state);
-	if (ret)
+	/* Check for error in getting crtc state */
+	if (IS_ERR(crtc_state)) {
+		ret = PTR_ERR(crtc_state);
 		goto out;
+	}
 
 	/* force a restore */
 	crtc_state->mode_changed = true;
@@ -11035,9 +11020,11 @@ static int dm_force_atomic_commit(struct drm_connector *connector)
 	/* Attach plane to drm_atomic_state */
 	plane_state = drm_atomic_get_plane_state(state, plane);
 
-	ret = PTR_ERR_OR_ZERO(plane_state);
-	if (ret)
+	/* Check for error in getting plane state */
+	if (IS_ERR(plane_state)) {
+		ret = PTR_ERR(plane_state);
 		goto out;
+	}
 
 	/* Call commit internally with the state we just constructed */
 	ret = drm_atomic_commit(state);
@@ -11274,8 +11261,8 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 		drm_old_conn_state = drm_atomic_get_old_connector_state(state,
 									connector);
 
-		if (IS_ERR(drm_new_conn_state)) {
-			ret = PTR_ERR_OR_ZERO(drm_new_conn_state);
+		if (WARN_ON(!drm_new_conn_state)) {
+			ret = -EINVAL;
 			goto fail;
 		}
 
@@ -11528,6 +11515,9 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 	 */
 	if (amdgpu_ip_version(adev, DCE_HWIP, 0) < IP_VERSION(3, 2, 0) &&
 	    state->allow_modeset)
+		return true;
+
+	if (amdgpu_in_reset(adev) && state->allow_modeset)
 		return true;
 
 	/* Exit early if we know that we're adding or removing the plane. */

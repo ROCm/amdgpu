@@ -31,7 +31,7 @@
 static const char *
 amdgpu_eviction_fence_get_driver_name(struct dma_fence *fence)
 {
-	return "amdgpu";
+	return "amdgpu_eviction_fence";
 }
 
 static const char *
@@ -112,7 +112,7 @@ amdgpu_eviction_fence_suspend_worker(struct work_struct *work)
 	if (!ev_fence)
 		goto unlock;
 
-	amdgpu_userqueue_suspend(uq_mgr, ev_fence);
+	amdgpu_userq_evict(uq_mgr, ev_fence);
 
 unlock:
 	mutex_unlock(&uq_mgr->userq_mutex);

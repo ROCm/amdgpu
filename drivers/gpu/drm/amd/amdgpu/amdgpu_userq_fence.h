@@ -27,7 +27,7 @@
 
 #include <linux/types.h>
 
-#include "amdgpu_userqueue.h"
+#include "amdgpu_userq.h"
 
 struct amdgpu_userq_fence {
 	struct dma_fence base;
@@ -59,9 +59,6 @@ struct amdgpu_userq_fence_driver {
 	spinlock_t fence_list_lock;
 	struct list_head fences;
 	struct amdgpu_device *adev;
-#ifdef HAVE_STRUCT_XARRAY
-	struct xarray *fence_drv_xa_ptr;
-#endif
 	char timeline_name[TASK_COMM_LEN];
 };
 

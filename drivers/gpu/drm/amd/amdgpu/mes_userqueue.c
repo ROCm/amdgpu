@@ -120,9 +120,6 @@ static int mes_userq_map(struct amdgpu_userq_mgr *uq_mgr,
 	struct mes_add_queue_input queue_input;
 	int r;
 
-	if (queue->queue_active)
-		return 0;
-
 	memset(&queue_input, 0x0, sizeof(struct mes_add_queue_input));
 
 	queue_input.process_va_start = 0;
@@ -155,7 +152,6 @@ static int mes_userq_map(struct amdgpu_userq_mgr *uq_mgr,
 		return r;
 	}
 
-	queue->queue_active = true;
 	DRM_DEBUG_DRIVER("Queue (doorbell:%d) mapped successfully\n", userq_props->doorbell_index);
 	return 0;
 }
@@ -168,9 +164,6 @@ static int mes_userq_unmap(struct amdgpu_userq_mgr *uq_mgr,
 	struct amdgpu_userq_obj *ctx = &queue->fw_obj;
 	int r;
 
-	if (!queue->queue_active)
-		return 0;
-
 	memset(&queue_input, 0x0, sizeof(struct mes_remove_queue_input));
 	queue_input.doorbell_offset = queue->doorbell_index;
 	queue_input.gang_context_addr = ctx->gpu_addr + AMDGPU_USERQ_PROC_CTX_SZ;
@@ -180,7 +173,6 @@ static int mes_userq_unmap(struct amdgpu_userq_mgr *uq_mgr,
 	amdgpu_mes_unlock(&adev->mes);
 	if (r)
 		DRM_ERROR("Failed to unmap queue in HW, err (%d)\n", r);
-	queue->queue_active = false;
 	return r;
 }
 
@@ -197,7 +189,7 @@ static int mes_userq_create_ctx_space(struct amdgpu_userq_mgr *uq_mgr,
 	 * for the same.
 	 */
 	size = AMDGPU_USERQ_PROC_CTX_SZ + AMDGPU_USERQ_GANG_CTX_SZ;
-	r = amdgpu_userqueue_create_object(uq_mgr, ctx, size);
+	r = amdgpu_userq_create_object(uq_mgr, ctx, size);
 	if (r) {
 		DRM_ERROR("Failed to allocate ctx space bo for userqueue, err:%d\n", r);
 		return r;
@@ -230,7 +222,7 @@ static int mes_userq_mqd_create(struct amdgpu_userq_mgr *uq_mgr,
 		goto free_props;
 	}
 
-	r = amdgpu_userqueue_create_object(uq_mgr, &queue->mqd, mqd_hw_default->mqd_size);
+	r = amdgpu_userq_create_object(uq_mgr, &queue->mqd, mqd_hw_default->mqd_size);
 	if (r) {
 		DRM_ERROR("Failed to create MQD object for userqueue\n");
 		goto free_props;
@@ -266,6 +258,8 @@ static int mes_userq_mqd_create(struct amdgpu_userq_mgr *uq_mgr,
 		userq_props->hqd_pipe_priority = AMDGPU_GFX_PIPE_PRIO_NORMAL;
 		userq_props->hqd_queue_priority = AMDGPU_GFX_QUEUE_PRIORITY_MINIMUM;
 		userq_props->hqd_active = false;
+		userq_props->tmz_queue =
+			mqd_user->flags & AMDGPU_USERQ_CREATE_FLAGS_QUEUE_SECURE;
 		kfree(compute_mqd);
 	} else if (queue->queue_type == AMDGPU_HW_IP_GFX) {
 		struct drm_amdgpu_userq_mqd_gfx11 *mqd_gfx_v11;
@@ -285,6 +279,8 @@ static int mes_userq_mqd_create(struct amdgpu_userq_mgr *uq_mgr,
 
 		userq_props->shadow_addr = mqd_gfx_v11->shadow_va;
 		userq_props->csa_addr = mqd_gfx_v11->csa_va;
+		userq_props->tmz_queue =
+			mqd_user->flags & AMDGPU_USERQ_CREATE_FLAGS_QUEUE_SECURE;
 		kfree(mqd_gfx_v11);
 	} else if (queue->queue_type == AMDGPU_HW_IP_DMA) {
 		struct drm_amdgpu_userq_mqd_sdma_gfx11 *mqd_sdma_v11;
@@ -331,10 +327,10 @@ static int mes_userq_mqd_create(struct amdgpu_userq_mgr *uq_mgr,
 	return 0;
 
 free_ctx:
-	amdgpu_userqueue_destroy_object(uq_mgr, &queue->fw_obj);
+	amdgpu_userq_destroy_object(uq_mgr, &queue->fw_obj);
 
 free_mqd:
-	amdgpu_userqueue_destroy_object(uq_mgr, &queue->mqd);
+	amdgpu_userq_destroy_object(uq_mgr, &queue->mqd);
 
 free_props:
 	kfree(userq_props);
@@ -346,9 +342,9 @@ static void
 mes_userq_mqd_destroy(struct amdgpu_userq_mgr *uq_mgr,
 		      struct amdgpu_usermode_queue *queue)
 {
-	amdgpu_userqueue_destroy_object(uq_mgr, &queue->fw_obj);
+	amdgpu_userq_destroy_object(uq_mgr, &queue->fw_obj);
 	kfree(queue->userq_prop);
-	amdgpu_userqueue_destroy_object(uq_mgr, &queue->mqd);
+	amdgpu_userq_destroy_object(uq_mgr, &queue->mqd);
 }
 
 const struct amdgpu_userq_funcs userq_mes_funcs = {
