@@ -32,6 +32,13 @@ $(error CONFIG_KALLSYMS disabled, kallsyms_lookup_name() is absent, exit...)
 endif
 
 ifneq ($(CONFIG_CC_IS_CLANG),)
+ifeq ($(shell command -v clang > /dev/null && echo "y"),)
+$(error "clang is not installed, exit...")
+endif
+ifeq ($(shell command -v ld.lld > /dev/null && echo "y"),)
+$(error "ld.lld is not installed, exit...")
+endif
+
 CC := clang
 module_build_flags += CC=clang
 module_build_flags += LD=ld.lld
