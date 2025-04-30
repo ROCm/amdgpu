@@ -119,6 +119,9 @@
 /* dma_buf->dynamic_mapping is not available */
 /* #undef HAVE_DMA_BUF_OPS_LEGACY */
 
+/* dma_fence_array_first() is available */
+#define HAVE_DMA_FENCE_ARRAY_FIRST 1
+
 /* dma_fence_chain_alloc() is available */
 #define HAVE_DMA_FENCE_CHAIN_ALLOC 1
 
