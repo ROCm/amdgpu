@@ -1188,6 +1188,9 @@ struct amdgpu_device {
 	 */
 #ifdef HAVE_STRUCT_XARRAY
 	struct xarray			userq_xa;
+#else
+	struct idr			userq_idr;
+	spinlock_t			userq_lock;
 #endif
 
 	/* df */
