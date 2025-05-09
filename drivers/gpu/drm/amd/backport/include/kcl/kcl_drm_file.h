@@ -29,4 +29,9 @@ void _kcl_drm_print_memory_stats(struct drm_printer *p,
 int drm_memory_stats_is_zero(const struct drm_memory_stats *stats);
 #endif
 
+#ifndef HAVE_DRM_FILE_ERR
+void kcl_drm_file_err(struct drm_file *file_priv, const char *fmt, ...);
+#define drm_file_err kcl_drm_file_err
+#endif
+
 #endif
