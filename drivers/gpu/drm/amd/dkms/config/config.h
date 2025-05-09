@@ -558,6 +558,9 @@
 /* drm_fb_helper_init() has 3 args */
 /* #undef HAVE_DRM_FB_HELPER_INIT_3ARGS */
 
+/* drm_file_err() is available */
+#define HAVE_DRM_FILE_ERR 1
+
 /* drm_firmware_drivers_only() is available */
 #define HAVE_DRM_FIRMWARE_DRIVERS_ONLY 1
 
