@@ -1612,7 +1612,8 @@ static ssize_t amdgpu_gfx_set_run_cleaner_shader(struct device *dev,
  * Provides the sysfs read interface to get the current settings of the 'enforce_isolation'
  * feature for each GPU partition. Reading from the 'enforce_isolation'
  * sysfs file returns the isolation settings for all partitions, where '0'
- * indicates disabled, '1' indicates enabled, and '2' indicates enabled in legacy mode.
+ * indicates disabled, '1' indicates enabled, and '2' indicates enabled in legacy mode,
+ * and '3' indicates enabled without cleaner shader.
  *
  * Return: The number of bytes read from the sysfs file.
  */
@@ -1647,9 +1648,11 @@ static ssize_t amdgpu_gfx_get_enforce_isolation(struct device *dev,
  * @count: The size of the input data
  *
  * This function allows control over the 'enforce_isolation' feature, which
- * serializes access to the graphics engine. Writing '1', '2', or '0' to the
- * 'enforce_isolation' sysfs file enables (full or legacy) or disables process
- * isolation for each partition. The input should specify the setting for all
+ * serializes access to the graphics engine. Writing '0' to disable, '1' to
+ * enable isolation with cleaner shader, '2' to enable legacy isolation without
+ * cleaner shader, or '3' to enable process isolation without submitting the
+ * cleaner shader to the 'enforce_isolation' sysfs file sets the isolation mode
+ * for each partition. The input should specify the setting for all
  * partitions.
  *
  * Return: The number of bytes written to the sysfs file.
@@ -1689,7 +1692,8 @@ static ssize_t amdgpu_gfx_set_enforce_isolation(struct device *dev,
 	for (i = 0; i < num_partitions; i++) {
 		if (partition_values[i] != 0 &&
 		    partition_values[i] != 1 &&
-		    partition_values[i] != 2)
+		    partition_values[i] != 2 &&
+		    partition_values[i] != 3)
 			return -EINVAL;
 	}
 
@@ -1707,6 +1711,10 @@ static ssize_t amdgpu_gfx_set_enforce_isolation(struct device *dev,
 		case 2:
 			adev->enforce_isolation[i] =
 				AMDGPU_ENFORCE_ISOLATION_ENABLE_LEGACY;
+			break;
+		case 3:
+			adev->enforce_isolation[i] =
+				AMDGPU_ENFORCE_ISOLATION_NO_CLEANER_SHADER;
 			break;
 		}
 	}
@@ -1981,9 +1989,7 @@ static void amdgpu_gfx_kfd_sch_ctrl(struct amdgpu_device *adev, u32 idx,
 		if (adev->gfx.userq_sch_req_count[idx] == 0) {
 			cancel_delayed_work_sync(&adev->gfx.enforce_isolation[idx].work);
 			if (!adev->gfx.userq_sch_inactive[idx]) {
-#ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
 				amdgpu_userq_stop_sched_for_enforce_isolation(adev, idx);
-#endif
 				if (adev->kfd.init_complete)
 					amdgpu_amdkfd_stop_sched(adev, idx);
 				adev->gfx.userq_sch_inactive[idx] = true;
@@ -2041,9 +2047,8 @@ void amdgpu_gfx_enforce_isolation_handler(struct work_struct *work)
 		/* Tell KFD to resume the runqueue */
 		WARN_ON_ONCE(!adev->gfx.userq_sch_inactive[idx]);
 		WARN_ON_ONCE(adev->gfx.userq_sch_req_count[idx]);
-#ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
+
 		amdgpu_userq_start_sched_for_enforce_isolation(adev, idx);
-#endif
 		if (adev->kfd.init_complete)
 			amdgpu_amdkfd_start_sched(adev, idx);
 		adev->gfx.userq_sch_inactive[idx] = false;

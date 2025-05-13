@@ -66,10 +66,12 @@ enum smu_v13_0_6_caps {
 	SMU_CAP(SDMA_RESET),
 	SMU_CAP(STATIC_METRICS),
 	SMU_CAP(HST_LIMIT_METRICS),
+	SMU_CAP(BOARD_VOLTAGE),
 	SMU_CAP(ALL),
 };
 
 extern void smu_v13_0_6_set_ppt_funcs(struct smu_context *smu);
 bool smu_v13_0_6_cap_supported(struct smu_context *smu, enum smu_v13_0_6_caps cap);
+int smu_v13_0_6_get_static_metrics_table(struct smu_context *smu);
 
 #endif

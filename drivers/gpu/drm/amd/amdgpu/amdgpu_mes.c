@@ -285,68 +285,6 @@ int amdgpu_mes_resume(struct amdgpu_device *adev)
 	return r;
 }
 
-int amdgpu_mes_reset_hw_queue(struct amdgpu_device *adev, int queue_id)
-{
-	unsigned long flags;
-	struct amdgpu_mes_queue *queue;
-	struct amdgpu_mes_gang *gang;
-	struct mes_reset_queue_input queue_input;
-	int r;
-
-	/*
-	 * Avoid taking any other locks under MES lock to avoid circular
-	 * lock dependencies.
-	 */
-	amdgpu_mes_lock(&adev->mes);
-
-	/* remove the mes gang from idr list */
-	spin_lock_irqsave(&adev->mes.queue_id_lock, flags);
-
-	queue = idr_find(&adev->mes.queue_id_idr, queue_id);
-	if (!queue) {
-		spin_unlock_irqrestore(&adev->mes.queue_id_lock, flags);
-		amdgpu_mes_unlock(&adev->mes);
-		DRM_ERROR("queue id %d doesn't exist\n", queue_id);
-		return -EINVAL;
-	}
-	spin_unlock_irqrestore(&adev->mes.queue_id_lock, flags);
-
-	DRM_DEBUG("try to reset queue, doorbell off = 0x%llx\n",
-		  queue->doorbell_off);
-
-	gang = queue->gang;
-	queue_input.doorbell_offset = queue->doorbell_off;
-	queue_input.gang_context_addr = gang->gang_ctx_gpu_addr;
-
-	r = adev->mes.funcs->reset_hw_queue(&adev->mes, &queue_input);
-	if (r)
-		DRM_ERROR("failed to reset hardware queue, queue id = %d\n",
-			  queue_id);
-
-	amdgpu_mes_unlock(&adev->mes);
-
-	return 0;
-}
-
-int amdgpu_mes_reset_hw_queue_mmio(struct amdgpu_device *adev, int queue_type,
-				   int me_id, int pipe_id, int queue_id, int vmid)
-{
-	struct mes_reset_queue_input queue_input;
-	int r;
-
-	queue_input.queue_type = queue_type;
-	queue_input.use_mmio = true;
-	queue_input.me_id = me_id;
-	queue_input.pipe_id = pipe_id;
-	queue_input.queue_id = queue_id;
-	queue_input.vmid = vmid;
-	r = adev->mes.funcs->reset_hw_queue(&adev->mes, &queue_input);
-	if (r)
-		DRM_ERROR("failed to reset hardware queue by mmio, queue id = %d\n",
-			  queue_id);
-	return r;
-}
-
 int amdgpu_mes_map_legacy_queue(struct amdgpu_device *adev,
 				struct amdgpu_ring *ring)
 {
@@ -397,7 +335,7 @@ int amdgpu_mes_reset_legacy_queue(struct amdgpu_device *adev,
 				  unsigned int vmid,
 				  bool use_mmio)
 {
-	struct mes_reset_legacy_queue_input queue_input;
+	struct mes_reset_queue_input queue_input;
 	int r;
 
 	memset(&queue_input, 0, sizeof(queue_input));
@@ -411,8 +349,11 @@ int amdgpu_mes_reset_legacy_queue(struct amdgpu_device *adev,
 	queue_input.wptr_addr = ring->wptr_gpu_addr;
 	queue_input.vmid = vmid;
 	queue_input.use_mmio = use_mmio;
+	queue_input.is_kq = true;
+	if (ring->funcs->type == AMDGPU_RING_TYPE_GFX)
+		queue_input.legacy_gfx = true;
 
-	r = adev->mes.funcs->reset_legacy_queue(&adev->mes, &queue_input);
+	r = adev->mes.funcs->reset_hw_queue(&adev->mes, &queue_input);
 	if (r)
 		DRM_ERROR("failed to reset legacy queue\n");
 
@@ -428,7 +369,7 @@ uint32_t amdgpu_mes_rreg(struct amdgpu_device *adev, uint32_t reg)
 	uint32_t *read_val_ptr;
 
 	if (amdgpu_device_wb_get(adev, &addr_offset)) {
-		DRM_ERROR("critical bug! too many mes readers\n");
+		dev_err(adev->dev, "critical bug! too many mes readers\n");
 		goto error;
 	}
 	read_val_gpu_addr = adev->wb.gpu_addr + (addr_offset * 4);
@@ -438,13 +379,13 @@ uint32_t amdgpu_mes_rreg(struct amdgpu_device *adev, uint32_t reg)
 	op_input.read_reg.buffer_addr = read_val_gpu_addr;
 
 	if (!adev->mes.funcs->misc_op) {
-		DRM_ERROR("mes rreg is not supported!\n");
+		dev_err(adev->dev, "mes rreg is not supported!\n");
 		goto error;
 	}
 
 	r = adev->mes.funcs->misc_op(&adev->mes, &op_input);
 	if (r)
-		DRM_ERROR("failed to read reg (0x%x)\n", reg);
+		dev_err(adev->dev, "failed to read reg (0x%x)\n", reg);
 	else
 		val = *(read_val_ptr);
 
@@ -465,14 +406,14 @@ int amdgpu_mes_wreg(struct amdgpu_device *adev,
 	op_input.write_reg.reg_value = val;
 
 	if (!adev->mes.funcs->misc_op) {
-		DRM_ERROR("mes wreg is not supported!\n");
+		dev_err(adev->dev, "mes wreg is not supported!\n");
 		r = -EINVAL;
 		goto error;
 	}
 
 	r = adev->mes.funcs->misc_op(&adev->mes, &op_input);
 	if (r)
-		DRM_ERROR("failed to write reg (0x%x)\n", reg);
+		dev_err(adev->dev, "failed to write reg (0x%x)\n", reg);
 
 error:
 	return r;
@@ -492,14 +433,14 @@ int amdgpu_mes_reg_write_reg_wait(struct amdgpu_device *adev,
 	op_input.wrm_reg.mask = mask;
 
 	if (!adev->mes.funcs->misc_op) {
-		DRM_ERROR("mes reg_write_reg_wait is not supported!\n");
+		dev_err(adev->dev, "mes reg_write_reg_wait is not supported!\n");
 		r = -EINVAL;
 		goto error;
 	}
 
 	r = adev->mes.funcs->misc_op(&adev->mes, &op_input);
 	if (r)
-		DRM_ERROR("failed to reg_write_reg_wait\n");
+		dev_err(adev->dev, "failed to reg_write_reg_wait\n");
 
 error:
 	return r;
@@ -517,14 +458,14 @@ int amdgpu_mes_reg_wait(struct amdgpu_device *adev, uint32_t reg,
 	op_input.wrm_reg.mask = mask;
 
 	if (!adev->mes.funcs->misc_op) {
-		DRM_ERROR("mes reg wait is not supported!\n");
+		dev_err(adev->dev, "mes reg wait is not supported!\n");
 		r = -EINVAL;
 		goto error;
 	}
 
 	r = adev->mes.funcs->misc_op(&adev->mes, &op_input);
 	if (r)
-		DRM_ERROR("failed to reg_write_reg_wait\n");
+		dev_err(adev->dev, "failed to reg_write_reg_wait\n");
 
 error:
 	return r;

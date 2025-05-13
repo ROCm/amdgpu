@@ -944,13 +944,20 @@ void dc_state_release_phantom_streams_and_planes(
 		const struct dc *dc,
 		struct dc_state *state)
 {
+	unsigned int phantom_count;
+	struct dc_stream_state *phantom_streams[MAX_PHANTOM_PIPES];
+	struct dc_plane_state *phantom_planes[MAX_PHANTOM_PIPES];
 	int i;
 
-	for (i = 0; i < state->phantom_stream_count; i++)
-		dc_state_release_phantom_stream(dc, state, state->phantom_streams[i]);
+	phantom_count = state->phantom_stream_count;
+	memcpy(phantom_streams, state->phantom_streams, sizeof(struct dc_stream_state *) * MAX_PHANTOM_PIPES);
+	for (i = 0; i < phantom_count; i++)
+		dc_state_release_phantom_stream(dc, state, phantom_streams[i]);
 
-	for (i = 0; i < state->phantom_plane_count; i++)
-		dc_state_release_phantom_plane(dc, state, state->phantom_planes[i]);
+	phantom_count = state->phantom_plane_count;
+	memcpy(phantom_planes, state->phantom_planes, sizeof(struct dc_plane_state *) * MAX_PHANTOM_PIPES);
+	for (i = 0; i < phantom_count; i++)
+		dc_state_release_phantom_plane(dc, state, phantom_planes[i]);
 }
 
 struct dc_stream_state *dc_state_get_stream_from_id(const struct dc_state *state, unsigned int id)

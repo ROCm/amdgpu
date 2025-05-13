@@ -207,7 +207,7 @@ static bool dc_dmub_srv_fb_cmd_list_queue_execute(struct dc_dmub_srv *dc_dmub_sr
 				return false;
 
 			do {
-				status = dmub_srv_wait_for_idle(dmub, 100000);
+				status = dmub_srv_wait_for_inbox_free(dmub, 100000, count - i);
 			} while (dc_dmub_srv->ctx->dc->debug.disable_timeout && status != DMUB_STATUS_OK);
 
 			/* Requeue the command. */
@@ -1365,14 +1365,15 @@ static void dc_dmub_srv_exit_low_power_state(const struct dc *dc)
 			if (!dc->debug.optimize_ips_handshake || !ips_fw->signals.bits.ips2_commit)
 				udelay(dc->debug.ips2_eval_delay_us);
 
-			if (ips_fw->signals.bits.ips2_commit) {
-				DC_LOG_IPS(
-					"exit IPS2 #1 (ips1_commit=%u ips2_commit=%u)",
-					ips_fw->signals.bits.ips1_commit,
-					ips_fw->signals.bits.ips2_commit);
+			DC_LOG_IPS(
+				"exit IPS2 #1 (ips1_commit=%u ips2_commit=%u)",
+				ips_fw->signals.bits.ips1_commit,
+				ips_fw->signals.bits.ips2_commit);
 
-				// Tell PMFW to exit low power state
-				dc->clk_mgr->funcs->exit_low_power_state(dc->clk_mgr);
+			// Tell PMFW to exit low power state
+			dc->clk_mgr->funcs->exit_low_power_state(dc->clk_mgr);
+
+			if (ips_fw->signals.bits.ips2_commit) {
 
 				DC_LOG_IPS(
 					"wait IPS2 entry delay (ips1_commit=%u ips2_commit=%u)",

@@ -36,6 +36,9 @@
 //<DMUB_TYPES>==================================================================
 /* Basic type definitions. */
 
+#ifdef __forceinline
+#undef __forceinline
+#endif
 #define __forceinline inline
 
 /**
@@ -5447,7 +5450,8 @@ struct dmub_cmd_fused_request {
 		struct dmub_cmd_fused_request_location_i2c {
 			uint8_t is_aux : 1;  // False
 			uint8_t ddc_line : 3;
-			uint8_t _reserved0 : 4;
+			uint8_t over_aux : 1;
+			uint8_t _reserved0 : 3;
 			uint8_t address;
 			uint8_t offset;
 			uint8_t length;

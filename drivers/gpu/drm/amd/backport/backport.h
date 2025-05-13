@@ -146,4 +146,7 @@
 #include <kcl/kcl_drm_drv.h>
 #include <kcl/kcl_string.h>
 #include <kcl/kcl_cpu_device_id.h>
+#include <kcl/kcl_dma_fence_array.h>
+#include <kcl/kcl_dma_fence_unwrap.h>
+
 #endif /* AMDGPU_BACKPORT_H */

@@ -3517,7 +3517,7 @@ static bool update_planes_and_stream_state(struct dc *dc,
 	}
 
 	if (update_type == UPDATE_TYPE_FULL) {
-		if (!dc->res_pool->funcs->validate_bandwidth(dc, context, false)) {
+		if (dc->res_pool->funcs->validate_bandwidth(dc, context, false) != DC_OK) {
 			BREAK_TO_DEBUGGER();
 			goto fail;
 		}
@@ -5045,6 +5045,9 @@ static bool full_update_required(struct dc *dc,
 	if (dc->idle_optimizations_allowed)
 		return true;
 
+	if (dc_can_clear_cursor_limit(dc))
+		return true;
+
 	return false;
 }
 
@@ -6307,10 +6310,10 @@ void dc_query_current_properties(struct dc *dc, struct dc_current_properties *pr
 void dc_set_edp_power(const struct dc *dc, struct dc_link *edp_link,
 				 bool powerOn)
 {
-	if (!edp_link || !edp_link->dc || !edp_link->dc->link_srv)
+	if (edp_link->connector_signal != SIGNAL_TYPE_EDP)
 		return;
 
-	if (edp_link->connector_signal != SIGNAL_TYPE_EDP)
+	if (edp_link->skip_implict_edp_power_control == false)
 		return;
 
 	edp_link->dc->link_srv->edp_set_panel_power(edp_link, powerOn);
