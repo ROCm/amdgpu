@@ -5,14 +5,6 @@
 #include <kcl/kcl_slab.h>
 
 /*
- * commit v4.18-rc2-533-g418cc6ca0607
- * dma-fence: Allow wait_any_timeout for all fences)
- */
-#ifdef AMDKCL_FENCE_WAIT_ANY_TIMEOUT
-#define dma_fence_wait_any_timeout _kcl_fence_wait_any_timeout
-#endif
-
-/*
  * commit  v4.9-rc2-472-gbcc004b629d2
  * dma-buf/fence: make timeout handling in fence_default_wait consistent (v2))
  *
