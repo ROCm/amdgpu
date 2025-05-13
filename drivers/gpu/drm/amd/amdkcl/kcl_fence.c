@@ -25,14 +25,6 @@
 #define CREATE_TRACE_POINTS
 #include "kcl_fence_trace.h"
 
-#ifdef AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING
-bool _kcl_fence_enable_signaling(struct dma_fence *f)
-{
-	return true;
-}
-EXPORT_SYMBOL(_kcl_fence_enable_signaling);
-#endif
-
 #if !defined(HAVE_DMA_FENCE_DESCRIBE)
 /**
  * dma_fence_describe - Dump fence describtion into seq_file
