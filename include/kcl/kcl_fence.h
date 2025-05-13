@@ -105,17 +105,6 @@ bool _kcl_fence_enable_signaling(struct dma_fence *f);
 #define AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL
 #endif
 
-/*
- * commit v4.18-rc2-533-g418cc6ca0607
- * dma-fence: Make ->wait callback optional
- */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
-#define AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL \
-	.wait = dma_fence_default_wait,
-#else
-#define AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL
-#endif
-
 #if !defined(HAVE_DMA_FENCE_DESCRIBE)
 void dma_fence_describe(struct dma_fence *fence, struct seq_file *seq);
 #endif
