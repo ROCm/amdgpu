@@ -51,19 +51,6 @@ static inline bool __dma_fence_is_later(u64 f1, u64 f2,
 #endif
 #endif /* HAVE__DMA_FENCE_IS_LATER_2ARGS */
 
-/*
- * commit v4.18-rc2-519-gc701317a3eb8
- * dma-fence: Make ->enable_signaling optional
- */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
-#define AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING
-bool _kcl_fence_enable_signaling(struct dma_fence *f);
-#define AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL \
-	.enable_signaling = _kcl_fence_enable_signaling,
-#else
-#define AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL
-#endif
-
 #if !defined(HAVE_DMA_FENCE_DESCRIBE)
 void dma_fence_describe(struct dma_fence *fence, struct seq_file *seq);
 #endif
