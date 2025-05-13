@@ -50,7 +50,7 @@ if [ "$CC" == "gcc" ]; then
 		done
 	fi
 
-	gcc_version=$($CC -dumpfullversion | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')
+	gcc_version=$(($CC -dumpfullversion 2>/dev/null || $CC -dumpversion) | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')
 	kernel_version=$(uname -r | awk -F. '{printf "%d%02d", $1, $2}')
 	# gcc 4.8.5 is too old for kernel >= 5.4, which will cause the compile failure.
 	if [ "$gcc_version" -lt 40805 ] && [ "$kernel_version" -ge 0504 ]; then
