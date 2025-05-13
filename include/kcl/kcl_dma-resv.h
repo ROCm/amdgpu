@@ -47,7 +47,8 @@
 #define KCL_KCL_DMA_RESV_H
 
 #include <asm/barrier.h>
-#include <kcl/backport/kcl_fence_backport.h>
+#include <kcl/kcl_fence.h>
+#include <kcl/kcl_slab.h>
 #include <kcl/backport/kcl_ww_mutex.h>
 #include <kcl/kcl_seqlock.h>
 #include <kcl/kcl_dma_fence.h>
