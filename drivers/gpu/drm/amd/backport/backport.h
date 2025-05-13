@@ -55,7 +55,7 @@
 #include <kcl/kcl_drm_connector.h>
 #include <kcl/backport/kcl_drm_dp_helper_backport.h>
 #include <kcl/backport/kcl_drm_dp_mst_helper_backport.h>
-#include <kcl/backport/kcl_drm_atomic_helper_backport.h>
+#include <kcl/kcl_drm_atomic_helper.h>
 #include <kcl/kcl_drm_hdcp.h>
 #include <kcl/kcl_moduleparam.h>
 #include <kcl/kcl_drm_prime.h>
