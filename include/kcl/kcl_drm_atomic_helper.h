@@ -39,16 +39,6 @@
 #define DRM_PLANE_NO_SCALING (1<<16)
 #endif
 
-/*
- * v4.19-rc1-206-ge267364a6e1b
- * drm/atomic: Initialise planes with opaque alpha values
- */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
-#define AMDKCL__DRM_ATOMIC_HELPER_PLANE_RESET
-void _kcl__drm_atomic_helper_plane_reset(struct drm_plane *plane,
-							struct drm_plane_state *state);
-#endif
-
 #ifndef HAVE___DRM_ATOMIC_HELPER_CRTC_RESET
 void __drm_atomic_helper_crtc_reset(struct drm_crtc *crtc,
                               struct drm_crtc_state *crtc_state);
