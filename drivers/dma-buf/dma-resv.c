@@ -40,6 +40,9 @@
 #include <linux/sched/mm.h>
 #include <linux/mmu_notifier.h>
 #include <linux/seq_file.h>
+#ifndef HAVE_CONFIG_H
+#define HAVE_DMA_FENCE_OPS_SET_DEADLINE
+#endif
 
 /**
  * DOC: Reservation Object Overview
