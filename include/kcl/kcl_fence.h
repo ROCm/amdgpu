@@ -52,47 +52,6 @@ static inline bool __dma_fence_is_later(u64 f1, u64 f2,
 #endif /* HAVE__DMA_FENCE_IS_LATER_2ARGS */
 
 /*
- * commit v4.14-rc3-601-g5f72db59160c
- * dma-buf/fence: Sparse wants __rcu on the object itself
- */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 15, 0)
-#define AMDKCL_FENCE_GET_RCU_SAFE
-static inline struct dma_fence *
-_kcl_fence_get_rcu_safe(struct dma_fence __rcu **fencep)
-{
-	do {
-		struct dma_fence *fence;
-
-		fence = rcu_dereference(*fencep);
-		if (!fence)
-			return NULL;
-
-		if (!dma_fence_get_rcu(fence))
-			continue;
-
-		/* The atomic_inc_not_zero() inside dma_fence_get_rcu()
-		 * provides a full memory barrier upon success (such as now).
-		 * This is paired with the write barrier from assigning
-		 * to the __rcu protected fence pointer so that if that
-		 * pointer still matches the current fence, we know we
-		 * have successfully acquire a reference to it. If it no
-		 * longer matches, we are holding a reference to some other
-		 * reallocated pointer. This is possible if the allocator
-		 * is using a freelist like SLAB_TYPESAFE_BY_RCU where the
-		 * fence remains valid for the RCU grace period, but it
-		 * may be reallocated. When using such allocators, we are
-		 * responsible for ensuring the reference we get is to
-		 * the right fence, as below.
-		 */
-		if (fence == rcu_access_pointer(*fencep))
-			return rcu_pointer_handoff(fence);
-
-		dma_fence_put(fence);
-	} while (1);
-}
-#endif
-
-/*
  * commit v4.18-rc2-519-gc701317a3eb8
  * dma-fence: Make ->enable_signaling optional
  */
