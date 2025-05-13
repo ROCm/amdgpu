@@ -8,7 +8,7 @@
 static inline
 void _kcl_drm_fbdev_ttm_setup(struct drm_device *dev, unsigned int preferred_bpp)
 {
-	return drm_fbdev_generic_setup(dev, preferred_bpp);
+	drm_fbdev_generic_setup(dev, preferred_bpp);
 }
 #define drm_fbdev_ttm_setup _kcl_drm_fbdev_ttm_setup
 #endif
