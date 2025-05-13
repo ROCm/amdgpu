@@ -32,7 +32,8 @@
 #include <kcl/kcl_timekeeping.h>
 #include <kcl/backport/kcl_mm_backport.h>
 #include <kcl/kcl_pm.h>
-#include <kcl/backport/kcl_fence_backport.h>
+#include <kcl/kcl_fence.h>
+#include <kcl/kcl_slab.h>
 #include <kcl/backport/kcl_device_cgroup_backport.h>
 #include <kcl/backport/kcl_hmm.h>
 #include <kcl/backport/kcl_migrate.h>
