@@ -8,7 +8,8 @@
 #ifndef __KCL_LINUX_DMA_FENCE_UNWRAP_H
 #define __KCL_LINUX_DMA_FENCE_UNWRAP_H
 
-#include <linux/dma-fence-chain.h>
+#include <linux/dma-fence-unwrap.h>
+#include <kcl/kcl_dma_fence_chain.h>
 #include <kcl/kcl_dma_fence_array.h>
 
 #ifndef HAVE_LINUX_DMA_FENCE_UNWRAP_H
@@ -91,5 +92,11 @@ kcl_dma_fence_unwrap_next(struct dma_fence_unwrap *cursor)
 	for (fence = kcl_dma_fence_unwrap_first(head, cursor); fence;	\
 	     fence = kcl_dma_fence_unwrap_next(cursor))
 
+#endif
+
+#ifndef HAVE_DMA_FENCE_DEDUP_ARRAY
+int kcl_dma_fence_dedup_array(struct dma_fence **array, int num_fences);
+
+#define dma_fence_dedup_array kcl_dma_fence_dedup_array
 #endif
 #endif
