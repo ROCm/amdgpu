@@ -22,7 +22,7 @@ void _kcl_drm_print_memory_stats(struct drm_printer *p,
 			    const struct drm_memory_stats *stats,
 			    enum drm_gem_object_status supported_status,
 			    const char *region);
-#define drm_print_memory_stats _kcl_drm_print_memory_stats;
+#define drm_print_memory_stats _kcl_drm_print_memory_stats
 #endif
 
 #ifndef HAVE_DRM_MEMORY_STATS_IS_ZERO
