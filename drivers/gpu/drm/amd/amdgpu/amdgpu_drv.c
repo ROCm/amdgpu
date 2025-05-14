@@ -2507,23 +2507,20 @@ retry_init:
 	 */
 	if (adev->mode_info.mode_config_initialized &&
 	    !list_empty(&adev_to_drm(adev)->mode_config.connector_list)) {
+#ifdef HAVE_DRM_CLIENT_SETUP
 		const struct drm_format_info *format;
 
 		/* select 8 bpp console on low vram cards */
 		if (adev->gmc.real_vram_size <= (32*1024*1024))
-#if HAVE_DRM_CLIENT_SETUP
 			format = drm_format_info(DRM_FORMAT_C8);
-#else
-			drm_fbdev_ttm_setup(adev_to_drm(adev), 8);
-#endif
 		else
-#if HAVE_DRM_CLIENT_SETUP
 			format = NULL;
-#else
-			drm_fbdev_ttm_setup(adev_to_drm(adev), 32);
-#endif
-#if HAVE_DRM_CLIENT_SETUP
 		drm_client_setup(adev_to_drm(adev), format);
+#else
+		if (adev->gmc.real_vram_size <= (32*1024*1024))
+			drm_fbdev_ttm_setup(adev_to_drm(adev), 8);
+		else
+			drm_fbdev_ttm_setup(adev_to_drm(adev), 32);
 #endif
 	}
 
