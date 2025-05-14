@@ -3,6 +3,8 @@
 #ifndef AMDKCL_SHRINKER_H
 #define AMDKCL_SHRINKER_H
 
+#include <linux/shrinker.h>
+
 #ifndef HAVE_SYNCHRONIZE_SHRINKERS
 extern void synchronize_shrinkers(void);
 #endif
