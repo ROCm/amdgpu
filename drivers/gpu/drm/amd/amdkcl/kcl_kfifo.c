@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-#include <linux/kfifo.h>
+#include <kcl/kcl_kfifo.h>
 
 #ifndef HAVE_KFIFO_OUT_LINEAR
-
 #define	__KFIFO_PEEK(data, out, mask) \
 	((data)[(out) & (mask)])
 /*

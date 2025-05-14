@@ -3,10 +3,9 @@
 #ifndef KCL_LINUX_KFIFO_H
 #define KCL_LINUX_KFIFO_H
 
-#ifndef HAVE_KFIFO_OUT_LINEAR
-
 #include <linux/kfifo.h>
 
+#ifndef HAVE_KFIFO_OUT_LINEAR
 /**
  * commit 4edd7e96a1f159f43bd1cb82616f81eaddd54262
  * Author: Jiri Slaby (SUSE) <jirislaby@kernel.org>
