@@ -10,6 +10,7 @@
  *  Multiqueue VM started 5.8.00, Rik van Riel.
  */
 #include <linux/rwsem.h>
+#include <kcl/kcl_shrinker.h>
 
 #ifndef HAVE_SYNCHRONIZE_SHRINKERS
 static DECLARE_RWSEM(shrinker_rwsem);
