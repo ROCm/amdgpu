@@ -142,6 +142,9 @@
 /* dma_fence_chain_contained() is available */
 #define HAVE_DMA_FENCE_CHAIN_CONTAINED 1
 
+/* dma_fence_dedup_array() is available */
+#define HAVE_DMA_FENCE_DEDUP_ARRAY 1
+
 /* dma_fence_describe() is available */
 #define HAVE_DMA_FENCE_DESCRIBE 1
 
