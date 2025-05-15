@@ -56,9 +56,8 @@ void amdgpu_hdp_generic_flush(struct amdgpu_device *adev,
 			KFD_MMIO_REMAP_HDP_MEM_FLUSH_CNTL) >>
 			       2,
 		       0);
-		RREG32((adev->rmmio_remap.reg_offset +
-			KFD_MMIO_REMAP_HDP_MEM_FLUSH_CNTL) >>
-		       2);
+		if (adev->nbio.funcs->get_memsize)
+			adev->nbio.funcs->get_memsize(adev);
 	} else {
 		amdgpu_ring_emit_wreg(ring,
 				      (adev->rmmio_remap.reg_offset +
