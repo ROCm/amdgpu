@@ -128,6 +128,9 @@ void kcl_drm_file_err(struct drm_file *file_priv, const char *fmt, ...)
 	vaf.fmt = fmt;
 	vaf.va = &args;
 
+#ifdef HAVE_DRM_FILE_CLIENT_NAME
+	mutex_lock(&file_priv->client_name_lock);
+#endif
 	rcu_read_lock();
 	pid = rcu_dereference(file_priv->pid);
 	task = pid_task(pid,
@@ -136,11 +139,19 @@ void kcl_drm_file_err(struct drm_file *file_priv, const char *fmt, ...)
 #else
 		PIDTYPE_PGID);
 #endif
+#ifdef HAVE_DRM_FILE_CLIENT_NAME
+	drm_err(dev, "comm: %s pid: %d client: %s ... %pV", task ? task->comm : "Unset",
+		task ? task->pid : 0, file_priv->client_name ?: "Unset", &vaf);
+#else
 	drm_err(dev, "comm: %s pid: %d client: %s ... %pV", task ? task->comm : "Unset",
 		task ? task->pid : 0, "Unset", &vaf);
+#endif
 
 	va_end(args);
 	rcu_read_unlock();
+#ifdef HAVE_DRM_FILE_CLIENT_NAME
+	mutex_unlock(&file_priv->client_name_lock);
+#endif
 }
 EXPORT_SYMBOL(kcl_drm_file_err);
 #endif
