@@ -47,6 +47,7 @@ endif
 
 dkms-config ?= amd/dkms/dkms-config.mk
 config-file ?= amd/dkms/config/config.h
+rename_header ?= include/rename_symbol.h
 KCL_MACRO_CHECK_COMMAND=$(shell grep $(1) $(config-file) | grep -q "define" && echo "y")
 
 modules: sanity-check $(dkms-config)
@@ -57,7 +58,7 @@ modules: sanity-check $(dkms-config)
 		M=$(module_build_dir) $(module_build_flags)
 	$(Q)amd/dkms/post-build.sh $(module_build_dir)
 
-sanity-check: pre-build $(config-file)
+sanity-check: pre-build $(config-file) $(rename_header)
 	$(if $(call KCL_MACRO_CHECK_COMMAND, HAVE_DMA_RESV_SEQ_BUG), $(error dma_resv->seq is missing. exit...))
 	$(if $(call KCL_MACRO_CHECK_COMMAND, HAVE_RESERVATION_WW_CLASS_BUG), $(error reservation_ww_class is missing. exit...))
 
@@ -70,5 +71,5 @@ pre-build:
 clean:
 	$(Q)echo "Cleaning build files..."
 	$(Q)make -C $(kernel_build_dir) M=$(module_src_dir) clean
-	$(Q)rm -f $(dkms-config) $(config-file)
+	$(Q)rm -f $(dkms-config) $(config-file) $(rename_header)
 endif
