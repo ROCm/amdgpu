@@ -608,18 +608,18 @@ int amdgpu_userq_signal_ioctl(struct drm_device *dev, void *data,
 	}
 
 	for (i = 0; i < num_read_bo_handles; i++) {
-		if (!gobj_read || !gobj_read[i]->resv)
+		if (!gobj_read || !amdkcl_gem_resvp(gobj_read[i]))
 			continue;
 
-		dma_resv_add_fence(gobj_read[i]->resv, fence,
+		dma_resv_add_fence(amdkcl_gem_resvp(gobj_read[i]), fence,
 				   DMA_RESV_USAGE_READ);
 	}
 
 	for (i = 0; i < num_write_bo_handles; i++) {
-		if (!gobj_write || !gobj_write[i]->resv)
+		if (!gobj_write || !amdkcl_gem_resvp(gobj_write[i]))
 			continue;
 
-		dma_resv_add_fence(gobj_write[i]->resv, fence,
+		dma_resv_add_fence(amdkcl_gem_resvp(gobj_write[i]), fence,
 				   DMA_RESV_USAGE_WRITE);
 	}
 
@@ -798,7 +798,7 @@ int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
 			struct dma_resv_iter resv_cursor;
 			struct dma_fence *fence;
 
-			dma_resv_for_each_fence(&resv_cursor, gobj_read[i]->resv,
+			dma_resv_for_each_fence(&resv_cursor, amdkcl_gem_resvp(gobj_read[i]),
 						DMA_RESV_USAGE_READ, fence)
 				num_fences++;
 		}
@@ -807,7 +807,7 @@ int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
 			struct dma_resv_iter resv_cursor;
 			struct dma_fence *fence;
 
-			dma_resv_for_each_fence(&resv_cursor, gobj_write[i]->resv,
+			dma_resv_for_each_fence(&resv_cursor, amdkcl_gem_resvp(gobj_write[i]),
 						DMA_RESV_USAGE_WRITE, fence)
 				num_fences++;
 		}
@@ -839,7 +839,7 @@ int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
 			struct dma_resv_iter resv_cursor;
 			struct dma_fence *fence;
 
-			dma_resv_for_each_fence(&resv_cursor, gobj_read[i]->resv,
+			dma_resv_for_each_fence(&resv_cursor, amdkcl_gem_resvp(gobj_read[i]),
 						DMA_RESV_USAGE_READ, fence) {
 				if (WARN_ON_ONCE(num_fences >= wait_info->num_fences)) {
 					r = -EINVAL;
@@ -856,7 +856,7 @@ int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
 			struct dma_resv_iter resv_cursor;
 			struct dma_fence *fence;
 
-			dma_resv_for_each_fence(&resv_cursor, gobj_write[i]->resv,
+			dma_resv_for_each_fence(&resv_cursor, amdkcl_gem_resvp(gobj_write[i]),
 						DMA_RESV_USAGE_WRITE, fence) {
 				if (WARN_ON_ONCE(num_fences >= wait_info->num_fences)) {
 					r = -EINVAL;
