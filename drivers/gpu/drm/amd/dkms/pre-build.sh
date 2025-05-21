@@ -97,7 +97,22 @@ echo "PATH=$PATH" >$MODULE_BUILD_DIR/.env
 # otherwise conflicting package libpam-tmpdir incorrectly generates config
 unset TMPDIR
 
-(cd $SRC && ./configure CC=${CC})
+# Figure out SRCARCH for Debian builds
+ARCH=$(dpkg-architecture -qDEB_HOST_GNU_CPU || echo "")
+SRCARCH=$ARCH
+# Additional ARCH settings for x86
+if [[ "$ARCH" == "i386" ]]; then
+        SRCARCH="x86"
+fi
+if [[ "$ARCH" == "x86_64" ]]; then
+        SRCARCH="x86"
+fi
+
+if [[ -n $ARCH ]]; then
+	(cd $SRC && SRCARCH="${SRCARCH}" ./configure CC=${CC})
+else
+	(cd $SRC && ./configure CC=${CC})
+fi
 
 # rename CFLAGS_<path>target.o / CFLAGS_REMOVE_<path> to CFLAGS_target.o
 # for kernel version < 5.3
