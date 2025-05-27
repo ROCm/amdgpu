@@ -1113,7 +1113,7 @@ long ttm_bo_shrink(struct ttm_operation_ctx *ctx, struct ttm_buffer_object *bo,
 	struct ttm_device *bdev = bo->bdev;
 	long lret;
 
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 
 	if (flags.allow_move && bo->resource->mem_type != TTM_PL_SYSTEM) {
 		int ret = ttm_bo_validate(bo, &sys_placement, ctx);
