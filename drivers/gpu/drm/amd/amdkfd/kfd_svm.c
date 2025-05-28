@@ -4079,8 +4079,8 @@ exit:
 	return ret;
 }
 
-int svm_range_get_info(struct kfd_process *p, uint32_t *num_svm_ranges,
-		       uint64_t *svm_priv_data_size)
+void svm_range_get_info(struct kfd_process *p, uint32_t *num_svm_ranges,
+			uint64_t *svm_priv_data_size)
 {
 	uint64_t total_size, accessibility_size, common_attr_size;
 	int nattr_common = 4, nattr_accessibility = 1;
@@ -4092,8 +4092,6 @@ int svm_range_get_info(struct kfd_process *p, uint32_t *num_svm_ranges,
 	*svm_priv_data_size = 0;
 
 	svms = &p->svms;
-	if (!svms)
-		return -EINVAL;
 
 	mutex_lock(&svms->lock);
 	list_for_each_entry(prange, &svms->list, list) {
@@ -4135,7 +4133,6 @@ int svm_range_get_info(struct kfd_process *p, uint32_t *num_svm_ranges,
 
 	pr_debug("num_svm_ranges %u total_priv_size %llu\n", *num_svm_ranges,
 		 *svm_priv_data_size);
-	return 0;
 }
 
 int kfd_criu_checkpoint_svm(struct kfd_process *p,
@@ -4152,8 +4149,6 @@ int kfd_criu_checkpoint_svm(struct kfd_process *p,
 	struct mm_struct *mm;
 
 	svms = &p->svms;
-	if (!svms)
-		return -EINVAL;
 
 	mm = get_task_mm(p->lead_thread);
 	if (!mm) {

@@ -269,7 +269,6 @@ out_err:
 }
 EXPORT_SYMBOL_FOR_TESTS_ONLY(ttm_tt_swapin);
 
-#ifdef HAVE_SHMEM_READ_FOLIO
 /**
  * ttm_tt_backup() - Helper to back up a struct ttm_tt.
  * @bdev: The TTM device.
@@ -298,7 +297,6 @@ long ttm_tt_backup(struct ttm_device *bdev, struct ttm_tt *tt,
 
 	return ret;
 }
-#endif
 
 int ttm_tt_restore(struct ttm_device *bdev, struct ttm_tt *tt,
 		   const struct ttm_operation_ctx *ctx)

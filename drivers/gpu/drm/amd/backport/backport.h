@@ -34,7 +34,8 @@
 #include <kcl/backport/kcl_mm_backport.h>
 #include <kcl/kcl_pagemap.h>
 #include <kcl/kcl_pm.h>
-#include <kcl/backport/kcl_fence_backport.h>
+#include <kcl/kcl_fence.h>
+#include <kcl/kcl_slab.h>
 #include <kcl/backport/kcl_device_cgroup_backport.h>
 #include <kcl/backport/kcl_hmm.h>
 #include <kcl/backport/kcl_migrate.h>
@@ -55,7 +56,7 @@
 #include <kcl/kcl_drm_connector.h>
 #include <kcl/backport/kcl_drm_dp_helper_backport.h>
 #include <kcl/backport/kcl_drm_dp_mst_helper_backport.h>
-#include <kcl/backport/kcl_drm_atomic_helper_backport.h>
+#include <kcl/kcl_drm_atomic_helper.h>
 #include <kcl/kcl_drm_hdcp.h>
 #include <kcl/kcl_moduleparam.h>
 #include <kcl/kcl_drm_prime.h>

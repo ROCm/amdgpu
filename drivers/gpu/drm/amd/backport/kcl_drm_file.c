@@ -37,6 +37,7 @@
 #include <drm/drm_device.h>
 #include <drm/drm_drv.h>
 #include <linux/pci.h>
+#include <linux/pid.h>
 #include "amdgpu_fdinfo.h"
 #ifndef HAVE_DRM_SHOW_FDINFO
 /**
@@ -112,4 +113,45 @@ int drm_memory_stats_is_zero(const struct drm_memory_stats *stats)
                 stats->purgeable == 0 &&
                 stats->active == 0);
 }
+#endif
+
+#ifndef HAVE_DRM_FILE_ERR
+void kcl_drm_file_err(struct drm_file *file_priv, const char *fmt, ...)
+{
+	va_list args;
+	struct va_format vaf;
+	struct pid *pid;
+	struct task_struct *task;
+	struct drm_device *dev = file_priv->minor->dev;
+
+	va_start(args, fmt);
+	vaf.fmt = fmt;
+	vaf.va = &args;
+
+#ifdef HAVE_DRM_FILE_CLIENT_NAME
+	mutex_lock(&file_priv->client_name_lock);
+#endif
+	rcu_read_lock();
+	pid = rcu_dereference(file_priv->pid);
+	task = pid_task(pid,
+#ifdef HAVE_PIDTYPE_TGID
+		PIDTYPE_TGID);
+#else
+		PIDTYPE_PGID);
+#endif
+#ifdef HAVE_DRM_FILE_CLIENT_NAME
+	drm_err(dev, "comm: %s pid: %d client: %s ... %pV", task ? task->comm : "Unset",
+		task ? task->pid : 0, file_priv->client_name ?: "Unset", &vaf);
+#else
+	drm_err(dev, "comm: %s pid: %d client: %s ... %pV", task ? task->comm : "Unset",
+		task ? task->pid : 0, "Unset", &vaf);
+#endif
+
+	va_end(args);
+	rcu_read_unlock();
+#ifdef HAVE_DRM_FILE_CLIENT_NAME
+	mutex_unlock(&file_priv->client_name_lock);
+#endif
+}
+EXPORT_SYMBOL(kcl_drm_file_err);
 #endif

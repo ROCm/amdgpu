@@ -1188,6 +1188,9 @@ struct amdgpu_device {
 	 */
 #ifdef HAVE_STRUCT_XARRAY
 	struct xarray			userq_xa;
+#else
+	struct idr			userq_idr;
+	spinlock_t			userq_lock;
 #endif
 
 	/* df */
@@ -1752,6 +1755,10 @@ bool amdgpu_acpi_is_s0ix_active(struct amdgpu_device *adev);
 #else
 static inline bool amdgpu_acpi_is_s0ix_active(struct amdgpu_device *adev) { return false; }
 static inline bool amdgpu_acpi_is_s3_active(struct amdgpu_device *adev) { return false; }
+#endif
+
+#if defined(CONFIG_DRM_AMD_ISP)
+int amdgpu_acpi_get_isp4_dev_hid(u8 (*hid)[ACPI_ID_LEN]);
 #endif
 
 void amdgpu_register_gpu_instance(struct amdgpu_device *adev);

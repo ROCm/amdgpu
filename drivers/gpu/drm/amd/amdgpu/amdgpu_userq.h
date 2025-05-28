@@ -62,6 +62,9 @@ struct amdgpu_usermode_queue {
 	struct amdgpu_userq_obj wptr_obj;
 #ifdef HAVE_STRUCT_XARRAY
 	struct xarray		fence_drv_xa;
+#else
+	struct idr		fence_drv_idr;
+	spinlock_t		fence_drv_lock;
 #endif
 	struct amdgpu_userq_fence_driver *fence_drv;
 	struct dma_fence	*last_fence;
@@ -88,6 +91,7 @@ struct amdgpu_userq_mgr {
 	struct amdgpu_device		*adev;
 	struct delayed_work		resume_work;
 	struct list_head		list;
+	struct drm_file			*file;
 };
 
 struct amdgpu_db_info {
@@ -99,7 +103,8 @@ struct amdgpu_db_info {
 
 int amdgpu_userq_ioctl(struct drm_device *dev, void *data, struct drm_file *filp);
 
-int amdgpu_userq_mgr_init(struct amdgpu_userq_mgr *userq_mgr, struct amdgpu_device *adev);
+int amdgpu_userq_mgr_init(struct amdgpu_userq_mgr *userq_mgr, struct drm_file *file_priv,
+			  struct amdgpu_device *adev);
 
 void amdgpu_userq_mgr_fini(struct amdgpu_userq_mgr *userq_mgr);
 
