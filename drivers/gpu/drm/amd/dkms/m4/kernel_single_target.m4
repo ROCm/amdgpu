@@ -3,13 +3,13 @@ dnl # extract cc, cflags, cppflags
 dnl #
 AC_DEFUN([AC_KERNEL_SINGLE_TARGET_CFLAGS], [
 	AS_IF([test -s .conftest.o.cmd], [
-		_conftest_cmd=$(head -1 .conftest.o.cmd)
+		_conftest_cmd=$(head -1 .conftest.o.cmd | sed 's/.*:= //;s/;.*//;s/^[[[:space:]]]*//')
 
-		CC=$(echo $_conftest_cmd | awk -F ' ' '{print $[3]}')
+		CC=$(echo $_conftest_cmd | awk -F ' ' '{print $[1]}')
 		CPP="$CC -E"
 
 		CFLAGS=$(echo $_conftest_cmd | \
-			 cut -d ' ' -f 4- | \
+			 cut -d ' ' -f 2- | \
 			 sed -e "s|\./|${LINUX_OBJ}/|g" \
 			     -e "s|-I\([[[a-z]]]*\)|-I${LINUX_OBJ}/\1|g" \
 			     -e "s|-include \([[[a-z]]]*\)|-include ${LINUX_OBJ}/\1|g" \
@@ -17,7 +17,6 @@ AC_DEFUN([AC_KERNEL_SINGLE_TARGET_CFLAGS], [
 		CFLAGS=$(echo $CFLAGS | sed -E 's/-W(array-bounds|error=array-bounds|unused-variable|error=unused-variable|unused-[^ ]*-variable|error=unused-[^ ]*-variable)( |$)//g')
 
 		CPPFLAGS=$(echo $CFLAGS | \
-			   cut -d ';' -f 1 | \
 			   sed 's| -|\n&|g' | \
 			   sed -n -e '/conftest/d' \
 				  -e '/KBUILD/d' \
