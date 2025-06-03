@@ -3,8 +3,9 @@
  * Copyright © 2021 Intel Corporation
  */
 
-#include <linux/kmemleak.h>
 #include <kunit/test-bug.h>
+
+#include <linux/kmemleak.h>
 #include <linux/module.h>
 #include <linux/sizes.h>
 
@@ -337,9 +338,7 @@ void drm_buddy_fini(struct drm_buddy *mm)
 		__force_merge(mm, start, start + size, order);
 
 		if (WARN_ON(!drm_buddy_block_is_free(mm->roots[i])))
-#ifdef kunit_fail_current_test
 			kunit_fail_current_test("buddy_fini() root");
-#endif
 
 		drm_block_free(mm, mm->roots[i]);
 
