@@ -8706,7 +8706,7 @@ static int amdgpu_dm_connector_get_modes(struct drm_connector *connector)
 #else
 		amdgpu_dm_connector_ddc_get_modes(connector, edid);
 #endif
-		if (encoder)
+		if (encoder && connector->connector_type != DRM_MODE_CONNECTOR_eDP)
 			amdgpu_dm_connector_add_common_modes(encoder, connector);
 #ifdef HAVE_DRM_DP_MST_EDID_READ
 		amdgpu_dm_connector_add_freesync_modes(connector, drm_edid);
