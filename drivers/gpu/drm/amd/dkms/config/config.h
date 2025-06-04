@@ -1035,6 +1035,9 @@
 /* smca_get_bank_type(x) is available */
 /* #undef HAVE_SMCA_GET_BANK_TYPE_WITH_ONE_ARGUMENT */
 
+/* size_mul() is available */
+#define HAVE_SIZE_MUL 1
+
 /* whether smca_get_bank_type(x, x) is available */
 #define HAVE_SMCA_GET_BANK_TYPE_WITH_TWO_ARGUMENTS 1
 
