@@ -104,6 +104,14 @@
  */
 #define DMUB_MAX_FPO_STREAMS 4
 
+/* Define to ensure that the "common" members always appear in the same
+ * order in different structs for back compat purposes
+ */
+#define COMMON_STREAM_STATIC_SUB_STATE \
+    struct dmub_fams2_cmd_legacy_stream_static_state legacy; \
+    struct dmub_fams2_cmd_subvp_stream_static_state subvp; \
+    struct dmub_fams2_cmd_drr_stream_static_state drr;
+
 /* Maximum number of streams on any ASIC. */
 #define DMUB_MAX_STREAMS 6
 
@@ -1508,6 +1516,11 @@ enum dmub_cmd_type {
 	 */
 	DMUB_CMD__FUSED_IO = 89,
 
+	/**
+	 * Command type used for all LSDMA commands.
+	 */
+	DMUB_CMD__LSDMA = 90,
+
 	DMUB_CMD__VBIOS = 128,
 };
 
@@ -1918,6 +1931,121 @@ struct dmub_rb_cmd_fams2_flip {
 	struct dmub_fams2_flip_info flip_info;
 };
 
+struct dmub_cmd_lsdma_data {
+	union {
+		struct lsdma_init_data {
+			union dmub_addr gpu_addr_base;
+			uint32_t ring_size;
+		} init_data;
+		struct lsdma_tiled_copy_data {
+			uint32_t src_addr_lo;
+			uint32_t src_addr_hi;
+			uint32_t dst_addr_lo;
+			uint32_t dst_addr_hi;
+
+			uint32_t src_x            : 16;
+			uint32_t src_y            : 16;
+
+			uint32_t src_width        : 16;
+			uint32_t src_height       : 16;
+
+			uint32_t dst_x            : 16;
+			uint32_t dst_y            : 16;
+
+			uint32_t dst_width        : 16;
+			uint32_t dst_height       : 16;
+
+			uint32_t rect_x           : 16;
+			uint32_t rect_y           : 16;
+
+			uint32_t src_swizzle_mode : 5;
+			uint32_t src_mip_max      : 5;
+			uint32_t src_mip_id       : 5;
+			uint32_t dst_mip_max      : 5;
+			uint32_t dst_swizzle_mode : 5;
+			uint32_t dst_mip_id       : 5;
+			uint32_t tmz              : 1;
+			uint32_t dcc              : 1;
+
+			uint32_t data_format      : 6;
+			uint32_t padding1         : 4;
+			uint32_t dst_element_size : 3;
+			uint32_t num_type         : 3;
+			uint32_t src_element_size : 3;
+			uint32_t write_compress   : 2;
+			uint32_t cache_policy_dst : 2;
+			uint32_t cache_policy_src : 2;
+			uint32_t read_compress    : 2;
+			uint32_t src_dim          : 2;
+			uint32_t dst_dim          : 2;
+			uint32_t max_uncom        : 1;
+
+			uint32_t max_com          : 2;
+			uint32_t padding          : 30;
+		} tiled_copy_data;
+		struct lsdma_linear_copy_data {
+			uint32_t count            : 30;
+			uint32_t cache_policy_dst : 2;
+
+			uint32_t tmz              : 1;
+			uint32_t cache_policy_src : 2;
+			uint32_t padding          : 29;
+
+			uint32_t src_lo;
+			uint32_t src_hi;
+			uint32_t dst_lo;
+			uint32_t dst_hi;
+		} linear_copy_data;
+		struct lsdma_reg_write_data {
+			uint32_t reg_addr;
+			uint32_t reg_data;
+		} reg_write_data;
+		struct lsdma_pio_copy_data {
+			union {
+				struct {
+					uint32_t byte_count      : 26;
+					uint32_t src_loc         : 1;
+					uint32_t dst_loc         : 1;
+					uint32_t src_addr_inc    : 1;
+					uint32_t dst_addr_inc    : 1;
+					uint32_t overlap_disable : 1;
+					uint32_t constant_fill   : 1;
+				} fields;
+				uint32_t raw;
+			} packet;
+			uint32_t src_lo;
+			uint32_t src_hi;
+			uint32_t dst_lo;
+			uint32_t dst_hi;
+		} pio_copy_data;
+		struct lsdma_pio_constfill_data {
+			union {
+				struct {
+					uint32_t byte_count      : 26;
+					uint32_t src_loc         : 1;
+					uint32_t dst_loc         : 1;
+					uint32_t src_addr_inc    : 1;
+					uint32_t dst_addr_inc    : 1;
+					uint32_t overlap_disable : 1;
+					uint32_t constant_fill   : 1;
+				} fields;
+				uint32_t raw;
+			} packet;
+			uint32_t dst_lo;
+			uint32_t dst_hi;
+			uint32_t data;
+		} pio_constfill_data;
+
+		uint32_t all[14];
+	} u;
+
+};
+
+struct dmub_rb_cmd_lsdma {
+	struct dmub_cmd_header header;
+	struct dmub_cmd_lsdma_data lsdma_data;
+};
+
 struct dmub_optc_state_v2 {
 	uint32_t v_total_min;
 	uint32_t v_total_max;
@@ -2021,10 +2149,12 @@ union dmub_fams2_stream_static_sub_state {
 }; //v0
 
 union dmub_fams2_cmd_stream_static_sub_state {
-	struct dmub_fams2_cmd_legacy_stream_static_state legacy;
-	struct dmub_fams2_cmd_subvp_stream_static_state subvp;
-	struct dmub_fams2_cmd_drr_stream_static_state drr;
+	COMMON_STREAM_STATIC_SUB_STATE
 }; //v1
+
+union dmub_fams2_stream_static_sub_state_v2 {
+	COMMON_STREAM_STATIC_SUB_STATE
+}; //v2
 
 struct dmub_fams2_stream_static_state {
 	enum fams2_stream_type type;
@@ -2091,7 +2221,7 @@ struct dmub_fams2_cmd_stream_static_base_state {
 
 struct dmub_fams2_stream_static_state_v1 {
 	struct dmub_fams2_cmd_stream_static_base_state base;
-	union dmub_fams2_cmd_stream_static_sub_state sub_state;
+	union dmub_fams2_stream_static_sub_state_v2 sub_state;
 }; //v1
 
 /**
@@ -2139,12 +2269,33 @@ union dmub_cmd_fams2_config {
 	} stream_v1; //v1
 };
 
+struct dmub_fams2_config_v2 {
+	struct dmub_cmd_fams2_global_config global;
+	struct dmub_fams2_stream_static_state_v1 stream_v1[DMUB_MAX_STREAMS]; //v1
+};
+
 /**
  * DMUB rb command definition for FAMS2 (merged SubVP, FPO, Legacy)
  */
 struct dmub_rb_cmd_fams2 {
 	struct dmub_cmd_header header;
 	union dmub_cmd_fams2_config config;
+};
+
+/**
+ * Indirect buffer descriptor
+ */
+struct dmub_ib_data {
+	union dmub_addr src; // location of indirect buffer in memory
+	uint16_t size; // indirect buffer size in bytes
+};
+
+/**
+ * DMUB rb command definition for commands passed over indirect buffer
+ */
+struct dmub_rb_cmd_ib {
+	struct dmub_cmd_header header;
+	struct dmub_ib_data ib_data;
 };
 
 /**
@@ -2170,6 +2321,11 @@ enum dmub_cmd_idle_opt_type {
 	 * DCN hardware notify power state.
 	 */
 	DMUB_CMD__IDLE_OPT_SET_DC_POWER_STATE = 3,
+
+	/**
+	 * DCN notify to release HW.
+	 */
+	 DMUB_CMD__IDLE_OPT_RELEASE_HW = 4,
 };
 
 /**
@@ -2933,6 +3089,7 @@ enum dmub_cmd_fams_type {
 	DMUB_CMD__FAMS2_CONFIG = 4,
 	DMUB_CMD__FAMS2_DRR_UPDATE = 5,
 	DMUB_CMD__FAMS2_FLIP = 6,
+	DMUB_CMD__FAMS2_IB_CONFIG = 7,
 };
 
 /**
@@ -4414,6 +4571,37 @@ enum dmub_cmd_abm_type {
 	 * Get current histogram data
 	 */
 	DMUB_CMD__ABM_GET_HISTOGRAM_DATA = 11,
+};
+
+/**
+ * LSDMA command sub-types.
+ */
+enum dmub_cmd_lsdma_type {
+	/**
+	 * Initialize parameters for LSDMA.
+	 * Ring buffer is mapped to the ring buffer
+	 */
+	DMUB_CMD__LSDMA_INIT_CONFIG	= 0,
+	/**
+	 * LSDMA copies data from source to destination linearly
+	 */
+	DMUB_CMD__LSDMA_LINEAR_COPY = 1,
+	/**
+	 * Send the tiled-to-tiled copy command
+	 */
+	DMUB_CMD__LSDMA_TILED_TO_TILED_COPY = 2,
+	/**
+	 * Send the poll reg write command
+	 */
+	DMUB_CMD__LSDMA_POLL_REG_WRITE = 3,
+	/**
+	 * Send the pio copy command
+	 */
+	DMUB_CMD__LSDMA_PIO_COPY = 4,
+	/**
+	 * Send the pio constfill command
+	 */
+	DMUB_CMD__LSDMA_PIO_CONSTFILL = 5,
 };
 
 struct abm_ace_curve {
@@ -5926,13 +6114,21 @@ union dmub_rb_cmd {
 	 * Definition of a DMUB_CMD__PSP_ASSR_ENABLE command.
 	 */
 	struct dmub_rb_cmd_assr_enable assr_enable;
+
 	struct dmub_rb_cmd_fams2 fams2_config;
+
+	struct dmub_rb_cmd_ib ib_fams2_config;
 
 	struct dmub_rb_cmd_fams2_drr_update fams2_drr_update;
 
 	struct dmub_rb_cmd_fams2_flip fams2_flip;
 
 	struct dmub_rb_cmd_fused_io fused_io;
+
+	/**
+	 * Definition of a DMUB_CMD__LSDMA command.
+	 */
+	struct dmub_rb_cmd_lsdma lsdma;
 };
 
 /**

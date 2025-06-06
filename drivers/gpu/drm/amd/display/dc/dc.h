@@ -46,6 +46,8 @@
 
 #include "dmub/inc/dmub_cmd.h"
 
+#include "sspl/dc_spl_types.h"
+
 struct abm_save_restore;
 
 /* forward declaration */
@@ -53,7 +55,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.334"
+#define DC_VER "3.2.336"
 
 /**
  * MAX_SURFACES - representative of the upper bound of surfaces that can be piped to a single CRTC
@@ -67,6 +69,7 @@ struct dmub_notification;
 #define MIN_VIEWPORT_SIZE 12
 #define MAX_NUM_EDP 2
 #define MAX_HOST_ROUTERS_NUM 2
+#define MAX_SUPPORTED_FORMATS 7
 
 /* Display Core Interfaces */
 struct dc_versions {
@@ -192,6 +195,34 @@ struct dpp_color_caps {
 	struct rom_curve_caps ogam_rom_caps;
 };
 
+/* Below structure is to describe the HW support for mem layout, extend support
+	range to match what OS could handle in the roadmap */
+struct lut3d_caps {
+	uint32_t dma_3d_lut : 1; /*< DMA mode support for 3D LUT */
+	struct {
+		uint32_t swizzle_3d_rgb : 1;
+		uint32_t swizzle_3d_bgr : 1;
+		uint32_t linear_1d : 1;
+	} mem_layout_support;
+	struct {
+		uint32_t unorm_12msb : 1;
+		uint32_t unorm_12lsb : 1;
+		uint32_t float_fp1_5_10 : 1;
+	} mem_format_support;
+	struct {
+		uint32_t order_rgba : 1;
+		uint32_t order_bgra : 1;
+	} mem_pixel_order_support;
+	/*< size options are 9, 17, 33, 45, 65 */
+	struct {
+		uint32_t dim_9 : 1; /* 3D LUT support for 9x9x9 */
+		uint32_t dim_17 : 1; /* 3D LUT support for 17x17x17 */
+		uint32_t dim_33 : 1; /* 3D LUT support for 33x33x33 */
+		uint32_t dim_45 : 1; /* 3D LUT support for 45x45x45 */
+		uint32_t dim_65 : 1; /* 3D LUT support for 65x65x65 */
+	} lut_dim_caps;
+};
+
 /**
  * struct mpc_color_caps - color pipeline capabilities for multiple pipe and
  * plane combined blocks
@@ -211,6 +242,8 @@ struct mpc_color_caps {
 	uint16_t num_3dluts : 3;
 	uint16_t shared_3d_lut:1;
 	struct rom_curve_caps ogam_rom_caps;
+	struct lut3d_caps mcm_3d_lut_caps;
+	struct lut3d_caps rmcm_3d_lut_caps;
 };
 
 /**
@@ -481,6 +514,8 @@ struct dc_config {
 	bool set_pipe_unlock_order;
 	bool enable_dpia_pre_training;
 	bool unify_link_enc_assignment;
+	struct spl_sharpness_range dcn_sharpness_range;
+	struct spl_sharpness_range dcn_override_sharpness_range;
 };
 
 enum visual_confirm {
@@ -1392,6 +1427,8 @@ struct dc_plane_state {
 	int sharpness_level;
 	enum linear_light_scaling linear_light_scaling;
 	unsigned int sdr_white_level_nits;
+	struct spl_sharpness_range sharpness_range;
+	enum sharpness_range_source sharpness_source;
 };
 
 struct dc_plane_info {
@@ -1770,19 +1807,15 @@ enum dc_status dc_validate_with_context(struct dc *dc,
 					const struct dc_validation_set set[],
 					int set_count,
 					struct dc_state *context,
-					bool fast_validate);
+					enum dc_validate_mode validate_mode);
 
 bool dc_set_generic_gpio_for_stereo(bool enable,
 		struct gpio_service *gpio_service);
 
-/*
- * fast_validate: we return after determining if we can support the new state,
- * but before we populate the programming info
- */
 enum dc_status dc_validate_global_state(
 		struct dc *dc,
 		struct dc_state *new_ctx,
-		bool fast_validate);
+		enum dc_validate_mode validate_mode);
 
 bool dc_acquire_release_mpc_3dlut(
 		struct dc *dc, bool acquire,
