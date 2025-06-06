@@ -29,7 +29,7 @@
 struct drm_edid {
 	/* Size allocated for edid */
 	size_t size;
-	const struct edid *edid;
+	struct edid *edid;
 };
 #endif
 
