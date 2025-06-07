@@ -46,6 +46,7 @@ export CONFIG_DRM_TTM=m
 export CONFIG_DRM_AMDGPU=m
 export CONFIG_DRM_SCHED=m
 
+subdir-ccflags-y += -Wno-frame-larger-than
 subdir-ccflags-y += -Wno-error
 
 # Trying to enable DCN2/3 with core2 optimizations will result in
