@@ -4811,26 +4811,29 @@ static void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm,
 #endif
 }
 
-#ifdef HAVE_HDR_SINK_METADATA
 static int get_brightness_range(const struct amdgpu_dm_backlight_caps *caps,
 				unsigned int *min, unsigned int *max)
 {
 	if (!caps)
 		return 0;
-
+#ifdef HAVE_HDR_SINK_METADATA
 	if (caps->aux_support) {
 		// Firmware limits are in nits, DC API wants millinits.
 		*max = 1000 * caps->aux_max_input_signal;
 		*min = 1000 * caps->aux_min_input_signal;
 	} else {
+#endif
 		// Firmware limits are 8-bit, PWM control is 16-bit.
 		*max = 0x101 * caps->max_input_signal;
 		*min = 0x101 * caps->min_input_signal;
+#ifdef HAVE_HDR_SINK_METADATA
 	}
+#endif
 	return 1;
 }
 
 /* Rescale from [min..max] to [0..MAX_BACKLIGHT_LEVEL] */
+#ifdef HAVE_HDR_SINK_METADATA
 static inline u32 scale_input_to_fw(int min, int max, u64 input)
 {
 	return DIV_ROUND_CLOSEST_ULL(input * MAX_BACKLIGHT_LEVEL, max - min);
