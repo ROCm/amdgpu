@@ -7,7 +7,8 @@ AC_DEFUN([AC_AMDGPU_SIZE_MUL], [
 		AC_KERNEL_TRY_COMPILE([
 			#include <linux/overflow.h>
 		], [
-			size_mul(NULL, NULL);
+			size_t offset;
+			offset = size_mul(0, 0);
 		], [
 			AC_DEFINE(HAVE_SIZE_MUL, 1,
 				[size_mul() is available])
