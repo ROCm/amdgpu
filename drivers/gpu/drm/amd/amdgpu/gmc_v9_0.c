@@ -78,10 +78,6 @@
 #define mmHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION_DCN2                                                          0x05ea
 #define mmHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION_DCN2_BASE_IDX                                                 2
 
-#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
-#define MAX_MEM_RANGES 8
-#endif
-
 static const char * const gfxhub_client_ids[] = {
 	"CB",
 	"DB",
@@ -1935,7 +1931,7 @@ gmc_v9_0_init_acpi_mem_ranges(struct amdgpu_device *adev,
 			      struct amdgpu_mem_partition_info *mem_ranges)
 {
 	struct amdgpu_numa_info numa_info;
-	int node_ids[MAX_MEM_RANGES];
+	int node_ids[AMDGPU_MAX_MEM_RANGES];
 	int num_ranges = 0, ret;
 	int num_xcc, xcc_id;
 	uint32_t xcc_mask;
@@ -2045,7 +2041,7 @@ static int gmc_v9_0_init_mem_ranges(struct amdgpu_device *adev)
 {
 	bool valid;
 
-	adev->gmc.mem_partitions = kcalloc(MAX_MEM_RANGES,
+	adev->gmc.mem_partitions = kcalloc(AMDGPU_MAX_MEM_RANGES,
 					   sizeof(struct amdgpu_mem_partition_info),
 					   GFP_KERNEL);
 	if (!adev->gmc.mem_partitions)
