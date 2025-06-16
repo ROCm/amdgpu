@@ -72,6 +72,7 @@ static int smu_set_power_limit(void *handle, uint32_t limit);
 static int smu_set_fan_speed_rpm(void *handle, uint32_t speed);
 static int smu_set_gfx_cgpg(struct smu_context *smu, bool enabled);
 static int smu_set_mp1_state(void *handle, enum pp_mp1_state mp1_state);
+static enum smu_clk_type smu_convert_to_smuclk(enum pp_clock_type type);
 
 static int smu_sys_get_pp_feature_mask(void *handle,
 				       char *buf)
@@ -130,11 +131,16 @@ int smu_get_status_gfxoff(struct smu_context *smu, uint32_t *value)
 }
 
 int smu_set_soft_freq_range(struct smu_context *smu,
-			    enum smu_clk_type clk_type,
+			    enum pp_clock_type type,
 			    uint32_t min,
 			    uint32_t max)
 {
+	enum smu_clk_type clk_type;
 	int ret = 0;
+
+	clk_type = smu_convert_to_smuclk(type);
+	if (clk_type == SMU_CLK_COUNT)
+		return -EINVAL;
 
 	if (smu->ppt_funcs->set_soft_freq_limited_range)
 		ret = smu->ppt_funcs->set_soft_freq_limited_range(smu,
@@ -2936,6 +2942,12 @@ static enum smu_clk_type smu_convert_to_smuclk(enum pp_clock_type type)
 		clk_type = SMU_DCLK; break;
 	case PP_DCLK1:
 		clk_type = SMU_DCLK1; break;
+	case PP_ISPICLK:
+		clk_type = SMU_ISPICLK;
+		break;
+	case PP_ISPXCLK:
+		clk_type = SMU_ISPXCLK;
+		break;
 	case OD_SCLK:
 		clk_type = SMU_OD_SCLK; break;
 	case OD_MCLK:
