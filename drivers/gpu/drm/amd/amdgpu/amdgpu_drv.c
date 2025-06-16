@@ -3253,10 +3253,6 @@ static int __init amdgpu_init(void)
 	if (r)
 		goto error_sync;
 
-	r = amdgpu_fence_slab_init();
-	if (r)
-		goto error_fence;
-
 	r = amdgpu_userq_fence_slab_init();
 	if (r)
 		goto error_fence;
@@ -3297,7 +3293,6 @@ static void __exit amdgpu_exit(void)
 	amdgpu_acpi_release();
 #endif
 	amdgpu_sync_fini();
-	amdgpu_fence_slab_fini();
 	amdgpu_userq_fence_slab_fini();
 #ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
 	mmu_notifier_synchronize();
