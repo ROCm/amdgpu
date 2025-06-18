@@ -11,6 +11,15 @@
 #include "dml21_translation_helper.h"
 #include "bounding_boxes/dcn4_soc_bb.h"
 
+static void dml21_apply_dmub_bb_params(struct dml2_soc_bb *soc_bb, const void *dmub_bb_params, const struct dc *in_dc)
+{
+	switch (in_dc->ctx->dce_version) {
+	case DCN_VERSION_4_01:
+	default:
+		break;
+	}
+}
+
 static void dml21_init_socbb_params(struct dml2_initialize_instance_in_out *dml_init,
 		const struct dml2_configuration_options *config,
 		const struct dc *in_dc)
@@ -21,16 +30,16 @@ static void dml21_init_socbb_params(struct dml2_initialize_instance_in_out *dml_
 	switch (in_dc->ctx->dce_version) {
 	case DCN_VERSION_4_01:
 	default:
-		if (config->bb_from_dmub)
-			soc_bb = config->bb_from_dmub;
-		else
-			soc_bb = &dml2_socbb_dcn401;
+		soc_bb = &dml2_socbb_dcn401;
 
 		qos_params = &dml_dcn4_variant_a_soc_qos_params;
 	}
 
 	/* patch soc bb */
 	memcpy(&dml_init->soc_bb, soc_bb, sizeof(struct dml2_soc_bb));
+
+	if (config->bb_from_dmub)
+		dml21_apply_dmub_bb_params(&dml_init->soc_bb, config->bb_from_dmub, in_dc);
 
 	/* patch qos params */
 	memcpy(&dml_init->soc_bb.qos_parameters, qos_params, sizeof(struct dml2_soc_qos_parameters));
@@ -788,6 +797,7 @@ static void populate_dml21_plane_config_from_plane_state(struct dml2_context *dm
 		plane->pixel_format = dml2_420_10;
 		break;
 	case SURFACE_PIXEL_FORMAT_GRPH_ARGB16161616:
+	case SURFACE_PIXEL_FORMAT_GRPH_ABGR16161616:
 	case SURFACE_PIXEL_FORMAT_GRPH_ARGB16161616F:
 	case SURFACE_PIXEL_FORMAT_GRPH_ABGR16161616F:
 		plane->pixel_format = dml2_444_64;

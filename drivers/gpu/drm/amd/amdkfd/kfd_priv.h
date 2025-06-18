@@ -436,6 +436,9 @@ struct kfd_dev {
 	struct mutex profiler_lock;
 	/* Process currently holding the lock */
 	struct kfd_process *profiler_process;
+
+	/* for dynamic partitioning */
+	int kfd_dev_lock;
 };
 
 struct kfd_ipc_obj;
@@ -1686,7 +1689,7 @@ static inline bool kfd_flush_tlb_after_unmap(struct kfd_dev *dev)
 int kfd_send_exception_to_runtime(struct kfd_process *p,
 				unsigned int queue_id,
 				uint64_t error_reason);
-bool kfd_is_locked(void);
+bool kfd_is_locked(struct kfd_dev *kfd);
 
 void kfd_spm_init_process_device(struct kfd_process_device *pdd);
 void kfd_spm_release_process_device(struct kfd_process_device *pdd);

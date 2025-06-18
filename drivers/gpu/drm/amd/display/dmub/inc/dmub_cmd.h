@@ -299,6 +299,29 @@ union dmub_addr {
 	} u; /*<< Low/high bit access */
 	uint64_t quad_part; /*<< 64 bit address */
 };
+
+/* Flattened structure containing SOC BB parameters stored in the VBIOS
+ * It is not practical to store the entire bounding box in VBIOS since the bounding box struct can gain new parameters.
+ * This also prevents alighment issues when new parameters are added to the SoC BB.
+ */
+struct dmub_soc_bb_params {
+	/* dml2_soc_power_management_parameters */
+	uint32_t dram_clk_change_blackout_ns;
+	uint32_t dram_clk_change_read_only_ns;
+	uint32_t dram_clk_change_write_only_ns;
+	uint32_t fclk_change_blackout_ns;
+	uint32_t g7_ppt_blackout_ns;
+	uint32_t stutter_enter_plus_exit_latency_ns;
+	uint32_t stutter_exit_latency_ns;
+	uint32_t z8_stutter_enter_plus_exit_latency_ns;
+	uint32_t z8_stutter_exit_latency_ns;
+	uint32_t z8_min_idle_time_ns;
+	uint32_t type_b_dram_clk_change_blackout_ns;
+	uint32_t type_b_ppt_blackout_ns;
+	/* dml2_soc_vmin_clock_limits */
+	uint32_t vmin_limit_dispclk_khz;
+	uint32_t vmin_limit_dcfclk_khz;
+};
 #pragma pack(pop)
 
 /**
@@ -2471,7 +2494,8 @@ struct dmub_dig_transmitter_control_data_v1_7 {
 	uint8_t connobj_id; /**< Connector Object Id defined in ObjectId.h */
 	uint8_t HPO_instance; /**< HPO instance (0: inst0, 1: inst1) */
 	uint8_t reserved1; /**< For future use */
-	uint8_t reserved2[3]; /**< For future use */
+	uint8_t skip_phy_ssc_reduction;
+	uint8_t reserved2[2]; /**< For future use */
 	uint32_t reserved3[11]; /**< For future use */
 };
 

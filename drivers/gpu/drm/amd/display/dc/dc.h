@@ -55,7 +55,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.336"
+#define DC_VER "3.2.337"
 
 /**
  * MAX_SURFACES - representative of the upper bound of surfaces that can be piped to a single CRTC
@@ -68,7 +68,8 @@ struct dmub_notification;
 #define MAX_STREAMS 6
 #define MIN_VIEWPORT_SIZE 12
 #define MAX_NUM_EDP 2
-#define MAX_HOST_ROUTERS_NUM 2
+#define MAX_HOST_ROUTERS_NUM 3
+#define MAX_DPIA_PER_HOST_ROUTER 2
 #define MAX_SUPPORTED_FORMATS 7
 
 /* Display Core Interfaces */
@@ -234,6 +235,9 @@ struct lut3d_caps {
  * @shared_3d_lut: shared 3D LUT flag. Can be either DPP or MPC, but single
  * instance
  * @ogam_rom_caps: pre-definied curve caps for regamma 1D LUT
+ * @mcm_3d_lut_caps: HW support cap for MCM LUT memory
+ * @rmcm_3d_lut_caps: HW support cap for RMCM LUT memory
+ * @preblend: whether color manager supports preblend with MPC
  */
 struct mpc_color_caps {
 	uint16_t gamut_remap : 1;
@@ -244,6 +248,7 @@ struct mpc_color_caps {
 	struct rom_curve_caps ogam_rom_caps;
 	struct lut3d_caps mcm_3d_lut_caps;
 	struct lut3d_caps rmcm_3d_lut_caps;
+	bool preblend;
 };
 
 /**
@@ -338,6 +343,8 @@ struct dc_caps {
 	/* Conservative limit for DCC cases which require ODM4:1 to support*/
 	uint32_t dcc_plane_width_limit;
 	struct dc_scl_caps scl_caps;
+	uint8_t num_of_host_routers;
+	uint8_t num_of_dpias_per_host_router;
 };
 
 struct dc_bug_wa {
@@ -821,10 +828,8 @@ union dpia_debug_options {
 		uint32_t disable_mst_dsc_work_around:1; /* bit 3 */
 		uint32_t enable_force_tbt3_work_around:1; /* bit 4 */
 		uint32_t disable_usb4_pm_support:1; /* bit 5 */
-		uint32_t enable_consolidated_dpia_dp_lt:1; /* bit 6 */
-		uint32_t enable_dpia_pre_training:1; /* bit 7 */
-		uint32_t unify_link_enc_assignment:1; /* bit 8 */
-		uint32_t reserved:24;
+		uint32_t enable_usb4_bw_zero_alloc_patch:1; /* bit 6 */
+		uint32_t reserved:25;
 	} bits;
 	uint32_t raw;
 };
@@ -1189,7 +1194,7 @@ struct dc_init_data {
 	uint32_t *dcn_reg_offsets;
 	uint32_t *nbio_reg_offsets;
 	uint32_t *clk_reg_offsets;
-	struct dml2_soc_bb *bb_from_dmub;
+	void *bb_from_dmub;
 };
 
 struct dc_callback_init {
@@ -1610,6 +1615,7 @@ struct dc_scratch_space {
 		bool blank_stream_on_ocs_change;
 		bool read_dpcd204h_on_irq_hpd;
 		bool force_dp_ffe_preset;
+		bool skip_phy_ssc_reduction;
 	} wa_flags;
 	union dc_dp_ffe_preset forced_dp_ffe_preset;
 	struct link_mst_stream_allocation_table mst_stream_alloc_table;
@@ -1643,6 +1649,7 @@ struct dc {
 
 	uint8_t link_count;
 	struct dc_link *links[MAX_LINKS];
+	uint8_t lowest_dpia_link_index;
 	struct link_service *link_srv;
 
 	struct dc_state *current_state;
@@ -1702,7 +1709,7 @@ struct dc {
 	} scratch;
 
 	struct dml2_configuration_options dml2_options;
-	struct dml2_configuration_options dml2_tmp;
+	struct dml2_configuration_options dml2_dc_power_options;
 	enum dc_acpi_cm_power_state power_state;
 
 };
@@ -2630,6 +2637,8 @@ struct dc_power_profile {
 struct dc_power_profile dc_get_power_profile_for_dc_state(const struct dc_state *context);
 
 unsigned int dc_get_det_buffer_size_from_state(const struct dc_state *context);
+
+bool dc_get_host_router_index(const struct dc_link *link, unsigned int *host_router_index);
 
 /* DSC Interfaces */
 #include "dc_dsc.h"
