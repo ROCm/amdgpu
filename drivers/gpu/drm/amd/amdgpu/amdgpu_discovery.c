@@ -241,7 +241,6 @@ static int hw_id_map[MAX_HWIP] = {
 	[ISP_HWIP]	= ISP_HWID,
 };
 
-#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 static int amdgpu_discovery_read_binary_from_sysmem(struct amdgpu_device *adev, uint8_t *binary)
 {
 	u64 tmr_offset, tmr_size, pos;
@@ -264,7 +263,6 @@ static int amdgpu_discovery_read_binary_from_sysmem(struct amdgpu_device *adev, 
 
 	return -ENOENT;
 }
-#endif
 
 #define IP_DISCOVERY_V2		2
 #define IP_DISCOVERY_V4		4
@@ -300,17 +298,13 @@ static int amdgpu_discovery_read_binary_from_mem(struct amdgpu_device *adev,
 	else
 		vram_size <<= 20;
 
-#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 	if (sz_valid) {
-#endif
 		uint64_t pos = vram_size - DISCOVERY_TMR_OFFSET;
 		amdgpu_device_vram_access(adev, pos, (uint32_t *)binary,
 					  adev->mman.discovery_tmr_size, false);
-#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 	} else {
 		ret = amdgpu_discovery_read_binary_from_sysmem(adev, binary);
 	}
-#endif
 
 	if (ret)
 		dev_err(adev->dev,

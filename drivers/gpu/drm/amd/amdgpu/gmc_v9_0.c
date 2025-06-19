@@ -1836,7 +1836,6 @@ static void gmc_v9_0_save_registers(struct amdgpu_device *adev)
 		adev->gmc.sdpif_register = RREG32_SOC15(DCE, 0, mmDCHUBBUB_SDPIF_MMIO_CNTRL_0);
 }
 
-#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 static bool gmc_v9_0_validate_partition_info(struct amdgpu_device *adev)
 {
 	enum amdgpu_memory_partition mode;
@@ -1918,7 +1917,6 @@ gmc_v9_0_init_acpi_mem_ranges(struct amdgpu_device *adev,
 
 	adev->gmc.num_mem_partitions = num_ranges;
 }
-#endif
 
 static void
 gmc_v9_0_init_sw_mem_ranges(struct amdgpu_device *adev,
@@ -1991,7 +1989,6 @@ gmc_v9_0_init_sw_mem_ranges(struct amdgpu_device *adev,
 		((u64)mem_ranges[l].range.fpfn << AMDGPU_GPU_PAGE_SHIFT);
 }
 
-#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 static int gmc_v9_0_init_mem_ranges(struct amdgpu_device *adev)
 {
 	bool valid;
@@ -2020,7 +2017,6 @@ static int gmc_v9_0_init_mem_ranges(struct amdgpu_device *adev)
 
 	return 0;
 }
-#endif
 
 static void gmc_v9_4_3_init_vram_info(struct amdgpu_device *adev)
 {
@@ -2193,13 +2189,11 @@ static int gmc_v9_0_sw_init(struct amdgpu_ip_block *ip_block)
 
 	amdgpu_gmc_get_vbios_allocations(adev);
 
-#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 	if (amdgpu_is_multi_aid(adev)) {
 		r = gmc_v9_0_init_mem_ranges(adev);
 		if (r)
 			return r;
 	}
-#endif
 
 	/* Memory manager */
 	r = amdgpu_bo_init(adev);
@@ -2261,10 +2255,8 @@ static int gmc_v9_0_sw_fini(struct amdgpu_ip_block *ip_block)
 	amdgpu_bo_free_kernel(&adev->gmc.pdb0_bo, NULL, &adev->gmc.ptr_pdb0);
 	amdgpu_bo_fini(adev);
 
-#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 	adev->gmc.num_mem_partitions = 0;
 	kfree(adev->gmc.mem_partitions);
-#endif
 
 	return 0;
 }
