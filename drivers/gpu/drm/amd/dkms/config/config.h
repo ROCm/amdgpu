@@ -259,6 +259,9 @@
    drm_atomic_state arg */
 #define HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE 1
 
+/* drm_crtc_helper_mode_valid_fixed() is available */
+#define HAVE_DRM_CRTC_HELPER_MODE_VALID_FIXED 1
+
 /* drm_dbg_printer() is available */
 #define HAVE_DRM_DBG_PRINTER 1
 
