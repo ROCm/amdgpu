@@ -150,5 +150,6 @@
 #include <kcl/kcl_dma_fence_array.h>
 #include <kcl/kcl_dma_fence_unwrap.h>
 #include <kcl/kcl_overflow.h>
+#include <kcl/kcl_drm_probe_helper.h>
 
 #endif /* AMDGPU_BACKPORT_H */
