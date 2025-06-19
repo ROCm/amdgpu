@@ -36,6 +36,9 @@
 #define HDP_MEM_POWER_CTRL__RC_MEM_POWER_LS_EN_MASK     0x00020000L
 #define mmHDP_MEM_POWER_CTRL_BASE_IDX   0
 
+#define HDP_MMHUB_CNTL__HDP_MMHUB_RO_OVERRIDE_MASK       0x00000010L
+#define HDP_MMHUB_CNTL__HDP_MMHUB_RO_OVERRIDE__SHIFT     0x4
+
 static void hdp_v4_0_invalidate_hdp(struct amdgpu_device *adev,
 				    struct amdgpu_ring *ring)
 {
@@ -136,6 +139,9 @@ static void hdp_v4_0_get_clockgating_state(struct amdgpu_device *adev,
 
 static void hdp_v4_0_init_registers(struct amdgpu_device *adev)
 {
+	uint32_t aid_mask = adev->aid_mask;
+	u32 tmp, i;
+
 	switch (amdgpu_ip_version(adev, HDP_HWIP, 0)) {
 	case IP_VERSION(4, 2, 1):
 		WREG32_FIELD15(HDP, 0, HDP_MMHUB_CNTL, HDP_MMHUB_GCC, 1);
@@ -152,6 +158,17 @@ static void hdp_v4_0_init_registers(struct amdgpu_device *adev)
 
 	if (amdgpu_ip_version(adev, HDP_HWIP, 0) == IP_VERSION(4, 4, 0))
 		WREG32_FIELD15(HDP, 0, HDP_MISC_CNTL, READ_BUFFER_WATERMARK, 2);
+	else if (amdgpu_ip_version(adev, HDP_HWIP, 0) == IP_VERSION(4, 4, 2) &&
+		 !adev->gmc.is_app_apu) {
+		for_each_inst(i, aid_mask) {
+			tmp = RREG32_SOC15(HDP, GET_INST(HDP, i), mmHDP_MMHUB_CNTL);
+			if (tmp & HDP_MMHUB_CNTL__HDP_MMHUB_RO_OVERRIDE_MASK ) {
+				tmp = REG_SET_FIELD(tmp, HDP_MMHUB_CNTL, HDP_MMHUB_RO_OVERRIDE, 0);
+				WREG32_SOC15(HDP, GET_INST(HDP, i), mmHDP_MMHUB_CNTL, tmp);
+			}
+		}
+
+	}
 
 	WREG32_SOC15(HDP, 0, mmHDP_NONSURFACE_BASE, (adev->gmc.vram_start >> 8));
 	WREG32_SOC15(HDP, 0, mmHDP_NONSURFACE_BASE_HI, (adev->gmc.vram_start >> 40));
