@@ -1379,12 +1379,28 @@ static int sdma_v6_0_sw_init(struct amdgpu_ip_block *ip_block)
 		if ((adev->sdma.instance[0].fw_version >= 24) && !adev->sdma.disable_uq)
 			adev->userq_funcs[AMDGPU_HW_IP_DMA] = &userq_mes_funcs;
 		break;
+	case IP_VERSION(6, 0, 1):
+		if ((adev->sdma.instance[0].fw_version >= 18) && !adev->sdma.disable_uq)
+			adev->userq_funcs[AMDGPU_HW_IP_DMA] = &userq_mes_funcs;
+		break;
 	case IP_VERSION(6, 0, 2):
 		if ((adev->sdma.instance[0].fw_version >= 21) && !adev->sdma.disable_uq)
 			adev->userq_funcs[AMDGPU_HW_IP_DMA] = &userq_mes_funcs;
 		break;
 	case IP_VERSION(6, 0, 3):
 		if ((adev->sdma.instance[0].fw_version >= 25) && !adev->sdma.disable_uq)
+			adev->userq_funcs[AMDGPU_HW_IP_DMA] = &userq_mes_funcs;
+		break;
+	case IP_VERSION(6, 1, 0):
+		if ((adev->sdma.instance[0].fw_version >= 11) && !adev->sdma.disable_uq)
+			adev->userq_funcs[AMDGPU_HW_IP_DMA] = &userq_mes_funcs;
+		break;
+	case IP_VERSION(6, 1, 1):
+		if ((adev->sdma.instance[0].fw_version >= 14) && !adev->sdma.disable_uq)
+			adev->userq_funcs[AMDGPU_HW_IP_DMA] = &userq_mes_funcs;
+		break;
+	case IP_VERSION(6, 1, 2):
+		if ((adev->sdma.instance[0].fw_version >= 12) && !adev->sdma.disable_uq)
 			adev->userq_funcs[AMDGPU_HW_IP_DMA] = &userq_mes_funcs;
 		break;
 	default:
