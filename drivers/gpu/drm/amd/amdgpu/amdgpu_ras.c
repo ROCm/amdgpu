@@ -1902,7 +1902,11 @@ static char *amdgpu_ras_badpage_flags_str(unsigned int flags)
  */
 
 static ssize_t amdgpu_ras_sysfs_badpages_read(struct file *f,
+#ifdef HAVE_BIN_ATTR_CONST_ARGS
 		struct kobject *kobj, const struct bin_attribute *attr,
+#else
+		struct kobject *kobj, struct bin_attribute *attr,
+#endif
 		char *buf, loff_t ppos, size_t count)
 {
 	struct amdgpu_ras *con =

@@ -664,7 +664,11 @@ static void update_config(void *handle, struct cp_psp_stream_config *config)
  *	incorrect/corrupted and we should correct our SRM by getting it from PSP
  */
 static ssize_t srm_data_write(struct file *filp, struct kobject *kobj,
+#ifdef HAVE_BIN_ATTR_CONST_ARGS
 			      const struct bin_attribute *bin_attr, char *buffer,
+#else
+					struct bin_attribute *bin_attr, char *buffer,
+#endif
 			      loff_t pos, size_t count)
 {
 	struct hdcp_workqueue *work;
@@ -688,7 +692,11 @@ static ssize_t srm_data_write(struct file *filp, struct kobject *kobj,
 }
 
 static ssize_t srm_data_read(struct file *filp, struct kobject *kobj,
+#ifdef HAVE_BIN_ATTR_CONST_ARGS
 			     const struct bin_attribute *bin_attr, char *buffer,
+#else
+			     struct bin_attribute *bin_attr, char *buffer,
+#endif		
 			     loff_t pos, size_t count)
 {
 	struct hdcp_workqueue *work;

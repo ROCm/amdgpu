@@ -4629,8 +4629,13 @@ int is_psp_fw_valid(struct psp_bin_desc bin)
 }
 
 static ssize_t amdgpu_psp_vbflash_write(struct file *filp, struct kobject *kobj,
+#ifdef HAVE_BIN_ATTR_CONST_ARGS
 					const struct bin_attribute *bin_attr,
+#else
+					struct bin_attribute *bin_attr,
+#endif
 					char *buffer, loff_t pos, size_t count)
+
 {
 	struct device *dev = kobj_to_dev(kobj);
 	struct drm_device *ddev = dev_get_drvdata(dev);
@@ -4668,7 +4673,11 @@ static ssize_t amdgpu_psp_vbflash_write(struct file *filp, struct kobject *kobj,
 }
 
 static ssize_t amdgpu_psp_vbflash_read(struct file *filp, struct kobject *kobj,
+#ifdef HAVE_BIN_ATTR_CONST_ARGS
 				       const struct bin_attribute *bin_attr, char *buffer,
+#else
+						struct bin_attribute *bin_attr, char *buffer,
+#endif
 				       loff_t pos, size_t count)
 {
 	struct device *dev = kobj_to_dev(kobj);
