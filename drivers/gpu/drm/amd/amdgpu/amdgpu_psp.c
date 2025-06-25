@@ -4288,7 +4288,11 @@ static ssize_t amdgpu_psp_vbflash_status(struct device *dev,
 }
 static DEVICE_ATTR(psp_vbflash_status, 0440, amdgpu_psp_vbflash_status, NULL);
 
+#ifdef HAVE_ATTRIBUTE_GROUP_BIN_ATTRS_NEW
 static const struct bin_attribute *const bin_flash_attrs[] = {
+#else
+static struct bin_attribute *bin_flash_attrs[] = {
+#endif
 	&psp_vbflash_bin_attr,
 	NULL
 };
@@ -4329,7 +4333,11 @@ static umode_t amdgpu_bin_flash_attr_is_visible(struct kobject *kobj,
 
 const struct attribute_group amdgpu_flash_attr_group = {
 	.attrs = flash_attrs,
+#ifdef HAVE_ATTRIBUTE_GROUP_BIN_ATTRS_NEW
 	.bin_attrs_new = bin_flash_attrs,
+#else
+	.bin_attrs = bin_flash_attrs,
+#endif
 #ifdef HAVE_ATTRIBUTE_GROUP_IS_BIN_VISIBLE
 	.is_bin_visible = amdgpu_bin_flash_attr_is_visible,
 #endif
