@@ -648,7 +648,7 @@ static void update_config(void *handle, struct cp_psp_stream_config *config)
  *	incorrect/corrupted and we should correct our SRM by getting it from PSP
  */
 static ssize_t srm_data_write(struct file *filp, struct kobject *kobj,
-#ifdef HAVE_BIN_ATTR_CONST_ARGS
+#if defined(HAVE_BIN_ATTRIBUTE_READ_NEW) || defined(HAVE_BIN_ATTR_CONST_ARGS)
 			      const struct bin_attribute *bin_attr, char *buffer,
 #else
 					struct bin_attribute *bin_attr, char *buffer,
@@ -676,7 +676,7 @@ static ssize_t srm_data_write(struct file *filp, struct kobject *kobj,
 }
 
 static ssize_t srm_data_read(struct file *filp, struct kobject *kobj,
-#ifdef HAVE_BIN_ATTR_CONST_ARGS
+#if defined(HAVE_BIN_ATTRIBUTE_READ_NEW) || defined(HAVE_BIN_ATTR_CONST_ARGS)
 			     const struct bin_attribute *bin_attr, char *buffer,
 #else
 			     struct bin_attribute *bin_attr, char *buffer,
@@ -740,8 +740,13 @@ ret:
 static const struct bin_attribute data_attr = {
 	.attr = {.name = "hdcp_srm", .mode = 0664},
 	.size = PSP_HDCP_SRM_FIRST_GEN_MAX_SIZE, /* Limit SRM size */
+#ifdef HAVE_BIN_ATTRIBUTE_READ_NEW
 	.write_new = srm_data_write,
 	.read_new = srm_data_read,
+#else
+	.write = srm_data_write,
+	.read = srm_data_read,
+#endif
 };
 
 struct hdcp_workqueue *hdcp_create_workqueue(struct amdgpu_device *adev,

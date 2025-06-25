@@ -4160,7 +4160,7 @@ int is_psp_fw_valid(struct psp_bin_desc bin)
 }
 
 static ssize_t amdgpu_psp_vbflash_write(struct file *filp, struct kobject *kobj,
-#ifdef HAVE_BIN_ATTR_CONST_ARGS
+#if defined(HAVE_BIN_ATTRIBUTE_READ_NEW) || defined(HAVE_BIN_ATTR_CONST_ARGS)
 					const struct bin_attribute *bin_attr,
 #else
 					struct bin_attribute *bin_attr,
@@ -4201,7 +4201,7 @@ static ssize_t amdgpu_psp_vbflash_write(struct file *filp, struct kobject *kobj,
 }
 
 static ssize_t amdgpu_psp_vbflash_read(struct file *filp, struct kobject *kobj,
-#ifdef HAVE_BIN_ATTR_CONST_ARGS
+#if defined(HAVE_BIN_ATTRIBUTE_READ_NEW) || defined(HAVE_BIN_ATTR_CONST_ARGS)
 				       const struct bin_attribute *bin_attr, char *buffer,
 #else
 						struct bin_attribute *bin_attr, char *buffer,
@@ -4260,8 +4260,13 @@ rel_buf:
 static const struct bin_attribute psp_vbflash_bin_attr = {
 	.attr = {.name = "psp_vbflash", .mode = 0660},
 	.size = 0,
+#ifdef HAVE_BIN_ATTRIBUTE_READ_NEW
 	.write_new = amdgpu_psp_vbflash_write,
 	.read_new = amdgpu_psp_vbflash_read,
+#else
+	.write = amdgpu_psp_vbflash_write,
+	.read = amdgpu_psp_vbflash_read,
+#endif
 };
 
 /**
