@@ -8386,10 +8386,10 @@ static void amdgpu_dm_connector_funcs_force(struct drm_connector *connector)
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 	struct dc_link *dc_link = aconnector->dc_link;
 	struct dc_sink *dc_em_sink = aconnector->dc_em_sink;
+	struct drm_device *dev = connector->dev;
 #ifdef HAVE_DRM_DP_MST_EDID_READ
 	const struct drm_edid *drm_edid;
 	struct i2c_adapter *ddc;
-	struct drm_device *dev = connector->dev;
 
 	if (dc_link && dc_link->aux_mode)
 		ddc = &aconnector->dm_dp_aux.aux.ddc;
