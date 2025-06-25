@@ -931,9 +931,11 @@ int amdgpu_vram_mgr_init(struct amdgpu_device *adev)
 	int ret;
 #endif
 
+#ifdef HAVE_DRMM_CGROUP_REGISTER_REGION
 	man->cg = drmm_cgroup_register_region(adev_to_drm(adev), "vram", adev->gmc.real_vram_size);
 	if (IS_ERR(man->cg))
 		return PTR_ERR(man->cg);
+#endif
 	ttm_resource_manager_init(man, &adev->mman.bdev,
 				  adev->gmc.real_vram_size);
 
