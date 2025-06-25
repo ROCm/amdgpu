@@ -258,7 +258,11 @@ static void amdgpu_device_attr_sysfs_fini(struct amdgpu_device *adev)
 }
 
 static ssize_t amdgpu_sysfs_reg_state_get(struct file *f, struct kobject *kobj,
+#ifdef HAVE_BIN_ATTR_CONST_ARGS
 					  const struct bin_attribute *attr, char *buf,
+#else
+					  struct bin_attribute *attr, char *buf,
+#endif
 					  loff_t ppos, size_t count)
 {
 	struct device *dev = kobj_to_dev(kobj);
