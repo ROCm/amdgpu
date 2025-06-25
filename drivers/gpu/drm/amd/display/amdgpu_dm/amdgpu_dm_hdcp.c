@@ -750,7 +750,11 @@ EXPORT_IF_KUNIT(update_config);
  *	incorrect/corrupted and we should correct our SRM by getting it from PSP
  */
 STATIC_IFN_KUNIT ssize_t srm_data_write(struct file *filp, struct kobject *kobj,
+#ifdef HAVE_BIN_ATTR_CONST_ARGS
 			      const struct bin_attribute *bin_attr, char *buffer,
+#else
+					struct bin_attribute *bin_attr, char *buffer,
+#endif
 			      loff_t pos, size_t count)
 {
 	struct hdcp_workqueue *work;
@@ -775,7 +779,11 @@ STATIC_IFN_KUNIT ssize_t srm_data_write(struct file *filp, struct kobject *kobj,
 EXPORT_IF_KUNIT(srm_data_write);
 
 STATIC_IFN_KUNIT ssize_t srm_data_read(struct file *filp, struct kobject *kobj,
+#ifdef HAVE_BIN_ATTR_CONST_ARGS
 			     const struct bin_attribute *bin_attr, char *buffer,
+#else
+			     struct bin_attribute *bin_attr, char *buffer,
+#endif		
 			     loff_t pos, size_t count)
 {
 	struct hdcp_workqueue *work;
