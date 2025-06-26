@@ -152,5 +152,6 @@
 #include <kcl/kcl_overflow.h>
 #include <kcl/kcl_drm_probe_helper.h>
 #include <kcl/kcl_ratelimit.h>
+#include <kcl/kcl_irq.h>
 
 #endif /* AMDGPU_BACKPORT_H */
