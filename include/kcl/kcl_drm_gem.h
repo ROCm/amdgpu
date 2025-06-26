@@ -35,6 +35,9 @@
 #define __KCL_KCL_DRM_GEM_H__
 
 #include <drm/drm_gem.h>
+#ifndef HAVE_DRM_GEM_IS_IMPORTED
+#include <linux/dma-buf.h>
+#endif
 
 #ifdef HAVE_DRM_GEM_OBJECT_RESV
 #define amdkcl_gem_resvp(bo) (bo->resv)
@@ -79,4 +82,18 @@ static inline bool drm_gem_object_is_shared_for_memory_stats(struct drm_gem_obje
 }
 #endif /* HAVE_DRM_GEM_OBJECT_IS_SHARED_FOR_MEMORY_STATS */
 
+#ifndef HAVE_DRM_GEM_IS_IMPORTED
+/**
+ * drm_gem_is_imported() - Tests if GEM object's buffer has been imported
+ * @obj: the GEM object
+ *
+ * Returns:
+ * True if the GEM object's buffer has been imported, false otherwise
+ */
+static inline bool drm_gem_is_imported(const struct drm_gem_object *obj)
+{
+	/* The dma-buf's priv field points to the original GEM object. */
+	return obj->dma_buf && (obj->dma_buf->priv != obj);
+}
+#endif
 #endif
