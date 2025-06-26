@@ -115,7 +115,11 @@ ttm_backup_backup_page(struct file *backup, struct page *page,
 	if (writeback && !folio_mapped(to_folio) &&
 	    folio_clear_dirty_for_io(to_folio)) {
 		folio_set_reclaim(to_folio);
+#ifdef HAVE_SHMEM_WRITEOUT
 		ret = shmem_writeout(to_folio, NULL, NULL);
+#else
+		ret = mapping->a_ops->writepage(folio_file_page(to_folio, idx), NULL);
+#endif
 		if (!folio_test_writeback(to_folio))
 			folio_clear_reclaim(to_folio);
 		/*
