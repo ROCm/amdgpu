@@ -5,6 +5,7 @@
 #include <linux/cache.h>
 #include <linux/math64.h>
 #include <linux/time64.h>
+#include <linux/timer.h>
 
 #ifndef HAVE_TIME64_TO_TM
 void time64_to_tm(time64_t totalsecs, int offset, struct tm *result);
@@ -14,5 +15,11 @@ void time64_to_tm(time64_t totalsecs, int offset, struct tm *result);
 #define timer_container_of(var, callback_timer, timer_fieldname)	\
 	container_of(callback_timer, typeof(*var), timer_fieldname)
 #endif
+
+#ifndef HAVE_TIMER_DELETE
+#define timer_delete del_timer
+#define timer_delete_sync del_timer_sync
+#endif
+
 
 #endif /* _KCL_TIME_H */
