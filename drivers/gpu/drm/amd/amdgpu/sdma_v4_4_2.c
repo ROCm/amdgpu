@@ -45,6 +45,7 @@
 #include "amdgpu_ras.h"
 
 MODULE_FIRMWARE("amdgpu/sdma_4_4_2.bin");
+MODULE_FIRMWARE("amdgpu/sdma_4_4_4.bin");
 MODULE_FIRMWARE("amdgpu/sdma_4_4_5.bin");
 
 static const struct amdgpu_hwip_reg_entry sdma_reg_list_4_4_2[] = {
@@ -1683,9 +1684,9 @@ static int sdma_v4_4_2_reset_queue(struct amdgpu_ring *ring, unsigned int vmid)
 	if (!(adev->sdma.supported_reset & AMDGPU_RESET_TYPE_PER_QUEUE))
 		return -EOPNOTSUPP;
 
-	amdgpu_amdkfd_suspend(adev, false);
+	amdgpu_amdkfd_suspend(adev, true);
 	r = amdgpu_sdma_reset_engine(adev, id);
-	amdgpu_amdkfd_resume(adev, false);
+	amdgpu_amdkfd_resume(adev, true);
 
 	return r;
 }

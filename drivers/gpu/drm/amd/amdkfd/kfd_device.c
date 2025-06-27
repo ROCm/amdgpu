@@ -1058,7 +1058,7 @@ bool kfd_is_locked(struct kfd_dev *kfd)
 	return false;
 }
 
-void kgd2kfd_suspend(struct kfd_dev *kfd, bool run_pm, bool force)
+void kgd2kfd_suspend(struct kfd_dev *kfd, bool suspend_proc, bool force)
 {
 	struct kfd_node *node;
 	int i;
@@ -1066,14 +1066,8 @@ void kgd2kfd_suspend(struct kfd_dev *kfd, bool run_pm, bool force)
 	if (!kfd->init_complete)
 		return;
 
-	/* for runtime suspend, skip locking kfd */
-	if (!run_pm) {
-		mutex_lock(&kfd_processes_mutex);
-		/* For first KFD device suspend all the KFD processes */
-		if (++kfd_locked == 1)
-			kfd_suspend_all_processes(force);
-		mutex_unlock(&kfd_processes_mutex);
-	}
+	if (suspend_proc)
+		kgd2kfd_suspend_process(kfd, force);
 
 	for (i = 0; i < kfd->num_nodes; i++) {
 		node = kfd->nodes[i];
@@ -1081,7 +1075,7 @@ void kgd2kfd_suspend(struct kfd_dev *kfd, bool run_pm, bool force)
 	}
 }
 
-int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm)
+int kgd2kfd_resume(struct kfd_dev *kfd, bool resume_proc)
 {
 	int ret, i;
 
@@ -1094,14 +1088,36 @@ int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm)
 			return ret;
 	}
 
-	/* for runtime resume, skip unlocking kfd */
-	if (!run_pm) {
-		mutex_lock(&kfd_processes_mutex);
-		if (--kfd_locked == 0)
-			ret = kfd_resume_all_processes();
-		WARN_ONCE(kfd_locked < 0, "KFD suspend / resume ref. error");
-		mutex_unlock(&kfd_processes_mutex);
-	}
+	if (resume_proc)
+		ret = kgd2kfd_resume_process(kfd);
+
+	return ret;
+}
+
+void kgd2kfd_suspend_process(struct kfd_dev *kfd, bool force)
+{
+	if (!kfd->init_complete)
+		return;
+
+	mutex_lock(&kfd_processes_mutex);
+	/* For first KFD device suspend all the KFD processes */
+	if (++kfd_locked == 1)
+		kfd_suspend_all_processes(force);
+	mutex_unlock(&kfd_processes_mutex);
+}
+
+int kgd2kfd_resume_process(struct kfd_dev *kfd)
+{
+	int ret = 0;
+
+	if (!kfd->init_complete)
+		return 0;
+
+	mutex_lock(&kfd_processes_mutex);
+	if (--kfd_locked == 0)
+		ret = kfd_resume_all_processes();
+	WARN_ONCE(kfd_locked < 0, "KFD suspend / resume ref. error");
+	mutex_unlock(&kfd_processes_mutex);
 
 	return ret;
 }

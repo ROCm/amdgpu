@@ -160,8 +160,10 @@ struct amdkfd_process_info {
 int amdgpu_amdkfd_init(void);
 void amdgpu_amdkfd_fini(void);
 
-void amdgpu_amdkfd_suspend(struct amdgpu_device *adev, bool run_pm);
-int amdgpu_amdkfd_resume(struct amdgpu_device *adev, bool run_pm);
+void amdgpu_amdkfd_suspend(struct amdgpu_device *adev, bool suspend_proc);
+int amdgpu_amdkfd_resume(struct amdgpu_device *adev, bool resume_proc);
+void amdgpu_amdkfd_suspend_process(struct amdgpu_device *adev);
+int amdgpu_amdkfd_resume_process(struct amdgpu_device *adev);
 void amdgpu_amdkfd_interrupt(struct amdgpu_device *adev,
 			const void *ih_ring_entry);
 void amdgpu_amdkfd_device_probe(struct amdgpu_device *adev);
@@ -483,8 +485,10 @@ struct kfd_dev *kgd2kfd_probe(struct amdgpu_device *adev, bool vf);
 bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			 const struct kgd2kfd_shared_resources *gpu_resources);
 void kgd2kfd_device_exit(struct kfd_dev *kfd);
-void kgd2kfd_suspend(struct kfd_dev *kfd, bool run_pm, bool force);
-int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm);
+void kgd2kfd_suspend(struct kfd_dev *kfd, bool suspend_proc, bool force);
+int kgd2kfd_resume(struct kfd_dev *kfd, bool resume_proc);
+void kgd2kfd_suspend_process(struct kfd_dev *kfd, bool force);
+int kgd2kfd_resume_process(struct kfd_dev *kfd);
 int kgd2kfd_pre_reset(struct kfd_dev *kfd,
 		      struct amdgpu_reset_context *reset_context);
 int kgd2kfd_post_reset(struct kfd_dev *kfd);
@@ -526,11 +530,20 @@ static inline void kgd2kfd_device_exit(struct kfd_dev *kfd)
 {
 }
 
-static inline void kgd2kfd_suspend(struct kfd_dev *kfd, bool run_pm, bool force)
+static inline void kgd2kfd_suspend(struct kfd_dev *kfd, bool suspend_proc, bool force)
 {
 }
 
-static inline int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm)
+static inline int kgd2kfd_resume(struct kfd_dev *kfd, bool resume_proc)
+{
+	return 0;
+}
+
+static inline void kgd2kfd_suspend_process(struct kfd_dev *kfd, bool force)
+{
+}
+
+static inline int kgd2kfd_resume_process(struct kfd_dev *kfd)
 {
 	return 0;
 }
