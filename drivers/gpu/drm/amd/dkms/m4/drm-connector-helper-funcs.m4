@@ -45,9 +45,10 @@ AC_DEFUN([AC_AMDGPU_CONNECTOR_HELPER_FUNCTS_MODE_VALID_CONST_ARGUMENT], [
         AC_KERNEL_TRY_COMPILE([
                 #include <drm/drm_modeset_helper_vtables.h>
             ], [
-                struct drm_connector_helper_funcs test_funcs = {
-                .mode_valid = (enum drm_mode_status (*)(struct drm_connector *, const struct drm_display_mode *))0
-            };
+				enum drm_mode_status (*p)(struct drm_connector *, const struct drm_display_mode *) = NULL;
+				
+                struct drm_connector_helper_funcs test_funcs;
+				test_funcs.mode_valid = p;
             ], [
                 AC_DEFINE(HAVE_DRM_CONNECTOR_HELPER_FUNCS_MODE_VALID_CONST_ARGUMENT, 1,
                     [.mode_valid need a const drm_display_mode argument])
