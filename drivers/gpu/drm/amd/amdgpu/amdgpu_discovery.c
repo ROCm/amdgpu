@@ -80,6 +80,7 @@
 #include "ih_v6_0.h"
 #include "ih_v6_1.h"
 #include "ih_v7_0.h"
+#include "ih_v8_0.h"
 #include "gfx_v10_0.h"
 #include "gfx_v11_0.h"
 #include "gfx_v12_0.h"
@@ -2787,6 +2788,9 @@ static int amdgpu_discovery_set_ih_ip_blocks(struct amdgpu_device *adev)
 	case IP_VERSION(7, 0, 0):
 	case IP_VERSION(7, 1, 0):
 		amdgpu_device_ip_block_add(adev, &ih_v7_0_ip_block);
+		break;
+	case IP_VERSION(8, 0, 1):
+		amdgpu_device_ip_block_add(adev, &ih_v8_0_ip_block);
 		break;
 	default:
 		dev_err(adev->dev,
