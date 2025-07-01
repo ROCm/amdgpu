@@ -95,9 +95,9 @@ enum dm_micro_swizzle {
 };
 
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
-const struct drm_format_info *amdgpu_dm_plane_get_format_info(const struct drm_mode_fb_cmd2 *cmd)
+const struct drm_format_info *amdgpu_dm_plane_get_format_info(u32 pixel_format, u64 modifier)
 {
-	return amdgpu_lookup_format_info(cmd->pixel_format, cmd->modifier[0]);
+	return amdgpu_lookup_format_info(pixel_format, modifier);
 }
 #endif
 
