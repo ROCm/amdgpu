@@ -4,7 +4,7 @@ dnl # drm: Add client-agnostic setup helper
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_CLIENT_SETUP], [
      AC_KERNEL_DO_BACKGROUND([
-            AC_KERNEL_TRY_COMPILE([
+            AC_KERNEL_TRY_COMPILE_SYMBOL([
                 #ifdef  HAVE_DRM_DRM_CLIENT_SETUP_H
                 #include <drm/drm_client_setup.h>
                 #endif
@@ -13,7 +13,7 @@ AC_DEFUN([AC_AMDGPU_DRM_CLIENT_SETUP], [
                 #endif
             ], [
                 drm_client_setup(NULL, NULL);
-            ], [
+            ], [drm_client_setup],[drivers/gpu/drm/clients/drm_client_setup.c],[
                 AC_DEFINE(HAVE_DRM_CLIENT_SETUP, 1,
                     [drm_client_setup() is available])
             ])
