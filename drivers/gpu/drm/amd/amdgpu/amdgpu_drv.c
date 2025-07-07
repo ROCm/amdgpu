@@ -2652,6 +2652,7 @@ static int amdgpu_pmops_suspend(struct device *dev)
 		adev->in_s3 = true;
 	if (!adev->in_s0ix && !adev->in_s3) {
 #ifdef HAVE_PM_SUSPEND_TARGET_STATE
+#if IS_ENABLED(CONFIG_SUSPEND)
 		/* don't allow going deep first time followed by s2idle the next time */
 		if (adev->last_suspend_state != PM_SUSPEND_ON &&
 		    adev->last_suspend_state != pm_suspend_target_state) {
@@ -2660,12 +2661,15 @@ static int amdgpu_pmops_suspend(struct device *dev)
 			return -EINVAL;
 		}
 #endif
+#endif
 		return 0;
 	}
 
 #ifdef HAVE_PM_SUSPEND_TARGET_STATE
+#if IS_ENABLED(CONFIG_SUSPEND)
 	/* cache the state last used for suspend */
 	adev->last_suspend_state = pm_suspend_target_state;
+#endif
 #endif
 
 	return amdgpu_device_suspend(drm_dev, true);
