@@ -69,6 +69,7 @@
 #include <kcl/backport/kcl_numa_backport.h>
 #include <kcl/kcl_mmzone.h>
 #include <kcl/kcl_drm_file.h>
+#include <kcl/kcl_drm_drv.h>
 #include "kcl/kcl_amdgpu_drm_fb_helper.h"
 #include "kcl/kcl_amdgpu.h"
 #include "kcl/kcl_amdgpu_drm_drv.h"
@@ -144,7 +145,6 @@
 #include <kcl/kcl_minmax.h>
 #include <kcl/kcl_cleanup.h>
 #include <kcl/kcl_mutex.h>
-#include <kcl/kcl_drm_drv.h>
 #include <kcl/kcl_string.h>
 #include <kcl/kcl_cpu_device_id.h>
 #include <kcl/kcl_dma_fence_array.h>
