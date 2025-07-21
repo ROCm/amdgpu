@@ -7,8 +7,18 @@
 #include <drm/drm_print.h>
 #include <drm/drm_file.h>
 #include <kcl/kcl_drm_print.h>
+#include <linux/sched.h>
+#include <drm/drm_drv.h>
 
 #ifndef HAVE_DRM_DEV_WEDGED_EVENT
+/**
+ * struct drm_wedge_task_info - information about the guilty task of a wedge dev
+ */
+struct drm_wedge_task_info {
+	pid_t pid;
+	char comm[TASK_COMM_LEN];
+};
+
 /*
  * Recovery methods for wedged device in order of less to more side-effects.
  * To be used with drm_dev_wedged_event() as recovery @method. Callers can
@@ -18,7 +28,9 @@
 #define DRM_WEDGE_RECOVERY_REBIND       BIT(1)  /* unbind + bind driver */
 #define DRM_WEDGE_RECOVERY_BUS_RESET    BIT(2)  /* unbind + reset bus device + bind */
 
-int drm_dev_wedged_event(struct drm_device *dev, unsigned long method);
+int kcl_drm_dev_wedged_event(struct drm_device *dev, unsigned long method,
+			 struct drm_wedge_task_info *info);
+#define drm_dev_wedged_event kcl_drm_dev_wedged_event
 #endif /* HAVE_DRM_DEV_WEDGED_EVENT */
 
 #endif /* AMDKCL_DRM_DRV_H */

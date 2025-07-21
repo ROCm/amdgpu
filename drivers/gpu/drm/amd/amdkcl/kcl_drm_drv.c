@@ -47,6 +47,10 @@ static const char *drm_get_wedge_recovery(unsigned int opt)
         }
 }
 
+#define WEDGE_STR_LEN	32
+#define PID_STR_LEN	15
+#define COMM_STR_LEN	(TASK_COMM_LEN + 5)
+
 /**
  * drm_dev_wedged_event - generate a device wedged uevent
  * @dev: DRM device
@@ -63,13 +67,13 @@ static const char *drm_get_wedge_recovery(unsigned int opt)
  *
  * Returns: 0 on success, negative error code otherwise.
  */
-int drm_dev_wedged_event(struct drm_device *dev, unsigned long method)
+int kcl_drm_dev_wedged_event(struct drm_device *dev, unsigned long method,
+			 struct drm_wedge_task_info *info)
 {
-        const char *recovery = NULL;
-        unsigned int len, opt;
-        /* Event string length up to 28+ characters with available methods */
-        char event_string[32];
-        char *envp[] = { event_string, NULL };
+	char event_string[WEDGE_STR_LEN], pid_string[PID_STR_LEN], comm_string[COMM_STR_LEN];
+	char *envp[] = { event_string, NULL, NULL, NULL };
+	const char *recovery = NULL;
+	unsigned int len, opt;
 
         len = scnprintf(event_string, sizeof(event_string), "%s", "WEDGED=");
 
@@ -90,8 +94,15 @@ int drm_dev_wedged_event(struct drm_device *dev, unsigned long method)
         drm_info(dev, "device wedged, %s\n", method == DRM_WEDGE_RECOVERY_NONE ?
                  "but recovered through reset" : "needs recovery");
 
+	if (info && (info->comm[0] != '\0') && (info->pid >= 0)) {
+		snprintf(pid_string, sizeof(pid_string), "PID=%u", info->pid);
+		snprintf(comm_string, sizeof(comm_string), "TASK=%s", info->comm);
+		envp[1] = pid_string;
+		envp[2] = comm_string;
+	}
+
         return kobject_uevent_env(&dev->primary->kdev->kobj, KOBJ_CHANGE, envp);
 }
-EXPORT_SYMBOL(drm_dev_wedged_event);
+EXPORT_SYMBOL(kcl_drm_dev_wedged_event);
 
 #endif /* HAVE_DRM_DEV_WEDGED_EVENT */
