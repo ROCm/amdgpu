@@ -1764,6 +1764,67 @@ struct kfd_ioctl_profiler_args {
 	};
 };
 
+/**
+ * kfd_ais_ops - AIS ioctl operations
+ *
+ * @KFD_IOC_AIS_READ:  Direct IO read from a file into VRAM
+ * @KFD_IOC_AIS_WRITE: Direct IO write into a file into VRAM
+ */
+enum kfd_ais_ops {
+	KFD_IOC_AIS_READ  = 1,
+	KFD_IOC_AIS_WRITE = 2,
+};
+
+/**
+ * kfd_ais_in_args
+ *
+ * Arguments for AMDKFD_IOC_AIS_OP
+ * AIS (AMD Infinity Storage) operations.
+ *
+ * @op            (IN) - kfd_ais_ops
+ * @fd            (IN) - file descriptor of the file to read/write
+ * @handle        (IN) - memory handle returned by alloc. Should be mapped to
+ *                            the GPU with AMDKFD_IOC_MAP_MEMORY_TO_GPU.
+ * @handle_offset (IN) - offset into the allocated memory to read/write
+ * @file_offset   (IN) - offset from the beginning of the file to read/write
+ * @size          (IN) - size in bytes to read/write
+ */
+
+struct kfd_ais_in_args {
+	__u64 handle;         /* to KFD */
+	__u64 handle_offset;  /* to KFD */
+	__s64 file_offset;    /* to KFD */
+	__u64 size;           /* to KFD */
+	__u32 op;             /* to KFD */
+	__s32 fd;             /* to KFD */
+};
+
+/**
+ * kfd_ais_out_args
+ *
+ * @size_copied     (OUT) KFD returns number of bytes transferred
+ * @status          (OUT) 0 for success and -ve error values if failure
+ */
+struct  kfd_ais_out_args {
+	__u64 size_copied;     /* from KFD */
+	__s32 status;          /* from KFD */
+	__s32 pad;             /* unused */
+};
+
+/**
+ * Arguments for AMDKFD_IOC_AIS_OP
+ *    AIS (AMD Infinity Storage) operations.
+ *    See @kfd_ais_in_args and @kfd_ais_out_args
+ */
+
+struct kfd_ioctl_ais_args {
+	union {
+		struct kfd_ais_in_args in;
+		struct kfd_ais_out_args out;
+	};
+};
+
+
 #define AMDKFD_IOCTL_BASE 'K'
 #define AMDKFD_IO(nr)			_IO(AMDKFD_IOCTL_BASE, nr)
 #define AMDKFD_IOR(nr, type)		_IOR(AMDKFD_IOCTL_BASE, nr, type)
@@ -1909,7 +1970,10 @@ struct kfd_ioctl_profiler_args {
 #define AMDKFD_IOC_PROFILER			\
 		AMDKFD_IOWR(0x86, struct kfd_ioctl_profiler_args)
 
+#define AMDKFD_IOC_AIS_OP			\
+		AMDKFD_IOWR(0x87, struct kfd_ioctl_ais_args)
+
 #define AMDKFD_COMMAND_START_2		0x80
-#define AMDKFD_COMMAND_END_2		0x87
+#define AMDKFD_COMMAND_END_2		0x88
 
 #endif
