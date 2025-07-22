@@ -2332,8 +2332,10 @@ void amdgpu_debugfs_userq_init(struct drm_file *file, struct amdgpu_usermode_que
 
 void amdgpu_debugfs_vm_init(struct drm_file *file)
 {
+#ifdef STRUCT_DRM_FILE_DEBUGFS_CLIENT
 	debugfs_create_file("vm_pagetable_info", 0444, file->debugfs_client, file,
 			    &amdgpu_pt_info_fops);
+#endif
 }
 
 #else
