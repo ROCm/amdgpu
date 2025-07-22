@@ -880,6 +880,7 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
 		}
 	}
 
+#ifdef STRUCT_DRM_FILE_DEBUGFS_CLIENT
 	queue_name = kasprintf(GFP_KERNEL, "queue-%d", qid);
 	if (!queue_name) {
 		r = -ENOMEM;
@@ -893,6 +894,7 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
 #endif
 	amdgpu_userq_init_hang_detect_work(queue);
 	kfree(queue_name);
+#endif
 
 	args->out.queue_id = qid;
 	atomic_inc(&uq_mgr->userq_count[queue->queue_type]);
