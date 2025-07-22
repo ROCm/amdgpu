@@ -525,6 +525,7 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
 		}
 	}
 
+#ifdef STRUCT_DRM_FILE_DEBUGFS_CLIENT
 	queue_name = kasprintf(GFP_KERNEL, "queue-%d", qid);
 	if (!queue_name)
 		return -ENOMEM;
@@ -535,6 +536,7 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
 	debugfs_create_file("mqd_info", 0444, queue->debugfs_queue, queue, &amdgpu_mqd_info_fops);
 #endif
 	kfree(queue_name);
+#endif
 
 	args->out.queue_id = qid;
 
