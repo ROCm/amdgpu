@@ -74,4 +74,8 @@ static inline bool dma_fence_is_later_or_same(struct dma_fence *f1,
         return f1 == f2 || dma_fence_is_later(f1, f2);
 }
 #endif /*HAVE_DMA_FENCE_IS_LATER_OR_SAME*/
+
+#ifndef HAVE_DMA_FENCE_INIT64
+#define dma_fence_init64 dma_fence_init
+#endif
 #endif
