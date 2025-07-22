@@ -2783,11 +2783,13 @@ static int amdgpu_pmops_thaw(struct device *dev)
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(drm_dev);
 
+#if defined(HAVE_PM_HIBERNATE_IS_RECOVERING) || !defined(CONFIG_PM_SLEEP)
 	/* do not resume device if it's normal hibernation */
 	if (!adev->debug_hibernation_thaw_resume_gpu &&
 	    !pm_hibernate_is_recovering() &&
 	    !pm_hibernation_mode_is_suspend())
 		return 0;
+#endif
 
 	return amdgpu_device_resume(drm_dev, true);
 }
