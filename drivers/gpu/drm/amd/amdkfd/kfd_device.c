@@ -959,6 +959,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 
 	svm_range_set_max_pages(kfd->adev);
 
+	kfd_ais_init(kfd->adev);
+
 	kfd->init_complete = true;
 	dev_info(kfd_device, "added device %x:%x\n", kfd->adev->pdev->vendor,
 		 kfd->adev->pdev->device);
@@ -988,6 +990,7 @@ out:
 void kgd2kfd_device_exit(struct kfd_dev *kfd)
 {
 	if (kfd->init_complete) {
+		kfd_ais_deinit(kfd->adev);
 		/* Cleanup KFD nodes */
 		kfd_cleanup_nodes(kfd, kfd->num_nodes);
 		/* Cleanup common/shared resources */

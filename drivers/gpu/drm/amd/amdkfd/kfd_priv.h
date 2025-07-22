@@ -445,8 +445,12 @@ struct kfd_dev {
 
 	/* Lock for profiler process */
 	struct mutex profiler_lock;
+
 	/* Process currently holding the lock */
 	struct kfd_process *profiler_process;
+
+	/* flag for AIS */
+	bool ais_initialized;
 };
 
 struct kfd_ipc_obj;
@@ -1773,6 +1777,12 @@ int kfd_ptl_disable_request(struct kfd_process_device *pdd,
 		struct kfd_process *p);
 int kfd_ptl_disable_release(struct kfd_process_device *pdd,
 		struct kfd_process *p);
+
+/* AIS Support */
+int kfd_ais_init(struct amdgpu_device *adev);
+void kfd_ais_deinit(struct amdgpu_device *adev);
+int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
+		    struct kfd_ais_in_args *in, uint64_t *size_copied);
 
 /* Debugfs */
 #if defined(CONFIG_DEBUG_FS)

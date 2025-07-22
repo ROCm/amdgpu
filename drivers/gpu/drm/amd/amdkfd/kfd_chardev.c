@@ -3695,6 +3695,97 @@ static int kfd_ioctl_profiler(struct file *filep, struct kfd_process *p, void *d
 	return -EINVAL;
 }
 
+static int kfd_ioctl_ais(struct file *filep, struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_ais_args *args = data;
+	struct kfd_ais_in_args *in = &args->in;
+	struct kfd_ais_out_args __user *out = &args->out, out_args = {0};
+	struct kfd_process_device *pdd;
+	struct kfd_node *dev;
+	struct kfd_bo *buf_obj;
+	struct amdgpu_bo *bo;
+	int err;
+
+	if (in->op != KFD_IOC_AIS_READ && in->op != KFD_IOC_AIS_WRITE) {
+		pr_debug("AIS: Invalid operation: %d\n", in->op);
+		err = -EINVAL;
+		goto err_inval;
+	}
+
+	if (in->fd < 0)  {
+		pr_debug("AIS: fd: %d\n", in->fd);
+		err = -EINVAL;
+		goto err_inval;
+	}
+
+	mutex_lock(&p->mutex);
+	pdd = kfd_process_device_data_by_id(p, GET_GPU_ID(in->handle));
+	if (!pdd) {
+		pr_debug("AIS: Could not find gpu id 0x%llx\n", GET_GPU_ID(in->handle));
+		err = -EINVAL;
+		goto err_pdd;
+	}
+	dev = pdd->dev;
+	if (!dev->kfd->ais_initialized) {
+		dev_dbg(dev->adev->dev, "AIS: is not initialized for device\n");
+		err = -ENODEV;
+		goto err_pdd;
+	}
+
+	pdd = kfd_bind_process_to_device(dev, p);
+	if (IS_ERR(pdd)) {
+		err = -ESRCH;
+		goto err_bind_process;
+	}
+
+	buf_obj = kfd_process_device_find_bo(pdd, GET_IDR_HANDLE(in->handle));
+	if (!buf_obj) {
+		err = -EINVAL;
+		goto err_bind_process;
+	}
+	bo = ((struct kgd_mem *)buf_obj->mem)->bo;
+
+	/* Only VRAM BOs are supported */
+	if (((struct kgd_mem *)buf_obj->mem)->domain != AMDGPU_GEM_DOMAIN_VRAM) {
+		dev_dbg(dev->adev->dev, "AIS: BO not in VRAM, but in %d\n",
+			((struct kgd_mem *)buf_obj)->domain);
+		err = -EINVAL;
+		goto err_bind_process;
+	}
+
+	/*
+	 * Concurrent data transfers on the same buffer is allowed. Pin it before
+	 * releasing the lock. This ensures that BO remains valid when file system
+	 * is accessing it
+	 */
+	err = amdgpu_amdkfd_gpuvm_pin_bo(bo, AMDGPU_GEM_DOMAIN_VRAM);
+	if (err) {
+		pr_err("Pinning of buffer failed.\n");
+		goto err_bind_process;
+	}
+
+	mutex_unlock(&p->mutex);
+
+	err = kfd_ais_rw_file(dev->adev, bo, in, &out_args.size_copied);
+	if (err) {
+		pr_err("Failed to %s AIS file: %d\n",
+		       in->op == KFD_IOC_AIS_READ ? "read" : "write", err);
+		out_args.status = err;
+	}
+
+	amdgpu_amdkfd_gpuvm_unpin_bo(bo);
+	memcpy(out, &out_args, sizeof(out_args));
+	return err;
+
+err_pdd:
+err_bind_process:
+	mutex_unlock(&p->mutex);
+err_inval:
+	out_args.status = err;
+	memcpy(out, &out_args, sizeof(out_args));
+	return err;
+}
+
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, \
 			    .validate = NULL, .cmd_drv = 0, .name = #ioctl}
@@ -3843,6 +3934,9 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	/* TODO: KFD_IOC_FLAG_PERFMON is not required for host-trap, disable first */
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_PC_SAMPLE,
 			kfd_ioctl_pc_sample, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_AIS_OP,
+			kfd_ioctl_ais, 0),
 };
 
 static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
