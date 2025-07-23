@@ -18,6 +18,25 @@ AC_DEFUN([AC_AMDGPU_DRM_PRINT_MEMORY_STATS], [
 	])
 ])
 
+dnl #
+dnl # v6.4-rc1-190-g3f09a0cd4ea3
+dnl # drm: Add common fdinfo helper
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_FILE_CLIENT_ID], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_file.h>
+		], [
+			struct drm_file *filp = NULL;
+			filp->client_id = 0;
+		], [
+			AC_DEFINE(HAVE_DRM_FILE_CLIENT_ID, 1,
+				[struct drm_file->client_id is available])
+		])
+	])
+])
+
 AC_DEFUN([AC_AMDGPU_DRM_FILE], [
 		AC_AMDGPU_DRM_PRINT_MEMORY_STATS
+		AC_AMDGPU_DRM_FILE_CLIENT_ID
 ])
