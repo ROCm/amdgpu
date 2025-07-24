@@ -277,7 +277,7 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	ret = dma_resv_trylock(&amdkcl_ttm_resv(&fbo->base));
 	WARN_ON(!ret);
 
-	ret = dma_resv_reserve_fences(&fbo->base.base._resv, TTM_NUM_MOVE_FENCES);
+	ret = dma_resv_reserve_fences(&amdkcl_ttm_resv(&fbo->base), TTM_NUM_MOVE_FENCES);
 	if (ret) {
 		dma_resv_unlock(&fbo->base.base._resv);
 		kfree(fbo);
