@@ -6,6 +6,7 @@ AC_DEFUN([AC_AMDGPU_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
 			#include <drm/drm_aperture.h>
+			#include <linux/stddef.h>
 			struct drm_driver;
 		], [
 			const struct drm_driver *drv = NULL;
