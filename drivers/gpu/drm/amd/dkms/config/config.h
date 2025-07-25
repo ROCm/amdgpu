@@ -64,11 +64,20 @@
 /* __assign_str() wants 1 arguments */
 #define HAVE_ASSIGN_STR_ONE_ARGUMENT 1
 
+/* attribute_group.bin_attrs_new is available */
+#define HAVE_ATTRIBUTE_GROUP_BIN_ATTRS_NEW 1
+
 /* amdgpu_attr_group->is_bin_visible is available */
 #define HAVE_ATTRIBUTE_GROUP_IS_BIN_VISIBLE 1
 
 /* backlight_device_set_brightness() is available */
 #define HAVE_BACKLIGHT_DEVICE_SET_BRIGHTNESS 1
+
+/* bin_attribute.read_new is available */
+#define HAVE_BIN_ATTRIBUTE_READ_NEW 1
+
+/* bin_attribute.read is const args */
+#define HAVE_BIN_ATTR_CONST_ARGS 1
 
 /* bitmap_free(),bitmap_alloc(),bitmap_zalloc is available */
 #define HAVE_BITMAP_FUNCS 1
@@ -148,6 +157,9 @@
 /* dma_fence_describe() is available */
 #define HAVE_DMA_FENCE_DESCRIBE 1
 
+/* dma_fence_init64() is available */
+#define HAVE_DMA_FENCE_INIT64 1
+
 /* dma_fence_is_container() is available */
 #define HAVE_DMA_FENCE_IS_CONTAINER 1
 
@@ -158,7 +170,7 @@
 #define HAVE_DMA_FENCE_OPS_SET_DEADLINE 1
 
 /* struct dma_fence_ops has use_64bit_seqno field */
-#define HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO 1
+/* #undef HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO */
 
 /* dma_fence_TIMESTAMP() is available */
 #define HAVE_DMA_FENCE_TIMESTAMP 1
@@ -184,6 +196,9 @@
 /* down_write_killable() is available */
 #define HAVE_DOWN_WRITE_KILLABLE 1
 
+/* drmm_cgroup_register_region() is available */
+#define HAVE_DRMM_CGROUP_REGISTER_REGION 1
+
 /* drm_add_override_edid_modes() is available */
 /* #undef HAVE_DRM_ADD_OVERRIDE_EDID_MODES */
 
@@ -202,7 +217,6 @@
 
 /* drm_atomic_plane_enabling() is available */
 #define HAVE_DRM_ATOMIC_PLANE_ENABLING 1
-
 
 /* Define to 1 if you have the <drm/clients/drm_client_setup.h> header file.
    */
@@ -574,7 +588,10 @@
 /* drm_fb_helper_init() has 3 args */
 /* #undef HAVE_DRM_FB_HELPER_INIT_3ARGS */
 
-/* drm_file->client_name is available */
+/* struct drm_file->client_id is available */
+#define HAVE_DRM_FILE_CLIENT_ID 1
+
+/* struct drm_file->client_name is available */
 #define HAVE_DRM_FILE_CLIENT_NAME 1
 
 /* drm_file_err() is available */
@@ -760,14 +777,14 @@
 /* get_user_pages() remove vmas argument */
 #define HAVE_GET_USER_PAGES_REMOVE_VMAS 1
 
-/* drm_connector_hdr_sink_metadata() is available */
-#define HAVE_HDR_SINK_METADATA 1
-
 /* hmm remove the customizable pfn format */
 #define HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT 1
 
 /* hmm_range_fault() wants 1 arg */
 #define HAVE_HMM_RANGE_FAULT_1ARG 1
+
+/* hrtimer_setup() is available */
+#define HAVE_HRTIMER_SETUP 1
 
 /* hypervisor_is_type() is available */
 #define HAVE_HYPERVISOR_IS_TYPE 1
@@ -796,6 +813,9 @@
 /* io_mapping_unmap_local() is available */
 #define HAVE_IO_MAPPING_UNMAP_LOCAL 1
 
+/* irq_domain_create_linear() is available */
+#define HAVE_IRQ_DOMAIN_CREATE_LINEAR 1
+
 /* is_cow_mapping() is available */
 #define HAVE_IS_COW_MAPPING 1
 
@@ -822,6 +842,9 @@
 
 /* kmap_local_* is available */
 #define HAVE_KMAP_LOCAL 1
+
+/* kmap_local_page_try_from_panic() is available */
+#define HAVE_KMAP_LOCAL_PAGE_TRY_FROM_PANIC 1
 
 /* krealloc_array() is available */
 #define HAVE_KREALLOC_ARRAY 1
@@ -885,9 +908,6 @@
 
 /* Define to 1 if you have the <linux/cleanup.h> header file. */
 #define HAVE_LINUX_CLEANUP_H 1
-
-/* Define to 1 if you have the <linux/compiler.h> header file. */
-#define HAVE_LINUX_COMPILER_H 1
 
 /* Define to 1 if you have the <linux/compiler_attributes.h> header file. */
 #define HAVE_LINUX_COMPILER_ATTRIBUTES_H 1
@@ -986,7 +1006,7 @@
 #define HAVE_MIGRATE_VMA_PGMAP_OWNER 1
 
 /* mmap_assert_write_locked() is available */
-#define HAVE_MMAP_ASSERT_WRITE_LOCKED 1
+/* #undef HAVE_MMAP_ASSERT_WRITE_LOCKED */
 
 /* mmput_async() is available */
 #define HAVE_MMPUT_ASYNC 1
@@ -1051,6 +1071,9 @@
 /* PIDTYPE is availablea */
 #define HAVE_PIDTYPE_TGID 1
 
+/* pm_hibernate_is_recovering() is available */
+#define HAVE_PM_HIBERNATE_IS_RECOVERING 1
+
 /* pm_runtime_get_if_active() has one parameters */
 #define HAVE_PM_RUNTIME_GET_IF_ACTIVE_1ARGS 1
 
@@ -1075,6 +1098,9 @@
 /* radix_tree_iter_delete() is available */
 #define HAVE_RADIX_TREE_ITER_DELETE 1
 
+/* ratelimit_state_reset_interval() is available */
+#define HAVE_RATELIMIT_STATE_RESET_INTERVAL 1
+
 /* rb_add_cached is available */
 #define HAVE_RB_ADD_CACHED 1
 
@@ -1096,14 +1122,17 @@
 /* shmem_read_folio() is available */
 #define HAVE_SHMEM_READ_FOLIO 1
 
+/* shmem_writeout() is available */
+#define HAVE_SHMEM_WRITEOUT 1
+
 /* shrinker_register() is available */
 #define HAVE_SHRINKER_REGISTER 1
 
-/* smca_get_bank_type(x) is available */
-/* #undef HAVE_SMCA_GET_BANK_TYPE_WITH_ONE_ARGUMENT */
-
 /* size_mul() is available */
 #define HAVE_SIZE_MUL 1
+
+/* smca_get_bank_type(x) is available */
+/* #undef HAVE_SMCA_GET_BANK_TYPE_WITH_ONE_ARGUMENT */
 
 /* whether smca_get_bank_type(x, x) is available */
 #define HAVE_SMCA_GET_BANK_TYPE_WITH_TWO_ARGUMENTS 1
@@ -1184,6 +1213,9 @@
 /* time64_to_tm() is available */
 #define HAVE_TIME64_TO_TM 1
 
+/* timer_delete() is available */
+#define HAVE_TIMER_DELETE 1
+
 /* topology_num_cores_per_package is availablea */
 #define HAVE_TOPOLOGY_NUM_CORES_PER_PACKAGE 1
 
@@ -1253,8 +1285,11 @@
 /* __dma_fence_is_later() is available and has 2 args */
 /* #undef HAVE__DMA_FENCE_IS_LATER_2ARGS */
 
+/* __dma_fence_is_later() is available and has fence args */
+#define HAVE__DMA_FENCE_IS_LATER_WITH_FENCE_ARG 1
+
 /* __dma_fence_is_later() is available and has ops arg */
-#define HAVE__DMA_FENCE_IS_LATER_WITH_OPS_ARG 1
+/* #undef HAVE__DMA_FENCE_IS_LATER_WITH_OPS_ARG */
 
 /* __drm_atomic_helper_crtc_reset() is available */
 #define HAVE___DRM_ATOMIC_HELPER_CRTC_RESET 1
@@ -1272,7 +1307,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 6.14.0"
+#define PACKAGE_STRING "amdgpu-dkms 6.16.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
@@ -1281,7 +1316,10 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "6.14.0"
+#define PACKAGE_VERSION "6.16.0"
+
+/* drm_file->debugfs_client is available */
+#define STRUCT_DRM_FILE_DEBUGFS_CLIENT 1
 
 #include "config-amd-chips.h"
 
