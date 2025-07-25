@@ -24,6 +24,20 @@ AC_DEFUN([AC_AMDGPU__DMA_FENCE_IS_LATER], [
 			], [
 				AC_DEFINE(HAVE__DMA_FENCE_IS_LATER_2ARGS, 1,
 					[__dma_fence_is_later() is available and has 2 args])
+			],[
+				dnl #
+				dnl # v6.15-rc5-762-g549810e91815
+				dnl # dma-fence: Change signature of __dma_fence_is_later
+				dnl #
+				AC_KERNEL_TRY_COMPILE([
+					#include <linux/dma-fence.h>
+				], [
+					struct dma_fence *fence = NULL;
+					__dma_fence_is_later(fence, 0, 0);
+				], [
+					AC_DEFINE(HAVE__DMA_FENCE_IS_LATER_WITH_FENCE_ARG, 1,
+						[__dma_fence_is_later() is available and has fence args])
+				])
 			])
 		])
 	])
