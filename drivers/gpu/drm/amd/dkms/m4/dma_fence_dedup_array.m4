@@ -6,6 +6,7 @@ AC_DEFUN([AC_AMDGPU_DMA_FENCE_DEDUP_ARRAY], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE_SYMBOL([
 			#include <linux/dma-fence-unwrap.h>
+			#include <linux/stddef.h>
 		], [
 			dma_fence_dedup_array(NULL, 0);
 		], [dma_fence_dedup_array], [drivers/dma-buf/dma-fence-unwrap.c],[

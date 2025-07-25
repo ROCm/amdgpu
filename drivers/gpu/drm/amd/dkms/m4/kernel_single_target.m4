@@ -15,7 +15,7 @@ AC_DEFUN([AC_KERNEL_SINGLE_TARGET_CFLAGS], [
 			     -e "s|-include \([[[a-z]]]*\)|-include ${LINUX_OBJ}/\1|g" \
 			     -e "s|$PWD|\${PWD}|g")
 		CFLAGS=$(echo $CFLAGS | sed -E 's/-W(array-bounds|error=array-bounds|unused-variable|error=unused-variable|unused-[^ ]*-variable|error=unused-[^ ]*-variable)( |$)//g')
-
+		CFLAGS=$(echo $CFLAGS | sed -E "s/-Wunused/-Wno-unused/g")
 		CPPFLAGS=$(echo $CFLAGS | \
 			   sed 's| -|\n&|g' | \
 			   sed -n -e '/conftest/d' \
