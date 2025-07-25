@@ -16,6 +16,7 @@
 #include <kcl/kcl_rcupdate.h>
 #include <linux/dma-fence.h>
 
+#ifndef HAVE__DMA_FENCE_IS_LATER_WITH_FENCE_ARG
 #if !defined(HAVE__DMA_FENCE_IS_LATER_2ARGS)
 
 #if !defined(HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO)
@@ -50,6 +51,7 @@ static inline bool __dma_fence_is_later(u64 f1, u64 f2,
 
 #endif
 #endif /* HAVE__DMA_FENCE_IS_LATER_2ARGS */
+#endif /* HAVE__DMA_FENCE_IS_LATER_WITH_FENCE_ARG */
 
 #if !defined(HAVE_DMA_FENCE_DESCRIBE)
 void dma_fence_describe(struct dma_fence *fence, struct seq_file *seq);
