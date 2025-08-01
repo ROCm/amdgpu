@@ -185,6 +185,7 @@ static const struct cmn2asic_msg_mapping smu_v13_0_6_message_map[SMU_MSG_MAX_COU
 	MSG_MAP(SetPhsDetWRbwAlpha,                  PPSMC_MSG_SetPhsDetWRbwAlpha,              0),
 	MSG_MAP(SetPhsDetOnOff,                      PPSMC_MSG_SetPhsDetOnOff,                  0),
 	MSG_MAP(GetPhsDetResidency,                  PPSMC_MSG_GetPhsDetResidency,              0),
+	MSG_MAP(GetStaticMetricsTable,               PPSMC_MSG_GetStaticMetricsTable,           1),
 };
 
 // clang-format on
