@@ -35,4 +35,11 @@
 #define DPM_FLAG_MAY_SKIP_RESUME        BIT(3)
 #endif
 
+/*
+ * v5.16-rc5-3-g1a3c7bb08826
+ * PM: core: Add new *_PM_OPS macros, deprecate old ones
+ */
+#ifndef pm_sleep_ptr
+#define pm_sleep_ptr(_ptr) PTR_IF(IS_ENABLED(CONFIG_PM_SLEEP), (_ptr))
+#endif
 #endif
