@@ -4729,7 +4729,11 @@ rel_buf:
  * Writing to this file will stage an IFWI for update. Reading from this file
  * will trigger the update process.
  */
+#ifdef HAVE_ATTRIBUTE_GROUP_BIN_ATTRS_NEW
 static const struct bin_attribute psp_vbflash_bin_attr = {
+#else
+static struct bin_attribute psp_vbflash_bin_attr = {
+#endif
 	.attr = {.name = "psp_vbflash", .mode = 0660},
 	.size = AMD_VBIOS_FILE_MAX_SIZE_B,
 	.write = amdgpu_psp_vbflash_write,
