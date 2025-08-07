@@ -34,4 +34,8 @@
 #define TAINT_CPU_OUT_OF_SPEC TAINT_UNSAFE_SMP
 #endif
 
+#ifndef PTR_IF
+#define PTR_IF(cond, ptr)	((cond) ? (ptr) : NULL)
+#endif
+
 #endif /* AMDKCL_KERNEL_H */
