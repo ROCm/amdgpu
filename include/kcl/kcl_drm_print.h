@@ -218,4 +218,8 @@ enum drm_debug_category {
         __drm_printk((drm), info, _once, fmt, ##__VA_ARGS__)
 #endif
 
+#ifndef drm_err_ratelimited
+#define drm_err_ratelimited(drm, fmt, ...)				\
+	__drm_printk((drm), err, _ratelimited, "*ERROR* " fmt, ##__VA_ARGS__)
+#endif
 #endif
