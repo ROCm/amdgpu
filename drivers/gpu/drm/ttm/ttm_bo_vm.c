@@ -42,6 +42,9 @@
 
 #include <drm/drm_drv.h>
 #include <drm/drm_managed.h>
+#ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+#include "ttm_bo_internal.h"
+#endif
 
 static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 				struct vm_fault *vmf,
