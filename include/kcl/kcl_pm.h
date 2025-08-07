@@ -9,6 +9,7 @@
 
 #include <linux/bitops.h>
 #include <linux/pm.h>
+#include <kcl/kcl_kernel.h>
 
 /*
  * v5.7-rc2-7-ge07515563d01
