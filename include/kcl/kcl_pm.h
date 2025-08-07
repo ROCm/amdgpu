@@ -43,4 +43,12 @@
 #ifndef pm_sleep_ptr
 #define pm_sleep_ptr(_ptr) PTR_IF(IS_ENABLED(CONFIG_PM_SLEEP), (_ptr))
 #endif
+
+/*
+ * v5.8-rc7-1-g7a82e97a11b9
+ * PM: core: introduce pm_ptr() macro
+ */
+#ifndef pm_ptr
+#define pm_ptr(_ptr) PTR_IF(IS_ENABLED(CONFIG_PM), (_ptr))
+#endif
 #endif
