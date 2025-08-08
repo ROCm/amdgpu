@@ -663,6 +663,7 @@ static int amdgpu_dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
 #else
                                       struct drm_crtc_state *crtc_state)
 {
+	struct drm_atomic_state *state = crtc_state->state;
 #endif
 	struct amdgpu_device *adev = drm_to_adev(crtc->dev);
 	struct dc *dc = adev->dm.dc;
@@ -707,7 +708,6 @@ static int amdgpu_dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
 		return -EINVAL;
 	}
 
-#ifdef HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE
 	if (!state->legacy_cursor_update && amdgpu_dm_crtc_vrr_active(dm_crtc_state)) {
 		struct drm_plane_state *primary_state;
 
@@ -716,7 +716,6 @@ static int amdgpu_dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
 		if (IS_ERR(primary_state))
 			return PTR_ERR(primary_state);
 	}
-#endif
 
 	/* In some use cases, like reset, no stream is attached */
 	if (!dm_crtc_state->stream)
