@@ -8,6 +8,10 @@
 #include <linux/bug.h>
 #include <kcl/kcl_suspend.h>
 
+#ifndef HAVE_PM_HIBERNATE_IS_RECOVERING
+static pm_message_t pm_transition;
+#endif
+
 #ifndef HAVE_KSYS_SYNC_HELPER
 /* Copied from kernel/power/main.c */
 #ifdef CONFIG_PM_SLEEP
@@ -49,3 +53,18 @@ void amdkcl_suspend_init(void)
 #endif /* HAVE_KSYS_SYNC_HELPER */
 }
 
+#ifndef HAVE_PM_HIBERNATE_IS_RECOVERING
+/**
+ * pm_hibernate_is_recovering - if recovering from hibernate due to error.
+ *
+ * Used to query if dev_pm_ops.thaw() is called for normal hibernation case or
+ * recovering from some error.
+ *
+ * Return: true for error case, false for normal case.
+ */
+bool kcl_pm_hibernate_is_recovering(void)
+{
+	return pm_transition.event == PM_EVENT_RECOVER;
+}
+EXPORT_SYMBOL_GPL(kcl_pm_hibernate_is_recovering);
+#endif
