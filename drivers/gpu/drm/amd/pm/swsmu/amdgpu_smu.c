@@ -4227,10 +4227,21 @@ void amdgpu_smu_phase_det_debugfs_init(struct amdgpu_device *adev)
 
 #endif
 }
+
 int smu_reset_vcn(struct smu_context *smu, uint32_t inst_mask)
 {
 	if (smu->ppt_funcs && smu->ppt_funcs->dpm_reset_vcn)
 		smu->ppt_funcs->dpm_reset_vcn(smu, inst_mask);
 
 	return 0;
+}
+
+bool smu_reset_vcn_is_supported(struct smu_context *smu)
+{
+	bool ret = false;
+
+	if (smu->ppt_funcs && smu->ppt_funcs->reset_vcn_is_supported)
+		ret = smu->ppt_funcs->reset_vcn_is_supported(smu);
+
+	return ret;
 }
