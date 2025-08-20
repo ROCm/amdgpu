@@ -691,7 +691,10 @@
 #define HAVE_DRM_TASK_BARRIER_H 1
 
 /* drm_vblank_crtc_config is available */
-/* #undef HAVE_DRM_VBLANK_CRTC_CONFIG */
+#define HAVE_DRM_VBLANK_CRTC_CONFIG 1
+
+/* struct vblank->config is available */
+#define HAVE_DRM_VBLANK_CRTC_STRUCT_CONFIG 1
 
 /* struct drm_vma_offset_node has readonly field */
 /* #undef HAVE_DRM_VMA_OFFSET_NODE_READONLY_FIELD */
