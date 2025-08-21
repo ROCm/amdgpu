@@ -8870,7 +8870,7 @@ amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
 
 	if (!crtc)
 		return 0;
-
+#ifdef HAVE_DRM_CONNECTOR_UPDATE_PRIVACY_SCREEN
 	if (new_con_state->privacy_screen_sw_state != old_con_state->privacy_screen_sw_state) {
 		new_crtc_state = drm_atomic_get_crtc_state(state, crtc);
 		if (IS_ERR(new_crtc_state))
@@ -8878,7 +8878,7 @@ amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
 
 		new_crtc_state->mode_changed = true;
 	}
-
+#endif
 	if (new_con_state->colorspace != old_con_state->colorspace) {
 		new_crtc_state = drm_atomic_get_crtc_state(state, crtc);
 		if (IS_ERR(new_crtc_state))
@@ -9708,7 +9708,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 			drm_connector_attach_content_protection_property(&aconnector->base);
 #endif
 	}
-
+#ifdef HAVE_DRM_CONNECTOR_UPDATE_PRIVACY_SCREEN
 	if (connector_type == DRM_MODE_CONNECTOR_eDP) {
 		struct drm_privacy_screen *privacy_screen;
 
@@ -9722,6 +9722,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 			drm_warn(adev_to_drm(adev), "Error getting privacy-screen\n");
 		}
 	}
+#endif
 }
 
 static int amdgpu_dm_i2c_xfer(struct i2c_adapter *i2c_adap,
@@ -11786,8 +11787,9 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_commit *state)
 					    &stream_update);
 		mutex_unlock(&dm->dc_lock);
 		kfree(dummy_updates);
-
+#ifdef HAVE_DRM_CONNECTOR_UPDATE_PRIVACY_SCREEN
 		drm_connector_update_privacy_screen(new_con_state);
+#endif
 	}
 
 	/**
