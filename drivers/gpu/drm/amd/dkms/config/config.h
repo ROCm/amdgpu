@@ -248,6 +248,9 @@
 /* struct drm_connector_state has hdr_output_metadata member */
 #define HAVE_DRM_CONNECTOR_STATE_HDR_OUTPUT_METADATA 1
 
+/* drm_connector_update_privacy_screen() is available */
+#define HAVE_DRM_CONNECTOR_UPDATE_PRIVACY_SCREEN 1
+
 /* drm_connector_attach_colorspace_property() is available */
 #define HAVE_DRM_CONNECT_ATTACH_COLORSPACE_PROPERTY 1
 
