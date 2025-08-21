@@ -45,6 +45,12 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/drm_aperture.h])
 
 	dnl #
+	dnl # v5.15-rc1-290-ga1a98689301b
+	dnl # drm: Add privacy-screen class (v4)
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drm_privacy_screen_consumer.h])
+
+	dnl #
 	dnl # v5.16-rc5-872-g5b529e8d9c38
 	dnl # drm/dp: Move public DisplayPort headers into dp/
 	dnl #

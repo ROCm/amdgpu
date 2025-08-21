@@ -367,6 +367,9 @@
 /* Define to 1 if you have the <drm/dp/drm_dp_mst_helper.h> header file. */
 /* #undef HAVE_DRM_DP_DRM_DP_MST_HELPER_H */
 
+/* Define to 1 if you have the <drm/drm_privacy_screen_consumer.h> header file. */
+#define HAVE_DRM_DRM_PRIVACY_SCREEN_CONSUMER_H 1
+
 /* drm_dp_link_train_channel_eq_delay() has 2 args */
 #define HAVE_DRM_DP_LINK_TRAIN_CHANNEL_EQ_DELAY_2ARGS 1
 
