@@ -81,7 +81,6 @@
 #include <linux/component.h>
 #include <linux/sort.h>
 
-#include <drm/drm_privacy_screen_consumer.h>
 #include <drm/display/drm_dp_mst_helper.h>
 #include <drm/display/drm_hdmi_helper.h>
 #include <drm/drm_atomic.h>
@@ -8061,14 +8060,6 @@ amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
 	if (!crtc)
 		return 0;
 
-	if (new_con_state->privacy_screen_sw_state != old_con_state->privacy_screen_sw_state) {
-		new_crtc_state = drm_atomic_get_crtc_state(state, crtc);
-		if (IS_ERR(new_crtc_state))
-			return PTR_ERR(new_crtc_state);
-
-		new_crtc_state->mode_changed = true;
-	}
-
 	if (new_con_state->colorspace != old_con_state->colorspace) {
 		new_crtc_state = drm_atomic_get_crtc_state(state, crtc);
 		if (IS_ERR(new_crtc_state))
@@ -8845,18 +8836,6 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 #else
 			drm_connector_attach_content_protection_property(&aconnector->base);
 #endif
-	}
-
-	if (connector_type == DRM_MODE_CONNECTOR_eDP) {
-		struct drm_privacy_screen *privacy_screen;
-
-		privacy_screen = drm_privacy_screen_get(adev_to_drm(adev)->dev, NULL);
-		if (!IS_ERR(privacy_screen)) {
-			drm_connector_attach_privacy_screen_provider(&aconnector->base,
-								     privacy_screen);
-		} else if (PTR_ERR(privacy_screen) != -ENODEV) {
-			drm_warn(adev_to_drm(adev), "Error getting privacy-screen\n");
-		}
 	}
 }
 
@@ -10610,7 +10589,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	unsigned long flags;
 	bool wait_for_vblank = true;
 	struct drm_connector *connector;
-	struct drm_connector_state *old_con_state = NULL, *new_con_state = NULL;
+	struct drm_connector_state *old_con_state, *new_con_state;
 	struct dm_crtc_state *dm_old_crtc_state, *dm_new_crtc_state;
 	int crtc_disable_count = 0;
 
@@ -10743,8 +10722,6 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 					    &stream_update);
 		mutex_unlock(&dm->dc_lock);
 		kfree(dummy_updates);
-
-		drm_connector_update_privacy_screen(new_con_state);
 	}
 
 	/**
