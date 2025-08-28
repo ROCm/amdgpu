@@ -940,17 +940,18 @@ static void dc_destruct(struct dc *dc)
 	if (dc->link_srv)
 		link_destroy_link_service(&dc->link_srv);
 
-	if (dc->ctx->gpio_service)
-		dal_gpio_service_destroy(&dc->ctx->gpio_service);
+	if (dc->ctx) {
+		if (dc->ctx->gpio_service)
+			dal_gpio_service_destroy(&dc->ctx->gpio_service);
 
-	if (dc->ctx->created_bios)
-		dal_bios_parser_destroy(&dc->ctx->dc_bios);
+		if (dc->ctx->created_bios)
+			dal_bios_parser_destroy(&dc->ctx->dc_bios);
+		kfree(dc->ctx->logger);
+		dc_perf_trace_destroy(&dc->ctx->perf_trace);
 
-	kfree(dc->ctx->logger);
-	dc_perf_trace_destroy(&dc->ctx->perf_trace);
-
-	kfree(dc->ctx);
-	dc->ctx = NULL;
+		kfree(dc->ctx);
+		dc->ctx = NULL;
+	}
 
 	kfree(dc->bw_vbios);
 	dc->bw_vbios = NULL;
@@ -3391,7 +3392,7 @@ static void update_seamless_boot_flags(struct dc *dc,
 		int surface_count,
 		struct dc_stream_state *stream)
 {
-	if (get_seamless_boot_stream_count(context) > 0 && surface_count > 0) {
+	if (get_seamless_boot_stream_count(context) > 0 && (surface_count > 0 || stream->dpms_off)) {
 		/* Optimize seamless boot flag keeps clocks and watermarks high until
 		 * first flip. After first flip, optimization is required to lower
 		 * bandwidth. Important to note that it is expected UEFI will
@@ -6338,4 +6339,22 @@ bool dc_can_clear_cursor_limit(struct dc *dc)
 	}
 
 	return false;
+}
+
+void dc_get_underflow_debug_data_for_otg(struct dc *dc, int primary_otg_inst,
+				struct dc_underflow_debug_data *out_data)
+{
+	struct timing_generator *tg = NULL;
+
+	for (int i = 0; i < MAX_PIPES; i++) {
+		if (dc->res_pool->timing_generators[i] &&
+			dc->res_pool->timing_generators[i]->inst == primary_otg_inst) {
+				tg = dc->res_pool->timing_generators[i];
+				break;
+		}
+	}
+
+	dc_exit_ips_for_hw_access(dc);
+	if (dc->hwss.get_underflow_debug_data)
+		dc->hwss.get_underflow_debug_data(dc, tg, out_data);
 }

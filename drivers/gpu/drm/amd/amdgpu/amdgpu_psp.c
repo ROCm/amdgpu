@@ -666,6 +666,10 @@ static const char *psp_gfx_cmd_name(enum psp_gfx_cmd_id cmd_id)
 		return "FB_FW_RESERV_ADDR";
 	case GFX_CMD_ID_FB_FW_RESERV_EXT_ADDR:
 		return "FB_FW_RESERV_EXT_ADDR";
+	case GFX_CMD_ID_SRIOV_SPATIAL_PART:
+		return "SPATIAL_PARTITION";
+	case GFX_CMD_ID_FB_NPS_MODE:
+		return "NPS_MODE_CHANGE";
 	default:
 		return "UNKNOWN CMD";
 	}
@@ -1039,15 +1043,28 @@ int psp_update_fw_reservation(struct psp_context *psp)
 {
 	int ret;
 	uint64_t reserv_addr, reserv_addr_ext;
-	uint32_t reserv_size, reserv_size_ext;
+	uint32_t reserv_size, reserv_size_ext, mp0_ip_ver;
 	struct amdgpu_device *adev = psp->adev;
+
+	mp0_ip_ver = amdgpu_ip_version(adev, MP0_HWIP, 0);
 
 	if (amdgpu_sriov_vf(psp->adev))
 		return 0;
 
-	if ((amdgpu_ip_version(adev, MP0_HWIP, 0) != IP_VERSION(14, 0, 2)) &&
-	    (amdgpu_ip_version(adev, MP0_HWIP, 0) != IP_VERSION(14, 0, 3)))
+	switch (mp0_ip_ver) {
+	case IP_VERSION(14, 0, 2):
+		if (adev->psp.sos.fw_version < 0x3b0e0d)
+			return 0;
+		break;
+
+	case IP_VERSION(14, 0, 3):
+		if (adev->psp.sos.fw_version < 0x3a0e14)
+			return 0;
+		break;
+
+	default:
 		return 0;
+	}
 
 	ret = psp_get_fw_reservation_info(psp, GFX_CMD_ID_FB_FW_RESERV_ADDR, &reserv_addr, &reserv_size);
 	if (ret)

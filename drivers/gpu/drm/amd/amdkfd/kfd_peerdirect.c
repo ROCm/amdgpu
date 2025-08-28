@@ -557,6 +557,7 @@ static int rdma_get_pages(uint64_t address, uint64_t length, struct pid *pid,
 	kfd_unref_process(p);
 	if (r == 0) {
 		pr_debug("acquire failed: %d\n", r);
+		r = -EINVAL;
 		goto err_acquire;
 	}
 

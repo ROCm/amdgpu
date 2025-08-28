@@ -9,6 +9,7 @@
 
 #include <linux/bitops.h>
 #include <linux/pm.h>
+#include <kcl/kcl_kernel.h>
 
 /*
  * v5.7-rc2-7-ge07515563d01
@@ -35,4 +36,19 @@
 #define DPM_FLAG_MAY_SKIP_RESUME        BIT(3)
 #endif
 
+/*
+ * v5.16-rc5-3-g1a3c7bb08826
+ * PM: core: Add new *_PM_OPS macros, deprecate old ones
+ */
+#ifndef pm_sleep_ptr
+#define pm_sleep_ptr(_ptr) PTR_IF(IS_ENABLED(CONFIG_PM_SLEEP), (_ptr))
+#endif
+
+/*
+ * v5.8-rc7-1-g7a82e97a11b9
+ * PM: core: introduce pm_ptr() macro
+ */
+#ifndef pm_ptr
+#define pm_ptr(_ptr) PTR_IF(IS_ENABLED(CONFIG_PM), (_ptr))
+#endif
 #endif

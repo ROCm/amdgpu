@@ -153,6 +153,20 @@ struct idle_workqueue {
 	bool running;
 };
 
+/**
+ * struct vupdate_offload_work - Work data for offloading task from vupdate handler
+ * @work: Kernel work data for the work event
+ * @adev: amdgpu_device back pointer
+ * @stream: DC stream associated with the crtc
+ * @adjust: DC CRTC timing adjust to be applied to the crtc
+ */
+struct vupdate_offload_work {
+	struct work_struct work;
+	struct amdgpu_device *adev;
+	struct dc_stream_state *stream;
+	struct dc_crtc_timing_adjust *adjust;
+};
+
 #define MAX_LUMINANCE_DATA_POINTS 99
 
 /**

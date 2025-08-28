@@ -2659,6 +2659,7 @@ static int amdgpu_pmops_suspend(struct device *dev)
 		adev->in_s3 = true;
 	if (!adev->in_s0ix && !adev->in_s3) {
 #ifdef HAVE_PM_SUSPEND_TARGET_STATE
+#if IS_ENABLED(CONFIG_SUSPEND)
 		/* don't allow going deep first time followed by s2idle the next time */
 		if (adev->last_suspend_state != PM_SUSPEND_ON &&
 		    adev->last_suspend_state != pm_suspend_target_state) {
@@ -2667,12 +2668,15 @@ static int amdgpu_pmops_suspend(struct device *dev)
 			return -EINVAL;
 		}
 #endif
+#endif
 		return 0;
 	}
 
 #ifdef HAVE_PM_SUSPEND_TARGET_STATE
+#if IS_ENABLED(CONFIG_SUSPEND)
 	/* cache the state last used for suspend */
 	adev->last_suspend_state = pm_suspend_target_state;
+#endif
 #endif
 
 	return amdgpu_device_suspend(drm_dev, true);
@@ -3000,11 +3004,14 @@ static int amdgpu_drm_release(struct inode *inode, struct file *filp)
 {
 	struct drm_file *file_priv = filp->private_data;
 	struct amdgpu_fpriv *fpriv = file_priv->driver_priv;
+	struct drm_device *dev = file_priv->minor->dev;
+	int idx;
 
-	if (fpriv) {
+	if (fpriv && drm_dev_enter(dev, &idx)) {
 		fpriv->evf_mgr.fd_closing = true;
 		amdgpu_eviction_fence_destroy(&fpriv->evf_mgr);
 		amdgpu_userq_mgr_fini(&fpriv->userq_mgr);
+		drm_dev_exit(idx);
 	}
 
 	return drm_release(inode, filp);
@@ -3031,15 +3038,15 @@ out:
 }
 
 static const struct dev_pm_ops amdgpu_pm_ops = {
-	.prepare = amdgpu_pmops_prepare,
-	.complete = amdgpu_pmops_complete,
-	.suspend = amdgpu_pmops_suspend,
-	.suspend_noirq = amdgpu_pmops_suspend_noirq,
-	.resume = amdgpu_pmops_resume,
-	.freeze = amdgpu_pmops_freeze,
-	.thaw = amdgpu_pmops_thaw,
-	.poweroff = amdgpu_pmops_poweroff,
-	.restore = amdgpu_pmops_restore,
+	.prepare = pm_sleep_ptr(amdgpu_pmops_prepare),
+	.complete = pm_sleep_ptr(amdgpu_pmops_complete),
+	.suspend = pm_sleep_ptr(amdgpu_pmops_suspend),
+	.suspend_noirq = pm_sleep_ptr(amdgpu_pmops_suspend_noirq),
+	.resume = pm_sleep_ptr(amdgpu_pmops_resume),
+	.freeze = pm_sleep_ptr(amdgpu_pmops_freeze),
+	.thaw = pm_sleep_ptr(amdgpu_pmops_thaw),
+	.poweroff = pm_sleep_ptr(amdgpu_pmops_poweroff),
+	.restore = pm_sleep_ptr(amdgpu_pmops_restore),
 	.runtime_suspend = amdgpu_pmops_runtime_suspend,
 	.runtime_resume = amdgpu_pmops_runtime_resume,
 	.runtime_idle = amdgpu_pmops_runtime_idle,
@@ -3257,7 +3264,7 @@ static struct pci_driver amdgpu_kms_pci_driver = {
 	.probe = amdgpu_pci_probe,
 	.remove = amdgpu_pci_remove,
 	.shutdown = amdgpu_pci_shutdown,
-	.driver.pm = &amdgpu_pm_ops,
+	.driver.pm = pm_ptr(&amdgpu_pm_ops),
 	.err_handler = &amdgpu_pci_err_handler,
 #ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 	.dev_groups = amdgpu_sysfs_groups,

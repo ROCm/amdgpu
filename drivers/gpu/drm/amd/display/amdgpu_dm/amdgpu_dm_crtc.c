@@ -632,6 +632,7 @@ static int amdgpu_dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
 #else
                                       struct drm_crtc_state *crtc_state)
 {
+	struct drm_atomic_state *state = crtc_state->state;
 #endif
 	struct amdgpu_device *adev = drm_to_adev(crtc->dev);
 	struct dc *dc = adev->dm.dc;
@@ -674,6 +675,15 @@ static int amdgpu_dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
 			       "[CRTC:%d:%s] async flips are only supported for fast updates\n",
 			       crtc->base.id, crtc->name);
 		return -EINVAL;
+	}
+
+	if (!state->legacy_cursor_update && amdgpu_dm_crtc_vrr_active(dm_crtc_state)) {
+		struct drm_plane_state *primary_state;
+
+		/* Pull in primary plane for correct VRR handling */
+		primary_state = drm_atomic_get_plane_state(state, crtc->primary);
+		if (IS_ERR(primary_state))
+			return PTR_ERR(primary_state);
 	}
 
 	/* In some use cases, like reset, no stream is attached */

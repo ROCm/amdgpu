@@ -836,6 +836,20 @@ struct amdgpu_ip_map_info {
 					uint32_t mask);
 };
 
+enum amdgpu_uid_type {
+	AMDGPU_UID_TYPE_XCD,
+	AMDGPU_UID_TYPE_AID,
+	AMDGPU_UID_TYPE_SOC,
+	AMDGPU_UID_TYPE_MAX
+};
+
+#define AMDGPU_UID_INST_MAX 8 /* max number of instances for each UID type */
+
+struct amdgpu_uid {
+	uint64_t uid[AMDGPU_UID_TYPE_MAX][AMDGPU_UID_INST_MAX];
+	struct amdgpu_device *adev;
+};
+
 struct amd_powerplay {
 	void *pp_handle;
 	const struct amd_pm_funcs *pp_funcs;
@@ -913,6 +927,9 @@ struct amdgpu_pcie_reset_ctx {
 	bool in_link_reset;
 	bool occurs_dpc;
 	bool audio_suspended;
+	struct pci_dev *swus;
+	struct pci_saved_state *swus_pcistate;
+	struct pci_saved_state *swds_pcistate;
 };
 
 /*
@@ -1330,6 +1347,7 @@ struct amdgpu_device {
 	struct list_head		userq_mgr_list;
 	struct mutex                    userq_mutex;
 	bool                            userq_halt_for_enforce_isolation;
+	struct amdgpu_uid *uid_info;
 };
 
 static inline uint32_t amdgpu_ip_version(const struct amdgpu_device *adev,
@@ -1821,4 +1839,9 @@ static inline int amdgpu_device_bus_status_check(struct amdgpu_device *adev)
        return 0;
 }
 
+void amdgpu_device_set_uid(struct amdgpu_uid *uid_info,
+			   enum amdgpu_uid_type type, uint8_t inst,
+			   uint64_t uid);
+uint64_t amdgpu_device_get_uid(struct amdgpu_uid *uid_info,
+			       enum amdgpu_uid_type type, uint8_t inst);
 #endif

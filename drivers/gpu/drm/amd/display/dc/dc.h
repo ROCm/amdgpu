@@ -55,7 +55,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.343"
+#define DC_VER "3.2.345"
 
 /**
  * MAX_SURFACES - representative of the upper bound of surfaces that can be piped to a single CRTC
@@ -1073,6 +1073,7 @@ struct dc_debug_options {
 	unsigned int force_mall_ss_num_ways;
 	bool alloc_extra_way_for_cursor;
 	uint32_t subvp_extra_lines;
+	bool disable_force_pstate_allow_on_hw_release;
 	bool force_usr_allow;
 	/* uses value at boot and disables switch */
 	bool disable_dtb_ref_clk_switch;
@@ -1313,6 +1314,32 @@ union dc_3dlut_state {
 	uint32_t raw;
 };
 
+
+#define MATRIX_9C__DIM_128_ALIGNED_LEN   16 // 9+8 :  9 * 8 +  7 * 8 = 72  + 56  = 128 % 128 = 0
+#define MATRIX_17C__DIM_128_ALIGNED_LEN  32 //17+15:  17 * 8 + 15 * 8 = 136 + 120 = 256 % 128 = 0
+#define MATRIX_33C__DIM_128_ALIGNED_LEN  64 //17+47:  17 * 8 + 47 * 8 = 136 + 376 = 512 % 128 = 0
+
+struct lut_rgb {
+	uint16_t b;
+	uint16_t g;
+	uint16_t r;
+	uint16_t padding;
+};
+
+//this structure maps directly to how the lut will read it from memory
+struct lut_mem_mapping {
+	union {
+		//NATIVE MODE 1, 2
+		//RGB layout          [b][g][r]      //red  is 128 byte aligned
+		//BGR layout          [r][g][b]      //blue is 128 byte aligned
+		struct lut_rgb rgb_17c[17][17][MATRIX_17C__DIM_128_ALIGNED_LEN];
+		struct lut_rgb rgb_33c[33][33][MATRIX_33C__DIM_128_ALIGNED_LEN];
+
+		//TRANSFORMED
+		uint16_t linear_rgb[(33*33*33*4/128+1)*128];
+	};
+	uint16_t size;
+};
 
 struct dc_rmcm_3dlut {
 	bool isInUse;
@@ -1793,6 +1820,23 @@ struct dc_surface_update {
 	const struct dc_csc_transform *cursor_csc_color_matrix;
 	unsigned int sdr_white_level_nits;
 	struct dc_bias_and_scale bias_and_scale;
+};
+
+struct dc_underflow_debug_data {
+	uint32_t otg_inst;
+	uint32_t otg_underflow;
+	uint32_t h_position;
+	uint32_t v_position;
+	uint32_t otg_frame_count;
+	struct dc_underflow_per_hubp_debug_data {
+		uint32_t hubp_underflow;
+		uint32_t hubp_in_blank;
+		uint32_t hubp_readline;
+		uint32_t det_config_error;
+	} hubps[MAX_PIPES];
+	uint32_t curr_det_sizes[MAX_PIPES];
+	uint32_t target_det_sizes[MAX_PIPES];
+	uint32_t compbuf_config_error;
 };
 
 /*
@@ -2688,5 +2732,18 @@ bool dc_is_timing_changed(struct dc_stream_state *cur_stream,
 
 bool dc_is_cursor_limit_pending(struct dc *dc);
 bool dc_can_clear_cursor_limit(struct dc *dc);
+
+/**
+ * dc_get_underflow_debug_data_for_otg() - Retrieve underflow debug data.
+ *
+ * @dc: Pointer to the display core context.
+ * @primary_otg_inst: Instance index of the primary OTG that underflowed.
+ * @out_data: Pointer to a dc_underflow_debug_data struct to be filled with debug information.
+ *
+ * This function collects and logs underflow-related HW states when underflow happens,
+ * including OTG underflow status, current read positions, frame count, and per-HUBP debug data.
+ * The results are stored in the provided out_data structure for further analysis or logging.
+ */
+void dc_get_underflow_debug_data_for_otg(struct dc *dc, int primary_otg_inst, struct dc_underflow_debug_data *out_data);
 
 #endif /* DC_INTERFACE_H_ */
