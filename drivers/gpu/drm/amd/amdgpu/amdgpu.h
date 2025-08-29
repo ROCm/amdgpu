@@ -1170,9 +1170,6 @@ struct amdgpu_device {
 	/* for userq and VM fences */
 	struct amdgpu_seq64		seq64;
 
-	/* KFD */
-	struct amdgpu_kfd_dev		kfd;
-
 	/* UMC */
 	struct amdgpu_umc		umc;
 
@@ -1342,6 +1339,11 @@ struct amdgpu_device {
 	struct mutex                    userq_mutex;
 	bool                            userq_halt_for_enforce_isolation;
 	struct amdgpu_uid *uid_info;
+
+	/* KFD
+	 * Must be last --ends in a flexible-array member.
+	 */
+	struct amdgpu_kfd_dev		kfd;
 };
 
 static inline uint32_t amdgpu_ip_version(const struct amdgpu_device *adev,
