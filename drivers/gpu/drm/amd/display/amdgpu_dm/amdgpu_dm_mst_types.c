@@ -392,8 +392,13 @@ static bool retrieve_branch_specific_data(struct amdgpu_dm_connector *aconnector
 				      (branch_desc.ident.oui[1] << 8) +
 				      (branch_desc.ident.oui[2]);
 
+#ifdef HAVE_DRM_DP_AUX_DRM_DEV
 	drm_dbg_dp(port->aux.drm_dev, "MST branch oui 0x%x detected at %s\n",
 		   aconnector->branch_ieee_oui, connector->name);
+#else
+	DRM_DEBUG_KMS("MST branch oui 0x%x detected at %s\n",
+			aconnector->branch_ieee_oui, connector->name);
+#endif
 
 	return true;
 }
@@ -2175,9 +2180,13 @@ static bool dp_get_link_current_set_bw(struct drm_dp_aux *aux, uint32_t *cur_lin
 	dp_link_encoding = data[DP_MAIN_LINK_CHANNEL_CODING_SET - DP_LINK_BW_SET];
 	link_bw_set = data[DP_LINK_BW_SET - DP_LINK_BW_SET];
 	lane_count.raw = data[DP_LANE_COUNT_SET - DP_LINK_BW_SET];
-
+#ifdef HAVE_DRM_DP_AUX_DRM_DEV
 	drm_dbg_dp(aux->drm_dev, "MST_DSC downlink setting: %d, 0x%x x %d\n",
 		   dp_link_encoding, link_bw_set, lane_count.bits.LANE_COUNT_SET);
+#else
+	DRM_DEBUG_KMS("MST_DSC downlink setting: %d, 0x%x x %d\n",
+		      dp_link_encoding, link_bw_set, lane_count.bits.LANE_COUNT_SET);
+#endif
 
 	switch (dp_link_encoding) {
 	case DP_8b_10b_ENCODING:
