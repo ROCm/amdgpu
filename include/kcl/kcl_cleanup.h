@@ -35,6 +35,23 @@ static inline _type class_##_name##_constructor(_init_args)		\
 	for (CLASS(_name, scope)(args),					\
 	     *done = NULL; __guard_ptr(_name)(&scope) && !done; done = (void *)1)
 
+#ifndef no_free_ptr
+#define __get_and_null(p, nullvalue)   \
+	({                                  \
+		__auto_type __ptr = &(p);   \
+		__auto_type __val = *__ptr; \
+		*__ptr = nullvalue;         \
+		__val;                      \
+	})
+
+static inline __must_check
+const volatile void * __must_check_fn(const volatile void *val)
+{ return val; }
+
+#define no_free_ptr(p) \
+	((typeof(p)) __must_check_fn((__force const volatile void *)__get_and_null(p, NULL)))
+#endif
+
 #endif
 
 #endif /* KCL_CLEANUP_H_ */
