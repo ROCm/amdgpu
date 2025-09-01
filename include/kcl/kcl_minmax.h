@@ -10,11 +10,11 @@
 #endif
 
 #ifndef MIN
-#define __cmp_op_min <
+#define __kcl_cmp_op_min <
 
-#define __cmp(op, x, y)	((x) __cmp_op_##op (y) ? (x) : (y))
+#define __kcl_cmp(op, x, y)	((x) __kcl_cmp_op_##op (y) ? (x) : (y))
 
-#define MIN(a, b) __cmp(min, a, b)
+#define MIN(a, b) __kcl_cmp(min, a, b)
 #endif
 
 #endif /* _KCL_MINMAX_H */
