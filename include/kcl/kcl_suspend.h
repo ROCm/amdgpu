@@ -29,9 +29,4 @@ static inline bool pm_suspend_via_firmware(void) { return false; }
 static inline bool pm_resume_via_firmware(void) { return false; }
 #endif /* HAVE_PM_SUSPEND_VIA_FIRMWARE */
 
-#ifndef HAVE_PM_HIBERNATE_IS_RECOVERING
-bool kcl_pm_hibernate_is_recovering(void);
-
-#define pm_hibernate_is_recovering kcl_pm_hibernate_is_recovering
-#endif
 #endif /* AMDKCL_SUSPEND_H */
