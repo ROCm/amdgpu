@@ -79,6 +79,9 @@
 /* bitmap_to_arr32() is available */
 #define HAVE_BITMAP_TO_ARR32 1
 
+/* struct block_device has member named 'bd_device' */
+#define HAVE_BLOCK_DEVICE_BD_DEVICE 1
+
 /* cancel_work() is available */
 #define HAVE_CANCEL_WORK 1
 
