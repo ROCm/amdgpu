@@ -1168,6 +1168,7 @@ struct dc_debug_options {
 	short auxless_alpm_lfps_t1t2_offset_us;
 	bool enable_pg_cntl_debug_logs;
 	bool disable_stutter_for_wm_program;
+	bool enable_block_sequence_programming;
 };
 
 
