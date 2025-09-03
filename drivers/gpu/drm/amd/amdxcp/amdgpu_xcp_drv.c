@@ -112,8 +112,8 @@ static void free_xcp_dev(int8_t index)
 		devres_release_group(&pdev->dev, NULL);
 		platform_device_unregister(pdev);
 #ifndef HAVE_DRM_DRM_MANAGED_H
-		drm_dev_fini(&(xcp_dev[pdev_num]->drm));
-		kfree(xcp_dev[pdev_num]);
+		drm_dev_fini(&(xcp_dev[index]->drm));
+		kfree(xcp_dev[index]);
 #endif
 		xcp_dev[index] = NULL;
 		pdev_num--;
