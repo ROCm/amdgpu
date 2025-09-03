@@ -367,9 +367,17 @@ L_FETCH_2ND_TRAP_DRIVER_MASKABLE:
     s_cbranch_scc0  L_NO_SIGN_EXTEND_TMA
     s_or_b32        ttmp15, ttmp15, 0xFFFF0000
 L_NO_SIGN_EXTEND_TMA:
-    s_load_dword    s_tma_flags, [ttmp14, ttmp15], 0x10 glc:1 //Load the debug enables and host trap enabled flags
+#if ASIC_FAMILY >= CHIP_ALDEBARAN
+    s_dcache_inv
+    s_waitcnt       lgkmcnt(0)
+    s_load_dword    s_tma_flags, [ttmp14, ttmp15], 0x10      // Load the debug enables and host trap enabled flags
+    s_load_dwordx2  [ttmp2, ttmp3], [ttmp14, ttmp15], 0x0    // second-level TBA
+    s_load_dwordx2  [ttmp14, ttmp15], [ttmp14, ttmp15], 0x8  // second-level TMA
+#else
+    s_load_dword    s_tma_flags, [ttmp14, ttmp15], 0x10 glc:1 // Load the debug enables and host trap enabled flags
     s_load_dwordx2  [ttmp2, ttmp3], [ttmp14, ttmp15], 0x0 glc:1 // second-level TBA
     s_load_dwordx2  [ttmp14, ttmp15], [ttmp14, ttmp15], 0x8 glc:1 // second-level TMA
+#endif
     s_waitcnt       lgkmcnt(0)
 
     // Put debug enable bit, stochastic trap bit, and host trap bit into SAVE_IB_STS register, bits
