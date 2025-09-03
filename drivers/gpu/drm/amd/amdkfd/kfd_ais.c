@@ -28,7 +28,7 @@
 #include <linux/memremap.h>
 #include <linux/mmzone.h>
 #include <linux/dma-direct.h>
-
+#include <linux/mount.h>
 /* Each VRAM page uses sizeof(struct page) on system memory */
 #define AIS_P2P_PAGE_STRUCT_SIZE(size) ((size)/PAGE_SIZE * sizeof(struct page))
 
@@ -49,8 +49,11 @@ static struct pci_dev *get_pci_dev_from_file(struct file *file)
 		pr_err("Invalid file path or mount point\n");
 		return NULL;
 	}
-
+#ifdef HAVE_BLOCK_DEVICE_BD_DEVICE
 	dev = file->f_path.mnt->mnt_sb->s_bdev->bd_device.parent;
+#else
+	dev = disk_to_dev(file->f_path.mnt->mnt_sb->s_bdev->bd_disk)->parent;
+#endif
 	if (!dev) {
 		pr_debug("No parent device found for the file\n");
 		return NULL;
