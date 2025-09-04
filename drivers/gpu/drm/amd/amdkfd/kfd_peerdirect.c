@@ -169,8 +169,12 @@ static int amd_acquire(unsigned long addr, size_t size,
 			char *peer_mem_name, void **client_context)
 {
 	struct kfd_process *p;
-	struct kfd_bo *buf_obj;
 	struct amd_mem_context *mem_context;
+	struct kfd_bo *buf_obj = NULL;
+	struct kfd_node	*dev = NULL;
+	struct amdgpu_bo *bo = NULL;
+	unsigned long offset = 0;
+	uint32_t flags = 0;
 
 	if (peer_mem_name == rdma_name) {
 		p = peer_mem_private_data;
@@ -186,34 +190,54 @@ static int amd_acquire(unsigned long addr, size_t size,
 	align_addr_size(&addr, &size);
 
 	mutex_lock(&p->mutex);
-	buf_obj = kfd_process_find_bo_from_interval(p, addr,
-			addr + size - 1);
-	if (!buf_obj) {
-		pr_debug("Cannot find a kfd_bo for the range\n");
+	buf_obj = kfd_process_find_bo_from_interval(p, addr, addr + size - 1);
+	if (buf_obj) {
+		offset = addr - buf_obj->it.start;
+		bo = amdgpu_amdkfd_gpuvm_get_bo_ref(buf_obj->mem, &flags);
+
+		dev = buf_obj->dev;
+	} else {
+		struct vm_area_struct *vma;
+		struct amdgpu_device *adev;
+
+		mmap_read_lock(p->mm);
+		vma = find_vma(p->mm, addr);
+
+		if (!vma ||
+		    !amdgpu_vma_is_amdgpu_bo(vma) ||
+		    vma->vm_start > addr ||
+		    vma->vm_end < addr + size) {
+			mmap_read_unlock(p->mm);
+			goto out_unlock;
+		}
+
+		bo = ttm_to_amdgpu_bo(vma->vm_private_data);
+		drm_gem_object_get(&bo->tbo.base);
+		mmap_read_unlock(p->mm);
+
+		offset = addr - vma->vm_start;
+
+		flags = bo->kfd_bo->alloc_flags;
+		adev = amdgpu_ttm_adev(bo->tbo.bdev);
+		dev = adev->kfd.dev->nodes[bo->xcp_id];
+	}
+
+	mem_context = kzalloc(sizeof(*mem_context), GFP_KERNEL);
+	if (unlikely(!mem_context)) {
+		drm_gem_object_put(&bo->tbo.base);
 		goto out_unlock;
 	}
 
-	/* Initialize context used for operation with given address */
-	mem_context = kzalloc(sizeof(*mem_context), GFP_KERNEL);
-	if (!mem_context)
-		goto out_unlock;
+	mutex_unlock(&p->mutex);
+	pr_debug("addr: %#lx, size: %#lx, pid: %d\n", addr, size, mem_context->pid);
 
 	mem_context->pid = p->lead_thread->pid;
-
-	pr_debug("addr: %#lx, size: %#lx, pid: %d\n",
-		 addr, size, mem_context->pid);
-
-	mem_context->va     = addr;
-	mem_context->size   = size;
-	mem_context->offset = addr - buf_obj->it.start;
-
-	mem_context->bo = amdgpu_amdkfd_gpuvm_get_bo_ref(buf_obj->mem,
-							 &mem_context->flags);
-	mem_context->dev = buf_obj->dev;
-
-	mutex_unlock(&p->mutex);
-
-	pr_debug("Client context: 0x%p\n", mem_context);
+	mem_context->va = addr;
+	mem_context->size = size;
+	mem_context->dev = dev;
+	mem_context->offset = offset;
+	mem_context->bo = bo;
+	mem_context->flags = flags;
 
 	/* Return pointer to allocated context */
 	*client_context = mem_context;
@@ -224,7 +248,6 @@ static int amd_acquire(unsigned long addr, size_t size,
 	 * by AMD GPU driver
 	 */
 	return 1;
-
 out_unlock:
 	mutex_unlock(&p->mutex);
 	kfd_unref_process(p);
