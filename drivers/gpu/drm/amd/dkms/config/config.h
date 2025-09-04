@@ -1051,6 +1051,9 @@
 /* class_create has one argument */
 #define HAVE_ONE_ARGUMENT_OF_CLASS_CREATE 1
 
+/* page_pgmap() is available */
+#define HAVE_PAGE_PGMAP 1
+
 /* pcie_aspm_enabled() is available */
 #define HAVE_PCIE_ASPM_ENABLED 1
 
