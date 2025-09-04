@@ -3368,23 +3368,6 @@ static int smu_v13_0_6_reset_sdma(struct smu_context *smu, uint32_t inst_mask)
 	return ret;
 }
 
-static int smu_v13_0_6_post_init(struct smu_context *smu)
-{
-	struct smu_dpm_context *smu_dpm = &smu->smu_dpm;
-	struct smu_phase_det_ctl *pd_ctl;
-	bool enable;
-
-	pd_ctl = smu_dpm->pd_ctl;
-
-	if (!pd_ctl || pd_ctl->status == SMU_PHASE_DET_DISABLED)
-		return 0;
-
-	enable = (pd_ctl->status == SMU_PHASE_DET_ON) ? true : false;
-	smu_v13_0_6_phase_det_enable(smu, enable);
-
-	return 0;
-}
-
 static bool smu_v13_0_6_reset_vcn_is_supported(struct smu_context *smu)
 {
 	return smu_v13_0_6_cap_supported(smu, SMU_CAP(VCN_RESET));
@@ -3400,6 +3383,26 @@ static int smu_v13_0_6_reset_vcn(struct smu_context *smu, uint32_t inst_mask)
 			"failed to send ResetVCN event with mask 0x%x\n",
 			inst_mask);
 	return ret;
+}
+
+static int smu_v13_0_6_post_init(struct smu_context *smu)
+{
+	struct smu_dpm_context *smu_dpm = &smu->smu_dpm;
+	struct smu_phase_det_ctl *pd_ctl;
+	bool enable;
+
+	if (smu_v13_0_6_is_link_reset_supported(smu))
+		smu_feature_cap_set(smu, SMU_FEATURE_CAP_ID__LINK_RESET);
+
+	pd_ctl = smu_dpm->pd_ctl;
+
+	if (!pd_ctl || pd_ctl->status == SMU_PHASE_DET_DISABLED)
+		return 0;
+
+	enable = (pd_ctl->status == SMU_PHASE_DET_ON) ? true : false;
+	smu_v13_0_6_phase_det_enable(smu, enable);
+
+	return 0;
 }
 
 static int mca_smu_set_debug_mode(struct amdgpu_device *adev, bool enable)
@@ -4071,7 +4074,6 @@ static const struct pptable_funcs smu_v13_0_6_ppt_funcs = {
 	.get_xcp_metrics = smu_v13_0_6_get_xcp_metrics,
 	.get_thermal_temperature_range = smu_v13_0_6_get_thermal_temperature_range,
 	.mode1_reset_is_support = smu_v13_0_6_is_mode1_reset_supported,
-	.link_reset_is_support = smu_v13_0_6_is_link_reset_supported,
 	.mode1_reset = smu_v13_0_6_mode1_reset,
 	.mode2_reset = smu_v13_0_6_mode2_reset,
 	.link_reset = smu_v13_0_6_link_reset,
@@ -4082,9 +4084,9 @@ static const struct pptable_funcs smu_v13_0_6_ppt_funcs = {
 	.send_rma_reason = smu_v13_0_6_send_rma_reason,
 	.reset_sdma = smu_v13_0_6_reset_sdma,
 	.reset_sdma_is_supported = smu_v13_0_6_reset_sdma_is_supported,
-	.post_init = smu_v13_0_6_post_init,
 	.dpm_reset_vcn = smu_v13_0_6_reset_vcn,
 	.reset_vcn_is_supported = smu_v13_0_6_reset_vcn_is_supported,
+	.post_init = smu_v13_0_6_post_init,
 };
 
 void smu_v13_0_6_set_ppt_funcs(struct smu_context *smu)
