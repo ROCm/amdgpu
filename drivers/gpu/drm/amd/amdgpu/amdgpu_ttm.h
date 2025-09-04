@@ -198,6 +198,8 @@ int amdgpu_ttm_init(struct amdgpu_device *adev);
 void amdgpu_ttm_fini(struct amdgpu_device *adev);
 void amdgpu_ttm_enable_buffer_funcs(struct amdgpu_device *adev);
 void amdgpu_ttm_disable_buffer_funcs(struct amdgpu_device *adev);
+bool amdgpu_vma_is_amdgpu_bo(struct vm_area_struct *vma);
+
 int amdgpu_copy_buffer(struct amdgpu_device *adev,
 		       struct amdgpu_ttm_buffer_entity *entity,
 		       uint64_t src_offset,
