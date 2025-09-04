@@ -48,8 +48,9 @@ export CONFIG_DRM_SCHED=m
 
 subdir-ccflags-y += -Wno-error
 
+_is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n")
 ifeq ($(call _is_kcl_macro_defined,HAVE_KFD_PEERDIRECT_SUPPORT),y)
-KBUILD_EXTRA_SYMBOLS += "/usr/src/ofa_kernel/x86_64/$(KERNELRELEASE)/Module.symvers"
+KBUILD_EXTRA_SYMBOLS += /usr/src/ofa_kernel/x86_64/$(KERNELRELEASE)/Module.symvers
 endif
 
 # Trying to enable DCN2/3 with core2 optimizations will result in
