@@ -559,6 +559,14 @@ enum smu_fw_status {
  */
 #define SMU_WBRF_EVENT_HANDLING_PACE	10
 
+enum smu_feature_cap_id {
+	SMU_FEATURE_CAP_ID__COUNT,
+};
+
+struct smu_feature_cap {
+	DECLARE_BITMAP(cap_map, SMU_FEATURE_CAP_ID__COUNT);
+};
+
 struct smu_context {
 	struct amdgpu_device            *adev;
 	struct amdgpu_irq_src		irq_source;
@@ -581,6 +589,7 @@ struct smu_context {
 	struct amd_pp_display_configuration  *display_config;
 	struct smu_baco_context		smu_baco;
 	struct smu_temperature_range	thermal_range;
+	struct smu_feature_cap		fea_cap;
 	void *od_settings;
 
 	struct smu_umd_pstate_table	pstate_table;
@@ -1826,4 +1835,7 @@ int smu_phase_det_enable(struct smu_context *smu, bool enable);
 void amdgpu_smu_phase_det_debugfs_init(struct amdgpu_device *adev);
 
 #endif
+
+void smu_feature_cap_set(struct smu_context *smu, enum smu_feature_cap_id fea_id);
+bool smu_feature_cap_test(struct smu_context *smu, enum smu_feature_cap_id fea_id);
 #endif
