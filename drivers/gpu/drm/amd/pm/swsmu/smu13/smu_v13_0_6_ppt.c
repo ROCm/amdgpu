@@ -3407,6 +3407,15 @@ static int smu_v13_0_6_post_init(struct smu_context *smu)
 	struct smu_phase_det_ctl *pd_ctl;
 	bool enable;
 
+	if (smu_v13_0_6_is_link_reset_supported(smu))
+		smu_feature_cap_set(smu, SMU_FEATURE_CAP_ID__LINK_RESET);
+
+	if (smu_v13_0_6_reset_sdma_is_supported(smu))
+		smu_feature_cap_set(smu, SMU_FEATURE_CAP_ID__SDMA_RESET);
+
+	if (smu_v13_0_6_reset_vcn_is_supported(smu))
+		smu_feature_cap_set(smu, SMU_FEATURE_CAP_ID__VCN_RESET);
+
 	pd_ctl = smu_dpm->pd_ctl;
 
 	if (!pd_ctl || pd_ctl->status == SMU_PHASE_DET_DISABLED)
@@ -4160,7 +4169,6 @@ static const struct pptable_funcs smu_v13_0_6_ppt_funcs = {
 	.send_hbm_bad_pages_num = smu_v13_0_6_smu_send_hbm_bad_page_num,
 	.send_rma_reason = smu_v13_0_6_send_rma_reason,
 	.reset_sdma = smu_v13_0_6_reset_sdma,
-	.reset_sdma_is_supported = smu_v13_0_6_reset_sdma_is_supported,
 	.dpm_reset_vcn = smu_v13_0_6_reset_vcn,
 	.post_init = smu_v13_0_6_post_init,
 	.ras_send_msg = smu_v13_0_6_ras_send_msg,
