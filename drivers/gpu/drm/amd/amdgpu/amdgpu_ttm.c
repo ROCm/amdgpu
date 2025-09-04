@@ -2934,6 +2934,22 @@ int amdgpu_mmap(struct file *filp, struct vm_area_struct *vma)
         vma->vm_ops = &amdgpu_ttm_vm_ops;
         return 0;
 }
+
+/* This function should be called with mm lock held */
+bool amdgpu_vma_is_amdgpu_bo(struct vm_area_struct *vma)
+{
+	if (vma->vm_ops == &amdgpu_ttm_vm_ops)
+		return true;
+
+	return false;
+}
+#else
+bool amdgpu_vma_is_amdgpu_bo(struct vm_area_struct *vma)
+{
+	pr_err_once("bo from address verification not supported\n");
+
+	return false;
+}
 #endif /* HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK */
 
 static int amdgpu_calc_bytes_per_packet(u32 max_bytes_per_packet,
