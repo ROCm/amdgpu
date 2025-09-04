@@ -160,10 +160,16 @@ void kfd_ais_deinit(struct amdgpu_device *adev)
 
 		if (pfn_valid(pci_start_pfn)) {
 			p2p_page = pfn_to_page(pci_start_pfn);
+#ifdef HAVE_PAGE_PGMAP
 			if (p2p_page && is_pci_p2pdma_page(p2p_page) &&
 			    page_pgmap(p2p_page))
 				devm_memunmap_pages(&adev->pdev->dev, page_pgmap(p2p_page));
-		}
+#else
+			if (p2p_page && is_pci_p2pdma_page(p2p_page) &&
+				p2p_page->pgmap)
+				devm_memunmap_pages(&adev->pdev->dev, p2p_page->pgmap);
+#endif
+                }
 		adev->kfd.dev->ais_initialized = false;
 	}
 }
