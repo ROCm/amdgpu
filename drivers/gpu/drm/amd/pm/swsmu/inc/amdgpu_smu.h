@@ -561,6 +561,7 @@ enum smu_fw_status {
 
 enum smu_feature_cap_id {
 	SMU_FEATURE_CAP_ID__LINK_RESET = 0,
+	SMU_FEATURE_CAP_ID__SDMA_RESET,
 	SMU_FEATURE_CAP_ID__COUNT,
 };
 
@@ -1463,10 +1464,6 @@ struct pptable_funcs {
 	 * @reset_sdma: message SMU to soft reset sdma instance.
 	 */
 	int (*reset_sdma)(struct smu_context *smu, uint32_t inst_mask);
-	/**
-	 * @reset_sdma_is_supported: Check if support resets the SDMA engine.
-	 */
-	bool (*reset_sdma_is_supported)(struct smu_context *smu);
 
 	/**
 	 * @reset_vcn: message SMU to soft reset vcn instance.
