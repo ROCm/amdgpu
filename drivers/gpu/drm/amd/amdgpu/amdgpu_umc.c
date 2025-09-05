@@ -254,6 +254,7 @@ int amdgpu_umc_pasid_poison_handler(struct amdgpu_device *adev,
 			if (!ret) {
 #endif
 				atomic_inc(&con->page_retirement_req_cnt);
+				atomic_inc(&con->poison_consumption_count);
 				wake_up(&con->page_retirement_wq);
 #ifdef HAVE_KFIFO_PUT_NON_POINTER
 			}

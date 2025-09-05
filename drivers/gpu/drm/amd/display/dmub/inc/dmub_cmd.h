@@ -2364,6 +2364,7 @@ struct dmub_cmd_fams2_global_config {
 	union dmub_fams2_global_feature_config features;
 	uint32_t recovery_timeout_us;
 	uint32_t hwfq_flip_programming_delay_us;
+	uint32_t max_allow_to_target_delta_us; // how early DCN could assert P-State allow compared to the P-State target
 };
 
 union dmub_cmd_fams2_config {
@@ -4171,6 +4172,12 @@ enum replay_version {
  */
 struct dmub_cmd_replay_set_version_data {
 	/**
+	 * Panel Instance.
+	 * Panel instance to identify which psr_state to use
+	 * Currently the support is only for 0 or 1
+	 */
+	uint8_t panel_inst;
+	/**
 	 * PSR version that FW should implement.
 	 */
 	enum replay_version version;
@@ -4178,12 +4185,6 @@ struct dmub_cmd_replay_set_version_data {
 	 * PSR control version.
 	 */
 	uint8_t cmd_version;
-	/**
-	 * Panel Instance.
-	 * Panel instance to identify which psr_state to use
-	 * Currently the support is only for 0 or 1
-	 */
-	uint8_t panel_inst;
 	/**
 	 * Explicit padding to 4 byte boundary.
 	 */
@@ -6021,6 +6022,8 @@ enum ips_residency_mode {
 	IPS_RESIDENCY__IPS1_RCG,
 	IPS_RESIDENCY__IPS1_ONO2_ON,
 	IPS_RESIDENCY__IPS1_Z8_RETENTION,
+	IPS_RESIDENCY__PG_ONO_LAST_SEEN_IN_IPS,
+	IPS_RESIDENCY__PG_ONO_CURRENT_STATE
 };
 
 #define NUM_IPS_HISTOGRAM_BUCKETS 16
@@ -6034,6 +6037,8 @@ struct dmub_ips_residency_info {
 	uint32_t histogram[NUM_IPS_HISTOGRAM_BUCKETS];
 	uint64_t total_time_us;
 	uint64_t total_inactive_time_us;
+	uint32_t ono_pg_state_at_collection;
+	uint32_t ono_pg_state_last_seen_in_ips;
 };
 
 /**
@@ -6542,15 +6547,18 @@ static inline bool dmub_rb_full(struct dmub_rb *rb)
 static inline bool dmub_rb_push_front(struct dmub_rb *rb,
 				      const union dmub_rb_cmd *cmd)
 {
-	uint64_t volatile *dst = (uint64_t volatile *)((uint8_t *)(rb->base_address) + rb->wrpt);
-	const uint64_t *src = (const uint64_t *)cmd;
+	uint8_t *dst = (uint8_t *)(rb->base_address) + rb->wrpt;
+	const uint8_t *src = (const uint8_t *)cmd;
 	uint8_t i;
+
+	if (rb->capacity == 0)
+		return false;
 
 	if (dmub_rb_full(rb))
 		return false;
 
 	// copying data
-	for (i = 0; i < DMUB_RB_CMD_SIZE / sizeof(uint64_t); i++)
+	for (i = 0; i < DMUB_RB_CMD_SIZE; i++)
 		*dst++ = *src++;
 
 	rb->wrpt += DMUB_RB_CMD_SIZE;
@@ -6574,6 +6582,9 @@ static inline bool dmub_rb_out_push_front(struct dmub_rb *rb,
 {
 	uint8_t *dst = (uint8_t *)(rb->base_address) + rb->wrpt;
 	const uint8_t *src = (const uint8_t *)cmd;
+
+	if (rb->capacity == 0)
+		return false;
 
 	if (dmub_rb_full(rb))
 		return false;
@@ -6620,6 +6631,9 @@ static inline void dmub_rb_get_rptr_with_offset(struct dmub_rb *rb,
 				  uint32_t num_cmds,
 				  uint32_t *next_rptr)
 {
+	if (rb->capacity == 0)
+		return;
+
 	*next_rptr = rb->rptr + DMUB_RB_CMD_SIZE * num_cmds;
 
 	if (*next_rptr >= rb->capacity)
@@ -6683,6 +6697,9 @@ static inline bool dmub_rb_out_front(struct dmub_rb *rb,
  */
 static inline bool dmub_rb_pop_front(struct dmub_rb *rb)
 {
+	if (rb->capacity == 0)
+		return false;
+
 	if (dmub_rb_empty(rb))
 		return false;
 
@@ -6706,6 +6723,9 @@ static inline void dmub_rb_flush_pending(const struct dmub_rb *rb)
 {
 	uint32_t rptr = rb->rptr;
 	uint32_t wptr = rb->wrpt;
+
+	if (rb->capacity == 0)
+		return;
 
 	while (rptr != wptr) {
 		uint64_t *data = (uint64_t *)((uint8_t *)(rb->base_address) + rptr);

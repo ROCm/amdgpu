@@ -320,6 +320,8 @@ static void smu_v13_0_14_init_caps(struct smu_context *smu)
 		smu_v13_0_6_cap_set(smu, SMU_CAP(PER_INST_METRICS));
 	if (fw_ver >= 0x5551200)
 		smu_v13_0_6_cap_set(smu, SMU_CAP(SDMA_RESET));
+	if (fw_ver >= 0x5551800)
+		smu_v13_0_6_cap_set(smu, SMU_CAP(VCN_RESET));
 	if (fw_ver >= 0x5551600) {
 		smu_v13_0_6_cap_set(smu, SMU_CAP(STATIC_METRICS));
 		smu_v13_0_6_cap_set(smu, SMU_CAP(BOARD_VOLTAGE));
@@ -445,7 +447,8 @@ static void smu_v13_0_6_init_caps(struct smu_context *smu)
 	    ((pgm == 4) && (fw_ver >= 0x4557000)))
 		smu_v13_0_6_cap_set(smu, SMU_CAP(SDMA_RESET));
 
-	if ((pgm == 4) && (fw_ver >= 0x04557100))
+	if (((pgm == 0) && (fw_ver >= 0x00558200)) ||
+	    ((pgm == 4) && (fw_ver >= 0x04557100)))
 		smu_v13_0_6_cap_set(smu, SMU_CAP(VCN_RESET));
 }
 
@@ -543,6 +546,9 @@ static int smu_v13_0_6_tables_init(struct smu_context *smu)
 {
 	struct smu_table_context *smu_table = &smu->smu_table;
 	struct smu_table *tables = smu_table->tables;
+	void *gpu_metrics_table __free(kfree) = NULL;
+	void *driver_pptable __free(kfree) = NULL;
+	void *metrics_table __free(kfree) = NULL;
 	struct amdgpu_device *adev = smu->adev;
 	int gpu_metrcs_size = METRICS_TABLE_SIZE;
 	int ret;
@@ -561,36 +567,31 @@ static int smu_v13_0_6_tables_init(struct smu_context *smu)
 		       PAGE_SIZE,
 		       AMDGPU_GEM_DOMAIN_VRAM | AMDGPU_GEM_DOMAIN_GTT);
 
-	smu_table->metrics_table = kzalloc(METRICS_TABLE_SIZE, GFP_KERNEL);
-	if (!smu_table->metrics_table)
+	metrics_table = kzalloc(METRICS_TABLE_SIZE, GFP_KERNEL);
+	if (!metrics_table)
 		return -ENOMEM;
 	smu_table->metrics_time = 0;
 
 	smu_table->gpu_metrics_table_size = sizeof(struct gpu_metrics_v1_8);
-	smu_table->gpu_metrics_table =
+	gpu_metrics_table =
 		kzalloc(smu_table->gpu_metrics_table_size, GFP_KERNEL);
-	if (!smu_table->gpu_metrics_table) {
-		kfree(smu_table->metrics_table);
+	if (!gpu_metrics_table)
 		return -ENOMEM;
-	}
 
-	smu_table->driver_pptable =
-		kzalloc(sizeof(struct PPTable_t), GFP_KERNEL);
-	if (!smu_table->driver_pptable) {
-		kfree(smu_table->metrics_table);
-		kfree(smu_table->gpu_metrics_table);
+	driver_pptable = kzalloc(sizeof(struct PPTable_t), GFP_KERNEL);
+	if (!driver_pptable)
 		return -ENOMEM;
-	}
 
 	if (amdgpu_ip_version(smu->adev, MP1_HWIP, 0) ==
 	    IP_VERSION(13, 0, 12)) {
 		ret = smu_v13_0_12_tables_init(smu);
-		if (ret) {
-			kfree(smu_table->metrics_table);
-			kfree(smu_table->gpu_metrics_table);
+		if (ret)
 			return ret;
-		}
 	}
+
+	smu_table->gpu_metrics_table = no_free_ptr(gpu_metrics_table);
+	smu_table->metrics_table = no_free_ptr(metrics_table);
+	smu_table->driver_pptable = no_free_ptr(driver_pptable);
 
 	return 0;
 }
@@ -2778,9 +2779,9 @@ static ssize_t smu_v13_0_6_get_xcp_metrics(struct smu_context *smu, int xcp_id,
 	const u8 num_jpeg_rings = AMDGPU_MAX_JPEG_RINGS_4_0_3;
 	int version = smu_v13_0_6_get_metrics_version(smu);
 	struct amdgpu_partition_metrics_v1_0 *xcp_metrics;
+	MetricsTableV0_t *metrics_v0 __free(kfree) = NULL;
 	struct amdgpu_device *adev = smu->adev;
 	int ret, inst, i, j, k, idx;
-	MetricsTableV0_t *metrics_v0;
 	MetricsTableV1_t *metrics_v1;
 	MetricsTableV2_t *metrics_v2;
 	struct amdgpu_xcp *xcp;
@@ -2805,17 +2806,14 @@ static ssize_t smu_v13_0_6_get_xcp_metrics(struct smu_context *smu, int xcp_id,
 		return -ENOMEM;
 
 	ret = smu_v13_0_6_get_metrics_table(smu, metrics_v0, false);
-	if (ret) {
-		kfree(metrics_v0);
+	if (ret)
 		return ret;
-	}
 
 	if (amdgpu_ip_version(smu->adev, MP1_HWIP, 0) ==
 		    IP_VERSION(13, 0, 12) &&
-	    smu_v13_0_6_cap_supported(smu, SMU_CAP(STATIC_METRICS))) {
-		ret = smu_v13_0_12_get_xcp_metrics(smu, xcp, table, metrics_v0);
-		goto out;
-	}
+	    smu_v13_0_6_cap_supported(smu, SMU_CAP(STATIC_METRICS)))
+		return smu_v13_0_12_get_xcp_metrics(smu, xcp, table,
+						    metrics_v0);
 
 	metrics_v1 = (MetricsTableV1_t *)metrics_v0;
 	metrics_v2 = (MetricsTableV2_t *)metrics_v0;
@@ -2886,8 +2884,6 @@ static ssize_t smu_v13_0_6_get_xcp_metrics(struct smu_context *smu, int xcp_id,
 			idx++;
 		}
 	}
-out:
-	kfree(metrics_v0);
 
 	return sizeof(*xcp_metrics);
 }
@@ -2898,31 +2894,26 @@ static ssize_t smu_v13_0_6_get_gpu_metrics(struct smu_context *smu, void **table
 	struct gpu_metrics_v1_8 *gpu_metrics =
 		(struct gpu_metrics_v1_8 *)smu_table->gpu_metrics_table;
 	int version = smu_v13_0_6_get_metrics_version(smu);
+	MetricsTableV0_t *metrics_v0 __free(kfree) = NULL;
 	int ret = 0, xcc_id, inst, i, j, k, idx;
 	struct amdgpu_device *adev = smu->adev;
-	MetricsTableV0_t *metrics_v0;
 	MetricsTableV1_t *metrics_v1;
 	MetricsTableV2_t *metrics_v2;
 	struct amdgpu_xcp *xcp;
 	u16 link_width_level;
-	ssize_t num_bytes;
 	u8 num_jpeg_rings;
 	u32 inst_mask;
 	bool per_inst;
 
 	metrics_v0 = kzalloc(METRICS_TABLE_SIZE, GFP_KERNEL);
 	ret = smu_v13_0_6_get_metrics_table(smu, metrics_v0, false);
-	if (ret) {
-		kfree(metrics_v0);
+	if (ret)
 		return ret;
-	}
 
-	if (amdgpu_ip_version(smu->adev, MP1_HWIP, 0) == IP_VERSION(13, 0, 12) &&
-	    smu_v13_0_6_cap_supported(smu, SMU_CAP(STATIC_METRICS))) {
-		num_bytes = smu_v13_0_12_get_gpu_metrics(smu, table, metrics_v0);
-		kfree(metrics_v0);
-		return num_bytes;
-	}
+	if (amdgpu_ip_version(smu->adev, MP1_HWIP, 0) ==
+		    IP_VERSION(13, 0, 12) &&
+	    smu_v13_0_6_cap_supported(smu, SMU_CAP(STATIC_METRICS)))
+		return smu_v13_0_12_get_gpu_metrics(smu, table, metrics_v0);
 
 	metrics_v1 = (MetricsTableV1_t *)metrics_v0;
 	metrics_v2 = (MetricsTableV2_t *)metrics_v0;
@@ -3108,7 +3099,6 @@ static ssize_t smu_v13_0_6_get_gpu_metrics(struct smu_context *smu, void **table
 	gpu_metrics->firmware_timestamp = GET_METRIC_FIELD(Timestamp, version);
 
 	*table = (void *)gpu_metrics;
-	kfree(metrics_v0);
 
 	return sizeof(*gpu_metrics);
 }
@@ -3294,7 +3284,7 @@ static inline bool smu_v13_0_6_is_link_reset_supported(struct smu_context *smu)
 	struct amdgpu_device *adev = smu->adev;
 	int var = (adev->pdev->device & 0xF);
 
-	if (var == 0x1)
+	if (var == 0x0 || var == 0x1 || var == 0x3)
 		return true;
 
 	return false;

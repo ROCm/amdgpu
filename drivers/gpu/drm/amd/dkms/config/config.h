@@ -284,6 +284,9 @@
 /* struct drm_connector_state has hdr_output_metadata member */
 #define HAVE_DRM_CONNECTOR_STATE_HDR_OUTPUT_METADATA 1
 
+/* drm_connector_update_privacy_screen() is available */
+#define HAVE_DRM_CONNECTOR_UPDATE_PRIVACY_SCREEN 1
+
 /* drm_connector_attach_colorspace_property() is available */
 #define HAVE_DRM_CONNECT_ATTACH_COLORSPACE_PROPERTY 1
 
@@ -398,6 +401,9 @@
 
 /* Define to 1 if you have the <drm/dp/drm_dp_mst_helper.h> header file. */
 /* #undef HAVE_DRM_DP_DRM_DP_MST_HELPER_H */
+
+/* Define to 1 if you have the <drm/drm_privacy_screen_consumer.h> header file. */
+#define HAVE_DRM_DRM_PRIVACY_SCREEN_CONSUMER_H 1
 
 /* drm_dp_link_train_channel_eq_delay() has 2 args */
 #define HAVE_DRM_DP_LINK_TRAIN_CHANNEL_EQ_DELAY_2ARGS 1
@@ -719,6 +725,9 @@
 
 /* drm_vblank_crtc_config is available */
 #define HAVE_DRM_VBLANK_CRTC_CONFIG 1
+
+/* struct vblank->config is available */
+#define HAVE_DRM_VBLANK_CRTC_STRUCT_CONFIG 1
 
 /* struct drm_vma_offset_node has readonly field */
 /* #undef HAVE_DRM_VMA_OFFSET_NODE_READONLY_FIELD */

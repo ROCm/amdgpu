@@ -185,16 +185,16 @@ int amdgpu_vcn_sw_init(struct amdgpu_device *adev, int i)
 		dec_ver = (le32_to_cpu(hdr->ucode_version) >> 24) & 0xf;
 		vep = (le32_to_cpu(hdr->ucode_version) >> 28) & 0xf;
 		dev_info(adev->dev,
-			 "Found VCN firmware Version ENC: %u.%u DEC: %u VEP: %u Revision: %u\n",
-			 enc_major, enc_minor, dec_ver, vep, fw_rev);
+			 "[VCN instance %d] Found VCN firmware Version ENC: %u.%u DEC: %u VEP: %u Revision: %u\n",
+			 i, enc_major, enc_minor, dec_ver, vep, fw_rev);
 	} else {
 		unsigned int version_major, version_minor, family_id;
 
 		family_id = le32_to_cpu(hdr->ucode_version) & 0xff;
 		version_major = (le32_to_cpu(hdr->ucode_version) >> 24) & 0xff;
 		version_minor = (le32_to_cpu(hdr->ucode_version) >> 8) & 0xff;
-		dev_info(adev->dev, "Found VCN firmware Version: %u.%u Family ID: %u\n",
-			 version_major, version_minor, family_id);
+		dev_info(adev->dev, "[VCN instance %d] Found VCN firmware Version: %u.%u Family ID: %u\n",
+			 i, version_major, version_minor, family_id);
 	}
 
 	bo_size = AMDGPU_VCN_STACK_SIZE + AMDGPU_VCN_CONTEXT_SIZE;
@@ -357,8 +357,6 @@ int amdgpu_vcn_suspend(struct amdgpu_device *adev, int i)
 	if (adev->vcn.harvest_config & (1 << i))
 		return 0;
 
-	cancel_delayed_work_sync(&adev->vcn.inst[i].idle_work);
-
 	/* err_event_athub and dpc recovery will corrupt VCPU buffer, so we need to
 	 * restore fw data and clear buffer in amdgpu_vcn_resume() */
 	if (in_ras_intr || adev->pcie_reset_ctx.in_link_reset)
@@ -410,6 +408,54 @@ int amdgpu_vcn_resume(struct amdgpu_device *adev, int i)
 	return 0;
 }
 
+void amdgpu_vcn_get_profile(struct amdgpu_device *adev)
+{
+	int r;
+
+	mutex_lock(&adev->vcn.workload_profile_mutex);
+
+	if (adev->vcn.workload_profile_active) {
+		mutex_unlock(&adev->vcn.workload_profile_mutex);
+		return;
+	}
+	r = amdgpu_dpm_switch_power_profile(adev, PP_SMC_POWER_PROFILE_VIDEO,
+					    true);
+	if (r)
+		dev_warn(adev->dev,
+			 "(%d) failed to enable video power profile mode\n", r);
+	else
+		adev->vcn.workload_profile_active = true;
+	mutex_unlock(&adev->vcn.workload_profile_mutex);
+}
+
+void amdgpu_vcn_put_profile(struct amdgpu_device *adev)
+{
+	bool pg = true;
+	int r, i;
+
+	mutex_lock(&adev->vcn.workload_profile_mutex);
+	for (i = 0; i < adev->vcn.num_vcn_inst; i++) {
+		if (adev->vcn.inst[i].cur_state != AMD_PG_STATE_GATE) {
+			pg = false;
+			break;
+		}
+	}
+
+	if (pg) {
+		r = amdgpu_dpm_switch_power_profile(
+			adev, PP_SMC_POWER_PROFILE_VIDEO, false);
+		if (r)
+			dev_warn(
+				adev->dev,
+				"(%d) failed to disable video power profile mode\n",
+				r);
+		else
+			adev->vcn.workload_profile_active = false;
+	}
+
+	mutex_unlock(&adev->vcn.workload_profile_mutex);
+}
+
 static void amdgpu_vcn_idle_work_handler(struct work_struct *work)
 {
 	struct amdgpu_vcn_inst *vcn_inst =
@@ -417,7 +463,6 @@ static void amdgpu_vcn_idle_work_handler(struct work_struct *work)
 	struct amdgpu_device *adev = vcn_inst->adev;
 	unsigned int fences = 0, fence[AMDGPU_MAX_VCN_INSTANCES] = {0};
 	unsigned int i = vcn_inst->inst, j;
-	int r = 0;
 
 	if (adev->vcn.harvest_config & (1 << i))
 		return;
@@ -446,15 +491,8 @@ static void amdgpu_vcn_idle_work_handler(struct work_struct *work)
 		mutex_lock(&vcn_inst->vcn_pg_lock);
 		vcn_inst->set_pg_state(vcn_inst, AMD_PG_STATE_GATE);
 		mutex_unlock(&vcn_inst->vcn_pg_lock);
-		mutex_lock(&adev->vcn.workload_profile_mutex);
-		if (adev->vcn.workload_profile_active) {
-			r = amdgpu_dpm_switch_power_profile(adev, PP_SMC_POWER_PROFILE_VIDEO,
-							    false);
-			if (r)
-				dev_warn(adev->dev, "(%d) failed to disable video power profile mode\n", r);
-			adev->vcn.workload_profile_active = false;
-		}
-		mutex_unlock(&adev->vcn.workload_profile_mutex);
+		amdgpu_vcn_put_profile(adev);
+
 	} else {
 		schedule_delayed_work(&vcn_inst->idle_work, VCN_IDLE_TIMEOUT);
 	}
@@ -464,30 +502,11 @@ void amdgpu_vcn_ring_begin_use(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 	struct amdgpu_vcn_inst *vcn_inst = &adev->vcn.inst[ring->me];
-	int r = 0;
 
 	atomic_inc(&vcn_inst->total_submission_cnt);
 
 	cancel_delayed_work_sync(&vcn_inst->idle_work);
 
-	/* We can safely return early here because we've cancelled the
-	 * the delayed work so there is no one else to set it to false
-	 * and we don't care if someone else sets it to true.
-	 */
-	if (adev->vcn.workload_profile_active)
-		goto pg_lock;
-
-	mutex_lock(&adev->vcn.workload_profile_mutex);
-	if (!adev->vcn.workload_profile_active) {
-		r = amdgpu_dpm_switch_power_profile(adev, PP_SMC_POWER_PROFILE_VIDEO,
-						    true);
-		if (r)
-			dev_warn(adev->dev, "(%d) failed to switch to video power profile mode\n", r);
-		adev->vcn.workload_profile_active = true;
-	}
-	mutex_unlock(&adev->vcn.workload_profile_mutex);
-
-pg_lock:
 	mutex_lock(&vcn_inst->vcn_pg_lock);
 	vcn_inst->set_pg_state(vcn_inst, AMD_PG_STATE_UNGATE);
 
@@ -515,6 +534,7 @@ pg_lock:
 		vcn_inst->pause_dpg_mode(vcn_inst, &new_state);
 	}
 	mutex_unlock(&vcn_inst->vcn_pg_lock);
+	amdgpu_vcn_get_profile(adev);
 }
 
 void amdgpu_vcn_ring_end_use(struct amdgpu_ring *ring)

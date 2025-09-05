@@ -55,7 +55,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.345"
+#define DC_VER "3.2.348"
 
 /**
  * MAX_SURFACES - representative of the upper bound of surfaces that can be piped to a single CRTC
@@ -234,6 +234,7 @@ struct lut3d_caps {
  * @ogam_ram: programmable out gamma LUT
  * @ocsc: output color space conversion matrix
  * @num_3dluts: MPC 3D LUT; always assumes a preceding shaper LUT
+ * @num_rmcm_3dluts: number of RMCM 3D LUTS; always assumes a preceding shaper LUT
  * @shared_3d_lut: shared 3D LUT flag. Can be either DPP or MPC, but single
  * instance
  * @ogam_rom_caps: pre-definied curve caps for regamma 1D LUT
@@ -694,6 +695,15 @@ struct dc_clocks {
 	int idle_fclk_khz;
 	int subvp_prefetch_dramclk_khz;
 	int subvp_prefetch_fclk_khz;
+
+	/* Stutter efficiency is technically not clock values
+	 * but stored here so the values are part of the update_clocks call similar to num_ways
+	 * Efficiencies are stored as percentage (0-100)
+	 */
+	struct {
+		uint8_t base_efficiency; //LP1
+		uint8_t low_power_efficiency; //LP2
+	} stutter_efficiency;
 };
 
 struct dc_bw_validation_profile {
@@ -1856,8 +1866,6 @@ void dc_3dlut_func_retain(struct dc_3dlut *lut);
 
 void dc_post_update_surfaces_to_stream(
 		struct dc *dc);
-
-#include "dc_stream.h"
 
 /**
  * struct dc_validation_set - Struct to store surface/stream associations for validation
