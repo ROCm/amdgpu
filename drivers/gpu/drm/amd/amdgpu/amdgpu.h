@@ -730,7 +730,7 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 /* VRAM scratch page for HDP bug, default vram page */
 struct amdgpu_mem_scratch {
 	struct amdgpu_bo		*robj;
-	volatile uint32_t		*ptr;
+	uint32_t			*ptr;
 	u64				gpu_addr;
 };
 
