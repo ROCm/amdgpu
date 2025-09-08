@@ -349,6 +349,9 @@
 /* drm_dp_mst_atomic_wait_for_dependencies() is available */
 #define HAVE_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES 1
 
+/* drm_dp_aux->dpcd_probe_disabled is available */
+#define HAVE_DRM_DP_AUX_DPCD_PROBE_DISABLED 1
+
 /* struct drm_dp_aux has member named 'drm_dev' */
 #define HAVE_DRM_DP_AUX_DRM_DEV 1
 
