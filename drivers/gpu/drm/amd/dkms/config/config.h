@@ -1192,6 +1192,9 @@
 /* vma_lookup() is available */
 #define HAVE_VMA_LOOKUP 1
 
+/* vmemdup_array_user() is available */
+#define HAVE_VMEMDUP_ARRAY_USER 1
+
 /* vmf_insert_*() are available */
 #define HAVE_VMF_INSERT 1
 
