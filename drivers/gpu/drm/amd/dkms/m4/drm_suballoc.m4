@@ -7,7 +7,11 @@ AC_DEFUN([AC_AMDGPU_DRM_SUBALLOC_MANAGER_INIT], [
                 AC_KERNEL_TRY_COMPILE([
                         #include <drm/drm_suballoc.h>
                 ], [
+                        #ifdef CONFIG_DRM_SUBALLOC_HELPER
 			drm_suballoc_manager_init(NULL, 0, 0);
+                        #else
+                        #error CONFIG_DRM_SUBALLOC_HELPER is not enabled
+                        #endif
                 ], [
                         AC_DEFINE(HAVE_DRM_SUBALLOC_MANAGER_INIT, 1,
                                 [Has function drm_suballoc_manager_init()])
