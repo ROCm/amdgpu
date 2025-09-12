@@ -68,6 +68,9 @@
 /* bitmap_free() is available */
 #define HAVE_BITMAP_FUNCS 1
 
+/* bitmap_read() is available */
+#define HAVE_BITMAP_READ 1
+
 /* bitmap_to_arr32() is available */
 #define HAVE_BITMAP_TO_ARR32 1
 
