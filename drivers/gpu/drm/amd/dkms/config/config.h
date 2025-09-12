@@ -615,6 +615,12 @@
 /* drm_gem_prime_handle_to_fd() is available */
 #define HAVE_DRM_GEM_PRIME_HANDLE_TO_FD 1
 
+/* get_format_info uses pixel_format and modifier parameters */
+#define HAVE_DRM_GET_FORMAT_INFO_TWO_ARGS 1
+
+/* drm_get_panel_min_brightness_quirk() is available */
+#define HAVE_DRM_GET_PANEL_MIN_BRIGHTNESS_QUIRK 1
+
 /* drm_hdcp_update_content_protection is available */
 #define HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION 1
 
