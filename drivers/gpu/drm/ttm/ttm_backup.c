@@ -160,11 +160,20 @@ ttm_backup_backup_folio(struct file *backup, struct folio *folio,
 		if (writeback && !folio_mapped(to_folio) &&
 		    folio_clear_dirty_for_io(to_folio)) {
 			folio_set_reclaim(to_folio);
-			#ifdef HAVE_SHMEM_WRITEOUT
+#ifdef HAVE_SHMEM_WRITEOUT
+			struct writeback_control wbc = {
+				.sync_mode = WB_SYNC_NONE,
+				.nr_to_write = SWAP_CLUSTER_MAX,
+				.range_start = 0,
+				.range_end = LLONG_MAX,
+				.for_reclaim = 1,
+			};
+			ret = shmem_writeout(to_folio, &wbc);
+#elif defined(HAVE_SHMEM_WRITEOUT_WANT_3_ARGS)
 			ret = shmem_writeout(to_folio, NULL, NULL);
-			#else
+#else
 			ret = mapping->a_ops->writepage(folio_file_page(to_folio, idx + i), NULL);
-			#endif
+#endif
 			if (!folio_test_writeback(to_folio))
 				folio_clear_reclaim(to_folio);
 			if (ret == AOP_WRITEPAGE_ACTIVATE)
