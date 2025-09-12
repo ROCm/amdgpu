@@ -114,6 +114,7 @@ ttm_backup_backup_page(struct file *backup, struct page *page,
 
 	if (writeback && !folio_mapped(to_folio) &&
 	    folio_clear_dirty_for_io(to_folio)) {
+#ifndef HAVE_SHMEM_WRITEOUT_WANT_3_ARGS
 		struct writeback_control wbc = {
 			.sync_mode = WB_SYNC_NONE,
 			.nr_to_write = SWAP_CLUSTER_MAX,
@@ -121,9 +122,12 @@ ttm_backup_backup_page(struct file *backup, struct page *page,
 			.range_end = LLONG_MAX,
 			.for_reclaim = 1,
 		};
+#endif
 		folio_set_reclaim(to_folio);
 #ifdef HAVE_SHMEM_WRITEOUT
 		ret = shmem_writeout(to_folio, &wbc);
+#elif defined(HAVE_SHMEM_WRITEOUT_WANT_3_ARGS)
+		ret = shmem_writeout(to_folio, NULL, NULL);
 #else
 		ret = mapping->a_ops->writepage(folio_file_page(to_folio, idx), &wbc);
 #endif

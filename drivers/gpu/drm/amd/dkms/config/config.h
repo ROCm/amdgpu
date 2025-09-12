@@ -1144,6 +1144,9 @@
 /* shmem_writeout() is available */
 #define HAVE_SHMEM_WRITEOUT 1
 
+/* shmem_writeout() wants 3 arguments */
+/* #undef HAVE_SHMEM_WRITEOUT_WANT_3_ARGS */
+
 /* shrinker_register() is available */
 #define HAVE_SHRINKER_REGISTER 1
 
