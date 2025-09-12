@@ -63,6 +63,7 @@
 #include <kcl/kcl_sysfs_emit.h>
 #include <kcl/kcl_bitops.h>
 #include <kcl/kcl_sched_mm.h>
+#include <kcl/kcl_bitmap.h>
 #include <kcl/backport/kcl_numa_backport.h>
 #include <kcl/kcl_mmzone.h>
 #include <kcl/kcl_drm_file.h>
@@ -79,7 +80,6 @@
 #include <kcl/backport/kcl_bitmap.h>
 #include <kcl/kcl_capability.h>
 #include <kcl/kcl_fdtable.h>
-#include <kcl/kcl_bitmap.h>
 #include <kcl/kcl_dma_fence_chain.h>
 #include <kcl/kcl_pci.h>
 #include <kcl/kcl_cc_platform.h>
