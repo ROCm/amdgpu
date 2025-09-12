@@ -595,6 +595,9 @@
 /* drm_edid_valid() is available */
 #define HAVE_DRM_EDID_VALID 1
 
+/* fb_create has const struct drm_format_info * parameter */
+#define HAVE_DRM_FB_CREATE_FORMAT_INFO 1
+
 /* drm_fb_helper_fill_info() is available */
 #define HAVE_DRM_FB_HELPER_FILL_INFO 1
 
