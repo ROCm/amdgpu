@@ -664,6 +664,9 @@
 /* drm_helper_force_disable_all() is available */
 #define HAVE_DRM_HELPER_FORCE_DISABLE_ALL 1
 
+/* drm_helper_mode_fill_fb_struct() wants 4 arguments */
+#define HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_4_ARGS 1
+
 /* drm_kms_helper_connector_hotplug_event() function is available */
 #define HAVE_DRM_KMS_HELPER_CONNECTOR_HOTPLUG_EVENT 1
 
