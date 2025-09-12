@@ -1206,7 +1206,12 @@ int amdgpu_display_gem_fb_init(struct drm_device *dev,
 {
 	int ret;
 	rfb->base.obj[0] = obj;
+
+#ifdef HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_4_ARGS
+	drm_helper_mode_fill_fb_struct(dev, &rfb->base, NULL, mode_cmd);
+#else
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
+#endif
 
 	ret = amdgpu_display_framebuffer_init(dev, rfb, mode_cmd, obj);
 	if (ret)
@@ -1233,7 +1238,14 @@ static int amdgpu_display_gem_fb_verify_and_init(struct drm_device *dev,
 	int ret;
 
 	rfb->base.obj[0] = obj;
+
+#ifdef HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_4_ARGS
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, info, mode_cmd);
+#else
+	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
+#endif
+
+
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	/* Verify that the modifier is supported. */
 	if (!drm_any_plane_has_format(dev, mode_cmd->pixel_format,
