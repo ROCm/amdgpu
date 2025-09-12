@@ -1231,7 +1231,9 @@ err:
 static int amdgpu_display_gem_fb_verify_and_init(struct drm_device *dev,
 						 struct amdgpu_framebuffer *rfb,
 						 struct drm_file *file_priv,
+#ifdef HAVE_DRM_FB_CREATE_FORMAT_INFO
 						 const struct drm_format_info *info,
+#endif
 						 const struct drm_mode_fb_cmd2 *mode_cmd,
 						 struct drm_gem_object *obj)
 {
@@ -1354,7 +1356,9 @@ static int amdgpu_display_framebuffer_init(struct drm_device *dev,
 struct drm_framebuffer *
 amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 				       struct drm_file *file_priv,
+#ifdef HAVE_DRM_FB_CREATE_FORMAT_INFO
 				       const struct drm_format_info *info,
+#endif
 				       const struct drm_mode_fb_cmd2 *mode_cmd)
 {
 	struct amdgpu_framebuffer *amdgpu_fb;
@@ -1392,7 +1396,11 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 	}
 
 	ret = amdgpu_display_gem_fb_verify_and_init(dev, amdgpu_fb, file_priv,
+#ifdef HAVE_DRM_FB_CREATE_FORMAT_INFO
 						    info, mode_cmd, obj);
+#else
+						    mode_cmd, obj);
+#endif
 	if (ret) {
 		kfree(amdgpu_fb);
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
