@@ -1180,6 +1180,9 @@
 /* usleep_range_stat() is available */
 #define HAVE_USLEEP_RANGE_STATE 1
 
+/* vfs_iocb_iter_read() is available */
+#define HAVE_VFS_IOCB_ITER_READ 1
+
 /* vga_client_register() don't pass a cookie */
 #define HAVE_VGA_CLIENT_REGISTER_NOT_PASS_COOKIE 1
 
