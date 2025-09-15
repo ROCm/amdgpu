@@ -616,6 +616,8 @@ struct amdgpu_ras {
 
 	/* Protect poison injection */
 	struct mutex poison_lock;
+
+	const struct ras_smu_drv *ras_smu_drv;
 };
 
 struct ras_fs_data {

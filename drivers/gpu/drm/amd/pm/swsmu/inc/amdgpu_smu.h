@@ -1553,6 +1553,11 @@ struct pptable_funcs {
 	 */
 	ssize_t (*get_xcp_metrics)(struct smu_context *smu, int xcp_id,
 				   void *table);
+	/**
+	 * @get_ras_smu_drv: Get RAS smu driver interface
+	 * Return: ras_smu_drv *
+	 */
+	int (*get_ras_smu_drv)(struct smu_context *smu, const struct ras_smu_drv **ras_smu_drv);
 };
 
 typedef enum {
@@ -1817,6 +1822,7 @@ int smu_set_pm_policy(struct smu_context *smu, enum pp_pm_policy p_type,
 		      int level);
 ssize_t smu_get_pm_policy_info(struct smu_context *smu,
 			       enum pp_pm_policy p_type, char *sysbuf);
+const struct ras_smu_drv *smu_get_ras_smu_driver(void *handle);
 
 int smu_set_phase_det_param(struct smu_context *smu,
 			    enum pp_pm_phase_det_param_id id, uint32_t val);
