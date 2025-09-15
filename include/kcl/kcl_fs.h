@@ -31,4 +31,13 @@ ssize_t _kcl_kernel_write(struct file *file, const void *buf, size_t count,
 #endif
 #endif
 
+#ifndef HAVE_VFS_IOCB_ITER_READ
+ssize_t kcl_vfs_iocb_iter_read(struct file *file, struct kiocb *iocb,
+			   struct iov_iter *iter);
+ssize_t kcl_vfs_iocb_iter_write(struct file *file, struct kiocb *iocb,
+			    struct iov_iter *iter);
+#define vfs_iocb_iter_read kcl_vfs_iocb_iter_read
+#define vfs_iocb_iter_write kcl_vfs_iocb_iter_write
+#endif
+
 #endif
