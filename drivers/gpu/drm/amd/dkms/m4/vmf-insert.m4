@@ -25,20 +25,6 @@ AC_DEFUN([AC_AMDGPU_VMF_INSERT], [
 			], [
 				AC_DEFINE(HAVE_VMF_INSERT, 1,
 					[vmf_insert_*() are available])
-			], [
-				dnl #
-				dnl # commit v4.4-6475-g01c8f1c44b83
-				dnl # mm, dax, gpu: convert vm_insert_mixed to pfn_t
-				dnl #
-				AC_KERNEL_TRY_COMPILE_SYMBOL([
-					#include <linux/mm.h>
-				], [
-					pfn_t pfn = {};
-					vm_insert_mixed(NULL, 0, pfn);
-				], [vm_insert_mixed], [mm/memory.c], [
-					AC_DEFINE(HAVE_PFN_T_VM_INSERT_MIXED, 1,
-						[vm_insert_mixed() wants pfn_t arg])
-				])
 			])
 		])
 	])
