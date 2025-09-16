@@ -31,9 +31,8 @@ static inline unsigned long pfn_t_to_pfn(pfn_t pfn)
 }
 #endif
 
-#ifndef HAVE_VMF_INSERT
+#if !defined(HAVE_VMF_INSERT) && !defined(HAVE_VMF_INSERT_MIXED_MKWRITE_LONG_PFN)
 typedef int vm_fault_t;
 #endif
 
 #endif /* AMDKCL_MM_TYPES_H */
-
