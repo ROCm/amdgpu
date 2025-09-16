@@ -1198,6 +1198,9 @@
 /* vmf_insert_*() are available */
 #define HAVE_VMF_INSERT 1
 
+/* vmf_insert_mixed_mkwrite() has long pfn arg */
+/* #undef HAVE_VMF_INSERT_MIXED_MKWRITE_LONG_PFN */
+
 /* vmf_insert_pfn_prot() is available */
 #define HAVE_VMF_INSERT_PFN_PROT 1
 
