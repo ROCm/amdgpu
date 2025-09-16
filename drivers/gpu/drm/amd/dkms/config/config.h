@@ -1087,9 +1087,6 @@
 /* pfn_t is defined */
 #define HAVE_PFN_T 1
 
-/* vm_insert_mixed() wants pfn_t arg */
-/* #undef HAVE_PFN_T_VM_INSERT_MIXED */
-
 /* PIDTYPE is availablea */
 #define HAVE_PIDTYPE_TGID 1
 
@@ -1273,9 +1270,6 @@
 
 /* vmf_insert_*() are available */
 #define HAVE_VMF_INSERT 1
-
-/* vmf_insert_mixed_prot() is available */
-/* #undef HAVE_VMF_INSERT_MIXED_PROT */
 
 /* vmf_insert_pfn_prot() is available */
 #define HAVE_VMF_INSERT_PFN_PROT 1
