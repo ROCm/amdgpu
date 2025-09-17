@@ -842,13 +842,12 @@ const uint64_t hmm_range_values[HMM_PFN_VALUE_MAX] = {
 
 int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 			       uint64_t start, uint64_t npages, bool readonly,
-			       void *owner, struct page **pages,
+			       void *owner,
 			       struct hmm_range **phmm_range)
 {
 	struct hmm_range *hmm_range;
 	unsigned long end;
 	unsigned long timeout;
-	unsigned long i;
 	unsigned long *pfns;
 	int r = 0;
 
@@ -914,26 +913,6 @@ retry:
 
 	hmm_range->start = start;
 	hmm_range->hmm_pfns = pfns;
-
-	/*
-	 * Due to default_flags, all pages are HMM_PFN_VALID or
-	 * hmm_range_fault() fails. FIXME: The pages cannot be touched outside
-	 * the notifier_lock, and mmu_interval_read_retry() must be done first.
-	 */
-	for (i = 0; pages && i < npages; i++) {
-#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
-		pages[i] = hmm_device_entry_to_page(hmm_range, pfns[i]);
-		if (unlikely(!pages[i])) {
-			pr_err("Page fault failed for pfn[%lu] = 0x%llx\n",
-			       i, pfns[i]);
-			r = -ENOMEM;
-
-			goto out_free_pfns;
-		}
-#else
-		pages[i] = hmm_pfn_to_page(pfns[i]);
-#endif
-	}
 
 	*phmm_range = hmm_range;
 
