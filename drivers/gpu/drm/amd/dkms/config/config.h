@@ -930,6 +930,9 @@
 /* list_is_first() is available */
 #define HAVE_LIST_IS_FIRST 1
 
+/* list_is_head() is available */
+#define HAVE_LIST_IS_HEAD 1
+
 /* list_rotate_to_front() is available */
 #define HAVE_LIST_ROTATE_TO_FRONT 1
 
