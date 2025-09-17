@@ -101,6 +101,9 @@
 /* MEMORY_DEVICE_COHERENT is availablea */
 #define HAVE_DEVICE_COHERENT 1
 
+/* devm_i2c_add_adapter() is available */
+#define HAVE_DEVM_I2C_ADD_ADAPTER 1
+
 /* dev_is_removable() is available */
 #define HAVE_DEV_IS_REMOVABLE 1
 

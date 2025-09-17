@@ -29,5 +29,9 @@ i2c_new_client_device(struct i2c_adapter *adap, struct i2c_board_info const *inf
 #define I2C_AQ_NO_ZERO_LEN              (I2C_AQ_NO_ZERO_LEN_READ | I2C_AQ_NO_ZERO_LEN_WRITE)
 #endif
 
+#ifndef HAVE_DEVM_I2C_ADD_ADAPTER
+extern int kcl_devm_i2c_add_adapter(struct device *dev, struct i2c_adapter *adapter);
+#define devm_i2c_add_adapter kcl_devm_i2c_add_adapter
+#endif
 
 #endif
