@@ -88,6 +88,9 @@
 /* bitmap_to_arr32() is available */
 #define HAVE_BITMAP_TO_ARR32 1
 
+/* struct block_device has member named 'bd_device' */
+#define HAVE_BLOCK_DEVICE_BD_DEVICE 1
+
 /* cancel_work() is available */
 #define HAVE_CANCEL_WORK 1
 
@@ -387,6 +390,9 @@
 /* drm_dp_mst_atomic_wait_for_dependencies() is available */
 #define HAVE_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES 1
 
+/* drm_dp_aux->dpcd_probe_disabled is available */
+#define HAVE_DRM_DP_AUX_DPCD_PROBE_DISABLED 1
+
 /* struct drm_dp_aux has member named 'drm_dev' */
 #define HAVE_DRM_DP_AUX_DRM_DEV 1
 
@@ -404,9 +410,6 @@
 
 /* Define to 1 if you have the <drm/dp/drm_dp_mst_helper.h> header file. */
 /* #undef HAVE_DRM_DP_DRM_DP_MST_HELPER_H */
-
-/* Define to 1 if you have the <drm/drm_privacy_screen_consumer.h> header file. */
-#define HAVE_DRM_DRM_PRIVACY_SCREEN_CONSUMER_H 1
 
 /* drm_dp_link_train_channel_eq_delay() has 2 args */
 #define HAVE_DRM_DP_LINK_TRAIN_CHANNEL_EQ_DELAY_2ARGS 1
@@ -548,6 +551,10 @@
 
 /* Define to 1 if you have the <drm/drm_panic.h> header file. */
 #define HAVE_DRM_DRM_PANIC_H 1
+
+/* Define to 1 if you have the <drm/drm_privacy_screen_consumer.h> header
+   file. */
+#define HAVE_DRM_DRM_PRIVACY_SCREEN_CONSUMER_H 1
 
 /* Define to 1 if you have the <drm/drm_probe_helper.h> header file. */
 #define HAVE_DRM_DRM_PROBE_HELPER_H 1
@@ -1047,6 +1054,9 @@
 /* class_create has one argument */
 #define HAVE_ONE_ARGUMENT_OF_CLASS_CREATE 1
 
+/* page_pgmap() is available */
+#define HAVE_PAGE_PGMAP 1
+
 /* pcie_aspm_enabled() is available */
 #define HAVE_PCIE_ASPM_ENABLED 1
 
@@ -1254,6 +1264,9 @@
 
 /* vma_lookup() is available */
 #define HAVE_VMA_LOOKUP 1
+
+/* vmemdup_array_user() is available */
+#define HAVE_VMEMDUP_ARRAY_USER 1
 
 /* vmf_insert_*() are available */
 #define HAVE_VMF_INSERT 1

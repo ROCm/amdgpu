@@ -529,6 +529,9 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 	/* always clear VRAM */
 	flags |= AMDGPU_GEM_CREATE_VRAM_CLEARED;
 
+	if (args->in.domains & AMDGPU_GEM_DOMAIN_MMIO_REMAP)
+		return -EINVAL;
+
 	/* create a gem object to contain this object in */
 	if (args->in.domains & (AMDGPU_GEM_DOMAIN_GDS |
 	    AMDGPU_GEM_DOMAIN_GWS | AMDGPU_GEM_DOMAIN_OA)) {
@@ -1228,7 +1231,8 @@ int amdgpu_gem_op_ioctl(struct drm_device *dev, void *data,
 		drm_exec_fini(&exec);
 
 		if (num_mappings > 0 && num_mappings <= args->num_entries)
-			r = copy_to_user(u64_to_user_ptr(args->value), vm_entries, num_mappings * sizeof(*vm_entries));
+			if (copy_to_user(u64_to_user_ptr(args->value), vm_entries, num_mappings * sizeof(*vm_entries)))
+				r = -EFAULT;
 
 		args->num_entries = num_mappings;
 
@@ -1249,7 +1253,7 @@ out_exec:
 }
 
 /**
- * drm_amdgpu_gem_list_handles_ioctl - get information about a process' buffer objects
+ * amdgpu_gem_list_handles_ioctl - get information about a process' buffer objects
  *
  * @dev: drm device pointer
  * @data: drm_amdgpu_gem_list_handles
@@ -1320,7 +1324,8 @@ int amdgpu_gem_list_handles_ioctl(struct drm_device *dev, void *data,
 	args->num_entries = bo_index;
 
 	if (!ret)
-		ret = copy_to_user(u64_to_user_ptr(args->entries), bo_entries, num_bos * sizeof(*bo_entries));
+		if (copy_to_user(u64_to_user_ptr(args->entries), bo_entries, num_bos * sizeof(*bo_entries)))
+			ret = -EFAULT;
 
 	kvfree(bo_entries);
 

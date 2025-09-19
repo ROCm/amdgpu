@@ -179,6 +179,8 @@ static inline unsigned amdgpu_mem_type_to_domain(u32 mem_type)
 		return AMDGPU_GEM_DOMAIN_OA;
 	case AMDGPU_PL_DOORBELL:
 		return AMDGPU_GEM_DOMAIN_DOORBELL;
+	case AMDGPU_PL_MMIO_REMAP:
+		return AMDGPU_GEM_DOMAIN_MMIO_REMAP;
 	case AMDGPU_PL_DGMA:
 		return AMDGPU_GEM_DOMAIN_DGMA;
 	case AMDGPU_PL_DGMA_IMPORT:

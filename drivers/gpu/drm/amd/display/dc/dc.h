@@ -55,7 +55,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.348"
+#define DC_VER "3.2.349"
 
 /**
  * MAX_SURFACES - representative of the upper bound of surfaces that can be piped to a single CRTC
@@ -1165,6 +1165,7 @@ struct dc_debug_options {
 	unsigned int auxless_alpm_lfps_silence_ns;
 	unsigned int auxless_alpm_lfps_t1t2_us;
 	short auxless_alpm_lfps_t1t2_offset_us;
+	bool enable_pg_cntl_debug_logs;
 };
 
 
@@ -1779,7 +1780,7 @@ struct dc {
 	struct dml2_configuration_options dml2_options;
 	struct dml2_configuration_options dml2_dc_power_options;
 	enum dc_acpi_cm_power_state power_state;
-
+	struct soc_and_ip_translator *soc_and_ip_translator;
 };
 
 struct dc_scaling_info {
