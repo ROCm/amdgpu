@@ -215,7 +215,7 @@ svm_migrate_addr_to_pfn(struct amdgpu_device *adev, unsigned long addr)
 #ifdef HAVE_DEV_PAGEMAP_RANGE
 	return (addr + adev->kfd.pgmap.range.start) >> PAGE_SHIFT;
 #else
-	return (addr + adev->kfd.dev->pgmap.res.start) >> PAGE_SHIFT;
+	return (addr + adev->kfd.pgmap.res.start) >> PAGE_SHIFT;
 #endif
 }
 
@@ -249,7 +249,7 @@ svm_migrate_addr(struct amdgpu_device *adev, struct page *page)
 #ifdef HAVE_DEV_PAGEMAP_RANGE
 	return (addr - adev->kfd.pgmap.range.start);
 #else
-	return (addr - adev->kfd.dev->pgmap.res.start);
+	return (addr - adev->kfd.pgmap.res.start);
 #endif
 
 }
