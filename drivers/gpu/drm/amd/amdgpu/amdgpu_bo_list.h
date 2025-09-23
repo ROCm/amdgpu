@@ -43,6 +43,7 @@ struct amdgpu_bo_list_entry {
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	bool				user_invalidated;
 #else
+	struct page			**user_pages;
 	int				user_invalidated;
 	struct ttm_validate_buffer      tv;
 #endif
