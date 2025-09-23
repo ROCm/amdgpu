@@ -222,14 +222,26 @@ void amdgpu_ttm_recover_gart(struct ttm_buffer_object *tbo);
 uint64_t amdgpu_ttm_domain_start(struct amdgpu_device *adev, uint32_t type);
 
 #if IS_ENABLED(CONFIG_DRM_AMDGPU_USERPTR)
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo,
 				 struct amdgpu_hmm_range *range);
 #else
+int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages);
+#endif
+#else
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 static inline int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo,
 					       struct amdgpu_hmm_range *range)
 {
 	return -EPERM;
 }
+#else
+static inline int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages,
+				 struct hmm_range **range)
+{
+	return -EPERM;
+}
+#endif
 #endif
 
 /**
@@ -253,7 +265,11 @@ static inline u64 amdgpu_gtt_node_to_byte_offset(const struct drm_mm_node *gtt_n
 	return gtt_node->start * (u64)PAGE_SIZE;
 }
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct amdgpu_hmm_range *range);
+#else
+void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct page **pages);
+#endif
 int amdgpu_ttm_tt_get_userptr(const struct ttm_buffer_object *tbo,
 			      uint64_t *user_addr);
 int amdgpu_ttm_tt_set_userptr(struct ttm_buffer_object *bo,

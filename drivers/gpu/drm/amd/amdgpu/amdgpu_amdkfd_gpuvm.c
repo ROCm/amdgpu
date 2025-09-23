@@ -1151,13 +1151,13 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr,
 		return 0;
 	}
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	range = amdgpu_hmm_range_alloc(NULL);
 	if (unlikely(!range)) {
 		ret = -ENOMEM;
 		goto unregister_out;
 	}
 
-#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	ret = amdgpu_ttm_tt_get_user_pages(bo, range);
 	if (ret) {
 		amdgpu_hmm_range_free(range);
@@ -1197,7 +1197,9 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr,
 		goto release_out;
 	}
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm, range);
+#endif
 
 	amdgpu_bo_placement_from_domain(bo, mem->domain);
 	ret = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
@@ -2932,9 +2934,10 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 
 		bo = mem->bo;
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 		amdgpu_hmm_range_free(mem->range);
 		mem->range = NULL;
-
+#endif
 		/* BO reservations and getting user pages (hmm_range_fault)
 		 * must happen outside the notifier lock
 		 */
@@ -2955,11 +2958,11 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 				return -EAGAIN;
 			}
 		}
-
+		
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 		mem->range = amdgpu_hmm_range_alloc(NULL);
 		if (unlikely(!mem->range))
 			return -ENOMEM;
-#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 		/* Get updated user pages */
 		ret = amdgpu_ttm_tt_get_user_pages(bo, mem->range);
 		if (ret) {
