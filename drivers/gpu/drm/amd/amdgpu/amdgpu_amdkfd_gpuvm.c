@@ -1191,7 +1191,9 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr,
 		goto release_out;
 	}
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm, range);
+#endif
 
 	amdgpu_bo_placement_from_domain(bo, mem->domain);
 	ret = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);

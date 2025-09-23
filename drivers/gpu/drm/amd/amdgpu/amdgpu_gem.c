@@ -643,7 +643,12 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 		goto release_object;
 
 	if (args->flags & AMDGPU_GEM_USERPTR_VALIDATE) {
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 		r = amdgpu_ttm_tt_get_user_pages(bo, &range);
+#else
+		r = amdgpu_ttm_tt_get_user_pages(bo, bo->tbo.ttm->pages,
+						 &range);
+#endif
 		if (r)
 			goto release_object;
 
@@ -651,7 +656,9 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 		if (r)
 			goto user_pages_done;
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 		amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm, range);
+#endif
 
 		amdgpu_bo_placement_from_domain(bo, AMDGPU_GEM_DOMAIN_GTT);
 		r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
