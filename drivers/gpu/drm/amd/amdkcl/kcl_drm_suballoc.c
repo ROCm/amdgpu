@@ -50,8 +50,8 @@
 #include <linux/module.h>
 
 #ifndef HAVE_DRM_SUBALLOC_MANAGER_INIT
-static void drm_suballoc_remove_locked(struct drm_suballoc *sa);
-static void drm_suballoc_try_free(struct drm_suballoc_manager *sa_manager);
+static void kcl_drm_suballoc_remove_locked(struct drm_suballoc *sa);
+static void kcl_drm_suballoc_try_free(struct drm_suballoc_manager *sa_manager);
 
 /**
  * drm_suballoc_manager_init() - Initialise the drm_suballoc_manager
@@ -61,7 +61,7 @@ static void drm_suballoc_try_free(struct drm_suballoc_manager *sa_manager);
  *
  * Prepares the suballocation manager for suballocations.
  */
-void drm_suballoc_manager_init(struct drm_suballoc_manager *sa_manager,
+void kcl_drm_suballoc_manager_init(struct drm_suballoc_manager *sa_manager,
 			       size_t size, size_t align)
 {
 	unsigned int i;
@@ -83,7 +83,7 @@ void drm_suballoc_manager_init(struct drm_suballoc_manager *sa_manager,
 	for (i = 0; i < DRM_SUBALLOC_MAX_QUEUES; ++i)
 		INIT_LIST_HEAD(&sa_manager->flist[i]);
 }
-EXPORT_SYMBOL(drm_suballoc_manager_init);
+EXPORT_SYMBOL(kcl_drm_suballoc_manager_init);
 
 /**
  * drm_suballoc_manager_fini() - Destroy the drm_suballoc_manager
@@ -93,7 +93,7 @@ EXPORT_SYMBOL(drm_suballoc_manager_init);
  * with drm_suballoc_free() must be signaled, or we cannot clean up
  * the entire manager.
  */
-void drm_suballoc_manager_fini(struct drm_suballoc_manager *sa_manager)
+void kcl_drm_suballoc_manager_fini(struct drm_suballoc_manager *sa_manager)
 {
 	struct drm_suballoc *sa, *tmp;
 
@@ -102,19 +102,19 @@ void drm_suballoc_manager_fini(struct drm_suballoc_manager *sa_manager)
 
 	if (!list_empty(&sa_manager->olist)) {
 		sa_manager->hole = &sa_manager->olist;
-		drm_suballoc_try_free(sa_manager);
+		kcl_drm_suballoc_try_free(sa_manager);
 		if (!list_empty(&sa_manager->olist))
 			DRM_ERROR("sa_manager is not empty, clearing anyway\n");
 	}
 	list_for_each_entry_safe(sa, tmp, &sa_manager->olist, olist) {
-		drm_suballoc_remove_locked(sa);
+		kcl_drm_suballoc_remove_locked(sa);
 	}
 
 	sa_manager->size = 0;
 }
-EXPORT_SYMBOL(drm_suballoc_manager_fini);
+EXPORT_SYMBOL(kcl_drm_suballoc_manager_fini);
 
-static void drm_suballoc_remove_locked(struct drm_suballoc *sa)
+static void kcl_drm_suballoc_remove_locked(struct drm_suballoc *sa)
 {
 	struct drm_suballoc_manager *sa_manager = sa->manager;
 
@@ -127,7 +127,7 @@ static void drm_suballoc_remove_locked(struct drm_suballoc *sa)
 	kfree(sa);
 }
 
-static void drm_suballoc_try_free(struct drm_suballoc_manager *sa_manager)
+static void kcl_drm_suballoc_try_free(struct drm_suballoc_manager *sa_manager)
 {
 	struct drm_suballoc *sa, *tmp;
 
@@ -139,11 +139,11 @@ static void drm_suballoc_try_free(struct drm_suballoc_manager *sa_manager)
 		if (!sa->fence || !dma_fence_is_signaled(sa->fence))
 			return;
 
-		drm_suballoc_remove_locked(sa);
+		kcl_drm_suballoc_remove_locked(sa);
 	}
 }
 
-static size_t drm_suballoc_hole_soffset(struct drm_suballoc_manager *sa_manager)
+static size_t kcl_drm_suballoc_hole_soffset(struct drm_suballoc_manager *sa_manager)
 {
 	struct list_head *hole = sa_manager->hole;
 
@@ -153,7 +153,7 @@ static size_t drm_suballoc_hole_soffset(struct drm_suballoc_manager *sa_manager)
 	return 0;
 }
 
-static size_t drm_suballoc_hole_eoffset(struct drm_suballoc_manager *sa_manager)
+static size_t kcl_drm_suballoc_hole_eoffset(struct drm_suballoc_manager *sa_manager)
 {
 	struct list_head *hole = sa_manager->hole;
 
@@ -162,14 +162,14 @@ static size_t drm_suballoc_hole_eoffset(struct drm_suballoc_manager *sa_manager)
 	return sa_manager->size;
 }
 
-static bool drm_suballoc_try_alloc(struct drm_suballoc_manager *sa_manager,
+static bool kcl_drm_suballoc_try_alloc(struct drm_suballoc_manager *sa_manager,
 				   struct drm_suballoc *sa,
 				   size_t size, size_t align)
 {
 	size_t soffset, eoffset, wasted;
 
-	soffset = drm_suballoc_hole_soffset(sa_manager);
-	eoffset = drm_suballoc_hole_eoffset(sa_manager);
+	soffset = kcl_drm_suballoc_hole_soffset(sa_manager);
+	eoffset = kcl_drm_suballoc_hole_eoffset(sa_manager);
 	wasted = round_up(soffset, align) - soffset;
 
 	if ((eoffset - soffset) >= (size + wasted)) {
@@ -186,7 +186,7 @@ static bool drm_suballoc_try_alloc(struct drm_suballoc_manager *sa_manager,
 	return false;
 }
 
-static bool __drm_suballoc_event(struct drm_suballoc_manager *sa_manager,
+static bool kcl___drm_suballoc_event(struct drm_suballoc_manager *sa_manager,
 				 size_t size, size_t align)
 {
 	size_t soffset, eoffset, wasted;
@@ -196,8 +196,8 @@ static bool __drm_suballoc_event(struct drm_suballoc_manager *sa_manager,
 		if (!list_empty(&sa_manager->flist[i]))
 			return true;
 
-	soffset = drm_suballoc_hole_soffset(sa_manager);
-	eoffset = drm_suballoc_hole_eoffset(sa_manager);
+	soffset = kcl_drm_suballoc_hole_soffset(sa_manager);
+	eoffset = kcl_drm_suballoc_hole_eoffset(sa_manager);
 	wasted = round_up(soffset, align) - soffset;
 
 	return ((eoffset - soffset) >= (size + wasted));
@@ -213,18 +213,18 @@ static bool __drm_suballoc_event(struct drm_suballoc_manager *sa_manager,
  * enough free memory to satisfy the allocation directly.
  * false otherwise.
  */
-static bool drm_suballoc_event(struct drm_suballoc_manager *sa_manager,
+static bool kcl_drm_suballoc_event(struct drm_suballoc_manager *sa_manager,
 			       size_t size, size_t align)
 {
 	bool ret;
 
 	spin_lock(&sa_manager->wq.lock);
-	ret = __drm_suballoc_event(sa_manager, size, align);
+	ret = kcl___drm_suballoc_event(sa_manager, size, align);
 	spin_unlock(&sa_manager->wq.lock);
 	return ret;
 }
 
-static bool drm_suballoc_next_hole(struct drm_suballoc_manager *sa_manager,
+static bool kcl_drm_suballoc_next_hole(struct drm_suballoc_manager *sa_manager,
 				   struct dma_fence **fences,
 				   unsigned int *tries)
 {
@@ -239,7 +239,7 @@ static bool drm_suballoc_next_hole(struct drm_suballoc_manager *sa_manager,
 		return true;
 	}
 
-	soffset = drm_suballoc_hole_soffset(sa_manager);
+	soffset = kcl_drm_suballoc_hole_soffset(sa_manager);
 	/* to handle wrap around we add sa_manager->size */
 	best = sa_manager->size * 2;
 	/* go over all fence list and try to find the closest sa
@@ -287,7 +287,7 @@ static bool drm_suballoc_next_hole(struct drm_suballoc_manager *sa_manager,
 		 * We know that this one is signaled,
 		 * so it's safe to remove it.
 		 */
-		drm_suballoc_remove_locked(best_bo);
+		kcl_drm_suballoc_remove_locked(best_bo);
 		return true;
 	}
 	return false;
@@ -313,7 +313,7 @@ static bool drm_suballoc_next_hole(struct drm_suballoc_manager *sa_manager,
  * Return: a new suballocated bo, or an ERR_PTR.
  */
 struct drm_suballoc *
-drm_suballoc_new(struct drm_suballoc_manager *sa_manager, size_t size,
+kcl_drm_suballoc_new(struct drm_suballoc_manager *sa_manager, size_t size,
 		 gfp_t gfp, bool intr, size_t align)
 {
 	struct dma_fence *fences[DRM_SUBALLOC_MAX_QUEUES];
@@ -344,16 +344,16 @@ drm_suballoc_new(struct drm_suballoc_manager *sa_manager, size_t size,
 			tries[i] = 0;
 
 		do {
-			drm_suballoc_try_free(sa_manager);
+			kcl_drm_suballoc_try_free(sa_manager);
 
-			if (drm_suballoc_try_alloc(sa_manager, sa,
+			if (kcl_drm_suballoc_try_alloc(sa_manager, sa,
 						   size, align)) {
 				spin_unlock(&sa_manager->wq.lock);
 				return sa;
 			}
 
 			/* see if we can skip over some allocations */
-		} while (drm_suballoc_next_hole(sa_manager, fences, tries));
+		} while (kcl_drm_suballoc_next_hole(sa_manager, fences, tries));
 
 		for (i = 0, count = 0; i < DRM_SUBALLOC_MAX_QUEUES; ++i)
 			if (fences[i])
@@ -375,11 +375,11 @@ drm_suballoc_new(struct drm_suballoc_manager *sa_manager, size_t size,
 			/* if we have nothing to wait for block */
 			r = wait_event_interruptible_locked
 				(sa_manager->wq,
-				 __drm_suballoc_event(sa_manager, size, align));
+				 kcl___drm_suballoc_event(sa_manager, size, align));
 		} else {
 			spin_unlock(&sa_manager->wq.lock);
 			wait_event(sa_manager->wq,
-				   drm_suballoc_event(sa_manager, size, align));
+				   kcl_drm_suballoc_event(sa_manager, size, align));
 			r = 0;
 			spin_lock(&sa_manager->wq.lock);
 		}
@@ -389,7 +389,7 @@ drm_suballoc_new(struct drm_suballoc_manager *sa_manager, size_t size,
 	kfree(sa);
 	return ERR_PTR(r);
 }
-EXPORT_SYMBOL(drm_suballoc_new);
+EXPORT_SYMBOL(kcl_drm_suballoc_new);
 
 /**
  * drm_suballoc_free - Free a suballocation
@@ -398,7 +398,7 @@ EXPORT_SYMBOL(drm_suballoc_new);
  *
  * Free the suballocation. The suballocation can be re-used after @fence signals.
  */
-void drm_suballoc_free(struct drm_suballoc *suballoc,
+void kcl_drm_suballoc_free(struct drm_suballoc *suballoc,
 		       struct dma_fence *fence)
 {
 	struct drm_suballoc_manager *sa_manager;
@@ -416,15 +416,15 @@ void drm_suballoc_free(struct drm_suballoc *suballoc,
 		idx = fence->context & (DRM_SUBALLOC_MAX_QUEUES - 1);
 		list_add_tail(&suballoc->flist, &sa_manager->flist[idx]);
 	} else {
-		drm_suballoc_remove_locked(suballoc);
+		kcl_drm_suballoc_remove_locked(suballoc);
 	}
 	wake_up_all_locked(&sa_manager->wq);
 	spin_unlock(&sa_manager->wq.lock);
 }
-EXPORT_SYMBOL(drm_suballoc_free);
+EXPORT_SYMBOL(kcl_drm_suballoc_free);
 
 #ifdef CONFIG_DEBUG_FS
-void drm_suballoc_dump_debug_info(struct drm_suballoc_manager *sa_manager,
+void kcl_drm_suballoc_dump_debug_info(struct drm_suballoc_manager *sa_manager,
 				  struct drm_printer *p,
 				  unsigned long long suballoc_base)
 {
@@ -453,7 +453,7 @@ void drm_suballoc_dump_debug_info(struct drm_suballoc_manager *sa_manager,
 	}
 	spin_unlock(&sa_manager->wq.lock);
 }
-EXPORT_SYMBOL(drm_suballoc_dump_debug_info);
+EXPORT_SYMBOL(kcl_drm_suballoc_dump_debug_info);
 #endif
 MODULE_AUTHOR("Multiple");
 MODULE_DESCRIPTION("Range suballocator helper");
