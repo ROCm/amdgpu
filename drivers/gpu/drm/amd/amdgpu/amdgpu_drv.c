@@ -2741,7 +2741,7 @@ static int amdgpu_pmops_thaw(struct device *dev)
 
 #if defined(HAVE_PM_HIBERNATE_IS_RECOVERING) || !defined(CONFIG_PM_SLEEP)
 	/* do not resume device if it's normal hibernation */
-	if (!pm_hibernate_is_recovering())
+	if (!pm_hibernate_is_recovering() && !pm_hibernation_mode_is_suspend())
 		return 0;
 #endif
 
