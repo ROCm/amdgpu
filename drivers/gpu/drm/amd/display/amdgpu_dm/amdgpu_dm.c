@@ -8497,7 +8497,7 @@ static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_state *state,
 }
 #endif
 
-static int to_drm_connector_type(enum signal_type st)
+static int to_drm_connector_type(enum signal_type st, uint32_t connector_id)
 {
 	switch (st) {
 	case SIGNAL_TYPE_HDMI_TYPE_A:
@@ -8513,6 +8513,10 @@ static int to_drm_connector_type(enum signal_type st)
 		return DRM_MODE_CONNECTOR_DisplayPort;
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
+		if (connector_id == CONNECTOR_ID_SINGLE_LINK_DVII ||
+			connector_id == CONNECTOR_ID_DUAL_LINK_DVII)
+			return DRM_MODE_CONNECTOR_DVII;
+
 		return DRM_MODE_CONNECTOR_DVID;
 	case SIGNAL_TYPE_VIRTUAL:
 		return DRM_MODE_CONNECTOR_VIRTUAL;
@@ -8935,6 +8939,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 			link->link_enc->features.dp_ycbcr420_supported ? true : false;
 		break;
 	case DRM_MODE_CONNECTOR_DVID:
+	case DRM_MODE_CONNECTOR_DVII:
 		aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
 		break;
 	default:
@@ -9148,7 +9153,7 @@ static int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
 		goto out_free;
 	}
 
-	connector_type = to_drm_connector_type(link->connector_signal);
+	connector_type = to_drm_connector_type(link->connector_signal, link->link_id.id);
 
 	res = drm_connector_init_with_ddc(
 			dm->ddev,
