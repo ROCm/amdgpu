@@ -17,7 +17,7 @@ amdkcl-y += kcl_backlight.o kcl_ioctl.o \
 	kcl_irqdesc.o kcl_drm_suballoc.o kcl_drm_dp_helper.o kcl_drm_prime.o \
 	kcl_drm_vblank.o kcl_drm_dp_mst_topology.o kcl_drm_syncobj.o kcl_drm_client_event.o \
 	kcl_scatterlist.o kcl_kfifo.o kcl_cec_adap.o kcl_drm_hdcp.o kcl_timeconv.o kcl_drm_drv.o \
-	kcl_dma_fence_array.o kcl_dma_fence_unwrap.o kcl_drm_probe_helper.o
+	kcl_dma_fence_array.o kcl_dma_fence_unwrap.o kcl_drm_probe_helper.o kcl_i2c_core_base.o
 
 amdkcl-$(CONFIG_MMU_NOTIFIER) += kcl_mn.o
 amdkcl-$(CONFIG_DEBUG_FS) += kcl_debugfs_inode.o kcl_debugfs_file.o

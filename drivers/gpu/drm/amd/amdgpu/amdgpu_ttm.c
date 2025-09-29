@@ -2358,11 +2358,13 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	}
 	adev->mman.initialized = true;
 
-	/* Initialize VRAM pool with all of VRAM divided into pages */
-	r = amdgpu_vram_mgr_init(adev);
-	if (r) {
-		dev_err(adev->dev, "Failed initializing VRAM heap.\n");
-		return r;
+	if (!adev->gmc.is_app_apu) {
+		/* Initialize VRAM pool with all of VRAM divided into pages */
+		r = amdgpu_vram_mgr_init(adev);
+		if (r) {
+			dev_err(adev->dev, "Failed initializing VRAM heap.\n");
+			return r;
+		}
 	}
 
 	/* Change the size here instead of the init above so only lpfn is affected */
@@ -2582,7 +2584,8 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 
 	drain_workqueue(adev->mman.bdev.wq);
 	amdgpu_direct_gma_fini(adev);
-	amdgpu_vram_mgr_fini(adev);
+	if (!adev->gmc.is_app_apu)
+		amdgpu_vram_mgr_fini(adev);
 	amdgpu_gtt_mgr_fini(adev);
 	amdgpu_preempt_mgr_fini(adev);
 	amdgpu_doorbell_fini(adev);

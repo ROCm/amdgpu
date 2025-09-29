@@ -362,7 +362,11 @@ static void smu_v13_0_12_init_caps(struct smu_context *smu)
 	}
 
 	if (fw_ver >= 0x04560700) {
-		if (!amdgpu_sriov_vf(smu->adev))
+		if (fw_ver >= 0x04560900) {
+			smu_v13_0_6_cap_set(smu, SMU_CAP(TEMP_METRICS));
+			if (smu->adev->gmc.xgmi.physical_node_id == 0)
+				smu_v13_0_6_cap_set(smu, SMU_CAP(NPM_METRICS));
+		} else if (!amdgpu_sriov_vf(smu->adev))
 			smu_v13_0_6_cap_set(smu, SMU_CAP(TEMP_METRICS));
 	} else {
 		smu_v13_0_12_tables_fini(smu);
@@ -1958,6 +1962,15 @@ static int smu_v13_0_6_read_sensor(struct smu_context *smu,
 			ret = -EOPNOTSUPP;
 			break;
 		}
+	case AMDGPU_PP_SENSOR_NODEPOWERLIMIT:
+	case AMDGPU_PP_SENSOR_NODEPOWER:
+	case AMDGPU_PP_SENSOR_GPPTRESIDENCY:
+	case AMDGPU_PP_SENSOR_MAXNODEPOWERLIMIT:
+		ret = smu_v13_0_12_get_npm_data(smu, sensor, (uint32_t *)data);
+		if (ret)
+			return ret;
+		*size = 4;
+		break;
 	case AMDGPU_PP_SENSOR_GPU_AVG_POWER:
 	default:
 		ret = -EOPNOTSUPP;
@@ -2653,10 +2666,10 @@ static int smu_v13_0_6_i2c_control_init(struct smu_context *smu)
 		control->quirks = &smu_v13_0_6_i2c_control_quirks;
 		i2c_set_adapdata(control, smu_i2c);
 
-		res = i2c_add_adapter(control);
+		res = devm_i2c_add_adapter(adev->dev, control);
 		if (res) {
 			DRM_ERROR("Failed to register hw i2c, err: %d\n", res);
-			goto Out_err;
+			return res;
 		}
 	}
 
@@ -2664,27 +2677,12 @@ static int smu_v13_0_6_i2c_control_init(struct smu_context *smu)
 	adev->pm.fru_eeprom_i2c_bus = &adev->pm.smu_i2c[0].adapter;
 
 	return 0;
-Out_err:
-	for ( ; i >= 0; i--) {
-		struct amdgpu_smu_i2c_bus *smu_i2c = &adev->pm.smu_i2c[i];
-		struct i2c_adapter *control = &smu_i2c->adapter;
-
-		i2c_del_adapter(control);
-	}
-	return res;
 }
 
 static void smu_v13_0_6_i2c_control_fini(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
-	int i;
 
-	for (i = 0; i < MAX_SMU_I2C_BUSES; i++) {
-		struct amdgpu_smu_i2c_bus *smu_i2c = &adev->pm.smu_i2c[i];
-		struct i2c_adapter *control = &smu_i2c->adapter;
-
-		i2c_del_adapter(control);
-	}
 	adev->pm.ras_eeprom_i2c_bus = NULL;
 	adev->pm.fru_eeprom_i2c_bus = NULL;
 }
@@ -3368,23 +3366,6 @@ static int smu_v13_0_6_reset_sdma(struct smu_context *smu, uint32_t inst_mask)
 	return ret;
 }
 
-static int smu_v13_0_6_post_init(struct smu_context *smu)
-{
-	struct smu_dpm_context *smu_dpm = &smu->smu_dpm;
-	struct smu_phase_det_ctl *pd_ctl;
-	bool enable;
-
-	pd_ctl = smu_dpm->pd_ctl;
-
-	if (!pd_ctl || pd_ctl->status == SMU_PHASE_DET_DISABLED)
-		return 0;
-
-	enable = (pd_ctl->status == SMU_PHASE_DET_ON) ? true : false;
-	smu_v13_0_6_phase_det_enable(smu, enable);
-
-	return 0;
-}
-
 static bool smu_v13_0_6_reset_vcn_is_supported(struct smu_context *smu)
 {
 	return smu_v13_0_6_cap_supported(smu, SMU_CAP(VCN_RESET));
@@ -3400,6 +3381,32 @@ static int smu_v13_0_6_reset_vcn(struct smu_context *smu, uint32_t inst_mask)
 			"failed to send ResetVCN event with mask 0x%x\n",
 			inst_mask);
 	return ret;
+}
+
+static int smu_v13_0_6_post_init(struct smu_context *smu)
+{
+	struct smu_dpm_context *smu_dpm = &smu->smu_dpm;
+	struct smu_phase_det_ctl *pd_ctl;
+	bool enable;
+
+	if (smu_v13_0_6_is_link_reset_supported(smu))
+		smu_feature_cap_set(smu, SMU_FEATURE_CAP_ID__LINK_RESET);
+
+	if (smu_v13_0_6_reset_sdma_is_supported(smu))
+		smu_feature_cap_set(smu, SMU_FEATURE_CAP_ID__SDMA_RESET);
+
+	if (smu_v13_0_6_reset_vcn_is_supported(smu))
+		smu_feature_cap_set(smu, SMU_FEATURE_CAP_ID__VCN_RESET);
+
+	pd_ctl = smu_dpm->pd_ctl;
+
+	if (!pd_ctl || pd_ctl->status == SMU_PHASE_DET_DISABLED)
+		return 0;
+
+	enable = (pd_ctl->status == SMU_PHASE_DET_ON) ? true : false;
+	smu_v13_0_6_phase_det_enable(smu, enable);
+
+	return 0;
 }
 
 static int mca_smu_set_debug_mode(struct amdgpu_device *adev, bool enable)
@@ -4071,7 +4078,6 @@ static const struct pptable_funcs smu_v13_0_6_ppt_funcs = {
 	.get_xcp_metrics = smu_v13_0_6_get_xcp_metrics,
 	.get_thermal_temperature_range = smu_v13_0_6_get_thermal_temperature_range,
 	.mode1_reset_is_support = smu_v13_0_6_is_mode1_reset_supported,
-	.link_reset_is_support = smu_v13_0_6_is_link_reset_supported,
 	.mode1_reset = smu_v13_0_6_mode1_reset,
 	.mode2_reset = smu_v13_0_6_mode2_reset,
 	.link_reset = smu_v13_0_6_link_reset,
@@ -4081,10 +4087,8 @@ static const struct pptable_funcs smu_v13_0_6_ppt_funcs = {
 	.send_hbm_bad_pages_num = smu_v13_0_6_smu_send_hbm_bad_page_num,
 	.send_rma_reason = smu_v13_0_6_send_rma_reason,
 	.reset_sdma = smu_v13_0_6_reset_sdma,
-	.reset_sdma_is_supported = smu_v13_0_6_reset_sdma_is_supported,
-	.post_init = smu_v13_0_6_post_init,
 	.dpm_reset_vcn = smu_v13_0_6_reset_vcn,
-	.reset_vcn_is_supported = smu_v13_0_6_reset_vcn_is_supported,
+	.post_init = smu_v13_0_6_post_init,
 };
 
 void smu_v13_0_6_set_ppt_funcs(struct smu_context *smu)
