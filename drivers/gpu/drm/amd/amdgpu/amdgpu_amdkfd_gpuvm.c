@@ -1153,7 +1153,7 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr,
 	}
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
-	ret = amdgpu_ttm_tt_get_user_pages(bo, bo->tbo.ttm->pages, &range);
+	ret = amdgpu_ttm_tt_get_user_pages(bo, &range);
 	if (ret) {
 		if (ret == -EAGAIN)
 			pr_debug("Failed to get user pages, try again\n");
@@ -1190,6 +1190,11 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr,
 		pr_err("%s: Failed to reserve BO\n", __func__);
 		goto release_out;
 	}
+
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm, range);
+#endif
+
 	amdgpu_bo_placement_from_domain(bo, mem->domain);
 	ret = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
 	if (ret)
@@ -2940,8 +2945,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 		/* Get updated user pages */
-		ret = amdgpu_ttm_tt_get_user_pages(bo, bo->tbo.ttm->pages,
-						   &mem->range);
+		ret = amdgpu_ttm_tt_get_user_pages(bo, &mem->range);
 		if (ret) {
 			pr_debug("Failed %d to get user pages\n", ret);
 
@@ -2969,6 +2973,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 
 			ret = 0;
 		}
+		amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm, mem->range);
 #else
 		if (!mem->user_pages) {
 			mem->user_pages =
@@ -3003,6 +3008,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 			ret = 0;
 		}
 #endif
+
 		mutex_lock(&process_info->notifier_lock);
 		/* Mark the BO as valid unless it was invalidated
 		 * again concurrently.

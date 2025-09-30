@@ -442,6 +442,8 @@ struct kfd_dev {
 	/* for dynamic partitioning */
 	int kfd_dev_lock;
 
+	atomic_t kfd_processes_count;
+
 	/* Lock for profiler process */
 	struct mutex profiler_lock;
 	/* Process currently holding the lock */

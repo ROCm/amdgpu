@@ -59,12 +59,9 @@ int amdgpu_amdkfd_rlc_spm_acquire(struct amdgpu_device *adev, int xcc_id,
 	if (!adev->gfx.rlc.funcs->update_spm_vmid)
 		return -EINVAL;
 
-    if (!vm->reserved_vmid[AMDGPU_GFXHUB(0)]) {
-        r = amdgpu_vmid_alloc_reserved(adev, AMDGPU_GFXHUB(0));
+        r = amdgpu_vmid_alloc_reserved(adev, vm, AMDGPU_GFXHUB(0));
         if (r)
                 return r;
-        vm->reserved_vmid[AMDGPU_GFXHUB(0)] = true;
-    }
 
 	/* init spm vmid with 0x0 */
 	adev->gfx.rlc.funcs->update_spm_vmid(adev, xcc_id, NULL, 0);
@@ -89,10 +86,7 @@ void amdgpu_amdkfd_rlc_spm_release(struct amdgpu_device *adev, int xcc_id, struc
 	amdgpu_ring_commit(kiq_ring);
 	spin_unlock(&adev->gfx.kiq[xcc_id].ring_lock);
 
-    if (vm->reserved_vmid[AMDGPU_GFXHUB(0)]) {
-        amdgpu_vmid_free_reserved(adev,AMDGPU_GFXHUB(0));
-        vm->reserved_vmid[AMDGPU_GFXHUB(0)] = false;
-    }
+        amdgpu_vmid_free_reserved(adev, vm, AMDGPU_GFXHUB(0));
 
 	/* revert spm vmid with 0xf */
 	if (adev->gfx.rlc.funcs->update_spm_vmid)

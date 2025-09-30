@@ -187,7 +187,7 @@ svm_range_dma_map_dev(struct amdgpu_device *adev, struct svm_range *prange,
 #ifdef HAVE_DEV_PAGEMAP_RANGE
 				   bo_adev->kfd.pgmap.range.start;
 #else
-				   bo_adev->kfd.dev->pgmap.res.start;
+				   bo_adev->kfd.pgmap.res.start;
 #endif
 			addr[i] |= SVM_RANGE_VRAM_DOMAIN;
 			pr_debug_ratelimited("vram address: 0x%llx\n", addr[i]);
@@ -1742,7 +1742,7 @@ static int svm_range_validate_and_map(struct mm_struct *mm,
 
 			WRITE_ONCE(p->svms.faulting_task, current);
 			r = amdgpu_hmm_range_get_pages(&prange->notifier, addr, npages,
-						       readonly, owner, NULL,
+						       readonly, owner,
 						       &hmm_range);
 			WRITE_ONCE(p->svms.faulting_task, NULL);
 			if (r)
