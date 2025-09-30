@@ -644,7 +644,7 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 
 	if (args->flags & AMDGPU_GEM_USERPTR_VALIDATE) {
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
-		range = kzalloc(sizeof(*range), GFP_KERNEL);
+		range = amdgpu_hmm_range_alloc();
 		if (unlikely(!range))
 			return -ENOMEM;
 		r = amdgpu_ttm_tt_get_user_pages(bo, range);
@@ -654,7 +654,7 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 #endif
 		if (r) {
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
-			kfree(range);
+			amdgpu_hmm_range_free(range);
 #endif
 			goto release_object;
 		}
@@ -692,7 +692,7 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 user_pages_done:
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	if (args->flags & AMDGPU_GEM_USERPTR_VALIDATE)
-		amdgpu_ttm_tt_get_user_pages_done(bo->tbo.ttm, range);
+		amdgpu_hmm_range_free(range);
 #else
 	release_pages(bo->tbo.ttm->pages, bo->tbo.ttm->num_pages);
 #endif
