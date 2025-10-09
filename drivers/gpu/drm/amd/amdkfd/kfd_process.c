@@ -471,6 +471,27 @@ static ssize_t kfd_sysfs_counters_show(struct kobject *kobj,
 	return 0;
 }
 
+#ifdef HAVE_STRUCT_XARRAY
+static ssize_t kfd_sysfs_ais_show(struct kobject *kobj,
+				       struct attribute *attr, char *buf)
+{
+	struct ais_counter_entry *entry;
+	int len = strlen(attr->name);
+
+	if (len > 6 && !strcmp(((char *)attr->name) + len - 6, "PCI_in")) {
+		entry = container_of(attr, struct ais_counter_entry,
+				   attr_bytes_read);
+		return sysfs_emit(buf, "%llu\n", READ_ONCE(entry->bytes_read));
+	}
+	if (len > 7 && !strcmp(((char *)attr->name) + len - 7, "PCI_out")) {
+		entry = container_of(attr, struct ais_counter_entry,
+				   attr_bytes_written);
+		return sysfs_emit(buf, "%llu\n", READ_ONCE(entry->bytes_written));
+	}
+	return 0;
+}
+#endif
+
 static const struct sysfs_ops procfs_queue_ops = {
 	.show = kfd_procfs_queue_show,
 };
@@ -496,6 +517,17 @@ static const struct kobj_type sysfs_counters_type = {
 	.sysfs_ops = &sysfs_counters_ops,
 	.release = kfd_procfs_kobj_release,
 };
+
+#ifdef HAVE_STRUCT_XARRAY
+static const struct sysfs_ops sysfs_ais_ops = {
+	.show = kfd_sysfs_ais_show,
+};
+
+static const struct kobj_type sysfs_ais_type = {
+	.sysfs_ops = &sysfs_ais_ops,
+	.release = kfd_procfs_kobj_release,
+};
+#endif
 
 int kfd_procfs_add_queue(struct queue *q)
 {
@@ -660,6 +692,45 @@ static void kfd_procfs_add_sysfs_files(struct kfd_process *p)
 					    pdd->sdma_filename);
 	}
 }
+
+#ifdef HAVE_STRUCT_XARRAY
+static void kfd_procfs_add_sysfs_ais(struct kfd_process *p)
+{
+	int ret = 0;
+	int i;
+	char ais_dir_filename[MAX_SYSFS_FILENAME_LEN];
+
+	if (!p || !p->kobj)
+		return;
+
+	/*
+	 * Create sysfs files for each GPU which supports SVM
+	 * - proc/<pid>/ais_<gpuid>/
+	 * - proc/<pid>/ais_<gpuid>/XX:XX:XX.XX:PCI_in (created dynamically)
+	 * - proc/<pid>/ais_<gpuid>/XX:XX:XX.XX:PCI_out (created dynamically)
+	 */
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+		struct kobject *kobj_ais;
+
+		snprintf(ais_dir_filename, MAX_SYSFS_FILENAME_LEN,
+			"ais_%u", pdd->dev->id);
+		kobj_ais = kfd_alloc_struct(kobj_ais);
+		if (!kobj_ais)
+			return;
+
+		ret = kobject_init_and_add(kobj_ais, &sysfs_ais_type,
+					   p->kobj, ais_dir_filename);
+		pdd->kobj_ais = kobj_ais;
+		if (ret) {
+			pr_warn("Creating KFD proc/%s folder failed",
+				ais_dir_filename);
+			kobject_put(kobj_ais);
+			return;
+		}
+	}
+}
+#endif
 
 void kfd_procfs_del_queue(struct queue *q)
 {
@@ -860,6 +931,9 @@ int kfd_create_process_sysfs(struct kfd_process *process)
 	kfd_procfs_add_sysfs_stats(process);
 	kfd_procfs_add_sysfs_files(process);
 	kfd_procfs_add_sysfs_counters(process);
+#ifdef HAVE_STRUCT_XARRAY
+        kfd_procfs_add_sysfs_ais(process);
+#endif
 
 	return 0;
 }
@@ -1198,6 +1272,29 @@ static void kfd_process_remove_sysfs(struct kfd_process *p)
 		kobject_put(pdd->kobj_counters);
 		pdd->kobj_counters = NULL;
 	}
+#ifdef HAVE_STRUCT_XARRAY
+	for (i = 0; i < p->n_pdds; i++) {
+		pdd = p->pdds[i];
+		struct ais_counter_entry *counter;
+		unsigned long index;
+
+		xa_for_each(&pdd->ais_counters_xa, index, counter) {
+			const char *read_filename = counter->attr_bytes_read.name;
+			const char *write_filename = counter->attr_bytes_written.name;
+
+			sysfs_remove_file(pdd->kobj_ais, &counter->attr_bytes_read);
+			sysfs_remove_file(pdd->kobj_ais, &counter->attr_bytes_written);
+			kfree(read_filename);
+			kfree(write_filename);
+			kfree(counter);
+		}
+
+		xa_destroy(&pdd->ais_counters_xa);
+
+		kobject_del(pdd->kobj_ais);
+		kobject_put(pdd->kobj_ais);
+	}
+#endif
 
 	kobject_del(p->kobj);
 	kobject_put(p->kobj);
@@ -1787,6 +1884,9 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_node *dev,
 	pdd->user_gpu_id = dev->id;
 	atomic64_set(&pdd->evict_duration_counter, 0);
 	kfd_spm_init_process_device(pdd);
+#ifdef HAVE_STRUCT_XARRAY
+	xa_init(&pdd->ais_counters_xa);
+#endif
 
 	p->pdds[p->n_pdds++] = pdd;
 	if (kfd_dbg_is_per_vmid_supported(pdd->dev))

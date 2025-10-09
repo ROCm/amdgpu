@@ -839,7 +839,7 @@ enum kfd_pdd_bound {
 	PDD_BOUND_SUSPENDED,
 };
 
-#define MAX_SYSFS_FILENAME_LEN 15
+#define MAX_SYSFS_FILENAME_LEN 31
 
 /*
  * SDMA counter runs at 100MHz frequency.
@@ -852,6 +852,14 @@ struct pc_sampling_entry {
 	bool enabled;
 	enum kfd_ioctl_pc_sample_method method;
 	struct kfd_process_device *pdd;
+};
+
+struct ais_counter_entry {
+	int pci_devfn;
+	struct attribute attr_bytes_read;
+	struct attribute attr_bytes_written;
+	uint64_t bytes_read;
+	uint64_t bytes_written;
 };
 
 /* Data that is per-process-per device. */
@@ -949,6 +957,12 @@ struct kfd_process_device {
 	uint64_t faults;
 	uint64_t page_in;
 	uint64_t page_out;
+
+	/* xarray of counters for ais; entries are of type struct ais_counter_entry *, indexed by pci_dev_fn */
+#ifdef HAVE_STRUCT_XARRAY
+	struct kobject *kobj_ais;
+	struct xarray ais_counters_xa;
+#endif
 
 	/* Exception code status*/
 	uint64_t exception_status;
@@ -1761,7 +1775,8 @@ static inline bool kfd_is_first_node(struct kfd_node *node)
 int kfd_ais_init(struct amdgpu_device *adev);
 void kfd_ais_deinit(struct amdgpu_device *adev);
 int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
-		    struct kfd_ais_in_args *in, uint64_t *size_copied);
+		    struct kfd_ais_in_args *in, struct kfd_process_device *pdd,
+                    uint64_t *size_copied);
 
 /* Debugfs */
 #if defined(CONFIG_DEBUG_FS)

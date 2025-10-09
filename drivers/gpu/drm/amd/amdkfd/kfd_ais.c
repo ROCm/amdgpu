@@ -171,8 +171,88 @@ void kfd_ais_deinit(struct amdgpu_device *adev)
 	adev->kfd.dev->ais_initialized = false;
 }
 
+#ifdef HAVE_STRUCT_XARRAY
+static int kfd_ais_init_attr(struct attribute *attr, struct pci_dev *pdev, bool is_read)
+{
+	char *filename = kzalloc(MAX_SYSFS_FILENAME_LEN, GFP_KERNEL);
+	char *suffix;
+
+	if (!filename)
+		return -ENOMEM;
+
+	if (is_read)
+		suffix = "PCI_in";
+	else
+		suffix = "PCI_out";
+
+	snprintf(filename, MAX_SYSFS_FILENAME_LEN,
+		"%04x:%02x:%02x.%d:%s", pci_domain_nr(pdev->bus), pdev->bus->number,
+		PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn), suffix);
+
+	attr->name = filename;
+	attr->mode = KFD_SYSFS_FILE_MODE;
+	sysfs_attr_init(attr);
+
+	return 0;
+}
+
+static int kfd_ais_update_counters(uint64_t size_copied, struct pci_dev *pdev,
+				    struct kfd_process_device *pdd, bool is_read)
+{
+	struct ais_counter_entry *counter;
+	int ret = 0;
+
+	xa_lock(&pdd->ais_counters_xa);
+	counter = (struct ais_counter_entry *)xa_load(&pdd->ais_counters_xa, pdev->devfn);
+	if (counter) {
+		if (is_read)
+			counter->bytes_read += size_copied;
+		else
+			counter->bytes_written += size_copied;
+
+		goto out;
+	}
+
+	counter = kzalloc(sizeof(struct ais_counter_entry), GFP_KERNEL);
+	if (!counter) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	counter->pci_devfn = pdev->devfn;
+	if (is_read)
+		counter->bytes_read = size_copied;
+	else
+		counter->bytes_written = size_copied;
+
+	ret = __xa_insert(&pdd->ais_counters_xa, pdev->devfn, counter, GFP_KERNEL);
+	if (ret) {
+		/* xa_insert failing means the entry is not empty, which shouldn't be possible */
+		kvfree(counter);
+		goto out;
+	}
+
+	ret = kfd_ais_init_attr(&counter->attr_bytes_read, pdev, true);
+	if (ret)
+		goto out;
+	ret = sysfs_create_file(pdd->kobj_ais, &counter->attr_bytes_read);
+	if (ret)
+		goto out;
+
+	ret = kfd_ais_init_attr(&counter->attr_bytes_written, pdev, false);
+	if (ret)
+		goto out;
+	ret = sysfs_create_file(pdd->kobj_ais, &counter->attr_bytes_written);
+
+out:
+	xa_unlock(&pdd->ais_counters_xa);
+	return 0;
+}
+#endif /* HAVE_STRUCT_XARRAY */
+
 int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
-		    struct kfd_ais_in_args *in, uint64_t *size_copied)
+		    struct kfd_ais_in_args *in, struct kfd_process_device *pdd,
+		    uint64_t *size_copied)
 {
 	struct file *filep;
 	struct pci_dev *pdev;
@@ -258,8 +338,13 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		*size_copied += ret;
 	}
 
-	if (ret > 0)
+
+	if (ret > 0) {
 		dev_dbg(adev->dev, "AIS: vfs transfer %llu bytes\n", *size_copied);
+#ifdef HAVE_STRUCT_XARRAY
+		ret = kfd_ais_update_counters(*size_copied, pdev, pdd, is_read);
+#endif
+	}
 
 	kvfree(bvec);
 put_sg:
