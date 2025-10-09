@@ -3766,7 +3766,7 @@ static int kfd_ioctl_ais(struct file *filep, struct kfd_process *p, void *data)
 
 	mutex_unlock(&p->mutex);
 
-	err = kfd_ais_rw_file(dev->adev, bo, in, &out_args.size_copied);
+	err = kfd_ais_rw_file(dev->adev, bo, in, pdd, &out_args.size_copied);
 	if (err) {
 		pr_err("Failed to %s AIS file: %d\n",
 		       in->op == KFD_IOC_AIS_READ ? "read" : "write", err);
