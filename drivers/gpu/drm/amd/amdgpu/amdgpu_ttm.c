@@ -2364,7 +2364,7 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	 * If IP discovery enabled, a block of memory should be
 	 * reserved for IP discovey.
 	 */
-	if (adev->mman.discovery_bin) {
+	if (adev->discovery.bin) {
 		r = amdgpu_ttm_reserve_tmr(adev);
 		if (r)
 			return r;

@@ -856,8 +856,6 @@ struct amd_powerplay {
 	const struct amd_pm_funcs *pp_funcs;
 };
 
-struct ip_discovery_top;
-
 /* polaris10 kickers */
 #define ASICID_IS_P20(did, rid)		(((did == 0x67DF) && \
 					 ((rid == 0xE3) || \
@@ -989,8 +987,7 @@ struct amdgpu_device {
 	struct notifier_block		acpi_nb;
 	struct notifier_block		pm_nb;
 	struct amdgpu_i2c_chan		*i2c_bus[AMDGPU_MAX_I2C_BUS];
-	struct debugfs_blob_wrapper     debugfs_vbios_blob;
-	struct debugfs_blob_wrapper     debugfs_discovery_blob;
+	struct debugfs_blob_wrapper debugfs_vbios_blob;
 	struct mutex			srbm_mutex;
 	/* GRBM index mutex. Protects concurrent access to GRBM index */
 	struct mutex                    grbm_idx_mutex;
@@ -1082,6 +1079,9 @@ struct amdgpu_device {
 		s64			accum_us_vis; /* for visible VRAM */
 		u32			log2_max_MBps;
 	} mm_stats;
+
+	/* discovery*/
+	struct amdgpu_discovery_info discovery;
 
 	/* display */
 	bool				enable_virtual_display;
@@ -1292,8 +1292,6 @@ struct amdgpu_device {
 	bool				ram_is_direct_mapped;
 
 	struct list_head                ras_list;
-
-	struct ip_discovery_top         *ip_top;
 
 	struct amdgpu_reset_domain	*reset_domain;
 
