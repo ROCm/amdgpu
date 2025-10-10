@@ -843,12 +843,13 @@ const uint64_t hmm_range_values[HMM_PFN_VALUE_MAX] = {
 int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 			       uint64_t start, uint64_t npages, bool readonly,
 			       void *owner,
-			       struct hmm_range *hmm_range)
+			       struct amdgpu_hmm_range *range)
 {
 	unsigned long end;
 	unsigned long timeout;
 	unsigned long *pfns;
 	int r = 0;
+	struct hmm_range *hmm_range = &range->hmm_range;
 
 	pfns = kvmalloc_array(npages, sizeof(*pfns), GFP_KERNEL);
 	if (unlikely(!pfns)) {
@@ -919,30 +920,38 @@ out_free_range:
 	return r;
 }
 
-bool amdgpu_hmm_range_valid(struct hmm_range *hmm_range)
+bool amdgpu_hmm_range_valid(struct amdgpu_hmm_range *range)
 {
-	if (!hmm_range)
+	if (!range)
 		return false;
 
-	return !mmu_interval_read_retry(hmm_range->notifier,
-					hmm_range->notifier_seq);
+	return !mmu_interval_read_retry(range->hmm_range.notifier,
+					range->hmm_range.notifier_seq);
 }
 
-struct hmm_range *amdgpu_hmm_range_alloc(void)
+struct amdgpu_hmm_range *amdgpu_hmm_range_alloc(struct amdgpu_bo *bo)
 {
-	return kzalloc(sizeof(struct hmm_range), GFP_KERNEL);
+	struct amdgpu_hmm_range *range;
+
+	range = kzalloc(sizeof(*range), GFP_KERNEL);
+	if (!range)
+		return NULL;
+
+	range->bo = amdgpu_bo_ref(bo);
+	return range;
 }
 
-void amdgpu_hmm_range_free(struct hmm_range *hmm_range)
+void amdgpu_hmm_range_free(struct amdgpu_hmm_range *range)
 {
-	if (!hmm_range)
+	if (!range)
 		return;
 
 #ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
-	kvfree(hmm_range->pfns);
+	kvfree(range->hmm_range.pfns);
 #else
-	kvfree(hmm_range->hmm_pfns);
+	kvfree(range->hmm_range.hmm_pfns);
 #endif
-	kfree(hmm_range);
+	amdgpu_bo_unref(&range->bo);
+	kfree(range);
 }
 #endif /* HAVE_AMDKCL_HMM_MIRROR_ENABLED */
