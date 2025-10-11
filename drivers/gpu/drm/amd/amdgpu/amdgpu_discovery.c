@@ -73,6 +73,7 @@
 #include "hdp_v5_2.h"
 #include "hdp_v6_0.h"
 #include "hdp_v7_0.h"
+#include "hdp_v8_0.h"
 #include "nv.h"
 #include "soc21.h"
 #include "soc24.h"
@@ -3885,6 +3886,9 @@ int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev)
 		break;
 	case IP_VERSION(7, 0, 0):
 		adev->hdp.funcs = &hdp_v7_0_funcs;
+		break;
+	case IP_VERSION(8, 0, 1):
+		adev->hdp.funcs = &hdp_v8_0_funcs;
 		break;
 	default:
 		break;
