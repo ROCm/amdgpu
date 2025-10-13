@@ -1741,12 +1741,15 @@ static int svm_range_validate_and_map(struct mm_struct *mm,
 			}
 
 			WRITE_ONCE(p->svms.faulting_task, current);
+			hmm_range = kzalloc(sizeof(*hmm_range), GFP_KERNEL);
 			r = amdgpu_hmm_range_get_pages(&prange->notifier, addr, npages,
 						       readonly, owner,
-						       &hmm_range);
+						       hmm_range);
 			WRITE_ONCE(p->svms.faulting_task, NULL);
-			if (r)
+			if (r) {
+				kfree(hmm_range);
 				pr_debug("failed %d to get svm range pages\n", r);
+			}
 		} else {
 			r = -EFAULT;
 		}
@@ -3049,6 +3052,8 @@ retry_write_locked:
 	if (svms->checkpoint_ts[gpuidx] != 0) {
 		if (amdgpu_ih_ts_after_or_equal(ts,  svms->checkpoint_ts[gpuidx])) {
 			pr_debug("draining retry fault, drop fault 0x%llx\n", addr);
+			if (write_locked)
+				mmap_write_downgrade(mm);
 			r = -EAGAIN;
 			goto out_unlock_svms;
 		} else {

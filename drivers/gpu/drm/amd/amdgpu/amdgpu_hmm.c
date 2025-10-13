@@ -843,17 +843,12 @@ const uint64_t hmm_range_values[HMM_PFN_VALUE_MAX] = {
 int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 			       uint64_t start, uint64_t npages, bool readonly,
 			       void *owner,
-			       struct hmm_range **phmm_range)
+			       struct hmm_range *hmm_range)
 {
-	struct hmm_range *hmm_range;
 	unsigned long end;
 	unsigned long timeout;
 	unsigned long *pfns;
 	int r = 0;
-
-	hmm_range = kzalloc(sizeof(*hmm_range), GFP_KERNEL);
-	if (unlikely(!hmm_range))
-		return -ENOMEM;
 
 	pfns = kvmalloc_array(npages, sizeof(*pfns), GFP_KERNEL);
 	if (unlikely(!pfns)) {
@@ -914,15 +909,11 @@ retry:
 	hmm_range->start = start;
 	hmm_range->hmm_pfns = pfns;
 
-	*phmm_range = hmm_range;
-
 	return 0;
 
 out_free_pfns:
 	kvfree(pfns);
 out_free_range:
-	kfree(hmm_range);
-
 	if (r == -EBUSY)
 		r = -EAGAIN;
 	return r;
