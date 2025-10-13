@@ -569,7 +569,7 @@ static int vangogh_print_legacy_clk_levels(struct smu_context *smu,
 	DpmClocks_t *clk_table = smu->smu_table.clocks_table;
 	SmuMetrics_legacy_t metrics;
 	struct smu_dpm_context *smu_dpm_ctx = &(smu->smu_dpm);
-	int i, idx, size = 0, ret = 0;
+	int i, idx, size = 0, ret = 0, start_offset = 0;
 	uint32_t cur_value = 0, value = 0, count = 0;
 	bool cur_value_match_level = false;
 
@@ -580,6 +580,7 @@ static int vangogh_print_legacy_clk_levels(struct smu_context *smu,
 		return ret;
 
 	smu_cmn_get_sysfs_buf(&buf, &size);
+	start_offset = size;
 
 	switch (clk_type) {
 	case SMU_OD_SCLK:
@@ -662,7 +663,7 @@ static int vangogh_print_legacy_clk_levels(struct smu_context *smu,
 		break;
 	}
 
-	return size;
+	return size - start_offset;
 }
 
 static int vangogh_print_clk_levels(struct smu_context *smu,
@@ -670,7 +671,7 @@ static int vangogh_print_clk_levels(struct smu_context *smu,
 {
 	DpmClocks_t *clk_table = smu->smu_table.clocks_table;
 	SmuMetrics_t metrics;
-	int i, idx, size = 0, ret = 0;
+	int i, idx, size = 0, ret = 0, start_offset = 0;
 	uint32_t cur_value = 0, value = 0, count = 0;
 	bool cur_value_match_level = false;
 	uint32_t min, max;
@@ -682,6 +683,7 @@ static int vangogh_print_clk_levels(struct smu_context *smu,
 		return ret;
 
 	smu_cmn_get_sysfs_buf(&buf, &size);
+	start_offset = size;
 
 	switch (clk_type) {
 	case SMU_OD_SCLK:
@@ -783,7 +785,7 @@ static int vangogh_print_clk_levels(struct smu_context *smu,
 		break;
 	}
 
-	return size;
+	return size - start_offset;
 }
 
 static int vangogh_common_print_clk_levels(struct smu_context *smu,
