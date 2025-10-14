@@ -1043,7 +1043,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				goto error_free_pages;
 			}
 
-			r = amdgpu_ttm_tt_get_user_pages(bo, e->user_pages, NULL);
+			r = amdgpu_ttm_tt_get_user_pages(bo, e->user_pages);
 			if (r) {
 				DRM_ERROR("amdgpu_ttm_tt_get_user_pages failed.\n");
 				kvfree(e->user_pages);

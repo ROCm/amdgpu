@@ -236,8 +236,7 @@ static inline int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo,
 	return -EPERM;
 }
 #else
-static inline int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages,
-				 struct hmm_range **range)
+static inline int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages)
 {
 	return -EPERM;
 }
