@@ -954,6 +954,9 @@
 /* memalloc_noreclaim_save() is available */
 #define HAVE_MEMALLOC_NORECLAIM_SAVE 1
 
+/* mempool_alloc_preallocated() is available */
+#define HAVE_MEMPOOL_ALLOC_PREALLOCATED 1
+
 /* migrate_disable() is available */
 #define HAVE_MIGRATE_DISABLE 1
 
