@@ -179,4 +179,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #kunit: support failure from dynamic analysis tools
 	dnl
 	AC_KERNEL_CHECK_HEADERS([kunit/test-bug.h])
+
+	dnl #v5.5-rc2-4-gaf628aae8640
+	dnl #device.h: move dev_printk()-like functions to dev_printk.h
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([linux/dev_printk.h])
 ])
