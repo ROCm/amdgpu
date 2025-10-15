@@ -952,6 +952,9 @@
 /* Define to 1 if you have the <linux/device/class.h> header file. */
 #define HAVE_LINUX_DEVICE_CLASS_H 1
 
+/* Define to 1 if you have the <linux/dev_printk.h> header file. */
+#define HAVE_LINUX_DEV_PRINTK_H 1
+
 /* Define to 1 if you have the <linux/dma-attrs.h> header file. */
 /* #undef HAVE_LINUX_DMA_ATTRS_H */
 
