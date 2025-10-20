@@ -649,7 +649,8 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 			return -ENOMEM;
 		r = amdgpu_ttm_tt_get_user_pages(bo, range);
 #else
-		r = amdgpu_ttm_tt_get_user_pages(bo, bo->tbo.ttm->pages);
+		r = amdgpu_ttm_tt_get_user_pages(bo, bo->tbo.ttm->pages,
+						 &range);
 #endif
 		if (r) {
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED

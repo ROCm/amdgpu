@@ -203,7 +203,8 @@ uint64_t amdgpu_ttm_domain_start(struct amdgpu_device *adev, uint32_t type);
 int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo,
 				 struct amdgpu_hmm_range *range);
 #else
-int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages);
+int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages,
+				 struct hmm_range **range);
 #endif
 #else
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
@@ -213,7 +214,8 @@ static inline int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo,
 	return -EPERM;
 }
 #else
-static inline int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages)
+static inline int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages,
+				 struct hmm_range **range)
 {
 	return -EPERM;
 }
