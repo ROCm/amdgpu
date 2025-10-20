@@ -356,6 +356,7 @@ static void vpe_idle_work_handler(struct work_struct *work)
 		goto reschedule;
 
 	amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VPE, AMD_PG_STATE_GATE);
+	return;
 
 reschedule:
 	schedule_delayed_work(&adev->vpe.idle_work, VPE_IDLE_TIMEOUT);
