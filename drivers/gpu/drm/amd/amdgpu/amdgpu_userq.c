@@ -862,28 +862,21 @@ static int
 amdgpu_userq_vm_validate(struct amdgpu_userq_mgr *uq_mgr)
 {
 	struct amdgpu_fpriv *fpriv = uq_mgr_to_fpriv(uq_mgr);
-	struct amdgpu_device *adev = uq_mgr->adev;
-	struct amdgpu_vm *vm = &fpriv->vm;
-	struct amdgpu_bo_va *bo_va;
-	struct drm_exec exec;
-	int ret;
-#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	bool invalidated = false, new_addition = false;
 	struct ttm_operation_ctx ctx = { true, false };
+	struct amdgpu_device *adev = uq_mgr->adev;
 	struct amdgpu_hmm_range *range;
+	struct amdgpu_vm *vm = &fpriv->vm;
 	unsigned long key, tmp_key;
+	struct amdgpu_bo_va *bo_va;
 	struct amdgpu_bo *bo;
+	struct drm_exec exec;
 	struct xarray xa;
+	int ret;
 
 	xa_init(&xa);
 
 retry_lock:
-#else
-	dev_warn_once(adev->dev, "HMM is not functional; falling back to legacy path. "
-		      "Legacy path is untested and may be unstable. "
-		      "Please enable HMM or refer to documentation for supported kernels.\n");
-	WARN_ON_ONCE(1);
-#endif
 	drm_exec_init(&exec, DRM_EXEC_IGNORE_DUPLICATES, 0);
 	drm_exec_until_all_locked(&exec) {
 		ret = amdgpu_vm_lock_pd(vm, &exec, 1);
@@ -910,7 +903,6 @@ retry_lock:
 			goto unlock_all;
 	}
 
-#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	if (invalidated) {
 		xa_for_each(&xa, tmp_key, range) {
 			bo = range->bo;
@@ -928,13 +920,11 @@ retry_lock:
 		}
 		invalidated = false;
 	}
-#endif
 
 	ret = amdgpu_vm_handle_moved(adev, vm, NULL);
 	if (ret)
 		goto unlock_all;
 
-#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	key = 0;
 	/* Validate User Ptr BOs */
 	list_for_each_entry(bo_va, &vm->done, base.vm_status) {
@@ -978,7 +968,6 @@ retry_lock:
 		new_addition = false;
 		goto retry_lock;
 	}
-#endif
 
 	ret = amdgpu_vm_update_pdes(adev, vm, false);
 	if (ret)
@@ -999,7 +988,6 @@ retry_lock:
 
 unlock_all:
 	drm_exec_fini(&exec);
-#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	xa_for_each(&xa, tmp_key, range) {
 		if (!range)
 			continue;
@@ -1007,7 +995,6 @@ unlock_all:
 		amdgpu_hmm_range_free(range);
 	}
 	xa_destroy(&xa);
-#endif
 	return ret;
 }
 
