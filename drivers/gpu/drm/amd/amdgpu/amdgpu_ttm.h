@@ -28,7 +28,6 @@
 #include <drm/gpu_scheduler.h>
 #include <drm/ttm/ttm_placement.h>
 #include "amdgpu_vram_mgr.h"
-#include "amdgpu_hmm.h"
 
 #define AMDGPU_PL_GDS		(TTM_PL_PRIV + 0)
 #define AMDGPU_PL_GWS		(TTM_PL_PRIV + 1)
@@ -201,7 +200,7 @@ uint64_t amdgpu_ttm_domain_start(struct amdgpu_device *adev, uint32_t type);
 #if IS_ENABLED(CONFIG_DRM_AMDGPU_USERPTR)
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo,
-				 struct amdgpu_hmm_range *range);
+				 struct hmm_range *range);
 #else
 int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages,
 				 struct hmm_range **range);
@@ -209,7 +208,7 @@ int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages,
 #else
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 static inline int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo,
-					       struct amdgpu_hmm_range *range)
+					       struct hmm_range *range)
 {
 	return -EPERM;
 }
@@ -223,7 +222,7 @@ static inline int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page
 #endif
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
-void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct amdgpu_hmm_range *range);
+void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct hmm_range *range);
 #else
 void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct page **pages);
 #endif

@@ -1702,7 +1702,7 @@ static int svm_range_validate_and_map(struct mm_struct *mm,
 	start = map_start << PAGE_SHIFT;
 	end = (map_last + 1) << PAGE_SHIFT;
 	for (addr = start; !r && addr < end; ) {
-		struct amdgpu_hmm_range *range = NULL;
+		struct hmm_range *hmm_range = NULL;
 		unsigned long map_start_vma;
 		unsigned long map_last_vma;
 		struct vm_area_struct *vma;
@@ -1741,13 +1741,13 @@ static int svm_range_validate_and_map(struct mm_struct *mm,
 			}
 
 			WRITE_ONCE(p->svms.faulting_task, current);
-			range = amdgpu_hmm_range_alloc(NULL);
+			hmm_range = amdgpu_hmm_range_alloc();
 			r = amdgpu_hmm_range_get_pages(&prange->notifier, addr, npages,
 						       readonly, owner,
-						       range);
+						       hmm_range);
 			WRITE_ONCE(p->svms.faulting_task, NULL);
 			if (r) {
-				amdgpu_hmm_range_free(range);
+				amdgpu_hmm_range_free(hmm_range);
 				pr_debug("failed %d to get svm range pages\n", r);
 			}
 		} else {
@@ -1757,7 +1757,7 @@ static int svm_range_validate_and_map(struct mm_struct *mm,
 		if (!r) {
 			offset = (addr >> PAGE_SHIFT) - prange->start;
 			r = svm_range_dma_map(prange, ctx->bitmap, offset, npages,
-					      range->hmm_range.hmm_pfns);
+					      hmm_range->hmm_pfns);
 			if (r)
 				pr_debug("failed %d to dma map range\n", r);
 		}
@@ -1768,12 +1768,12 @@ static int svm_range_validate_and_map(struct mm_struct *mm,
 		 * Overrride return value to TRY AGAIN only if prior returns
 		 * were successful
 		 */
-		if (range && !amdgpu_hmm_range_valid(range) && !r) {
+		if (hmm_range && !amdgpu_hmm_range_valid(hmm_range) && !r) {
 			pr_debug("hmm update the range, need validate again\n");
 			r = -EAGAIN;
 		}
 		/* Free the hmm range */
-		amdgpu_hmm_range_free(range);
+		amdgpu_hmm_range_free(hmm_range);
 
 
 		if (!r && !list_empty(&prange->child_list)) {

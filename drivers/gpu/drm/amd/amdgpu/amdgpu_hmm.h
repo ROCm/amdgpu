@@ -82,20 +82,16 @@ static inline struct page *hmm_pfn_to_page(unsigned long hmm_pfn)
 	return hmm_device_entry_to_page(&hmm_range, hmm_pfn);
 }
 #endif
-struct amdgpu_hmm_range {
-	struct hmm_range hmm_range;
-	struct amdgpu_bo *bo;
-};
 
 int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 			       uint64_t start, uint64_t npages, bool readonly,
 			       void *owner,
-			       struct amdgpu_hmm_range *range);
+			       struct hmm_range *hmm_range);
 
 #if defined(CONFIG_HMM_MIRROR)
-bool amdgpu_hmm_range_valid(struct amdgpu_hmm_range *range);
-struct amdgpu_hmm_range *amdgpu_hmm_range_alloc(struct amdgpu_bo *bo);
-void amdgpu_hmm_range_free(struct amdgpu_hmm_range *range);
+bool amdgpu_hmm_range_valid(struct hmm_range *hmm_range);
+struct hmm_range *amdgpu_hmm_range_alloc(void);
+void amdgpu_hmm_range_free(struct hmm_range *hmm_range);
 int amdgpu_hmm_register(struct amdgpu_bo *bo, unsigned long addr);
 void amdgpu_hmm_unregister(struct amdgpu_bo *bo);
 #else
@@ -108,17 +104,17 @@ static inline int amdgpu_hmm_register(struct amdgpu_bo *bo, unsigned long addr)
 
 static inline void amdgpu_hmm_unregister(struct amdgpu_bo *bo) {}
 
-static inline bool amdgpu_hmm_range_valid(struct amdgpu_hmm_range *range)
+static inline bool amdgpu_hmm_range_valid(struct hmm_range *hmm_range)
 {
 	return false;
 }
 
-static inline struct amdgpu_hmm_range *amdgpu_hmm_range_alloc(struct amdgpu_bo *bo)
+static inline struct hmm_range *amdgpu_hmm_range_alloc(void)
 {
 	return NULL;
 }
 
-static inline void amdgpu_hmm_range_free(struct amdgpu_hmm_range *range) {}
+static inline void amdgpu_hmm_range_free(struct hmm_range *hmm_range) {}
 #endif
 #endif /* HAVE_AMDKCL_HMM_MIRROR_ENABLED */
 
