@@ -919,30 +919,19 @@ out_free_range:
 	return r;
 }
 
-bool amdgpu_hmm_range_valid(struct hmm_range *hmm_range)
+bool amdgpu_hmm_range_get_pages_done(struct hmm_range *hmm_range)
 {
-	if (!hmm_range)
-		return false;
+	bool r;
 
-	return !mmu_interval_read_retry(hmm_range->notifier,
-					hmm_range->notifier_seq);
-}
-
-struct hmm_range *amdgpu_hmm_range_alloc(void)
-{
-	return kzalloc(sizeof(struct hmm_range), GFP_KERNEL);
-}
-
-void amdgpu_hmm_range_free(struct hmm_range *hmm_range)
-{
-	if (!hmm_range)
-		return;
-
+	r = mmu_interval_read_retry(hmm_range->notifier,
+				    hmm_range->notifier_seq);
 #ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
 	kvfree(hmm_range->pfns);
 #else
 	kvfree(hmm_range->hmm_pfns);
 #endif
 	kfree(hmm_range);
+
+	return r;
 }
 #endif /* HAVE_AMDKCL_HMM_MIRROR_ENABLED */
