@@ -1153,7 +1153,7 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr,
 	}
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
-	range = amdgpu_hmm_range_alloc();
+	range = kzalloc(sizeof(*range), GFP_KERNEL);
 	if (unlikely(!range)) {
 		ret = -ENOMEM;
 		goto unregister_out;
@@ -1161,7 +1161,7 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr,
 
 	ret = amdgpu_ttm_tt_get_user_pages(bo, range);
 	if (ret) {
-		amdgpu_hmm_range_free(range);
+		kfree(range);
 		if (ret == -EAGAIN)
 			pr_debug("Failed to get user pages, try again\n");
 		else
@@ -1210,7 +1210,7 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr,
 
 release_out:
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
-	amdgpu_hmm_range_free(range);
+	amdgpu_ttm_tt_get_user_pages_done(bo->tbo.ttm, range);
 #else
 	if (ret)
 		amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm, NULL);
@@ -2032,7 +2032,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 		amdgpu_hmm_unregister(mem->bo);
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 		mutex_lock(&process_info->notifier_lock);
-		amdgpu_hmm_range_free(mem->range);
+		amdgpu_ttm_tt_discard_user_pages(mem->bo->tbo.ttm, mem->range);
 		mutex_unlock(&process_info->notifier_lock);
 #else
 		/* Free user pages if necessary */
@@ -2922,7 +2922,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		bo = mem->bo;
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
-		amdgpu_hmm_range_free(mem->range);
+		amdgpu_ttm_tt_discard_user_pages(bo->tbo.ttm, mem->range);
 		mem->range = NULL;
 #endif
 
@@ -2948,13 +2948,13 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		}
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
-		mem->range = amdgpu_hmm_range_alloc();
+		mem->range = kzalloc(sizeof(*mem->range), GFP_KERNEL);
 		if (unlikely(!mem->range))
 			return -ENOMEM;
 		/* Get updated user pages */
 		ret = amdgpu_ttm_tt_get_user_pages(bo, mem->range);
 		if (ret) {
-			amdgpu_hmm_range_free(mem->range);
+			kfree(mem->range);
 			mem->range = NULL;
 			pr_debug("Failed %d to get user pages\n", ret);
 
@@ -3186,8 +3186,8 @@ static int confirm_valid_user_pages_locked(struct amdkfd_process_info *process_i
 			continue;
 
 		/* Only check mem with hmm range associated */
-		valid = amdgpu_hmm_range_valid(mem->range);
-		amdgpu_hmm_range_free(mem->range);
+		valid = amdgpu_ttm_tt_get_user_pages_done(
+					mem->bo->tbo.ttm, mem->range);
 
 		mem->range = NULL;
 		if (!valid) {
