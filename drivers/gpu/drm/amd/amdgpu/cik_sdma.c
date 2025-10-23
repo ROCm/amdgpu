@@ -718,18 +718,16 @@ static void cik_sdma_vm_copy_pte(struct amdgpu_ib *ib,
 				 uint64_t pe, uint64_t src,
 				 unsigned count)
 {
-	u32 *ptr = &ib->ptr[ib->length_dw];
 	unsigned bytes = count * 8;
 
-	*ptr++ = SDMA_PACKET(SDMA_OPCODE_COPY, SDMA_WRITE_SUB_OPCODE_LINEAR, 0);
-	*ptr++ = bytes;
-	*ptr++ = 0; /* src/dst endian swap */
-	*ptr++ = lower_32_bits(src);
-	*ptr++ = upper_32_bits(src);
-	*ptr++ = lower_32_bits(pe);
-	*ptr++ = upper_32_bits(pe);
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = SDMA_PACKET(SDMA_OPCODE_COPY,
+		SDMA_WRITE_SUB_OPCODE_LINEAR, 0);
+	ib->ptr[ib->length_dw++] = bytes;
+	ib->ptr[ib->length_dw++] = 0; /* src/dst endian swap */
+	ib->ptr[ib->length_dw++] = lower_32_bits(src);
+	ib->ptr[ib->length_dw++] = upper_32_bits(src);
+	ib->ptr[ib->length_dw++] = lower_32_bits(pe);
+	ib->ptr[ib->length_dw++] = upper_32_bits(pe);
 }
 
 /**
@@ -747,21 +745,18 @@ static void cik_sdma_vm_write_pte(struct amdgpu_ib *ib, uint64_t pe,
 				  uint64_t value, unsigned count,
 				  uint32_t incr)
 {
-	u32 *ptr = &ib->ptr[ib->length_dw];
 	unsigned ndw = count * 2;
 
-	*ptr++ = SDMA_PACKET(SDMA_OPCODE_WRITE,
-			     SDMA_WRITE_SUB_OPCODE_LINEAR, 0);
-	*ptr++ = lower_32_bits(pe);
-	*ptr++ = upper_32_bits(pe);
-	*ptr++ = ndw;
+	ib->ptr[ib->length_dw++] = SDMA_PACKET(SDMA_OPCODE_WRITE,
+		SDMA_WRITE_SUB_OPCODE_LINEAR, 0);
+	ib->ptr[ib->length_dw++] = lower_32_bits(pe);
+	ib->ptr[ib->length_dw++] = upper_32_bits(pe);
+	ib->ptr[ib->length_dw++] = ndw;
 	for (; ndw > 0; ndw -= 2) {
-		*ptr++ = lower_32_bits(value);
-		*ptr++ = upper_32_bits(value);
+		ib->ptr[ib->length_dw++] = lower_32_bits(value);
+		ib->ptr[ib->length_dw++] = upper_32_bits(value);
 		value += incr;
 	}
-
-	ib->length_dw = ptr - ib->ptr;
 }
 
 /**
@@ -780,21 +775,17 @@ static void cik_sdma_vm_set_pte_pde(struct amdgpu_ib *ib, uint64_t pe,
 				    uint64_t addr, unsigned count,
 				    uint32_t incr, uint64_t flags)
 {
-	u32 *ptr = &ib->ptr[ib->length_dw];
-
 	/* for physically contiguous pages (vram) */
-	*ptr++ = SDMA_PACKET(SDMA_OPCODE_GENERATE_PTE_PDE, 0, 0);
-	*ptr++ = lower_32_bits(pe); /* dst addr */
-	*ptr++ = upper_32_bits(pe);
-	*ptr++ = lower_32_bits(flags); /* mask */
-	*ptr++ = upper_32_bits(flags);
-	*ptr++ = lower_32_bits(addr); /* value */
-	*ptr++ = upper_32_bits(addr);
-	*ptr++ = incr; /* increment size */
-	*ptr++ = 0;
-	*ptr++ = count; /* number of entries */
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = SDMA_PACKET(SDMA_OPCODE_GENERATE_PTE_PDE, 0, 0);
+	ib->ptr[ib->length_dw++] = lower_32_bits(pe); /* dst addr */
+	ib->ptr[ib->length_dw++] = upper_32_bits(pe);
+	ib->ptr[ib->length_dw++] = lower_32_bits(flags); /* mask */
+	ib->ptr[ib->length_dw++] = upper_32_bits(flags);
+	ib->ptr[ib->length_dw++] = lower_32_bits(addr); /* value */
+	ib->ptr[ib->length_dw++] = upper_32_bits(addr);
+	ib->ptr[ib->length_dw++] = incr; /* increment size */
+	ib->ptr[ib->length_dw++] = 0;
+	ib->ptr[ib->length_dw++] = count; /* number of entries */
 }
 
 /**
@@ -807,22 +798,18 @@ static void cik_sdma_vm_set_pte_pde(struct amdgpu_ib *ib, uint64_t pe,
 static void cik_sdma_ring_pad_ib(struct amdgpu_ring *ring, struct amdgpu_ib *ib)
 {
 	struct amdgpu_sdma_instance *sdma = amdgpu_sdma_get_instance_from_ring(ring);
-	u32 *ptr = &ib->ptr[ib->length_dw];
 	u32 pad_count;
 	int i;
 
 	pad_count = (-ib->length_dw) & 7;
-	if (!pad_count)
-		return;
-
 	for (i = 0; i < pad_count; i++)
 		if (sdma && sdma->burst_nop && (i == 0))
-			*ptr++ = SDMA_PACKET(SDMA_OPCODE_NOP, 0, 0) |
-				 SDMA_NOP_COUNT(pad_count - 1);
+			ib->ptr[ib->length_dw++] =
+					SDMA_PACKET(SDMA_OPCODE_NOP, 0, 0) |
+					SDMA_NOP_COUNT(pad_count - 1);
 		else
-			*ptr++ = SDMA_PACKET(SDMA_OPCODE_NOP, 0, 0);
-
-	ib->length_dw += pad_count;
+			ib->ptr[ib->length_dw++] =
+					SDMA_PACKET(SDMA_OPCODE_NOP, 0, 0);
 }
 
 /**
@@ -1303,17 +1290,13 @@ static void cik_sdma_emit_copy_buffer(struct amdgpu_ib *ib,
 				      uint32_t byte_count,
 				      uint32_t copy_flags)
 {
-	u32 *ptr = &ib->ptr[ib->length_dw];
-
-	*ptr++ = SDMA_PACKET(SDMA_OPCODE_COPY, SDMA_COPY_SUB_OPCODE_LINEAR, 0);
-	*ptr++ = byte_count;
-	*ptr++ = 0; /* src/dst endian swap */
-	*ptr++ = lower_32_bits(src_offset);
-	*ptr++ = upper_32_bits(src_offset);
-	*ptr++ = lower_32_bits(dst_offset);
-	*ptr++ = upper_32_bits(dst_offset);
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = SDMA_PACKET(SDMA_OPCODE_COPY, SDMA_COPY_SUB_OPCODE_LINEAR, 0);
+	ib->ptr[ib->length_dw++] = byte_count;
+	ib->ptr[ib->length_dw++] = 0; /* src/dst endian swap */
+	ib->ptr[ib->length_dw++] = lower_32_bits(src_offset);
+	ib->ptr[ib->length_dw++] = upper_32_bits(src_offset);
+	ib->ptr[ib->length_dw++] = lower_32_bits(dst_offset);
+	ib->ptr[ib->length_dw++] = upper_32_bits(dst_offset);
 }
 
 /**
@@ -1331,15 +1314,11 @@ static void cik_sdma_emit_fill_buffer(struct amdgpu_ib *ib,
 				      uint64_t dst_offset,
 				      uint32_t byte_count)
 {
-	u32 *ptr = &ib->ptr[ib->length_dw];
-
-	*ptr++ = SDMA_PACKET(SDMA_OPCODE_CONSTANT_FILL, 0, 0);
-	*ptr++ = lower_32_bits(dst_offset);
-	*ptr++ = upper_32_bits(dst_offset);
-	*ptr++ = src_data;
-	*ptr++ = byte_count;
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = SDMA_PACKET(SDMA_OPCODE_CONSTANT_FILL, 0, 0);
+	ib->ptr[ib->length_dw++] = lower_32_bits(dst_offset);
+	ib->ptr[ib->length_dw++] = upper_32_bits(dst_offset);
+	ib->ptr[ib->length_dw++] = src_data;
+	ib->ptr[ib->length_dw++] = byte_count;
 }
 
 static const struct amdgpu_buffer_funcs cik_sdma_buffer_funcs = {
