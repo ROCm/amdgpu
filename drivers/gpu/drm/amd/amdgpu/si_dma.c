@@ -323,16 +323,14 @@ static void si_dma_vm_copy_pte(struct amdgpu_ib *ib,
 			       uint64_t pe, uint64_t src,
 			       unsigned count)
 {
-	u32 *ptr = &ib->ptr[ib->length_dw];
 	unsigned bytes = count * 8;
 
-	*ptr++ = DMA_PACKET(DMA_PACKET_COPY, 1, 0, 0, bytes);
-	*ptr++ = lower_32_bits(pe);
-	*ptr++ = lower_32_bits(src);
-	*ptr++ = upper_32_bits(pe) & 0xff;
-	*ptr++ = upper_32_bits(src) & 0xff;
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = DMA_PACKET(DMA_PACKET_COPY,
+					      1, 0, 0, bytes);
+	ib->ptr[ib->length_dw++] = lower_32_bits(pe);
+	ib->ptr[ib->length_dw++] = lower_32_bits(src);
+	ib->ptr[ib->length_dw++] = upper_32_bits(pe) & 0xff;
+	ib->ptr[ib->length_dw++] = upper_32_bits(src) & 0xff;
 }
 
 /**
@@ -350,19 +348,16 @@ static void si_dma_vm_write_pte(struct amdgpu_ib *ib, uint64_t pe,
 				uint64_t value, unsigned count,
 				uint32_t incr)
 {
-	u32 *ptr = &ib->ptr[ib->length_dw];
 	unsigned ndw = count * 2;
 
-	*ptr++ = DMA_PACKET(DMA_PACKET_WRITE, 0, 0, 0, ndw);
-	*ptr++ = lower_32_bits(pe);
-	*ptr++ = upper_32_bits(pe);
+	ib->ptr[ib->length_dw++] = DMA_PACKET(DMA_PACKET_WRITE, 0, 0, 0, ndw);
+	ib->ptr[ib->length_dw++] = lower_32_bits(pe);
+	ib->ptr[ib->length_dw++] = upper_32_bits(pe);
 	for (; ndw > 0; ndw -= 2) {
-		*ptr++ = lower_32_bits(value);
-		*ptr++ = upper_32_bits(value);
+		ib->ptr[ib->length_dw++] = lower_32_bits(value);
+		ib->ptr[ib->length_dw++] = upper_32_bits(value);
 		value += incr;
 	}
-
-	ib->length_dw = ptr - ib->ptr;
 }
 
 /**
@@ -382,7 +377,6 @@ static void si_dma_vm_set_pte_pde(struct amdgpu_ib *ib,
 				     uint64_t addr, unsigned count,
 				     uint32_t incr, uint64_t flags)
 {
-	u32 *ptr = &ib->ptr[ib->length_dw];
 	uint64_t value;
 	unsigned ndw;
 
@@ -397,21 +391,19 @@ static void si_dma_vm_set_pte_pde(struct amdgpu_ib *ib,
 			value = 0;
 
 		/* for physically contiguous pages (vram) */
-		*ptr++ = DMA_PTE_PDE_PACKET(ndw);
-		*ptr++ = pe; /* dst addr */
-		*ptr++ = upper_32_bits(pe) & 0xff;
-		*ptr++ = lower_32_bits(flags); /* mask */
-		*ptr++ = upper_32_bits(flags);
-		*ptr++ = value; /* value */
-		*ptr++ = upper_32_bits(value);
-		*ptr++ = incr; /* increment size */
-		*ptr++ = 0;
+		ib->ptr[ib->length_dw++] = DMA_PTE_PDE_PACKET(ndw);
+		ib->ptr[ib->length_dw++] = pe; /* dst addr */
+		ib->ptr[ib->length_dw++] = upper_32_bits(pe) & 0xff;
+		ib->ptr[ib->length_dw++] = lower_32_bits(flags); /* mask */
+		ib->ptr[ib->length_dw++] = upper_32_bits(flags);
+		ib->ptr[ib->length_dw++] = value; /* value */
+		ib->ptr[ib->length_dw++] = upper_32_bits(value);
+		ib->ptr[ib->length_dw++] = incr; /* increment size */
+		ib->ptr[ib->length_dw++] = 0;
 		pe += ndw * 4;
 		addr += (ndw / 2) * incr;
 		count -= ndw / 2;
 	}
-
-	ib->length_dw = ptr - ib->ptr;
 }
 
 /**
@@ -423,12 +415,8 @@ static void si_dma_vm_set_pte_pde(struct amdgpu_ib *ib,
  */
 static void si_dma_ring_pad_ib(struct amdgpu_ring *ring, struct amdgpu_ib *ib)
 {
-	int pad = 8 - (ib->length_dw & 0x7);
-
-	if (pad && pad < 8) {
-		memset32(ib->ptr, DMA_PACKET(DMA_PACKET_NOP, 0, 0, 0, 0), pad);
-		ib->length_dw += pad;
-	}
+	while (ib->length_dw & 0x7)
+		ib->ptr[ib->length_dw++] = DMA_PACKET(DMA_PACKET_NOP, 0, 0, 0, 0);
 }
 
 /**
@@ -795,15 +783,12 @@ static void si_dma_emit_copy_buffer(struct amdgpu_ib *ib,
 				       uint32_t byte_count,
 				       uint32_t copy_flags)
 {
-	u32 *ptr = &ib->ptr[ib->length_dw];
-
-	*ptr++ = DMA_PACKET(DMA_PACKET_COPY, 1, 0, 0, byte_count);
-	*ptr++ = lower_32_bits(dst_offset);
-	*ptr++ = lower_32_bits(src_offset);
-	*ptr++ = upper_32_bits(dst_offset) & 0xff;
-	*ptr++ = upper_32_bits(src_offset) & 0xff;
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = DMA_PACKET(DMA_PACKET_COPY,
+					      1, 0, 0, byte_count);
+	ib->ptr[ib->length_dw++] = lower_32_bits(dst_offset);
+	ib->ptr[ib->length_dw++] = lower_32_bits(src_offset);
+	ib->ptr[ib->length_dw++] = upper_32_bits(dst_offset) & 0xff;
+	ib->ptr[ib->length_dw++] = upper_32_bits(src_offset) & 0xff;
 }
 
 /**
@@ -821,14 +806,11 @@ static void si_dma_emit_fill_buffer(struct amdgpu_ib *ib,
 				       uint64_t dst_offset,
 				       uint32_t byte_count)
 {
-	u32 *ptr = &ib->ptr[ib->length_dw];
-
-	*ptr++ = DMA_PACKET(DMA_PACKET_CONSTANT_FILL, 0, 0, 0, byte_count / 4);
-	*ptr++ = lower_32_bits(dst_offset);
-	*ptr++ = src_data;
-	*ptr++ = upper_32_bits(dst_offset) << 16;
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = DMA_PACKET(DMA_PACKET_CONSTANT_FILL,
+					      0, 0, 0, byte_count / 4);
+	ib->ptr[ib->length_dw++] = lower_32_bits(dst_offset);
+	ib->ptr[ib->length_dw++] = src_data;
+	ib->ptr[ib->length_dw++] = upper_32_bits(dst_offset) << 16;
 }
 
 
