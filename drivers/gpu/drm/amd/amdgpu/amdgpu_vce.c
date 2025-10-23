@@ -444,7 +444,6 @@ static int amdgpu_vce_get_create_msg(struct amdgpu_ring *ring, uint32_t handle,
 	struct amdgpu_ib ib_msg;
 	struct dma_fence *f = NULL;
 	uint64_t addr;
-	u32 *ptr;
 	int i, r;
 
 	r = amdgpu_job_alloc_with_ib(ring->adev, &ring->adev->vce.entity,
@@ -463,47 +462,45 @@ static int amdgpu_vce_get_create_msg(struct amdgpu_ring *ring, uint32_t handle,
 		goto err;
 
 	ib = &job->ibs[0];
-	ptr = ib->ptr;
 	/* let addr point to page boundary */
 	addr = AMDGPU_GPU_PAGE_ALIGN(ib_msg.gpu_addr);
 
 	/* stitch together an VCE create msg */
-	*ptr++ = 0x0000000c; /* len */
-	*ptr++ = 0x00000001; /* session cmd */
-	*ptr++ = handle;
+	ib->length_dw = 0;
+	ib->ptr[ib->length_dw++] = 0x0000000c; /* len */
+	ib->ptr[ib->length_dw++] = 0x00000001; /* session cmd */
+	ib->ptr[ib->length_dw++] = handle;
 
 	if ((ring->adev->vce.fw_version >> 24) >= 52)
-		*ptr++ = 0x00000040; /* len */
+		ib->ptr[ib->length_dw++] = 0x00000040; /* len */
 	else
-		*ptr++ = 0x00000030; /* len */
-	*ptr++ = 0x01000001; /* create cmd */
-	*ptr++ = 0x00000000;
-	*ptr++ = 0x00000042;
-	*ptr++ = 0x0000000a;
-	*ptr++ = 0x00000001;
-	*ptr++ = 0x00000080;
-	*ptr++ = 0x00000060;
-	*ptr++ = 0x00000100;
-	*ptr++ = 0x00000100;
-	*ptr++ = 0x0000000c;
-	*ptr++ = 0x00000000;
+		ib->ptr[ib->length_dw++] = 0x00000030; /* len */
+	ib->ptr[ib->length_dw++] = 0x01000001; /* create cmd */
+	ib->ptr[ib->length_dw++] = 0x00000000;
+	ib->ptr[ib->length_dw++] = 0x00000042;
+	ib->ptr[ib->length_dw++] = 0x0000000a;
+	ib->ptr[ib->length_dw++] = 0x00000001;
+	ib->ptr[ib->length_dw++] = 0x00000080;
+	ib->ptr[ib->length_dw++] = 0x00000060;
+	ib->ptr[ib->length_dw++] = 0x00000100;
+	ib->ptr[ib->length_dw++] = 0x00000100;
+	ib->ptr[ib->length_dw++] = 0x0000000c;
+	ib->ptr[ib->length_dw++] = 0x00000000;
 	if ((ring->adev->vce.fw_version >> 24) >= 52) {
-		*ptr++ = 0x00000000;
-		*ptr++ = 0x00000000;
-		*ptr++ = 0x00000000;
-		*ptr++ = 0x00000000;
+		ib->ptr[ib->length_dw++] = 0x00000000;
+		ib->ptr[ib->length_dw++] = 0x00000000;
+		ib->ptr[ib->length_dw++] = 0x00000000;
+		ib->ptr[ib->length_dw++] = 0x00000000;
 	}
 
-	*ptr++ = 0x00000014; /* len */
-	*ptr++ = 0x05000005; /* feedback buffer */
-	*ptr++ = upper_32_bits(addr);
-	*ptr++ = addr;
-	*ptr++ = 0x00000001;
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = 0x00000014; /* len */
+	ib->ptr[ib->length_dw++] = 0x05000005; /* feedback buffer */
+	ib->ptr[ib->length_dw++] = upper_32_bits(addr);
+	ib->ptr[ib->length_dw++] = addr;
+	ib->ptr[ib->length_dw++] = 0x00000001;
 
 	for (i = ib->length_dw; i < ib_size_dw; ++i)
-		*ptr++ = 0x0;
+		ib->ptr[i] = 0x0;
 
 	r = amdgpu_job_submit_direct(job, ring, &f);
 	amdgpu_ib_free(&ib_msg, f);
@@ -537,7 +534,6 @@ static int amdgpu_vce_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
 	struct amdgpu_job *job;
 	struct amdgpu_ib *ib;
 	struct dma_fence *f = NULL;
-	u32 *ptr;
 	int i, r;
 
 	r = amdgpu_job_alloc_with_ib(ring->adev, &ring->adev->vce.entity,
@@ -549,29 +545,27 @@ static int amdgpu_vce_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
 		return r;
 
 	ib = &job->ibs[0];
-	ptr = ib->ptr;
 
 	/* stitch together an VCE destroy msg */
-	*ptr++ = 0x0000000c; /* len */
-	*ptr++ = 0x00000001; /* session cmd */
-	*ptr++ = handle;
+	ib->length_dw = 0;
+	ib->ptr[ib->length_dw++] = 0x0000000c; /* len */
+	ib->ptr[ib->length_dw++] = 0x00000001; /* session cmd */
+	ib->ptr[ib->length_dw++] = handle;
 
-	*ptr++ = 0x00000020; /* len */
-	*ptr++ = 0x00000002; /* task info */
-	*ptr++ = 0xffffffff; /* next task info, set to 0xffffffff if no */
-	*ptr++ = 0x00000001; /* destroy session */
-	*ptr++ = 0x00000000;
-	*ptr++ = 0x00000000;
-	*ptr++ = 0xffffffff; /* feedback is not needed, set to 0xffffffff and firmware will not output feedback */
-	*ptr++ = 0x00000000;
+	ib->ptr[ib->length_dw++] = 0x00000020; /* len */
+	ib->ptr[ib->length_dw++] = 0x00000002; /* task info */
+	ib->ptr[ib->length_dw++] = 0xffffffff; /* next task info, set to 0xffffffff if no */
+	ib->ptr[ib->length_dw++] = 0x00000001; /* destroy session */
+	ib->ptr[ib->length_dw++] = 0x00000000;
+	ib->ptr[ib->length_dw++] = 0x00000000;
+	ib->ptr[ib->length_dw++] = 0xffffffff; /* feedback is not needed, set to 0xffffffff and firmware will not output feedback */
+	ib->ptr[ib->length_dw++] = 0x00000000;
 
-	*ptr++ = 0x00000008; /* len */
-	*ptr++ = 0x02000001; /* destroy cmd */
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = 0x00000008; /* len */
+	ib->ptr[ib->length_dw++] = 0x02000001; /* destroy cmd */
 
 	for (i = ib->length_dw; i < ib_size_dw; ++i)
-		*ptr++ = 0x0;
+		ib->ptr[i] = 0x0;
 
 	if (direct)
 		r = amdgpu_job_submit_direct(job, ring, &f);
