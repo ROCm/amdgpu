@@ -760,19 +760,16 @@ static uint32_t *amdgpu_vcn_unified_ring_ib_header(struct amdgpu_ib *ib,
 						uint32_t ib_pack_in_dw, bool enc)
 {
 	uint32_t *ib_checksum;
-	u32 *ptr = &ib->ptr[ib->length_dw];
 
-	*ptr++ = 0x00000010; /* single queue checksum */
-	*ptr++ = 0x30000002;
-	ib_checksum = ptr++;
-	*ptr++ = ib_pack_in_dw;
+	ib->ptr[ib->length_dw++] = 0x00000010; /* single queue checksum */
+	ib->ptr[ib->length_dw++] = 0x30000002;
+	ib_checksum = &ib->ptr[ib->length_dw++];
+	ib->ptr[ib->length_dw++] = ib_pack_in_dw;
 
-	*ptr++ = 0x00000010; /* engine info */
-	*ptr++ = 0x30000001;
-	*ptr++ = enc ? 0x2 : 0x3;
-	*ptr++ = ib_pack_in_dw * sizeof(uint32_t);
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = 0x00000010; /* engine info */
+	ib->ptr[ib->length_dw++] = 0x30000001;
+	ib->ptr[ib->length_dw++] = enc ? 0x2 : 0x3;
+	ib->ptr[ib->length_dw++] = ib_pack_in_dw * sizeof(uint32_t);
 
 	return ib_checksum;
 }
@@ -802,7 +799,6 @@ static int amdgpu_vcn_dec_sw_send_msg(struct amdgpu_ring *ring,
 	uint64_t addr = AMDGPU_GPU_PAGE_ALIGN(ib_msg->gpu_addr);
 	uint32_t *ib_checksum;
 	uint32_t ib_pack_in_dw;
-	u32 *ptr;
 	int i, r;
 
 	if (adev->vcn.inst[ring->me].using_unified_queue)
@@ -815,7 +811,7 @@ static int amdgpu_vcn_dec_sw_send_msg(struct amdgpu_ring *ring,
 		goto err;
 
 	ib = &job->ibs[0];
-	ptr = ib->ptr;
+	ib->length_dw = 0;
 
 	/* single queue headers */
 	if (adev->vcn.inst[ring->me].using_unified_queue) {
@@ -824,11 +820,10 @@ static int amdgpu_vcn_dec_sw_send_msg(struct amdgpu_ring *ring,
 		ib_checksum = amdgpu_vcn_unified_ring_ib_header(ib, ib_pack_in_dw, false);
 	}
 
-	*ptr++ = sizeof(struct amdgpu_vcn_decode_buffer) + 8;
-	*ptr++ = cpu_to_le32(AMDGPU_VCN_IB_FLAG_DECODE_BUFFER);
-	decode_buffer = (struct amdgpu_vcn_decode_buffer *)ptr;
-	ib->length_dw = ptr - ib->ptr +
-			sizeof(struct amdgpu_vcn_decode_buffer) / 4;
+	ib->ptr[ib->length_dw++] = sizeof(struct amdgpu_vcn_decode_buffer) + 8;
+	ib->ptr[ib->length_dw++] = cpu_to_le32(AMDGPU_VCN_IB_FLAG_DECODE_BUFFER);
+	decode_buffer = (struct amdgpu_vcn_decode_buffer *)&(ib->ptr[ib->length_dw]);
+	ib->length_dw += sizeof(struct amdgpu_vcn_decode_buffer) / 4;
 	memset(decode_buffer, 0, sizeof(struct amdgpu_vcn_decode_buffer));
 
 	decode_buffer->valid_buf_flag |= cpu_to_le32(AMDGPU_VCN_CMD_FLAG_MSG_BUFFER);
@@ -836,7 +831,7 @@ static int amdgpu_vcn_dec_sw_send_msg(struct amdgpu_ring *ring,
 	decode_buffer->msg_buffer_address_lo = cpu_to_le32(addr);
 
 	for (i = ib->length_dw; i < ib_size_dw; ++i)
-		*ptr++ = 0x0;
+		ib->ptr[i] = 0x0;
 
 	if (adev->vcn.inst[ring->me].using_unified_queue)
 		amdgpu_vcn_unified_ring_ib_checksum(&ib_checksum, ib_pack_in_dw);
@@ -934,7 +929,6 @@ static int amdgpu_vcn_enc_get_create_msg(struct amdgpu_ring *ring, uint32_t hand
 	struct dma_fence *f = NULL;
 	uint32_t *ib_checksum = NULL;
 	uint64_t addr;
-	u32 *ptr;
 	int i, r;
 
 	if (adev->vcn.inst[ring->me].using_unified_queue)
@@ -947,32 +941,31 @@ static int amdgpu_vcn_enc_get_create_msg(struct amdgpu_ring *ring, uint32_t hand
 		return r;
 
 	ib = &job->ibs[0];
-	ptr = ib->ptr;
 	addr = AMDGPU_GPU_PAGE_ALIGN(ib_msg->gpu_addr);
+
+	ib->length_dw = 0;
 
 	if (adev->vcn.inst[ring->me].using_unified_queue)
 		ib_checksum = amdgpu_vcn_unified_ring_ib_header(ib, 0x11, true);
 
-	*ptr++ = 0x00000018;
-	*ptr++ = 0x00000001; /* session info */
-	*ptr++ = handle;
-	*ptr++ = upper_32_bits(addr);
-	*ptr++ = addr;
-	*ptr++ = 0x00000000;
+	ib->ptr[ib->length_dw++] = 0x00000018;
+	ib->ptr[ib->length_dw++] = 0x00000001; /* session info */
+	ib->ptr[ib->length_dw++] = handle;
+	ib->ptr[ib->length_dw++] = upper_32_bits(addr);
+	ib->ptr[ib->length_dw++] = addr;
+	ib->ptr[ib->length_dw++] = 0x00000000;
 
-	*ptr++ = 0x00000014;
-	*ptr++ = 0x00000002; /* task info */
-	*ptr++ = 0x0000001c;
-	*ptr++ = 0x00000000;
-	*ptr++ = 0x00000000;
+	ib->ptr[ib->length_dw++] = 0x00000014;
+	ib->ptr[ib->length_dw++] = 0x00000002; /* task info */
+	ib->ptr[ib->length_dw++] = 0x0000001c;
+	ib->ptr[ib->length_dw++] = 0x00000000;
+	ib->ptr[ib->length_dw++] = 0x00000000;
 
-	*ptr++ = 0x00000008;
-	*ptr++ = 0x08000001; /* op initialize */
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = 0x00000008;
+	ib->ptr[ib->length_dw++] = 0x08000001; /* op initialize */
 
 	for (i = ib->length_dw; i < ib_size_dw; ++i)
-		*ptr++ = 0x0;
+		ib->ptr[i] = 0x0;
 
 	if (adev->vcn.inst[ring->me].using_unified_queue)
 		amdgpu_vcn_unified_ring_ib_checksum(&ib_checksum, 0x11);
@@ -1003,7 +996,6 @@ static int amdgpu_vcn_enc_get_destroy_msg(struct amdgpu_ring *ring, uint32_t han
 	struct dma_fence *f = NULL;
 	uint32_t *ib_checksum = NULL;
 	uint64_t addr;
-	u32 *ptr;
 	int i, r;
 
 	if (adev->vcn.inst[ring->me].using_unified_queue)
@@ -1016,32 +1008,31 @@ static int amdgpu_vcn_enc_get_destroy_msg(struct amdgpu_ring *ring, uint32_t han
 		return r;
 
 	ib = &job->ibs[0];
-	ptr = ib->ptr;
 	addr = AMDGPU_GPU_PAGE_ALIGN(ib_msg->gpu_addr);
+
+	ib->length_dw = 0;
 
 	if (adev->vcn.inst[ring->me].using_unified_queue)
 		ib_checksum = amdgpu_vcn_unified_ring_ib_header(ib, 0x11, true);
 
-	*ptr++ = 0x00000018;
-	*ptr++ = 0x00000001;
-	*ptr++ = handle;
-	*ptr++ = upper_32_bits(addr);
-	*ptr++ = addr;
-	*ptr++ = 0x00000000;
+	ib->ptr[ib->length_dw++] = 0x00000018;
+	ib->ptr[ib->length_dw++] = 0x00000001;
+	ib->ptr[ib->length_dw++] = handle;
+	ib->ptr[ib->length_dw++] = upper_32_bits(addr);
+	ib->ptr[ib->length_dw++] = addr;
+	ib->ptr[ib->length_dw++] = 0x00000000;
 
-	*ptr++ = 0x00000014;
-	*ptr++ = 0x00000002;
-	*ptr++ = 0x0000001c;
-	*ptr++ = 0x00000000;
-	*ptr++ = 0x00000000;
+	ib->ptr[ib->length_dw++] = 0x00000014;
+	ib->ptr[ib->length_dw++] = 0x00000002;
+	ib->ptr[ib->length_dw++] = 0x0000001c;
+	ib->ptr[ib->length_dw++] = 0x00000000;
+	ib->ptr[ib->length_dw++] = 0x00000000;
 
-	*ptr++ = 0x00000008;
-	*ptr++ = 0x08000002; /* op close session */
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = 0x00000008;
+	ib->ptr[ib->length_dw++] = 0x08000002; /* op close session */
 
 	for (i = ib->length_dw; i < ib_size_dw; ++i)
-		*ptr++ = 0x0;
+		ib->ptr[i] = 0x0;
 
 	if (adev->vcn.inst[ring->me].using_unified_queue)
 		amdgpu_vcn_unified_ring_ib_checksum(&ib_checksum, 0x11);
