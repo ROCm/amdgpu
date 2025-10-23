@@ -1023,6 +1023,12 @@
 /* PIDTYPE is availablea */
 #define HAVE_PIDTYPE_TGID 1
 
+/* pm_hibernate_is_recovering() is available */
+#define HAVE_PM_HIBERNATE_IS_RECOVERING 1
+
+/* pm_hibernation_mode_is_suspend() is available */
+#define HAVE_PM_HIBERNATION_MODE_IS_SUSPEND 1
+
 /* pm_runtime_get_if_active() has one parameters */
 #define HAVE_PM_RUNTIME_GET_IF_ACTIVE_1ARGS 1
 
