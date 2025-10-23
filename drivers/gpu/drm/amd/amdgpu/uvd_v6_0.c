@@ -214,7 +214,6 @@ static int uvd_v6_0_enc_get_create_msg(struct amdgpu_ring *ring, uint32_t handle
 	struct amdgpu_ib *ib;
 	struct dma_fence *f = NULL;
 	uint64_t addr;
-	u32 *ptr;
 	int i, r;
 
 	r = amdgpu_job_alloc_with_ib(ring->adev, NULL, NULL, ib_size_dw * 4,
@@ -223,29 +222,27 @@ static int uvd_v6_0_enc_get_create_msg(struct amdgpu_ring *ring, uint32_t handle
 		return r;
 
 	ib = &job->ibs[0];
-	ptr = ib->ptr;
 	addr = amdgpu_bo_gpu_offset(bo);
 
-	*ptr++ = 0x00000018;
-	*ptr++ = 0x00000001; /* session info */
-	*ptr++ = handle;
-	*ptr++ = 0x00010000;
-	*ptr++ = upper_32_bits(addr);
-	*ptr++ = addr;
+	ib->length_dw = 0;
+	ib->ptr[ib->length_dw++] = 0x00000018;
+	ib->ptr[ib->length_dw++] = 0x00000001; /* session info */
+	ib->ptr[ib->length_dw++] = handle;
+	ib->ptr[ib->length_dw++] = 0x00010000;
+	ib->ptr[ib->length_dw++] = upper_32_bits(addr);
+	ib->ptr[ib->length_dw++] = addr;
 
-	*ptr++ = 0x00000014;
-	*ptr++ = 0x00000002; /* task info */
-	*ptr++ = 0x0000001c;
-	*ptr++ = 0x00000001;
-	*ptr++ = 0x00000000;
+	ib->ptr[ib->length_dw++] = 0x00000014;
+	ib->ptr[ib->length_dw++] = 0x00000002; /* task info */
+	ib->ptr[ib->length_dw++] = 0x0000001c;
+	ib->ptr[ib->length_dw++] = 0x00000001;
+	ib->ptr[ib->length_dw++] = 0x00000000;
 
-	*ptr++ = 0x00000008;
-	*ptr++ = 0x08000001; /* op initialize */
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = 0x00000008;
+	ib->ptr[ib->length_dw++] = 0x08000001; /* op initialize */
 
 	for (i = ib->length_dw; i < ib_size_dw; ++i)
-		*ptr++ = 0x0;
+		ib->ptr[i] = 0x0;
 
 	r = amdgpu_job_submit_direct(job, ring, &f);
 	if (r)
@@ -281,7 +278,6 @@ static int uvd_v6_0_enc_get_destroy_msg(struct amdgpu_ring *ring,
 	struct amdgpu_ib *ib;
 	struct dma_fence *f = NULL;
 	uint64_t addr;
-	u32 *ptr;
 	int i, r;
 
 	r = amdgpu_job_alloc_with_ib(ring->adev, NULL, NULL, ib_size_dw * 4,
@@ -290,29 +286,27 @@ static int uvd_v6_0_enc_get_destroy_msg(struct amdgpu_ring *ring,
 		return r;
 
 	ib = &job->ibs[0];
-	ptr = ib->ptr;
 	addr = amdgpu_bo_gpu_offset(bo);
 
-	*ptr++ = 0x00000018;
-	*ptr++ = 0x00000001; /* session info */
-	*ptr++ = handle;
-	*ptr++ = 0x00010000;
-	*ptr++ = upper_32_bits(addr);
-	*ptr++ = addr;
+	ib->length_dw = 0;
+	ib->ptr[ib->length_dw++] = 0x00000018;
+	ib->ptr[ib->length_dw++] = 0x00000001; /* session info */
+	ib->ptr[ib->length_dw++] = handle;
+	ib->ptr[ib->length_dw++] = 0x00010000;
+	ib->ptr[ib->length_dw++] = upper_32_bits(addr);
+	ib->ptr[ib->length_dw++] = addr;
 
-	*ptr++ = 0x00000014;
-	*ptr++ = 0x00000002; /* task info */
-	*ptr++ = 0x0000001c;
-	*ptr++ = 0x00000001;
-	*ptr++ = 0x00000000;
+	ib->ptr[ib->length_dw++] = 0x00000014;
+	ib->ptr[ib->length_dw++] = 0x00000002; /* task info */
+	ib->ptr[ib->length_dw++] = 0x0000001c;
+	ib->ptr[ib->length_dw++] = 0x00000001;
+	ib->ptr[ib->length_dw++] = 0x00000000;
 
-	*ptr++ = 0x00000008;
-	*ptr++ = 0x08000002; /* op close session */
-
-	ib->length_dw = ptr - ib->ptr;
+	ib->ptr[ib->length_dw++] = 0x00000008;
+	ib->ptr[ib->length_dw++] = 0x08000002; /* op close session */
 
 	for (i = ib->length_dw; i < ib_size_dw; ++i)
-		*ptr++ = 0x0;
+		ib->ptr[i] = 0x0;
 
 	r = amdgpu_job_submit_direct(job, ring, &f);
 	if (r)
