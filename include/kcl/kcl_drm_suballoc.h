@@ -51,6 +51,7 @@ struct drm_suballoc {
 	size_t eoffset;
 	struct dma_fence *fence;
 };
+#endif /*HAVE_DRM_DRM_SUBALLOC_H*/
 
 #ifndef HAVE_DRM_SUBALLOC_MANAGER_INIT
 void kcl_drm_suballoc_manager_init(struct drm_suballoc_manager *sa_manager,
@@ -119,6 +120,5 @@ kcl_drm_suballoc_dump_debug_info(struct drm_suballoc_manager *sa_manager,
 #define drm_suballoc_dump_debug_info kcl_drm_suballoc_dump_debug_info
 #endif /* HAVE_DRM_SUBALLOC_MANAGER_INIT */
 
-#endif /*HAVE_DRM_DRM_SUBALLOC_H*/
 
 #endif /* _KCL_DRM_SUBALLOC_H_ */
