@@ -54,10 +54,12 @@ struct amdgpu_ras_mgr {
 	bool ras_is_ready;
 };
 
+extern const struct amdgpu_ip_block_version ras_v1_0_ip_block;
+
 struct amdgpu_ras_mgr *amdgpu_ras_mgr_get_context(
 			struct amdgpu_device *adev);
-int amdgpu_enable_unified_ras(struct amdgpu_device *adev, bool enable);
-bool amdgpu_unified_ras_enabled(struct amdgpu_device *adev);
+int amdgpu_enable_uniras(struct amdgpu_device *adev, bool enable);
+bool amdgpu_uniras_enabled(struct amdgpu_device *adev);
 int amdgpu_ras_mgr_handle_fatal_interrupt(struct amdgpu_device *adev, void *data);
 int amdgpu_ras_mgr_handle_controller_interrupt(struct amdgpu_device *adev, void *data);
 int amdgpu_ras_mgr_handle_consumer_interrupt(struct amdgpu_device *adev, void *data);
@@ -70,4 +72,7 @@ int amdgpu_ras_mgr_get_curr_nps_mode(struct amdgpu_device *adev, uint32_t *nps_m
 bool amdgpu_ras_mgr_check_retired_addr(struct amdgpu_device *adev,
 			uint64_t addr);
 bool amdgpu_ras_mgr_is_rma(struct amdgpu_device *adev);
+int amdgpu_ras_mgr_handle_ras_cmd(struct amdgpu_device *adev,
+		uint32_t cmd_id, void *input, uint32_t input_size,
+		void *output, uint32_t out_size);
 #endif

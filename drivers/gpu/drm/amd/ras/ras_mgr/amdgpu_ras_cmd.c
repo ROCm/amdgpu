@@ -36,67 +36,6 @@
 #define AMDGPU_RAS_TYPE_AMDGPU   0x2
 #define AMDGPU_RAS_TYPE_VF       0x3
 
-static int amdgpu_ras_query_interface_info(struct ras_core_context *ras_core,
-			struct ras_cmd_ioctl *cmd)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *)ras_core->dev;
-	struct ras_query_interface_info_rsp *output_data =
-		(struct ras_query_interface_info_rsp *)cmd->output_buff_raw;
-	int ret;
-
-	if (cmd->input_size != sizeof(struct ras_query_interface_info_req))
-		return RAS_CMD__ERROR_INVALID_INPUT_SIZE;
-
-	ret = ras_cmd_query_interface_info(ras_core, output_data);
-	if (!ret) {
-		output_data->plat_major_ver = 0;
-		output_data->plat_minor_ver = 0;
-
-		output_data->interface_type = amdgpu_sriov_vf(adev) ?
-			RAS_CMD_INTERFACE_TYPE_VF : RAS_CMD_INTERFACE_TYPE_AMDGPU;
-
-		cmd->output_size = sizeof(struct ras_query_interface_info_rsp);
-	}
-
-	return ret;
-}
-
-static struct ras_core_context *ras_cmd_get_ras_core(uint64_t dev_handle)
-{
-	struct ras_core_context *ras_core;
-
-	if (!dev_handle || (dev_handle == RAS_CMD_DEV_HANDLE_MAGIC))
-		return NULL;
-
-	ras_core = (struct ras_core_context *)(dev_handle ^ RAS_CMD_DEV_HANDLE_MAGIC);
-
-	if (ras_cmd_get_dev_handle(ras_core) == dev_handle)
-		return ras_core;
-
-	return NULL;
-}
-
-static int amdgpu_ras_get_devices_info(struct ras_core_context *ras_core,
-			struct ras_cmd_ioctl *cmd)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *)ras_core->dev;
-	struct ras_cmd_devices_info_rsp *output_data =
-			(struct ras_cmd_devices_info_rsp *)cmd->output_buff_raw;
-	struct ras_cmd_dev_info *dev_info;
-
-	dev_info = &output_data->devs[0];
-	dev_info->dev_handle = ras_cmd_get_dev_handle(ras_core);
-	dev_info->oam_id = adev->smuio.funcs->get_socket_id(adev);
-	dev_info->ecc_enabled = 1;
-	dev_info->ecc_supported = 1;
-
-	output_data->dev_num = 1;
-	output_data->version = 0;
-	cmd->output_size = sizeof(struct ras_cmd_devices_info_rsp);
-
-	return 0;
-}
-
 static int amdgpu_ras_trigger_error_prepare(struct ras_core_context *ras_core,
 			struct ras_cmd_inject_error_req *block_info)
 {
@@ -146,7 +85,7 @@ static uint64_t local_addr_to_xgmi_global_addr(struct ras_core_context *ras_core
 }
 
 static int amdgpu_ras_inject_error(struct ras_core_context *ras_core,
-			struct ras_cmd_ioctl *cmd, void *data)
+			struct ras_cmd_ctx *cmd, void *data)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)ras_core->dev;
 	struct ras_cmd_inject_error_req *req =
@@ -189,7 +128,7 @@ static int amdgpu_ras_inject_error(struct ras_core_context *ras_core,
 }
 
 static int amdgpu_ras_get_ras_safe_fb_addr_ranges(struct ras_core_context *ras_core,
-	struct ras_cmd_ioctl *cmd, void *data)
+	struct ras_cmd_ctx *cmd, void *data)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)ras_core->dev;
 	struct ras_cmd_dev_handle *input_data =
@@ -259,7 +198,7 @@ static int ras_translate_fb_address(struct ras_core_context *ras_core,
 }
 
 static int amdgpu_ras_translate_fb_address(struct ras_core_context *ras_core,
-				struct ras_cmd_ioctl *cmd, void *data)
+				struct ras_cmd_ctx *cmd, void *data)
 {
 	struct ras_cmd_translate_fb_address_req *req_buff =
 			(struct ras_cmd_translate_fb_address_req *)cmd->input_buff_raw;
@@ -291,7 +230,7 @@ static struct ras_cmd_func_map amdgpu_ras_cmd_maps[] = {
 	{RAS_CMD__TRANSLATE_FB_ADDRESS, amdgpu_ras_translate_fb_address},
 };
 
-int amdgpu_ras_handle_cmd(struct ras_core_context *ras_core, struct ras_cmd_ioctl *cmd, void *data)
+int amdgpu_ras_handle_cmd(struct ras_core_context *ras_core, struct ras_cmd_ctx *cmd, void *data)
 {
 	struct ras_cmd_func_map *ras_cmd = NULL;
 	int i, res;
@@ -311,51 +250,34 @@ int amdgpu_ras_handle_cmd(struct ras_core_context *ras_core, struct ras_cmd_ioct
 	return res;
 }
 
-int amdgpu_ras_cmd_ioctl_handler(struct ras_core_context *ras_core,
-			uint8_t *cmd_buf, uint32_t buf_size)
+int amdgpu_ras_submit_cmd(struct ras_core_context *ras_core, struct ras_cmd_ctx *cmd)
 {
-	struct ras_cmd_ioctl *cmd = (struct ras_cmd_ioctl *)cmd_buf;
-	struct ras_core_context *cmd_core = NULL;
-	struct ras_cmd_dev_handle *cmd_handle = NULL;
+	struct ras_core_context *cmd_core = ras_core;
 	int timeout = 60;
 	int res;
 
 	cmd->cmd_res = RAS_CMD__ERROR_INVALID_CMD;
 	cmd->output_size = 0;
 
-	if (!ras_core_is_enabled(ras_core))
+	if (!ras_core_is_enabled(cmd_core))
 		return RAS_CMD__ERROR_ACCESS_DENIED;
 
-	if (cmd->cmd_id == RAS_CMD__QUERY_INTERFACE_INFO) {
-		cmd->cmd_res = amdgpu_ras_query_interface_info(ras_core, cmd);
-	} else if (cmd->cmd_id == RAS_CMD__GET_DEVICES_INFO) {
-		cmd->cmd_res = amdgpu_ras_get_devices_info(ras_core, cmd);
-	} else {
-		cmd_handle = (struct ras_cmd_dev_handle *)cmd->input_buff_raw;
-		cmd_core = ras_cmd_get_ras_core(cmd_handle->dev_handle);
-		if (!cmd_core)
-			return RAS_CMD__ERROR_INVALID_INPUT_DATA;
-
-		while (ras_core_gpu_in_reset(cmd_core)) {
-			msleep(1000);
-			if (!timeout--)
-				return RAS_CMD__ERROR_TIMEOUT;
-		}
-
-
-		if (!ras_core_is_enabled(cmd_core))
-			return RAS_CMD__ERROR_ACCESS_DENIED;
-
-		res = amdgpu_ras_handle_cmd(cmd_core, cmd, NULL);
-		if (res == RAS_CMD__ERROR_UKNOWN_CMD)
-			res = rascore_handle_cmd(cmd_core, cmd, NULL);
-
-		cmd->cmd_res = res;
+	while (ras_core_gpu_in_reset(cmd_core)) {
+		msleep(1000);
+		if (!timeout--)
+			return RAS_CMD__ERROR_TIMEOUT;
 	}
 
-	if ((cmd->cmd_res == RAS_CMD__SUCCESS) &&
-	    ((cmd->output_size + sizeof(*cmd)) > buf_size)) {
-		RAS_INFO("Insufficient command buffer size 0x%x!\n", buf_size);
+	res = amdgpu_ras_handle_cmd(cmd_core, cmd, NULL);
+	if (res == RAS_CMD__ERROR_UKNOWN_CMD)
+		res = rascore_handle_cmd(cmd_core, cmd, NULL);
+
+	cmd->cmd_res = res;
+
+	if (cmd->output_size > cmd->output_buf_size) {
+		RAS_DEV_ERR(cmd_core->dev,
+			"Output size 0x%x exceeds output buffer size 0x%x!\n",
+			cmd->output_size, cmd->output_buf_size);
 		return RAS_CMD__SUCCESS_EXEED_BUFFER;
 	}
 

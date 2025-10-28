@@ -862,6 +862,9 @@
 /* kernel_write() take arg type of position as pointer */
 #define HAVE_KERNEL_WRITE_PPOS 1
 
+/* HAVE_KFD_PEERDIRECT_SUPPORT is available */
+/* #undef HAVE_KFD_PEERDIRECT_SUPPORT */
+
 /* kfifo_out_linear() available */
 #define HAVE_KFIFO_OUT_LINEAR 1
 
@@ -952,6 +955,9 @@
 /* Define to 1 if you have the <linux/device/class.h> header file. */
 #define HAVE_LINUX_DEVICE_CLASS_H 1
 
+/* Define to 1 if you have the <linux/dev_printk.h> header file. */
+#define HAVE_LINUX_DEV_PRINTK_H 1
+
 /* Define to 1 if you have the <linux/dma-attrs.h> header file. */
 /* #undef HAVE_LINUX_DMA_ATTRS_H */
 
@@ -1029,6 +1035,9 @@
 
 /* memalloc_noreclaim_save() is available */
 #define HAVE_MEMALLOC_NORECLAIM_SAVE 1
+
+/* mempool_alloc_preallocated() is available */
+#define HAVE_MEMPOOL_ALLOC_PREALLOCATED 1
 
 /* migrate_disable() is available */
 #define HAVE_MIGRATE_DISABLE 1

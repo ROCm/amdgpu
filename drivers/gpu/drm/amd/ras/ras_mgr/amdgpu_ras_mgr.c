@@ -335,6 +335,11 @@ static int amdgpu_ras_mgr_hw_init(struct amdgpu_ip_block *ip_block)
 	struct amdgpu_ras_mgr *ras_mgr = amdgpu_ras_mgr_get_context(adev);
 	int ret;
 
+	/* Currently only debug mode can enable the ras module
+	 */
+	if (!adev->debug_enable_ras_aca)
+		return 0;
+
 	if (!ras_mgr || !ras_mgr->ras_core)
 		return -EINVAL;
 
@@ -346,6 +351,8 @@ static int amdgpu_ras_mgr_hw_init(struct amdgpu_ip_block *ip_block)
 
 	ras_mgr->ras_is_ready = true;
 
+	amdgpu_enable_uniras(adev, true);
+
 	RAS_DEV_INFO(adev, "AMDGPU RAS Is Ready.\n");
 	return 0;
 }
@@ -354,6 +361,11 @@ static int amdgpu_ras_mgr_hw_fini(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
 	struct amdgpu_ras_mgr *ras_mgr = amdgpu_ras_mgr_get_context(adev);
+
+	/* Currently only debug mode can enable the ras module
+	 */
+	if (!adev->debug_enable_ras_aca)
+		return 0;
 
 	if (!ras_mgr || !ras_mgr->ras_core)
 		return -EINVAL;
@@ -373,7 +385,7 @@ struct amdgpu_ras_mgr *amdgpu_ras_mgr_get_context(struct amdgpu_device *adev)
 	return (struct amdgpu_ras_mgr *)adev->psp.ras_context.ras->ras_mgr;
 }
 
-static const struct amd_ip_funcs ras_v1_0_ip_funcs = {
+static const struct amd_ip_funcs __maybe_unused ras_v1_0_ip_funcs = {
 	.name = "ras_v1_0",
 	.sw_init = amdgpu_ras_mgr_sw_init,
 	.sw_fini = amdgpu_ras_mgr_sw_fini,
@@ -381,7 +393,15 @@ static const struct amd_ip_funcs ras_v1_0_ip_funcs = {
 	.hw_fini = amdgpu_ras_mgr_hw_fini,
 };
 
-int amdgpu_enable_unified_ras(struct amdgpu_device *adev, bool enable)
+const struct amdgpu_ip_block_version ras_v1_0_ip_block = {
+	.type = AMD_IP_BLOCK_TYPE_RAS,
+	.major = 1,
+	.minor = 0,
+	.rev = 0,
+	.funcs = &ras_v1_0_ip_funcs,
+};
+
+int amdgpu_enable_uniras(struct amdgpu_device *adev, bool enable)
 {
 	struct amdgpu_ras_mgr *ras_mgr = amdgpu_ras_mgr_get_context(adev);
 
@@ -395,7 +415,7 @@ int amdgpu_enable_unified_ras(struct amdgpu_device *adev, bool enable)
 	return ras_core_set_status(ras_mgr->ras_core, enable);
 }
 
-bool amdgpu_unified_ras_enabled(struct amdgpu_device *adev)
+bool amdgpu_uniras_enabled(struct amdgpu_device *adev)
 {
 	struct amdgpu_ras_mgr *ras_mgr = amdgpu_ras_mgr_get_context(adev);
 
@@ -557,4 +577,35 @@ bool amdgpu_ras_mgr_is_rma(struct amdgpu_device *adev)
 		return false;
 
 	return ras_core_gpu_is_rma(ras_mgr->ras_core);
+}
+
+int amdgpu_ras_mgr_handle_ras_cmd(struct amdgpu_device *adev,
+			uint32_t cmd_id, void *input, uint32_t input_size,
+			void *output, uint32_t out_size)
+{
+	struct amdgpu_ras_mgr *ras_mgr = amdgpu_ras_mgr_get_context(adev);
+	struct ras_cmd_ctx *cmd_ctx;
+	uint32_t ctx_buf_size = PAGE_SIZE;
+	int ret;
+
+	if (!amdgpu_ras_mgr_is_ready(adev))
+		return -EPERM;
+
+	cmd_ctx = kzalloc(ctx_buf_size, GFP_KERNEL);
+	if (!cmd_ctx)
+		return -ENOMEM;
+
+	cmd_ctx->cmd_id = cmd_id;
+
+	memcpy(cmd_ctx->input_buff_raw, input, input_size);
+	cmd_ctx->input_size = input_size;
+	cmd_ctx->output_buf_size = ctx_buf_size - sizeof(*cmd_ctx);
+
+	ret = amdgpu_ras_submit_cmd(ras_mgr->ras_core, cmd_ctx);
+	if (!ret && !cmd_ctx->cmd_res && output && (out_size == cmd_ctx->output_size))
+		memcpy(output, cmd_ctx->output_buff_raw, cmd_ctx->output_size);
+
+	kfree(cmd_ctx);
+
+	return ret;
 }

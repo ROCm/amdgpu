@@ -154,5 +154,6 @@
 #include <kcl/kcl_ratelimit.h>
 #include <kcl/kcl_irq.h>
 #include <kcl/kcl_uio.h>
+#include <kcl/kcl_mempool.h>
 
 #endif /* AMDGPU_BACKPORT_H */

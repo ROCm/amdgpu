@@ -612,6 +612,17 @@ bool is_support_cclk_dpm(struct amdgpu_device *adev)
 	return true;
 }
 
+int amdgpu_smu_ras_send_msg(struct amdgpu_device *adev, enum smu_message_type msg,
+			    uint32_t param, uint32_t *read_arg)
+{
+	struct smu_context *smu = adev->powerplay.pp_handle;
+	int ret = -EOPNOTSUPP;
+
+	if (smu->ppt_funcs && smu->ppt_funcs->ras_send_msg)
+		ret = smu->ppt_funcs->ras_send_msg(smu, msg, param, read_arg);
+
+	return ret;
+}
 
 static int smu_sys_get_pp_table(void *handle,
 				char **table)
@@ -2228,7 +2239,6 @@ static int smu_resume(struct amdgpu_ip_block *ip_block)
 	int ret;
 	struct amdgpu_device *adev = ip_block->adev;
 	struct smu_context *smu = adev->powerplay.pp_handle;
-	struct smu_dpm_context *smu_dpm_ctx = &(smu->smu_dpm);
 
 	if (amdgpu_sriov_multi_vf_mode(adev))
 		return 0;
@@ -2259,18 +2269,6 @@ static int smu_resume(struct amdgpu_ip_block *ip_block)
 	smu->disable_uclk_switch = 0;
 
 	adev->pm.dpm_enabled = true;
-
-	if (smu->current_power_limit) {
-		ret = smu_set_power_limit(smu, SMU_DEFAULT_PPT_LIMIT, smu->current_power_limit);
-		if (ret && ret != -EOPNOTSUPP)
-			return ret;
-	}
-
-	if (smu_dpm_ctx->dpm_level == AMD_DPM_FORCED_LEVEL_MANUAL && smu->od_enabled) {
-		ret = smu_od_edit_dpm_table(smu, PP_OD_COMMIT_DPM_TABLE, NULL, 0);
-		if (ret)
-			return ret;
-	}
 
 	dev_info(adev->dev, "SMU is resumed successfully!\n");
 

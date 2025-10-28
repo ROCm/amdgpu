@@ -1553,6 +1553,15 @@ struct pptable_funcs {
 	 */
 	ssize_t (*get_xcp_metrics)(struct smu_context *smu, int xcp_id,
 				   void *table);
+	/**
+	 * @ras_send_msg: Send a message with a parameter from Ras
+	 * &msg: Type of message.
+	 * &param: Message parameter.
+	 * &read_arg: SMU response (optional).
+	 */
+	int (*ras_send_msg)(struct smu_context *smu,
+			    enum smu_message_type msg, uint32_t param, uint32_t *read_arg);
+
 };
 
 typedef enum {
@@ -1825,6 +1834,8 @@ int smu_get_phase_det_param(struct smu_context *smu,
 int smu_phase_det_enable(struct smu_context *smu, bool enable);
 void amdgpu_smu_phase_det_debugfs_init(struct amdgpu_device *adev);
 
+int amdgpu_smu_ras_send_msg(struct amdgpu_device *adev, enum smu_message_type msg,
+			    uint32_t param, uint32_t *readarg);
 #endif
 
 void smu_feature_cap_set(struct smu_context *smu, enum smu_feature_cap_id fea_id);

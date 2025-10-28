@@ -55,7 +55,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.353"
+#define DC_VER "3.2.355"
 
 /**
  * MAX_SURFACES - representative of the upper bound of surfaces that can be piped to a single CRTC
@@ -850,8 +850,7 @@ union dpia_debug_options {
 		uint32_t enable_force_tbt3_work_around:1; /* bit 4 */
 		uint32_t disable_usb4_pm_support:1; /* bit 5 */
 		uint32_t enable_usb4_bw_zero_alloc_patch:1; /* bit 6 */
-		uint32_t enable_bw_allocation_mode:1; /* bit 7 */
-		uint32_t reserved:24;
+		uint32_t reserved:25;
 	} bits;
 	uint32_t raw;
 };
@@ -1168,6 +1167,7 @@ struct dc_debug_options {
 	short auxless_alpm_lfps_t1t2_offset_us;
 	bool enable_pg_cntl_debug_logs;
 	bool disable_stutter_for_wm_program;
+	bool enable_block_sequence_programming;
 };
 
 

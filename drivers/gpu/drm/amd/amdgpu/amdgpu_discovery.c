@@ -107,6 +107,7 @@
 #include "vcn_v5_0_1.h"
 #include "jpeg_v5_0_0.h"
 #include "jpeg_v5_0_1.h"
+#include "amdgpu_ras_mgr.h"
 
 #include "amdgpu_vpe.h"
 #if defined(CONFIG_DRM_AMD_ISP)
@@ -298,10 +299,31 @@ static int amdgpu_discovery_read_binary_from_mem(struct amdgpu_device *adev,
 	else
 		vram_size <<= 20;
 
+	/*
+	 * If in VRAM, discovery TMR is marked for reservation. If it is in system mem,
+	 * then it is not required to be reserved.
+	 */
 	if (sz_valid) {
-		uint64_t pos = vram_size - DISCOVERY_TMR_OFFSET;
-		amdgpu_device_vram_access(adev, pos, (uint32_t *)binary,
-					  adev->discovery.size, false);
+		if (amdgpu_sriov_vf(adev) && adev->virt.is_dynamic_crit_regn_enabled) {
+			/* For SRIOV VFs with dynamic critical region enabled,
+			 * we will get the IPD binary via below call.
+			 * If dynamic critical is disabled, fall through to normal seq.
+			 */
+			if (amdgpu_virt_get_dynamic_data_info(adev,
+						AMD_SRIOV_MSG_IPD_TABLE_ID, binary,
+						(uint64_t *)&adev->discovery.size)) {
+				dev_err(adev->dev,
+						"failed to read discovery info from dynamic critical region.");
+				ret = -EINVAL;
+				goto exit;
+			}
+		} else {
+			uint64_t pos = vram_size - DISCOVERY_TMR_OFFSET;
+
+			amdgpu_device_vram_access(adev, pos, (uint32_t *)binary,
+					adev->discovery.size, false);
+			adev->discovery.reserve_tmr = true;
+		}
 	} else {
 		ret = amdgpu_discovery_read_binary_from_sysmem(adev, binary);
 	}
@@ -310,7 +332,7 @@ static int amdgpu_discovery_read_binary_from_mem(struct amdgpu_device *adev,
 		dev_err(adev->dev,
 			"failed to read discovery info from memory, vram size read: %llx",
 			vram_size);
-
+exit:
 	return ret;
 }
 
@@ -418,8 +440,11 @@ static int amdgpu_discovery_verify_npsinfo(struct amdgpu_device *adev,
 
 static const char *amdgpu_discovery_get_fw_name(struct amdgpu_device *adev)
 {
-	if (amdgpu_discovery == 2)
+	if (amdgpu_discovery == 2) {
+		/* Assume there is valid discovery TMR in VRAM even if binary is sideloaded */
+		adev->discovery.reserve_tmr = true;
 		return "amdgpu/ip_discovery.bin";
+	}
 
 	switch (adev->asic_type) {
 	case CHIP_VEGA10:
@@ -2401,6 +2426,21 @@ static int amdgpu_discovery_set_sdma_ip_blocks(struct amdgpu_device *adev)
 			amdgpu_ip_version(adev, SDMA0_HWIP, 0));
 		return -EINVAL;
 	}
+
+	return 0;
+}
+
+static int amdgpu_discovery_set_ras_ip_blocks(struct amdgpu_device *adev)
+{
+	switch (amdgpu_ip_version(adev, MP0_HWIP, 0)) {
+	case IP_VERSION(13, 0, 6):
+	case IP_VERSION(13, 0, 12):
+	case IP_VERSION(13, 0, 14):
+		amdgpu_device_ip_block_add(adev, &ras_v1_0_ip_block);
+		break;
+	default:
+		break;
+	}
 	return 0;
 }
 
@@ -3178,6 +3218,10 @@ int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev)
 		return r;
 
 	r = amdgpu_discovery_set_sdma_ip_blocks(adev);
+	if (r)
+		return r;
+
+	r = amdgpu_discovery_set_ras_ip_blocks(adev);
 	if (r)
 		return r;
 

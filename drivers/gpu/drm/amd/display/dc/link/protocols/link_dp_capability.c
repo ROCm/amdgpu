@@ -357,7 +357,9 @@ bool dp_should_enable_fec(const struct dc_link *link)
 {
 	bool force_disable = false;
 
-	if (link->fec_state == dc_link_fec_enabled)
+	if (link->dc->debug.disable_fec)
+		force_disable = true;
+	else if (link->fec_state == dc_link_fec_enabled)
 		force_disable = false;
 	else if (link->connector_signal != SIGNAL_TYPE_DISPLAY_PORT_MST &&
 			link->local_sink &&
@@ -1865,6 +1867,12 @@ static bool retrieve_link_cap(struct dc_link *link)
 	/* TODO - decouple raw mst capability from policy decision */
 	link->dpcd_caps.is_mst_capable = read_is_mst_supported(link);
 	DC_LOG_DC("%s: MST_Support: %s\n", __func__, str_yes_no(link->dpcd_caps.is_mst_capable));
+
+	/* Some MST docks seem to NAK I2C writes to segment pointer with mot=0. */
+	if (link->dpcd_caps.is_mst_capable)
+		link->wa_flags.dp_mot_reset_segment = true;
+	else
+		link->wa_flags.dp_mot_reset_segment = false;
 
 	get_active_converter_info(ds_port.byte, link);
 

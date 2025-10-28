@@ -48,8 +48,7 @@ struct ras_cmd_translate_memory_fd_rsp {
 };
 
 int amdgpu_ras_handle_cmd(struct ras_core_context *ras_core,
-		struct ras_cmd_ioctl *cmd, void *data);
-int amdgpu_ras_cmd_ioctl_handler(struct ras_core_context *ras_core,
-			uint8_t *cmd_buf, uint32_t buf_size);
+		struct ras_cmd_ctx *cmd, void *data);
+int amdgpu_ras_submit_cmd(struct ras_core_context *ras_core, struct ras_cmd_ctx *cmd);
 
 #endif

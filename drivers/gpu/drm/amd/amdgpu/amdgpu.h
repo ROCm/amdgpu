@@ -374,13 +374,15 @@ void amdgpu_device_ip_get_clockgating_state(struct amdgpu_device *adev,
 					    u64 *flags);
 int amdgpu_device_ip_wait_for_idle(struct amdgpu_device *adev,
 				   enum amd_ip_block_type block_type);
+bool amdgpu_device_ip_is_hw(struct amdgpu_device *adev,
+			    enum amd_ip_block_type block_type);
 bool amdgpu_device_ip_is_valid(struct amdgpu_device *adev,
 			      enum amd_ip_block_type block_type);
 int amdgpu_ip_block_suspend(struct amdgpu_ip_block *ip_block);
 
 int amdgpu_ip_block_resume(struct amdgpu_ip_block *ip_block);
 
-#define AMDGPU_MAX_IP_NUM 16
+#define AMDGPU_MAX_IP_NUM AMD_IP_BLOCK_TYPE_NUM
 
 struct amdgpu_ip_block_status {
 	bool valid;
@@ -1316,6 +1318,7 @@ struct amdgpu_device {
 	bool                            debug_disable_gpu_ring_reset;
 	bool                            debug_vm_userptr;
 	bool                            debug_disable_ce_logs;
+	bool                            debug_enable_ce_cs;
 
 	/* Protection for the following isolation structure */
 	struct mutex                    enforce_isolation_mutex;
