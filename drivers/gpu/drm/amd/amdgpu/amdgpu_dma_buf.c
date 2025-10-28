@@ -258,6 +258,7 @@ static int amdgpu_dma_buf_attach(struct dma_buf *dmabuf,
 	struct drm_gem_object *obj = dmabuf->priv;
 	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
+	int r;
 
 #ifdef HAVE_STRUCT_DMA_BUF_ATTACH_OPS_ALLOW_PEER2PEER
 	if (!amdgpu_dmabuf_is_xgmi_accessible(attach_adev, bo) &&
@@ -265,7 +266,13 @@ static int amdgpu_dma_buf_attach(struct dma_buf *dmabuf,
 		attach->peer2peer = false;
 #endif
 
+	r = dma_resv_lock(bo->tbo.base.resv, NULL);
+	if (r)
+		return r;
+
 	amdgpu_vm_bo_update_shared(bo);
+
+	dma_resv_unlock(bo->tbo.base.resv);
 
 	return 0;
 }
