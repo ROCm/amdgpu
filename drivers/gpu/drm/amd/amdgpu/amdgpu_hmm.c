@@ -981,11 +981,9 @@ void amdgpu_hmm_range_free(struct amdgpu_hmm_range *range)
 		return;
 
 #ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
-	if (range->hmm_range.pfns)
-		kvfree(range->hmm_range.pfns);
+	kvfree(range->hmm_range.pfns);
 #else
-	if (range->hmm_range.hmm_pfns)
-		kvfree(range->hmm_range.hmm_pfns);
+	kvfree(range->hmm_range.hmm_pfns);
 #endif
 	amdgpu_bo_unref(&range->bo);
 	kfree(range);
