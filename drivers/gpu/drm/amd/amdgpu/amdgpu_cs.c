@@ -29,7 +29,6 @@
 #include <linux/pagemap.h>
 #include <linux/sync_file.h>
 #include <linux/dma-buf.h>
-#include <linux/hmm.h>
 
 #include <drm/amdgpu_drm.h>
 #include <drm/drm_syncobj.h>
@@ -916,7 +915,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		bool userpage_invalidated = false;
 		struct amdgpu_bo *bo = e->bo;
 
-		e->range = kzalloc(sizeof(*e->range), GFP_KERNEL);
+		e->range = amdgpu_hmm_range_alloc(NULL);
 		if (unlikely(!e->range))
 			return -ENOMEM;
 
@@ -925,7 +924,8 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 			goto out_free_user_pages;
 
 		for (i = 0; i < bo->tbo.ttm->num_pages; i++) {
-			if (bo->tbo.ttm->pages[i] != hmm_pfn_to_page(e->range->hmm_pfns[i])) {
+			if (bo->tbo.ttm->pages[i] !=
+				hmm_pfn_to_page(e->range->hmm_range.hmm_pfns[i])) {
 				userpage_invalidated = true;
 				break;
 			}
@@ -1059,7 +1059,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				goto error_free_pages;
 			}
 
-			r = amdgpu_ttm_tt_get_user_pages(bo, e->user_pages, NULL);
+			r = amdgpu_ttm_tt_get_user_pages(bo, e->user_pages);
 			if (r) {
 				DRM_ERROR("amdgpu_ttm_tt_get_user_pages failed.\n");
 				kvfree(e->user_pages);
@@ -1110,9 +1110,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 out_free_user_pages:
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
-		struct amdgpu_bo *bo = e->bo;
-
-		amdgpu_ttm_tt_get_user_pages_done(bo->tbo.ttm, e->range);
+		amdgpu_hmm_range_free(e->range);
 		e->range = NULL;
 	}
 #else
@@ -1462,8 +1460,8 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	 */
 	r = 0;
 	amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
-		r |= !amdgpu_ttm_tt_get_user_pages_done(e->bo->tbo.ttm,
-							e->range);
+		r |= !amdgpu_hmm_range_valid(e->range);
+		amdgpu_hmm_range_free(e->range);
 		e->range = NULL;
 	}
 	if (r) {

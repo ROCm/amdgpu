@@ -782,7 +782,7 @@ struct amdgpu_ttm_tt {
  * that range is a valid memory and it is freed too.
  */
 int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo,
-				 struct hmm_range *range)
+				 struct amdgpu_hmm_range *range)
 {
 	struct ttm_tt *ttm = bo->tbo.ttm;
 	struct amdgpu_ttm_tt *gtt = ttm_to_amdgpu_ttm_tt(ttm);
@@ -826,44 +826,6 @@ out_unlock:
 	return r;
 }
 
-/* amdgpu_ttm_tt_discard_user_pages - Discard range and pfn array allocations
- */
-void amdgpu_ttm_tt_discard_user_pages(struct ttm_tt *ttm,
-				      struct hmm_range *range)
-{
-	struct amdgpu_ttm_tt *gtt = (void *)ttm;
-
-	if (gtt && gtt->userptr && range)
-		amdgpu_hmm_range_get_pages_done(range);
-}
-
-/*
- * amdgpu_ttm_tt_get_user_pages_done - stop HMM track the CPU page table change
- * Check if the pages backing this ttm range have been invalidated
- *
- * Returns: true if pages are still valid
- */
-bool amdgpu_ttm_tt_get_user_pages_done(struct ttm_tt *ttm,
-				       struct hmm_range *range)
-{
-	struct amdgpu_ttm_tt *gtt = ttm_to_amdgpu_ttm_tt(ttm);
-
-	if (!gtt || !gtt->userptr || !range)
-		return false;
-
-	DRM_DEBUG_DRIVER("user_pages_done 0x%llx pages 0x%x\n",
-		gtt->userptr, ttm->num_pages);
-
-#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
-	WARN_ONCE(!range->pfns,
-#else
-	WARN_ONCE(!range->hmm_pfns,
-#endif
-		"No user pages to check\n");
-
-	return !amdgpu_hmm_range_get_pages_done(range);
-}
-
 #else
 /*
  * amdgpu_ttm_tt_get_user_pages - Pin pages of memory pointed to by a USERPTR
@@ -873,8 +835,7 @@ bool amdgpu_ttm_tt_get_user_pages_done(struct ttm_tt *ttm,
  * This provides a wrapper around the get_user_pages() call to provide
  * device accessible pages that back user memory.
  */
-int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages,
-				 struct hmm_range **range)
+int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages)
 {
 	struct ttm_tt *ttm = bo->tbo.ttm;
 	struct amdgpu_ttm_tt *gtt = (void *)ttm;
@@ -955,12 +916,12 @@ release_pages:
  * that backs user memory and will ultimately be mapped into the device
  * address space.
  */
-void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct hmm_range *range)
+void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct amdgpu_hmm_range *range)
 {
 	unsigned long i;
 
 	for (i = 0; i < ttm->num_pages; ++i)
-		ttm->pages[i] = range ? hmm_pfn_to_page(range->hmm_pfns[i]) : NULL;
+		ttm->pages[i] = range ? hmm_pfn_to_page(range->hmm_range.hmm_pfns[i]) : NULL;
 }
 
 #else

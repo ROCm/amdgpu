@@ -73,7 +73,7 @@ struct kgd_mem {
 	struct kfd_ipc_obj *ipc_obj;
 	struct dma_buf *dmabuf;
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
-	struct hmm_range *range;
+	struct amdgpu_hmm_range *range;
 #else
 	struct page **user_pages;
 #endif
