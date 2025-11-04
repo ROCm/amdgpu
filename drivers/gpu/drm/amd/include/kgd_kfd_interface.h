@@ -355,6 +355,11 @@ struct kfd2kgd_calls {
 					enum kfd_ioctl_pc_sample_type type,
 					uint64_t intval,
 					uint32_t inst);
+	uint32_t (*ptl_ctrl)(struct amdgpu_device *adev,
+			     uint32_t cmd,
+			     uint32_t *ptl_state,
+			     enum amdgpu_ptl_fmt *fmt1,
+			     enum amdgpu_ptl_fmt *fmt2);
 };
 
 #endif	/* KGD_KFD_INTERFACE_H_INCLUDED */
