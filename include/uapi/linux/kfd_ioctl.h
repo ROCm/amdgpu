@@ -1700,6 +1700,15 @@ enum kfd_ioctl_pc_sample_op {
 	KFD_IOCTL_PCS_OP_STOP,
 };
 
+enum amdgpu_ptl_fmt {
+	AMDGPU_PTL_FMT_I8   = 0,
+	AMDGPU_PTL_FMT_F16  = 1,
+	AMDGPU_PTL_FMT_BF16 = 2,
+	AMDGPU_PTL_FMT_F32  = 3,
+	AMDGPU_PTL_FMT_F64  = 4,
+	AMDGPU_PTL_FMT_INVALID = 5,
+};
+
 /* Values have to be a power of 2*/
 #define KFD_IOCTL_PCS_FLAG_POWER_OF_2 0x00000001
 
