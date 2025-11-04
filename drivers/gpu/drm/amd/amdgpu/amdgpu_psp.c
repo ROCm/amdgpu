@@ -670,6 +670,8 @@ static const char *psp_gfx_cmd_name(enum psp_gfx_cmd_id cmd_id)
 		return "SPATIAL_PARTITION";
 	case GFX_CMD_ID_FB_NPS_MODE:
 		return "NPS_MODE_CHANGE";
+	case GFX_CMD_ID_PERF_HW:
+		return "PERF MONITORING HW";
 	default:
 		return "UNKNOWN CMD";
 	}
@@ -1197,6 +1199,84 @@ int psp_memory_partition(struct psp_context *psp, int mode)
 
 	release_psp_cmd_buf(psp);
 
+	return ret;
+}
+
+static int psp_ptl_fmt_verify(struct psp_context *psp, enum amdgpu_ptl_fmt fmt,
+						 uint32_t *ptl_fmt)
+{
+	struct amdgpu_device *adev = psp->adev;
+
+	if (amdgpu_ip_version(adev, GC_HWIP, 0) != IP_VERSION(9, 4, 4))
+		return -EINVAL;
+
+	switch (fmt) {
+	case AMDGPU_PTL_FMT_I8:
+		*ptl_fmt = GFX_FTYPE_I8;
+		break;
+	case AMDGPU_PTL_FMT_F16:
+		*ptl_fmt = GFX_FTYPE_F16;
+		break;
+	case AMDGPU_PTL_FMT_BF16:
+		*ptl_fmt = GFX_FTYPE_BF16;
+		break;
+	case AMDGPU_PTL_FMT_F32:
+		*ptl_fmt = GFX_FTYPE_F32;
+		break;
+	case AMDGPU_PTL_FMT_F64:
+		*ptl_fmt = GFX_FTYPE_F64;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+int psp_performance_monitor_hw(struct psp_context *psp, u32 req_code,
+			       uint32_t *ptl_state, uint32_t *fmt1, uint32_t *fmt2)
+{
+	struct psp_gfx_cmd_resp *cmd;
+	uint32_t ptl_fmt1, ptl_fmt2;
+	int ret;
+
+	if (!psp || !ptl_state || !fmt1 || !fmt2)
+		return -EINVAL;
+
+	if (amdgpu_sriov_vf(psp->adev))
+		return 0;
+
+	if (psp_ptl_fmt_verify(psp, *fmt1, &ptl_fmt1) ||
+			psp_ptl_fmt_verify(psp, *fmt2, &ptl_fmt2))
+		return -EINVAL;
+
+	cmd = acquire_psp_cmd_buf(psp);
+
+	cmd->cmd_id                     = GFX_CMD_ID_PERF_HW;
+	cmd->cmd.cmd_req_perf_hw.req    = req_code;
+	cmd->cmd.cmd_req_perf_hw.ptl_state    = *ptl_state;
+	cmd->cmd.cmd_req_perf_hw.pref_format1 = ptl_fmt1;
+	cmd->cmd.cmd_req_perf_hw.pref_format2 = ptl_fmt2;
+
+	ret = psp_cmd_submit_buf(psp, NULL, cmd, psp->fence_buf_mc_addr);
+	if (ret)
+		goto out;
+
+	switch (req_code) {
+	case PSP_PTL_PERF_MON_QUERY:
+		*ptl_state = cmd->resp.uresp.perf_hw_info.ptl_state;
+		*fmt1      = cmd->resp.uresp.perf_hw_info.pref_format1;
+		*fmt2      = cmd->resp.uresp.perf_hw_info.pref_format2;
+		break;
+	case PSP_PTL_PERF_MON_SET:
+		psp->ptl_enabled = *ptl_state;
+		psp->ptl_fmt1    = ptl_fmt1;
+		psp->ptl_fmt2    = ptl_fmt2;
+		break;
+	}
+
+out:
+	release_psp_cmd_buf(psp);
 	return ret;
 }
 
