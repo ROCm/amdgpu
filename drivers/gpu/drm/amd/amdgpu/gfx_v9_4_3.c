@@ -2393,10 +2393,44 @@ static int gfx_v9_4_3_hw_init(struct amdgpu_ip_block *ip_block)
 	return r;
 }
 
+static int gfx_v9_4_3_perf_monitor_ptl_init(struct amdgpu_device *adev, bool state)
+{
+	uint32_t fmt1, fmt2;
+	uint32_t ptl_state = state ? 1 : 0;
+	int r;
+
+	if (amdgpu_ip_version(adev, GC_HWIP, 0) != IP_VERSION(9, 4, 4))
+		return -ENOTSUPP;
+
+	if (!adev->psp.funcs)
+		return -EOPNOTSUPP;
+
+	if (!adev->psp.ptl_hw_supported) {
+		fmt1 = GFX_FTYPE_I8;
+		fmt2 = GFX_FTYPE_BF16;
+	} else {
+		fmt1 = adev->psp.ptl_fmt1;
+		fmt2 = adev->psp.ptl_fmt2;
+	}
+
+	/* initialize PTL with default formats: GFX_FTYPE_I8 & GFX_FTYPE_BF16 */
+	r = psp_performance_monitor_hw(&adev->psp, PSP_PTL_PERF_MON_SET, &ptl_state,
+							&fmt1, &fmt2);
+	if (r)
+		return r;
+
+	adev->psp.ptl_hw_supported = true;
+
+	return 0;
+}
+
 static int gfx_v9_4_3_hw_fini(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
 	int i, num_xcc;
+
+	if (adev->psp.ptl_hw_supported)
+		gfx_v9_4_3_perf_monitor_ptl_init(adev, 0);
 
 	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
 	amdgpu_irq_put(adev, &adev->gfx.spm_irq, 0);
@@ -2676,6 +2710,8 @@ static int gfx_v9_4_3_late_init(struct amdgpu_ip_block *ip_block)
 	if (adev->gfx.ras &&
 	    adev->gfx.ras->enable_watchdog_timer)
 		adev->gfx.ras->enable_watchdog_timer(adev);
+
+	gfx_v9_4_3_perf_monitor_ptl_init(adev, 1);
 
 	return 0;
 }
