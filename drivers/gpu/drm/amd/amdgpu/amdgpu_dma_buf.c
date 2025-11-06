@@ -261,11 +261,25 @@ static int amdgpu_dma_buf_attach(struct dma_buf *dmabuf,
 	int r;
 
 #ifdef HAVE_STRUCT_DMA_BUF_ATTACH_OPS_ALLOW_PEER2PEER
+	/*
+	 * Disable peer-to-peer access for DCC-enabled VRAM surfaces on GFX12+.
+	 * Such buffers cannot be safely accessed over P2P due to device-local
+	 * compression metadata. Fallback to system-memory path instead.
+	 * Device supports GFX12 (GC 12.x or newer)
+	 * BO was created with the AMDGPU_GEM_CREATE_GFX12_DCC flag
+	 *
+	 */
+	if (adev->ip_versions[GC_HWIP][0] >= IP_VERSION(12, 0, 0) &&
+		bo->flags & AMDGPU_GEM_CREATE_GFX12_DCC) {
+		attach->peer2peer = false;
+		goto lock_and_update_vm;
+	}
 	if (!amdgpu_dmabuf_is_xgmi_accessible(attach_adev, bo) &&
 	    pci_p2pdma_distance(adev->pdev, attach->dev, false) < 0)
 		attach->peer2peer = false;
-#endif
 
+lock_and_update_vm:
+#endif
 	r = dma_resv_lock(bo->tbo.base.resv, NULL);
 	if (r)
 		return r;
