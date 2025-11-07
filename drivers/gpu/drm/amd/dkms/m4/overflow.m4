@@ -15,3 +15,17 @@ AC_DEFUN([AC_AMDGPU_SIZE_MUL], [
 		])
 	])
 ])
+
+AC_DEFUN([AC_AMDGPU_RANGE_OVERFLOWS], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/overflow.h>
+		], [
+			bool ret;
+			ret = range_overflows(0, 0, 0);
+		], [
+			AC_DEFINE(HAVE_RANGE_OVERFLOWS, 1,
+				[range_overflows() is available])
+		])
+	])
+])
