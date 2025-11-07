@@ -4764,10 +4764,17 @@ static ssize_t amdgpu_psp_vbflash_status(struct device *dev,
 }
 static DEVICE_ATTR(psp_vbflash_status, 0440, amdgpu_psp_vbflash_status, NULL);
 
+#ifdef HAVE_ATTRIBUTE_GROUP_BIN_ATTRS_NEW
 static const struct bin_attribute *const bin_flash_attrs[] = {
 	&psp_vbflash_bin_attr,
 	NULL
 };
+#else
+static struct bin_attribute *bin_flash_attrs[] = {
+	&psp_vbflash_bin_attr,
+	NULL
+};
+#endif
 
 static struct attribute *flash_attrs[] = {
 	&dev_attr_psp_vbflash_status.attr,

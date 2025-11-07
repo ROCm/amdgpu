@@ -2329,10 +2329,17 @@ static int amdgpu_ras_fs_init(struct amdgpu_device *adev)
 		&con->event_state_attr.attr,
 		NULL
 	};
+#ifdef HAVE_ATTRIBUTE_GROUP_BIN_ATTRS_NEW
 	const struct bin_attribute *bin_attrs[] = {
 		NULL,
 		NULL,
 	};
+#else
+	struct bin_attribute *bin_attrs[] = {
+		NULL,
+		NULL,
+	};
+#endif
 	int r;
 
 	group.attrs = attrs;
