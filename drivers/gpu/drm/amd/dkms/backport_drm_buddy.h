@@ -3,5 +3,6 @@
 #define _KCL_BACKPORT_DRM_BUDDY_H
 
 #include <kcl/kcl_test-bug.h>
+#include <kcl/kcl_overflow.h>
 
 #endif
