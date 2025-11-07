@@ -25,3 +25,24 @@ AC_DEFUN([AC_AMDGPU_BIN_FLASH_ATTR_IS_VISIBLE], [
         ])
     ])
 ])
+
+dnl #
+dnl # commit v5.10-rc1 or later
+dnl # sysfs: Make bin_attrs in struct attribute_group const
+dnl #
+AC_DEFUN([AC_AMDGPU_ATTRIBUTE_GROUP_BIN_ATTRS_NEW], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/sysfs.h>
+		],[
+			const struct bin_attribute *const test_bin_attrs[] = { NULL };
+			struct attribute_group test_group = {
+				.bin_attrs = test_bin_attrs,
+			};
+			(void)test_group;
+		],[
+			AC_DEFINE(HAVE_ATTRIBUTE_GROUP_BIN_ATTRS_NEW, 1,
+				[bin_attrs in struct attribute_group is const])
+		])
+	])
+])
