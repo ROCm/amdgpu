@@ -6,6 +6,7 @@ AC_DEFUN([AC_AMDGPU_MIGRATE_DISABLE], [
         AC_KERNEL_DO_BACKGROUND([
                AC_KERNEL_TRY_COMPILE([
                        #include <linux/preempt.h>
+                       #include <linux/sched.h>
                 ],[
                         migrate_disable();
                 ],[
