@@ -11,6 +11,7 @@
 #define _KCL_KCL_I2C_H
 
 #include <linux/i2c.h>
+#include <linux/printk.h>
 
 #ifdef HAVE_I2C_NEW_CLIENT_DEVICE
 extern struct i2c_client *
