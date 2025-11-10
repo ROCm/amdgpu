@@ -619,7 +619,8 @@ out_put:
 uint64_t amdgpu_amdkfd_get_vram_usage(struct amdgpu_device *adev)
 {
 
-	return ttm_resource_manager_usage(&adev->mman.vram_mgr.manager);
+	return ttm_resource_manager_used(&adev->mman.vram_mgr.manager) ?
+			ttm_resource_manager_usage(&adev->mman.vram_mgr.manager) : 0;
 }
 
 int amdgpu_amdkfd_get_pcie_bandwidth_mbytes(struct amdgpu_device *adev, bool is_min)
