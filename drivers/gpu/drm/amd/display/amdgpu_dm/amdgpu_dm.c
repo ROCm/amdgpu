@@ -237,7 +237,9 @@ static int amdgpu_dm_encoder_init(struct drm_device *dev,
 
 static int amdgpu_dm_connector_get_modes(struct drm_connector *connector);
 
+#ifdef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT
 static int amdgpu_dm_atomic_setup_commit(struct drm_atomic_commit *state);
+#endif
 static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_commit *state);
 
 static int amdgpu_dm_atomic_check(struct drm_device *dev,
@@ -11606,6 +11608,7 @@ static void amdgpu_dm_update_hdcp(struct drm_atomic_commit *state)
 	}
 }
 
+#ifdef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT
 static int amdgpu_dm_atomic_setup_commit(struct drm_atomic_commit *state)
 {
 	struct drm_crtc *crtc;
@@ -11638,6 +11641,7 @@ static int amdgpu_dm_atomic_setup_commit(struct drm_atomic_commit *state)
 
 	return 0;
 }
+#endif
 
 /**
  * amdgpu_dm_atomic_commit_tail() - AMDgpu DM's commit tail implementation.
