@@ -34,3 +34,27 @@ AC_DEFUN([AC_AMDGPU_DRM_GEM_PRIME_HANDLE_TO_FD], [
                 ])
         ])
 ])
+
+dnl #
+dnl # commit 6619ccf1bb1d
+dnl # dma-buf: Use struct dma_buf_map in dma_buf_vmap() interfaces
+dnl #
+dnl # commit 20e76f1a7059
+dnl # dma-buf: Use struct dma_buf_map in dma_buf_vunmap() interfaces
+dnl #
+dnl # commit c67e62790f5c
+dnl # drm/prime: split array import functions v4
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_GEM_DMABUF_VMAP_HAS_IOSYS_MAP_ARG], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE_SYMBOL([
+			#include <drm/drm_prime.h>
+		],[
+			struct iosys_map map;
+			drm_gem_dmabuf_vmap(NULL, &map);
+		],[drm_gem_dmabuf_vmap], [drivers/gpu/drm/drm_prime.c], [
+			AC_DEFINE(HAVE_DRM_GEM_DMABUF_VMAP_HAS_IOSYS_MAP_ARG, 1,
+				[drm_gem_dmabuf_vmap() has struct iosys_map arg])
+		])
+	])
+])
