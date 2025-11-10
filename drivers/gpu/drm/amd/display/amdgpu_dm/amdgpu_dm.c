@@ -3809,7 +3809,9 @@ static struct drm_mode_config_helper_funcs amdgpu_dm_mode_config_helperfuncs = {
 
 static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 {
+#ifdef HAVE_DRM_GET_PANEL_BACKLIGHT_QUIRK
 	const struct drm_panel_backlight_quirk *panel_backlight_quirk;
+#endif
 	struct amdgpu_dm_backlight_caps *caps;
 	struct drm_connector *conn_base;
 	struct amdgpu_device *adev;
@@ -3859,6 +3861,7 @@ static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 		caps->aux_min_input_signal = 1;
 #endif
 
+#ifdef HAVE_DRM_GET_PANEL_BACKLIGHT_QUIRK
 	panel_backlight_quirk =
 		drm_get_panel_backlight_quirk(aconnector->drm_edid);
 	if (!IS_ERR_OR_NULL(panel_backlight_quirk)) {
@@ -3877,6 +3880,7 @@ static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 				panel_backlight_quirk->brightness_mask;
 		}
 	}
+#endif
 }
 
 DEFINE_FREE(sink_release, struct dc_sink *, if (_T) dc_sink_release(_T))
