@@ -507,6 +507,7 @@ static int amdgpu_dma_buf_begin_cpu_access(struct dma_buf *dma_buf,
 	return ret;
 }
 
+#ifdef HAVE_DRM_GEM_DMABUF_VMAP_HAS_IOSYS_MAP_ARG
 static int amdgpu_dma_buf_vmap(struct dma_buf *dma_buf, struct iosys_map *map)
 {
 	struct drm_gem_object *obj = dma_buf->priv;
@@ -536,6 +537,7 @@ static void amdgpu_dma_buf_vunmap(struct dma_buf *dma_buf, struct iosys_map *map
 	drm_gem_dmabuf_vunmap(dma_buf, map);
 	amdgpu_bo_unpin(bo);
 }
+#endif
 
 const struct dma_buf_ops amdgpu_dmabuf_ops = {
 #if defined(HAVE_DMA_BUF_OPS_LEGACY)
@@ -558,8 +560,13 @@ const struct dma_buf_ops amdgpu_dmabuf_ops = {
 	.release = drm_gem_dmabuf_release,
 	.begin_cpu_access = amdgpu_dma_buf_begin_cpu_access,
 	.mmap = drm_gem_dmabuf_mmap,
+#ifdef HAVE_DRM_GEM_DMABUF_VMAP_HAS_IOSYS_MAP_ARG
 	.vmap = amdgpu_dma_buf_vmap,
 	.vunmap = amdgpu_dma_buf_vunmap,
+#else
+	.vmap = drm_gem_dmabuf_vmap,
+	.vunmap = drm_gem_dmabuf_vunmap,
+#endif
 };
 
 /**
