@@ -1888,27 +1888,6 @@ static int kfd_ioctl_pc_sample(struct file *filep,
 	return ret;
 }
 
-static int kfd_ptl_control(struct kfd_process_device *pdd, bool enable)
-{
-	struct amdgpu_device *adev = pdd->dev->adev;
-	enum amdgpu_ptl_fmt pref_format1 = adev->psp.ptl_fmt1;
-	enum amdgpu_ptl_fmt pref_format2 = adev->psp.ptl_fmt2;
-	uint32_t ptl_state = enable ? 1 : 0;
-	int ret;
-
-	if (!adev->psp.ptl_hw_supported)
-		return -EOPNOTSUPP;
-
-	if (!pdd->dev->kfd2kgd || !pdd->dev->kfd2kgd->ptl_ctrl)
-		return -EOPNOTSUPP;
-
-	ret = pdd->dev->kfd2kgd->ptl_ctrl(adev, PSP_PTL_PERF_MON_SET,
-					  &ptl_state,
-					  &pref_format1,
-					  &pref_format2);
-	return ret;
-}
-
 static int criu_checkpoint_process(struct kfd_process *p,
 			     uint8_t __user *user_priv_data,
 			     uint64_t *priv_offset)
@@ -3413,7 +3392,6 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 		if (!kfd->profiler_process) {
 			kfd->profiler_process = p;
 			status = 0;
-			kfd_ptl_control(pdd, false);
 		} else if (kfd->profiler_process == p) {
 			status = -EALREADY;
 		} else {
@@ -3422,7 +3400,6 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 	} else if (op == 0 && kfd->profiler_process == p) {
 		kfd->profiler_process = NULL;
 		status = 0;
-		kfd_ptl_control(pdd, true);
 	}
 	mutex_unlock(&kfd->profiler_lock);
 
