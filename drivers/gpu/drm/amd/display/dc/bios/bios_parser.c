@@ -67,7 +67,9 @@ static ATOM_HPD_INT_RECORD *get_hpd_record(struct bios_parser *bp,
 	ATOM_OBJECT *object);
 static struct device_id device_type_from_device_id(uint16_t device_id);
 static uint32_t signal_to_ss_id(enum as_signal_type signal);
-static uint32_t get_support_mask_for_device_id(struct device_id device_id);
+static uint32_t get_support_mask_for_device_id(
+	enum dal_device_type device_type,
+	uint32_t enum_id);
 static ATOM_ENCODER_CAP_RECORD_V2 *get_encoder_cap_record(
 	struct bios_parser *bp,
 	ATOM_OBJECT *object);
@@ -778,6 +780,54 @@ static enum bp_result bios_parser_encoder_control(
 	return bp->cmd_tbl.dig_encoder_control(bp, cntl);
 }
 
+static enum bp_result bios_parser_dac_load_detection(
+	struct dc_bios *dcb,
+	enum engine_id engine_id,
+	enum dal_device_type device_type,
+	uint32_t enum_id)
+{
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+	struct dc_context *ctx = dcb->ctx;
+	struct bp_load_detection_parameters bp_params = {0};
+	enum bp_result bp_result;
+	uint32_t bios_0_scratch;
+	uint32_t device_id_mask = 0;
+
+	bp_params.engine_id = engine_id;
+	bp_params.device_id = get_support_mask_for_device_id(device_type, enum_id);
+
+	if (engine_id != ENGINE_ID_DACA &&
+	    engine_id != ENGINE_ID_DACB)
+		return BP_RESULT_UNSUPPORTED;
+
+	if (!bp->cmd_tbl.dac_load_detection)
+		return BP_RESULT_UNSUPPORTED;
+
+	if (bp_params.device_id == ATOM_DEVICE_CRT1_SUPPORT)
+		device_id_mask = ATOM_S0_CRT1_MASK;
+	else if (bp_params.device_id == ATOM_DEVICE_CRT1_SUPPORT)
+		device_id_mask = ATOM_S0_CRT2_MASK;
+	else
+		return BP_RESULT_UNSUPPORTED;
+
+	/* BIOS will write the detected devices to BIOS_SCRATCH_0, clear corresponding bit */
+	bios_0_scratch = dm_read_reg(ctx, bp->base.regs->BIOS_SCRATCH_0);
+	bios_0_scratch &= ~device_id_mask;
+	dm_write_reg(ctx, bp->base.regs->BIOS_SCRATCH_0, bios_0_scratch);
+
+	bp_result = bp->cmd_tbl.dac_load_detection(bp, &bp_params);
+
+	if (bp_result != BP_RESULT_OK)
+		return bp_result;
+
+	bios_0_scratch = dm_read_reg(ctx, bp->base.regs->BIOS_SCRATCH_0);
+
+	if (bios_0_scratch & device_id_mask)
+		return BP_RESULT_OK;
+
+	return BP_RESULT_FAILURE;
+}
+
 static enum bp_result bios_parser_adjust_pixel_clock(
 	struct dc_bios *dcb,
 	struct bp_adjust_pixel_clock_parameters *bp_params)
@@ -888,7 +938,7 @@ static bool bios_parser_is_device_id_supported(
 {
 	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
-	uint32_t mask = get_support_mask_for_device_id(id);
+	uint32_t mask = get_support_mask_for_device_id(id.device_type, id.enum_id);
 
 	return (le16_to_cpu(bp->object_info_tbl.v1_1->usDeviceSupport) & mask) != 0;
 }
@@ -2179,11 +2229,10 @@ static uint32_t signal_to_ss_id(enum as_signal_type signal)
 	return clk_id_ss;
 }
 
-static uint32_t get_support_mask_for_device_id(struct device_id device_id)
+static uint32_t get_support_mask_for_device_id(
+	enum dal_device_type device_type,
+	uint32_t enum_id)
 {
-	enum dal_device_type device_type = device_id.device_type;
-	uint32_t enum_id = device_id.enum_id;
-
 	switch (device_type) {
 	case DEVICE_TYPE_LCD:
 		switch (enum_id) {
@@ -2862,6 +2911,8 @@ static const struct dc_vbios_funcs vbios_funcs = {
 	.select_crtc_source = bios_parser_select_crtc_source,
 
 	.encoder_control = bios_parser_encoder_control,
+
+	.dac_load_detection = bios_parser_dac_load_detection,
 
 	.transmitter_control = bios_parser_transmitter_control,
 

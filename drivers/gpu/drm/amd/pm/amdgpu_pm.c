@@ -4725,7 +4725,7 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 		ret = devm_device_add_group(adev->dev,
 					    &amdgpu_pm_policy_attr_group);
 		if (ret)
-			goto err_out0;
+			goto err_out1;
 	}
 #endif
 
@@ -4733,7 +4733,7 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 		ret = devm_device_add_group(adev->dev,
 					    &amdgpu_board_attr_group);
 		if (ret)
-			goto err_out0;
+			goto err_out1;
 		if (amdgpu_pm_get_sensor_generic(adev, AMDGPU_PP_SENSOR_MAXNODEPOWERLIMIT,
 						 (void *)&tmp) != -EOPNOTSUPP) {
 			sysfs_add_file_to_group(&adev->dev->kobj,
