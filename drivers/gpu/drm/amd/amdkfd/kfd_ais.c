@@ -154,24 +154,7 @@ int kfd_ais_init(struct amdgpu_device *adev)
 
 void kfd_ais_deinit(struct amdgpu_device *adev)
 {
-	if (adev->kfd.dev->ais_initialized) {
-		unsigned long pci_start_pfn = PHYS_PFN(pci_resource_start(adev->pdev, 0));
-		struct page *p2p_page =  NULL;
-
-		if (pfn_valid(pci_start_pfn)) {
-			p2p_page = pfn_to_page(pci_start_pfn);
-#ifdef HAVE_PAGE_PGMAP
-			if (p2p_page && is_pci_p2pdma_page(p2p_page) &&
-			    page_pgmap(p2p_page))
-				devm_memunmap_pages(&adev->pdev->dev, page_pgmap(p2p_page));
-#else
-			if (p2p_page && is_pci_p2pdma_page(p2p_page) &&
-				p2p_page->pgmap)
-				devm_memunmap_pages(&adev->pdev->dev, p2p_page->pgmap);
-#endif
-                }
-		adev->kfd.dev->ais_initialized = false;
-	}
+	adev->kfd.dev->ais_initialized = false;
 }
 
 int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
