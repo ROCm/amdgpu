@@ -1748,6 +1748,8 @@ int kfd_ais_init(struct amdgpu_device *adev);
 void kfd_ais_deinit(struct amdgpu_device *adev);
 int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		    struct kfd_ais_in_args *in, uint64_t *size_copied);
+/* PTL support */
+int kfd_ptl_control(struct kfd_process_device *pdd, bool enable);
 
 /* Debugfs */
 #if defined(CONFIG_DEBUG_FS)

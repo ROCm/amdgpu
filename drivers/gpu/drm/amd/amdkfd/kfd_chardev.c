@@ -1888,7 +1888,7 @@ static int kfd_ioctl_pc_sample(struct file *filep,
 	return ret;
 }
 
-static int kfd_ptl_control(struct kfd_process_device *pdd, bool enable)
+int kfd_ptl_control(struct kfd_process_device *pdd, bool enable)
 {
 	struct amdgpu_device *adev = pdd->dev->adev;
 	enum amdgpu_ptl_fmt pref_format1 = adev->psp.ptl_fmt1;
