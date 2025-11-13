@@ -123,6 +123,8 @@ int kfd_ais_init(struct amdgpu_device *adev)
 {
 #ifdef CONFIG_PCI_P2PDMA
 	int ret;
+	struct page *p2p_page =  NULL;
+	unsigned long pci_start_pfn = PHYS_PFN(pci_resource_start(adev->pdev, 0));
 	unsigned long size = ALIGN(adev->gmc.real_vram_size, 2ULL << 20);
 	bool is_large_bar = adev->gmc.visible_vram_size &&
 		adev->gmc.real_vram_size == adev->gmc.visible_vram_size;
@@ -130,6 +132,13 @@ int kfd_ais_init(struct amdgpu_device *adev)
 	/* AIS support limited to large BAR dGPUs */
 	if (adev->flags & AMD_IS_APU || adev->gmc.xgmi.connected_to_cpu || !is_large_bar) {
 		dev_dbg(adev->dev, "AIS: only supported for large BAR dGPU\n");
+		return 0;
+	}
+
+	p2p_page = pfn_valid(pci_start_pfn) ? pfn_to_page(pci_start_pfn) : NULL;
+	if (p2p_page && is_pci_p2pdma_page(p2p_page)) {
+		adev->kfd.dev->ais_initialized = true;
+		dev_dbg(adev->dev, "AIS: PCI P2PDMA resource already exists\n");
 		return 0;
 	}
 
