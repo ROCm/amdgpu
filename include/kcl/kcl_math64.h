@@ -8,4 +8,8 @@
 	({ u64 _tmp = (d); div64_u64((ll) + _tmp - 1, _tmp); })
 #endif
 
+#ifndef DIV_U64_ROUND_UP
+#define DIV_U64_ROUND_UP(ll, d) ({ u32 _tmp = (d); div_u64((ll) + _tmp - 1, _tmp); })
+#endif
+
 #endif
