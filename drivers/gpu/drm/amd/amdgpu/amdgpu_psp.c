@@ -1280,6 +1280,140 @@ out:
 	return ret;
 }
 
+static enum amdgpu_ptl_fmt str_to_ptl_fmt(const char *str)
+{
+	int i;
+
+	for (i = 0; i < AMDGPU_PTL_FMT_INVALID; ++i) {
+		if (!strcmp(str, amdgpu_ptl_fmt_str[i]))
+			return (enum amdgpu_ptl_fmt)i;
+	}
+
+	return AMDGPU_PTL_FMT_INVALID;
+}
+
+static ssize_t ptl_supported_formats_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	ssize_t len = 0;
+
+	for (int i = 0; i < AMDGPU_PTL_FMT_INVALID; ++i) {
+		len += sysfs_emit_at(buf, len, "%s%s",
+				amdgpu_ptl_fmt_str[i],
+				(i < AMDGPU_PTL_FMT_INVALID - 1) ? "," : "\n");
+	}
+
+	return len;
+}
+
+static ssize_t ptl_enable_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	struct drm_device *ddev = dev_get_drvdata(dev);
+	struct amdgpu_device *adev = drm_to_adev(ddev);
+	struct psp_context *psp = &adev->psp;
+	bool enable, cur_enabled;
+	uint32_t ptl_state, fmt1, fmt2;
+	int ret;
+
+	if (sysfs_streq(buf, "enabled") || sysfs_streq(buf, "1"))
+		enable = true;
+	else if (sysfs_streq(buf, "disabled") || sysfs_streq(buf, "0"))
+		enable = false;
+	else
+		return -EINVAL;
+
+	fmt1 = psp->ptl_fmt1;
+	fmt2 = psp->ptl_fmt2;
+	ptl_state = enable ? 1 : 0;
+
+	cur_enabled = READ_ONCE(psp->ptl_enabled);
+	if (cur_enabled == enable)
+		return count;
+
+	ret = psp_performance_monitor_hw(psp, PSP_PTL_PERF_MON_SET, &ptl_state, &fmt1, &fmt2);
+	if (ret) {
+		dev_err(adev->dev, "Failed to set PTL err = %d\n", ret);
+		return ret;
+	}
+
+	return count;
+}
+
+static ssize_t ptl_enable_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct drm_device *ddev = dev_get_drvdata(dev);
+	struct amdgpu_device *adev = drm_to_adev(ddev);
+	struct psp_context *psp = &adev->psp;
+
+	return sysfs_emit(buf, "%s\n", psp->ptl_enabled ? "enabled" : "disabled");
+}
+
+static ssize_t ptl_format_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	struct drm_device *ddev = dev_get_drvdata(dev);
+	struct amdgpu_device *adev = drm_to_adev(ddev);
+	struct psp_context *psp = &adev->psp;
+	char fmt1_str[8], fmt2_str[8];
+	enum amdgpu_ptl_fmt fmt1_enum, fmt2_enum;
+	uint32_t ptl_state, fmt1, fmt2;
+	int ret;
+
+	/* Only allow format update when PTL is enabled */
+	if (!psp->ptl_enabled)
+		return -EPERM;
+
+	/* Parse input, expecting "FMT1,FMT2" */
+	if (sscanf(buf, "%7[^,],%7s", fmt1_str, fmt2_str) != 2)
+		return -EINVAL;
+
+	fmt1_enum = str_to_ptl_fmt(fmt1_str);
+	fmt2_enum = str_to_ptl_fmt(fmt2_str);
+
+	if (fmt1_enum >= AMDGPU_PTL_FMT_INVALID ||
+			fmt2_enum >= AMDGPU_PTL_FMT_INVALID ||
+			fmt1_enum == fmt2_enum)
+		return -EINVAL;
+
+	ptl_state = psp->ptl_enabled;
+	fmt1 = fmt1_enum;
+	fmt2 = fmt2_enum;
+	ret = psp_performance_monitor_hw(psp, PSP_PTL_PERF_MON_SET, &ptl_state, &fmt1, &fmt2);
+	if (ret) {
+		dev_err(adev->dev, "Failed to update PTL err = %d\n", ret);
+		return ret;
+	}
+
+	return count;
+}
+
+static ssize_t ptl_format_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct drm_device *ddev = dev_get_drvdata(dev);
+	struct amdgpu_device *adev = drm_to_adev(ddev);
+	struct psp_context *psp = &adev->psp;
+
+	return sysfs_emit(buf, "%s,%s\n",
+			amdgpu_ptl_fmt_str[psp->ptl_fmt1],
+			amdgpu_ptl_fmt_str[psp->ptl_fmt2]);
+}
+
+static umode_t amdgpu_ptl_is_visible(struct kobject *kobj, struct attribute *attr, int idx)
+{
+	struct device *dev = kobj_to_dev(kobj);
+	struct drm_device *ddev = dev_get_drvdata(dev);
+	struct amdgpu_device *adev = drm_to_adev(ddev);
+
+	/* Only show PTL sysfs files if PTL hardware is supported */
+	if (!adev->psp.ptl_hw_supported)
+		return 0;
+
+	return attr->mode;
+}
+
 int psp_spatial_partition(struct psp_context *psp, int mode)
 {
 	struct psp_gfx_cmd_resp *cmd;
@@ -4260,6 +4394,31 @@ void psp_copy_fw(struct psp_context *psp, uint8_t *start_addr, uint32_t bin_size
 static DEVICE_ATTR(usbc_pd_fw, 0644,
 		   psp_usbc_pd_fw_sysfs_read,
 		   psp_usbc_pd_fw_sysfs_write);
+/**
+ * DOC: PTL sysfs attributes
+ * These sysfs files under /sys/class/drm/cardX/device/ptl allow users to enable or disable
+ * the Peak Tops Limiter (PTL), configure preferred PTL data formats, and query supported
+ * formats for each GPU.
+ */
+static DEVICE_ATTR(ptl_enable, 0644,
+			ptl_enable_show, ptl_enable_store);
+static DEVICE_ATTR(ptl_format, 0644,
+			ptl_format_show, ptl_format_store);
+static DEVICE_ATTR(ptl_supported_formats, 0444,
+			ptl_supported_formats_show, NULL);
+
+static struct attribute *ptl_attrs[] = {
+	&dev_attr_ptl_enable.attr,
+	&dev_attr_ptl_format.attr,
+	&dev_attr_ptl_supported_formats.attr,
+	NULL,
+};
+
+const struct attribute_group amdgpu_ptl_attr_group = {
+	.name = "ptl",
+	.attrs = ptl_attrs,
+	.is_visible = amdgpu_ptl_is_visible,
+};
 
 int is_psp_fw_valid(struct psp_bin_desc bin)
 {
