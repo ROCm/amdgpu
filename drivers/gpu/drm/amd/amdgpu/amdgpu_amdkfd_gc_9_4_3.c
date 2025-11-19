@@ -550,6 +550,16 @@ static uint32_t kgd_v9_4_3_trigger_pc_sample_trap(struct amdgpu_device *adev,
 					target_simd, target_wave_slot, method, inst);
 }
 
+static uint32_t kgd_v9_4_3_ptl_ctrl(struct amdgpu_device *adev,
+				uint32_t cmd,
+				uint32_t *ptl_state,
+				enum amdgpu_ptl_fmt *fmt1,
+				enum amdgpu_ptl_fmt *fmt2)
+{
+	return psp_performance_monitor_hw(&adev->psp, cmd,
+			ptl_state, fmt1, fmt2);
+}
+
 static uint32_t kgd_v9_4_3_setup_stoch_sampling(struct amdgpu_device *adev,
 					    uint32_t compute_vmid_bitmap,
 					    bool enable,
@@ -613,4 +623,5 @@ const struct kfd2kgd_calls gc_9_4_3_kfd2kgd = {
 	.trigger_pc_sample_trap = kgd_v9_4_3_trigger_pc_sample_trap,
 	.override_core_cg = kgd_gfx_v9_4_3_override_core_cg,
 	.setup_stoch_sampling = kgd_v9_4_3_setup_stoch_sampling,
+	.ptl_ctrl = kgd_v9_4_3_ptl_ctrl,
 };

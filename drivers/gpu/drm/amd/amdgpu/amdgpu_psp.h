@@ -357,6 +357,28 @@ struct spirom_bo {
 };
 #endif
 
+enum psp_ptl_cmd {
+	PSP_PTL_PERF_MON_QUERY = 0xA0000000,
+	PSP_PTL_PERF_MON_SET = 0xA0000001,
+};
+
+enum psp_ptl_format_type
+{
+	GFX_FTYPE_I8          = 0x00000000,
+	GFX_FTYPE_F16         = 0x00000001,
+	GFX_FTYPE_BF16        = 0x00000002,
+	GFX_FTYPE_F32         = 0x00000003,
+	GFX_FTYPE_F64         = 0x00000004,
+	GFX_FTYPE_INVALID     = 0xFFFFFFFF,
+};
+
+struct psp_ptl_perf_req {
+	enum psp_ptl_cmd req;
+	uint32_t ptl_state;
+	uint32_t pref_format1;
+	uint32_t pref_format2;
+};
+
 struct psp_context {
 	struct amdgpu_device		*adev;
 	struct psp_ring			km_ring;
@@ -447,6 +469,10 @@ struct psp_context {
 #if defined(CONFIG_DEBUG_FS)
 	struct spirom_bo *spirom_dump_trip;
 #endif
+	enum amdgpu_ptl_fmt		ptl_fmt1;
+	enum amdgpu_ptl_fmt		ptl_fmt2;
+	bool				ptl_enabled;
+	bool				ptl_hw_supported;
 };
 
 struct amdgpu_psp_funcs {
@@ -622,5 +648,7 @@ int amdgpu_psp_reg_program_no_ring(struct psp_context *psp, uint32_t val,
 				   enum psp_reg_prog_id id);
 void amdgpu_psp_debugfs_init(struct amdgpu_device *adev);
 
+int psp_performance_monitor_hw(struct psp_context *psp, u32 req_code,
+			       u32 *ptl_state, u32 *fmt1, u32 *fmt2);
 
 #endif
