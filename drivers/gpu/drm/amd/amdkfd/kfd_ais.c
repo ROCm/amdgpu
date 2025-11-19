@@ -129,6 +129,11 @@ int kfd_ais_init(struct amdgpu_device *adev)
 	bool is_large_bar = adev->gmc.visible_vram_size &&
 		adev->gmc.real_vram_size == adev->gmc.visible_vram_size;
 
+	if (amdgpu_sriov_vf(adev)) {
+		dev_dbg(adev->dev, "AIS: not supported on SRIOV\n");
+		return 0;
+	}
+
 	/* AIS support limited to large BAR dGPUs */
 	if (adev->flags & AMD_IS_APU || adev->gmc.xgmi.connected_to_cpu || !is_large_bar) {
 		dev_dbg(adev->dev, "AIS: only supported for large BAR dGPU\n");
