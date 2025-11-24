@@ -37,6 +37,7 @@
 #include "amdgpu_sync.h"
 #include "amdgpu_vm.h"
 #include "amdgpu_xcp.h"
+#include "amdgpu_ptl.h"
 
 extern uint64_t amdgpu_amdkfd_total_mem_size;
 
