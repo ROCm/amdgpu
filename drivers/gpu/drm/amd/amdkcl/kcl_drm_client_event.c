@@ -1,16 +1,15 @@
 #include <kcl/kcl_drm_client_event.h>
 
 #ifndef HAVE_DRM_CLIENT_DEV_RESUME
-void drm_client_dev_resume(struct drm_device *dev, bool holds_console_lock)
+void _kcl_drm_client_dev_resume(struct drm_device *dev)
 {
-	drm_fb_helper_set_suspend_unlocked(dev->fb_helper, holds_console_lock);
+	drm_fb_helper_set_suspend_unlocked(dev->fb_helper, true);
 }
-EXPORT_SYMBOL(drm_client_dev_resume);
+EXPORT_SYMBOL(_kcl_drm_client_dev_resume);
 
-void drm_client_dev_suspend(struct drm_device *dev, bool holds_console_lock)
+void _kcl_drm_client_dev_suspend(struct drm_device *dev)
 {
-	bool suspend = !holds_console_lock;
-	drm_fb_helper_set_suspend_unlocked(dev->fb_helper, suspend);
+	drm_fb_helper_set_suspend_unlocked(dev->fb_helper, false);
 }
-EXPORT_SYMBOL(drm_client_dev_suspend);
+EXPORT_SYMBOL(_kcl_drm_client_dev_suspend);
 #endif

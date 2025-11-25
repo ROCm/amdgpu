@@ -30,15 +30,13 @@ AC_DEFUN([AC_AMDGPU_DRM_CLIENT_DEV_RESUME], [
                 #include <linux/types.h>
                 #include <drm/drm_client_event.h>
             ], [
-                drm_client_dev_resume(NULL, false);
+                drm_client_dev_resume(NULL);
             ], [
                 AC_DEFINE(HAVE_DRM_CLIENT_DEV_RESUME, 1,
                     [drm_client_dev_resume() is available])
             ])
     ])
 ])
-
-
 
 AC_DEFUN([AC_AMDGPU_DRM_CLIENT], [
     AC_AMDGPU_DRM_CLIENT_SETUP
