@@ -50,6 +50,15 @@ static int psp_load_smu_fw(struct psp_context *psp);
 static int psp_rap_terminate(struct psp_context *psp);
 static int psp_securedisplay_terminate(struct psp_context *psp);
 
+static const char * const amdgpu_ptl_fmt_str[] = {
+	[AMDGPU_PTL_FMT_I8]      = "I8",
+	[AMDGPU_PTL_FMT_F16]     = "F16",
+	[AMDGPU_PTL_FMT_BF16]    = "BF16",
+	[AMDGPU_PTL_FMT_F32]     = "F32",
+	[AMDGPU_PTL_FMT_F64]     = "F64",
+	[AMDGPU_PTL_FMT_INVALID] = "INVALID",
+};
+
 static int psp_ring_init(struct psp_context *psp,
 			 enum psp_ring_type ring_type)
 {

@@ -32,15 +32,6 @@ enum amdgpu_ptl_fmt {
 	AMDGPU_PTL_FMT_INVALID = 5,
 };
 
-static const char * const amdgpu_ptl_fmt_str[] = {
-	[AMDGPU_PTL_FMT_I8]      = "I8",
-	[AMDGPU_PTL_FMT_F16]     = "F16",
-	[AMDGPU_PTL_FMT_BF16]    = "BF16",
-	[AMDGPU_PTL_FMT_F32]     = "F32",
-	[AMDGPU_PTL_FMT_F64]     = "F64",
-	[AMDGPU_PTL_FMT_INVALID] = "INVALID",
-};
-
 enum psp_ptl_cmd {
 	PSP_PTL_PERF_MON_QUERY = 0xA0000000,
 	PSP_PTL_PERF_MON_SET = 0xA0000001,
