@@ -1255,6 +1255,10 @@ int psp_performance_monitor_hw(struct psp_context *psp, u32 req_code,
 	if (amdgpu_sriov_vf(psp->adev))
 		return 0;
 
+	if (amdgpu_ip_version(psp->adev, GC_HWIP, 0) != IP_VERSION(9, 4, 4) ||
+			psp->sos.fw_version < 0x0036081a)
+		return -EOPNOTSUPP;
+
 	if (psp_ptl_fmt_verify(psp, *fmt1, &ptl_fmt1) ||
 			psp_ptl_fmt_verify(psp, *fmt2, &ptl_fmt2))
 		return -EINVAL;

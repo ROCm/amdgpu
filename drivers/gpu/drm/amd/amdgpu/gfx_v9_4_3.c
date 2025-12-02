@@ -2399,9 +2399,6 @@ static int gfx_v9_4_3_perf_monitor_ptl_init(struct amdgpu_device *adev, bool sta
 	uint32_t ptl_state = state ? 1 : 0;
 	int r;
 
-	if (amdgpu_ip_version(adev, GC_HWIP, 0) != IP_VERSION(9, 4, 4))
-		return -ENOTSUPP;
-
 	if (!adev->psp.funcs)
 		return -EOPNOTSUPP;
 
