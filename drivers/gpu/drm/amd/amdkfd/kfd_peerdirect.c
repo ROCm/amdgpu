@@ -174,9 +174,10 @@ static int amd_acquire(unsigned long addr, size_t size,
 
 	if (peer_mem_name == rdma_name) {
 		p = peer_mem_private_data;
+		kref_get(&p->ref);
 	} else {
-		p = kfd_get_process(current);
-		if (IS_ERR(p)) {
+		p = kfd_lookup_process_by_mm(current->mm);
+		if (!p) {
 			pr_debug("Not a KFD process\n");
 			return 0;
 		}
@@ -217,6 +218,8 @@ static int amd_acquire(unsigned long addr, size_t size,
 	/* Return pointer to allocated context */
 	*client_context = mem_context;
 
+	kfd_unref_process(p);
+
 	/* Return 1 to inform that this address which will be handled
 	 * by AMD GPU driver
 	 */
@@ -224,6 +227,8 @@ static int amd_acquire(unsigned long addr, size_t size,
 
 out_unlock:
 	mutex_unlock(&p->mutex);
+	kfd_unref_process(p);
+
 	return 0;
 }
 
