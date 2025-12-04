@@ -38,16 +38,5 @@ static const struct file_operations __name ## _fops = {			\
 }
 #endif
 
-#ifndef HAVE_SEQ_HEX_DUMP
-void _kcl_seq_hex_dump(struct seq_file *m, const char *prefix_str, int prefix_type,
-		  int rowsize, int groupsize, const void *buf, size_t len,
-		  bool ascii);
 
-static inline void seq_hex_dump(struct seq_file *m, const char *prefix_str, int prefix_type,
-		int rowsize, int groupsize, const void *buf, size_t len,
-		bool ascii)
-{
-	_kcl_seq_hex_dump(m, prefix_str, prefix_type, rowsize, groupsize, buf, len, ascii);
-}
-#endif
 #endif
