@@ -1053,9 +1053,6 @@
 /* sched_set_fifo_low() is available */
 #define HAVE_SCHED_SET_FIFO_LOW 1
 
-/* seq_hex_dump() is available */
-#define HAVE_SEQ_HEX_DUMP 1
-
 /* sg_alloc_table_from_pages_segment() is available */
 #define HAVE_SG_ALLOC_TABLE_FROM_PAGES_SEGMENT 1
 
