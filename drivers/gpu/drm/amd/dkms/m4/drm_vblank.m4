@@ -8,7 +8,7 @@ AC_DEFUN([AC_AMDGPU_DRM_VBLANK_CRTC_STRUCT_CONFIG], [
                         #include <drm/drm_vblank.h>
                 ],[
                         struct drm_vblank_crtc *vblank = NULL;
-                        struct drm_vblank_crtc_config config;
+                        struct drm_vblank_crtc_config config = {};
                         vblank->config = config;
                 ],[
                         AC_DEFINE(HAVE_DRM_VBLANK_CRTC_STRUCT_CONFIG, 1,
