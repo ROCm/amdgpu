@@ -54,4 +54,8 @@ struct psp_ptl_perf_req {
 	uint32_t pref_format2;
 };
 
+extern const struct attribute_group amdgpu_ptl_attr_group;
+int amdgpu_ptl_sysfs_init(struct amdgpu_device *adev);
+void amdgpu_ptl_sysfs_fini(struct amdgpu_device *adev);
+
 #endif /* __AMDGPU_PTL_H__ */

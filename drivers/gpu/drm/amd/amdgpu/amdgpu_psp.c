@@ -1427,6 +1427,22 @@ static umode_t amdgpu_ptl_is_visible(struct kobject *kobj, struct attribute *att
 	return attr->mode;
 }
 
+int amdgpu_ptl_sysfs_init(struct amdgpu_device *adev)
+{
+	if (!adev->psp.ptl_hw_supported)
+		return 0;
+
+	return sysfs_create_group(&adev->dev->kobj, &amdgpu_ptl_attr_group);
+}
+
+void amdgpu_ptl_sysfs_fini(struct amdgpu_device *adev)
+{
+	if (!adev->psp.ptl_hw_supported)
+		return;
+
+	sysfs_remove_group(&adev->dev->kobj, &amdgpu_ptl_attr_group);
+}
+
 int psp_spatial_partition(struct psp_context *psp, int mode)
 {
 	struct psp_gfx_cmd_resp *cmd;
