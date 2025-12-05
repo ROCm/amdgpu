@@ -62,10 +62,13 @@
 /* Define to 1 if you have the <asm/set_memory.h> header file. */
 #define HAVE_ASM_SET_MEMORY_H 1
 
-/* backlight_device_set_brightness() is available */
-#define HAVE_BACKLIGHT_DEVICE_SET_BRIGHTNESS 1
+/* amdgpu_attr_group->is_bin_visible is available */
+#define HAVE_ATTRIBUTE_GROUP_IS_BIN_VISIBLE 1
 
-/* bitmap_free() is available */
+/* bin_attribute.read is const args */
+#define HAVE_BIN_ATTR_CONST_ARGS 1
+
+/* bitmap_free(),bitmap_alloc(),bitmap_zalloc is available */
 #define HAVE_BITMAP_FUNCS 1
 
 /* bitmap_read() is available */
