@@ -4,7 +4,7 @@ amdkcl-y += main.o kcl_common.o
 amdkcl-y += kcl_kernel_params.o
 amdkcl-y += dma-buf/dma-resv.o kcl_dma-resv.o
 
-amdkcl-y += kcl_backlight.o kcl_ioctl.o \
+amdkcl-y += kcl_ioctl.o \
 	kcl_io.o kcl_security.o \
 	kcl_suspend.o kcl_pci.o kcl_mm.o kcl_memory.o \
 	kcl_fence.o kcl_drm_cache.o \
