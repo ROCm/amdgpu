@@ -1210,15 +1210,6 @@
 /* vmemdup_array_user() is available */
 #define HAVE_VMEMDUP_ARRAY_USER 1
 
-/* vmf_insert_*() are available */
-#define HAVE_VMF_INSERT 1
-
-/* vmf_insert_mixed_mkwrite() has long pfn arg */
-/* #undef HAVE_VMF_INSERT_MIXED_MKWRITE_LONG_PFN */
-
-/* vmf_insert_pfn_prot() is available */
-#define HAVE_VMF_INSERT_PFN_PROT 1
-
 /* vm_fault->{address/vma} is available */
 #define HAVE_VM_FAULT_ADDRESS_VMA 1
 
