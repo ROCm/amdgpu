@@ -7,10 +7,6 @@
 #include <linux/time64.h>
 #include <linux/timer.h>
 
-#ifndef HAVE_TIME64_TO_TM
-void time64_to_tm(time64_t totalsecs, int offset, struct tm *result);
-#endif
-
 #ifndef timer_container_of
 #define timer_container_of(var, callback_timer, timer_fieldname)	\
 	container_of(callback_timer, typeof(*var), timer_fieldname)
