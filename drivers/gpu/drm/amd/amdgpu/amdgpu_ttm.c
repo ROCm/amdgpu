@@ -893,7 +893,7 @@ int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages)
 		spin_unlock(&gtt->guptasklock);
 
 		if (mm == current->mm)
-			r = get_user_pages(userptr, num_pages, flags, p, NULL);
+			r = get_user_pages(userptr, num_pages, flags, p);
 		else
 			r = kcl_get_user_pages_remote(gtt->usertask,
 					mm, userptr, num_pages,

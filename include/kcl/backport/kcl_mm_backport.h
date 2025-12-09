@@ -39,23 +39,16 @@ long kcl_get_user_pages_remote(struct task_struct *tsk, struct mm_struct *mm,
 #endif
 }
 
-#ifndef HAVE_GET_USER_PAGES_GUP_FLAGS
 static inline
 long _kcl_get_user_pages(unsigned long start, unsigned long nr_pages,
-		unsigned int gup_flags, struct page **pages,
-		struct vm_area_struct **vmas)
+		unsigned int gup_flags, struct page **pages)
 {
-#if defined(HAVE_GET_USER_PAGES_6ARGS)
-	return get_user_pages(start, nr_pages, !!(gup_flags & FOLL_WRITE),
-			      !!(gup_flags & FOLL_FORCE), pages, vmas);
-#elif defined(HAVE_GET_USER_PAGES_REMOVE_VMAS)
+#if defined(HAVE_GET_USER_PAGES_REMOVE_VMAS)
 	return get_user_pages(start, nr_pages, gup_flags, pages);
 #else
-	return get_user_pages(current, current->mm, start, nr_pages, !!(gup_flags & FOLL_WRITE),
-			      !!(gup_flags & FOLL_FORCE), pages, vmas);
+	return get_user_pages(start, nr_pages, gup_flags, pages, NULL);
 #endif
 }
 #define get_user_pages _kcl_get_user_pages
-#endif /* HAVE_GET_USER_PAGES_GUP_FLAGS */
 
 #endif
