@@ -3767,7 +3767,6 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		return r;
 
 	spin_lock_init(&adev->mmio_idx_lock);
-	spin_lock_init(&adev->pcie_idx_lock);
 	spin_lock_init(&adev->mm_stats.lock);
 	spin_lock_init(&adev->virt.rlcg_reg_lock);
 	spin_lock_init(&adev->wb.lock);
