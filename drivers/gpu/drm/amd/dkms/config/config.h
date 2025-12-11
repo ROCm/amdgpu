@@ -768,9 +768,6 @@
 /* idr_init_base() is available */
 #define HAVE_IDR_INIT_BASE 1
 
-/* idr_remove return void pointer */
-#define HAVE_IDR_REMOVE_RETURN_VOID_POINTER 1
-
 /* import_guid() is available */
 #define HAVE_IMPORT_GUID 1
 
