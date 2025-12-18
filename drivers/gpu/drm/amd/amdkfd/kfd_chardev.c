@@ -1893,6 +1893,9 @@ static int kfd_ptl_control(struct kfd_process_device *pdd, bool enable)
 	uint32_t ptl_state = enable ? 1 : 0;
 	int ret;
 
+	if (ptl->hw_supported_state != AMDGPU_PTL_HW_SUPPORTED)
+		return -EOPNOTSUPP;
+
 	if (!pdd->dev->kfd2kgd || !pdd->dev->kfd2kgd->ptl_ctrl)
 		return -EOPNOTSUPP;
 
@@ -1911,7 +1914,7 @@ int kfd_ptl_disable_request(struct kfd_process_device *pdd,
 	struct amdgpu_ptl *ptl = &adev->psp.ptl;
 	int ret = 0;
 
-	if (!ptl->hw_supported)
+	if (ptl->hw_supported_state != AMDGPU_PTL_HW_SUPPORTED)
 		return -EOPNOTSUPP;
 
 	mutex_lock(&ptl->mutex);
@@ -1943,7 +1946,7 @@ int kfd_ptl_disable_release(struct kfd_process_device *pdd,
 	struct amdgpu_ptl *ptl = &adev->psp.ptl;
 	int ret = 0;
 
-	if (!ptl->hw_supported)
+	if (ptl->hw_supported_state != AMDGPU_PTL_HW_SUPPORTED)
 		return -EOPNOTSUPP;
 
 	mutex_lock(&ptl->mutex);
@@ -3614,7 +3617,7 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 			kfd->profiler_process = p;
 			status = 0;
 			mutex_unlock(&kfd->profiler_lock);
-			if (ptl->hw_supported) {
+			if (ptl->hw_supported_state == AMDGPU_PTL_HW_SUPPORTED) {
 				status = kfd_ptl_disable_request(pdd, p);
 				if (status != 0)
 					dev_err(kfd_device,
@@ -3632,7 +3635,7 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 		status = 0;
 		mutex_unlock(&kfd->profiler_lock);
 
-		if (ptl->hw_supported) {
+		if (ptl->hw_supported_state == AMDGPU_PTL_HW_SUPPORTED) {
 			status = kfd_ptl_disable_release(pdd, p);
 			if (status)
 				dev_err(kfd_device,
