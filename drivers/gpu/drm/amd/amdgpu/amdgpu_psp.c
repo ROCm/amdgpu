@@ -1246,14 +1246,22 @@ int psp_performance_monitor_hw(struct psp_context *psp, u32 req_code,
 			       uint32_t *ptl_state, uint32_t *fmt1, uint32_t *fmt2)
 {
 	struct psp_gfx_cmd_resp *cmd;
+	struct amdgpu_device *adev = psp->adev;
 	uint32_t ptl_fmt1, ptl_fmt2;
 	int ret;
 
 	if (!psp || !ptl_state || !fmt1 || !fmt2)
 		return -EINVAL;
 
-	if (amdgpu_sriov_vf(psp->adev))
-		return 0;
+	if (amdgpu_sriov_vf(adev)) {
+		ret = amdgpu_virt_ptl_request(adev, req_code, ptl_state, fmt1, fmt2);
+		if (!ret) {
+			psp->ptl_enabled = *ptl_state;
+			psp->ptl_fmt1 = *fmt1;
+			psp->ptl_fmt2 = *fmt2;
+		}
+		return ret;
+	}
 
 	if (amdgpu_ip_version(psp->adev, GC_HWIP, 0) != IP_VERSION(9, 4, 4) ||
 			psp->sos.fw_version < 0x0036081a)
