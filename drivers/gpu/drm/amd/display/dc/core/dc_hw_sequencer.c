@@ -4108,3 +4108,24 @@ void hwss_add_tg_get_frame_count(struct block_sequence_state *seq_state,
 		(*seq_state->num_steps)++;
 	}
 }
+
+
+void get_refresh_rate_confirm_color(struct pipe_ctx *pipe_ctx, struct tg_color *color)
+{
+	uint32_t color_value = MAX_TG_COLOR_VALUE;
+	unsigned int refresh_rate = 0;
+	uint32_t scaling_factor = 0;
+	if (pipe_ctx && pipe_ctx->stream && color) {
+		refresh_rate = (pipe_ctx->stream->timing.pix_clk_100hz * 100) / (pipe_ctx->stream->adjust.v_total_max * pipe_ctx->stream->timing.h_total);
+
+		uint32_t min_refresh_rate = pipe_ctx->stream->timing.min_refresh_in_uhz / 1000000;
+		uint32_t max_refresh_rate = pipe_ctx->stream->timing.max_refresh_in_uhz / 1000000;
+
+		if (max_refresh_rate - min_refresh_rate)
+			scaling_factor = MAX_TG_COLOR_VALUE * (refresh_rate - min_refresh_rate) / (max_refresh_rate - min_refresh_rate);
+
+		pipe_ctx->visual_confirm_color.color_r_cr = color_value;
+		pipe_ctx->visual_confirm_color.color_g_y = scaling_factor;
+		pipe_ctx->visual_confirm_color.color_b_cb = color_value;
+	}
+}
