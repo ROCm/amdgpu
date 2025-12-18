@@ -32,6 +32,12 @@ enum amdgpu_ptl_fmt {
 	AMDGPU_PTL_FMT_INVALID = 5,
 };
 
+enum amdgpu_ptl_hw_supported_state {
+	AMDGPU_PTL_HW_UNINIT = 0,       /* Not yet initialized */
+	AMDGPU_PTL_HW_SUPPORTED,        /* Initialized and supported */
+	AMDGPU_PTL_HW_NOT_SUPPORTED,    /* Initialized and not supported */
+};
+
 enum psp_ptl_cmd {
 	PSP_PTL_PERF_MON_QUERY = 0xA0000000,
 	PSP_PTL_PERF_MON_SET = 0xA0000001,

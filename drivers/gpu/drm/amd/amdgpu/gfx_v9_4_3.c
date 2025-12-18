@@ -2402,7 +2402,10 @@ static int gfx_v9_4_3_perf_monitor_ptl_init(struct amdgpu_device *adev, bool sta
 	if (!adev->psp.funcs)
 		return -EOPNOTSUPP;
 
-	if (!adev->psp.ptl_hw_supported) {
+	if (adev->psp.ptl_hw_supported_state == AMDGPU_PTL_HW_NOT_SUPPORTED)
+		return -EOPNOTSUPP;
+
+	if (adev->psp.ptl_hw_supported_state == AMDGPU_PTL_HW_UNINIT) {
 		fmt1 = GFX_FTYPE_I8;
 		fmt2 = GFX_FTYPE_BF16;
 	} else {
@@ -2412,11 +2415,18 @@ static int gfx_v9_4_3_perf_monitor_ptl_init(struct amdgpu_device *adev, bool sta
 
 	/* initialize PTL with default formats: GFX_FTYPE_I8 & GFX_FTYPE_BF16 */
 	r = psp_performance_monitor_hw(&adev->psp, PSP_PTL_PERF_MON_SET, &ptl_state,
-							&fmt1, &fmt2);
-	if (r)
-		return r;
+						&fmt1, &fmt2);
+	if (r) {
+		if (adev->psp.ptl_hw_supported_state == AMDGPU_PTL_HW_UNINIT)
+			adev->psp.ptl_hw_supported_state = AMDGPU_PTL_HW_NOT_SUPPORTED;
 
-	adev->psp.ptl_hw_supported = true;
+		if (r != -EOPNOTSUPP)
+			dev_err(adev->dev, "PTL initialization failed (%d)\n", r);
+
+		return r;
+	}
+
+	adev->psp.ptl_hw_supported_state = AMDGPU_PTL_HW_SUPPORTED;
 
 	atomic_set(&adev->psp.ptl_disable_ref, 0);
 
@@ -2428,7 +2438,7 @@ static int gfx_v9_4_3_hw_fini(struct amdgpu_ip_block *ip_block)
 	struct amdgpu_device *adev = ip_block->adev;
 	int i, num_xcc;
 
-	if (adev->psp.ptl_hw_supported)
+	if (adev->psp.ptl_hw_supported_state == AMDGPU_PTL_HW_SUPPORTED)
 		gfx_v9_4_3_perf_monitor_ptl_init(adev, 0);
 
 	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);

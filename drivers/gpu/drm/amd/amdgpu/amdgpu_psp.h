@@ -451,10 +451,10 @@ struct psp_context {
 	enum amdgpu_ptl_fmt		ptl_fmt1;
 	enum amdgpu_ptl_fmt		ptl_fmt2;
 	bool				ptl_enabled;
-	bool				ptl_hw_supported;
 	/* PTL disable reference counting */
 	atomic_t			ptl_disable_ref;
 	struct mutex			ptl_mutex;
+	enum amdgpu_ptl_hw_supported_state	ptl_hw_supported_state;
 };
 
 struct amdgpu_psp_funcs {

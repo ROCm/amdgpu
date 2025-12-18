@@ -1897,7 +1897,7 @@ int kfd_ptl_control(struct kfd_process_device *pdd, bool enable)
 	uint32_t ptl_state = enable ? 1 : 0;
 	int ret;
 
-	if (!adev->psp.ptl_hw_supported)
+	if (adev->psp.ptl_hw_supported_state != AMDGPU_PTL_HW_SUPPORTED)
 		return -EOPNOTSUPP;
 
 	if (!pdd->dev->kfd2kgd || !pdd->dev->kfd2kgd->ptl_ctrl)
@@ -3509,7 +3509,7 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 			kfd->profiler_process = p;
 			status = 0;
 			mutex_unlock(&kfd->profiler_lock);
-			if (pdd->dev->adev->psp.ptl_hw_supported) {
+			if (pdd->dev->adev->psp.ptl_hw_supported_state == AMDGPU_PTL_HW_SUPPORTED) {
 				status = kfd_ptl_disable_request(pdd, p);
 				if (status != 0)
 					dev_err(kfd_device,
@@ -3527,7 +3527,7 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 		status = 0;
 		mutex_unlock(&kfd->profiler_lock);
 
-		if (pdd->dev->adev->psp.ptl_hw_supported) {
+		if (pdd->dev->adev->psp.ptl_hw_supported_state == AMDGPU_PTL_HW_SUPPORTED) {
 			status = kfd_ptl_disable_release(pdd, p);
 			if (status)
 				dev_err(kfd_device,

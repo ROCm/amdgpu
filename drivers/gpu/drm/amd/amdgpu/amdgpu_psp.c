@@ -1470,7 +1470,7 @@ static umode_t amdgpu_ptl_is_visible(struct kobject *kobj, struct attribute *att
 	struct amdgpu_device *adev = drm_to_adev(ddev);
 
 	/* Only show PTL sysfs files if PTL hardware is supported */
-	if (!adev->psp.ptl_hw_supported)
+	if (adev->psp.ptl_hw_supported_state != AMDGPU_PTL_HW_SUPPORTED)
 		return 0;
 
 	return attr->mode;
@@ -1478,7 +1478,7 @@ static umode_t amdgpu_ptl_is_visible(struct kobject *kobj, struct attribute *att
 
 int amdgpu_ptl_sysfs_init(struct amdgpu_device *adev)
 {
-	if (!adev->psp.ptl_hw_supported)
+	if (adev->psp.ptl_hw_supported_state != AMDGPU_PTL_HW_SUPPORTED)
 		return 0;
 
 	return sysfs_create_group(&adev->dev->kobj, &amdgpu_ptl_attr_group);
@@ -1486,7 +1486,7 @@ int amdgpu_ptl_sysfs_init(struct amdgpu_device *adev)
 
 void amdgpu_ptl_sysfs_fini(struct amdgpu_device *adev)
 {
-	if (!adev->psp.ptl_hw_supported)
+	if (adev->psp.ptl_hw_supported_state != AMDGPU_PTL_HW_SUPPORTED)
 		return;
 
 	sysfs_remove_group(&adev->dev->kobj, &amdgpu_ptl_attr_group);
