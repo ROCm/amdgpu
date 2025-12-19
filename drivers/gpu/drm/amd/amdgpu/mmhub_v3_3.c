@@ -636,6 +636,7 @@ static void mmhub_v3_3_init_client_info(struct amdgpu_device *adev)
 					     ARRAY_SIZE(mmhub_client_ids_v3_3_1));
 		break;
 	case IP_VERSION(3, 4, 0):
+	case IP_VERSION(3, 4, 2):
 		amdgpu_mmhub_init_client_info(&adev->mmhub,
 					     mmhub_client_ids_v3_4,
 					     ARRAY_SIZE(mmhub_client_ids_v3_4));
