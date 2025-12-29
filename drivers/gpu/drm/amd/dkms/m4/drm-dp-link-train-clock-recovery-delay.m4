@@ -8,7 +8,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_LINK_TRAIN_CLOCK_RECOVERY_DELAY], [
 			#include <drm/drm_dp_helper.h>
 		], [
 			struct drm_dp_aux *aux = NULL;
-			const u8 dpcd[DP_RECEIVER_CAP_SIZE];
+			const u8 dpcd[DP_RECEIVER_CAP_SIZE] = {0};
 			drm_dp_link_train_clock_recovery_delay(aux, dpcd);
 		], [drm_dp_link_train_clock_recovery_delay],[drivers/gpu/drm/drm_dp_helper.c drivers/gpu/drm/display/drm_dp_helper.c],[
 			AC_DEFINE(HAVE_DRM_DP_LINK_TRAIN_CLOCK_RECOVERY_DELAY_2ARGS, 1,
