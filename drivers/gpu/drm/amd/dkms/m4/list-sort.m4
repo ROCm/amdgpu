@@ -8,7 +8,7 @@ AC_DEFUN([AC_AMDGPU_LIST_CMP_FUNC_IS_CONST_PARAM], [
 			#include <linux/list_sort.h>
 		], [
 			list_cmp_func_t cmp = NULL;
-			struct list_head a, b;
+			struct list_head a = {0}, b = {0};
 			cmp(NULL, &a, &b);
 		], [
 			AC_DEFINE(HAVE_LIST_CMP_FUNC_IS_CONST_PARAM, 1,
