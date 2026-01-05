@@ -1910,6 +1910,88 @@ int kfd_ptl_control(struct kfd_process_device *pdd, bool enable)
 	return ret;
 }
 
+int kfd_ptl_disable_request(struct kfd_process_device *pdd,
+		struct kfd_process *p)
+{
+	struct amdgpu_device *adev;
+	int ret = 0;
+
+	if (!pdd)
+		return -ENODEV;
+
+	adev = pdd->dev->adev;
+	mutex_lock(&p->mutex);
+
+	if (pdd->ptl_disable_req)
+		goto out;
+
+	if (atomic_inc_return(&adev->psp.ptl_disable_ref) == 1) {
+		ret = kfd_ptl_control(pdd, false);
+		if (ret) {
+			atomic_dec(&adev->psp.ptl_disable_ref);
+			dev_warn(pdd->dev->adev->dev,
+					"failed to disable PTL\n");
+			goto out;
+		}
+	}
+	pdd->ptl_disable_req = true;
+
+out:
+	mutex_unlock(&p->mutex);
+	return ret;
+}
+
+int kfd_ptl_disable_release(struct kfd_process_device *pdd,
+		struct kfd_process *p)
+{
+	struct amdgpu_device *adev;
+	int ret = 0;
+
+	if (!pdd)
+		return -ENODEV;
+
+	adev = pdd->dev->adev;
+	mutex_lock(&p->mutex);
+	if (!pdd->ptl_disable_req)
+		goto out;
+
+	if (atomic_dec_return(&adev->psp.ptl_disable_ref) == 0) {
+		ret = kfd_ptl_control(pdd, true);
+		if (ret) {
+			atomic_inc(&adev->psp.ptl_disable_ref);
+			dev_warn(pdd->dev->adev->dev,
+					"failed to enable PTL\n");
+			goto out;
+		}
+	}
+	pdd->ptl_disable_req = false;
+
+out:
+	mutex_unlock(&p->mutex);
+	return ret;
+}
+
+static int kfd_profiler_ptl_control(struct kfd_process *p,
+		struct kfd_ioctl_ptl_control *args)
+{
+	struct kfd_process_device *pdd;
+	int ret;
+
+	mutex_lock(&p->mutex);
+	pdd = kfd_process_device_data_by_id(p, args->gpu_id);
+	mutex_unlock(&p->mutex);
+
+	if (!pdd)
+		return -ENODEV;
+
+	if (args->enable == 0)
+		ret = kfd_ptl_disable_request(pdd, p);
+	else
+		ret = kfd_ptl_disable_release(pdd, p);
+
+	return ret;
+}
+
 static int criu_checkpoint_process(struct kfd_process *p,
 			     uint8_t __user *user_priv_data,
 			     uint64_t *priv_offset)
@@ -3418,7 +3500,7 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 		if (!kfd->profiler_process) {
 			kfd->profiler_process = p;
 			status = 0;
-			kfd_ptl_control(pdd, false);
+			kfd_ptl_disable_request(pdd, p);
 		} else if (kfd->profiler_process == p) {
 			status = -EALREADY;
 		} else {
@@ -3427,7 +3509,8 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 	} else if (op == 0 && kfd->profiler_process == p) {
 		kfd->profiler_process = NULL;
 		status = 0;
-		kfd_ptl_control(pdd, true);
+		kfd_ptl_disable_release(pdd, p);
+
 	}
 	mutex_unlock(&kfd->profiler_lock);
 
@@ -3472,6 +3555,8 @@ static int kfd_ioctl_profiler(struct file *filep, struct kfd_process *p, void *d
 		return kfd_ioctl_pc_sample(filep, p, &args->pc_sample);
 	case KFD_IOC_PROFILER_PMC:
 		return kfd_profiler_pmc(p, &args->pmc);
+	case KFD_IOC_PROFILER_PTL_CONTROL:
+		return kfd_profiler_ptl_control(p, &args->ptl);
 	}
 	return -EINVAL;
 }

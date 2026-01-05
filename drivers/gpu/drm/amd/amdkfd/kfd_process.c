@@ -1042,7 +1042,6 @@ static void kfd_process_profiler_release(struct kfd_process *p, struct kfd_proce
 	mutex_lock(&pdd->dev->kfd->profiler_lock);
 	if (pdd->dev->kfd->profiler_process == p) {
 		pdd->qpd.dqm->ops.set_perfcount(pdd->qpd.dqm, 0);
-		kfd_ptl_control(pdd, true);
 		pdd->dev->kfd->profiler_process = NULL;
 	}
 	mutex_unlock(&pdd->dev->kfd->profiler_lock);
@@ -1061,6 +1060,10 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 			pdd->dev->id, p->lead_thread->pid);
 
 		kfd_process_profiler_release(p, pdd);
+
+		if (pdd->ptl_disable_req)
+			kfd_ptl_disable_release(pdd, p);
+
 		kfd_pc_sample_release(pdd);
 		kfd_spm_release_process_device(pdd);
 

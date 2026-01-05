@@ -975,6 +975,8 @@ struct kfd_process_device {
 	bool has_reset_queue;
 
 	u32 pasid;
+	/* Indicates this process has requested PTL stay disabled */
+	bool ptl_disable_req;
 };
 
 #define qpd_to_pdd(x) container_of(x, struct kfd_process_device, qpd)
@@ -1750,6 +1752,10 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		    struct kfd_ais_in_args *in, uint64_t *size_copied);
 /* PTL support */
 int kfd_ptl_control(struct kfd_process_device *pdd, bool enable);
+int kfd_ptl_disable_request(struct kfd_process_device *pdd,
+		struct kfd_process *p);
+int kfd_ptl_disable_release(struct kfd_process_device *pdd,
+		struct kfd_process *p);
 
 /* Debugfs */
 #if defined(CONFIG_DEBUG_FS)
