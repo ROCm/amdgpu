@@ -4,5 +4,6 @@
 
 #include <kcl/kcl_test-bug.h>
 #include <kcl/kcl_overflow.h>
+#include <kcl/kcl_rbtree.h>
 
 #endif
