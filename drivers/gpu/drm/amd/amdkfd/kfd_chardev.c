@@ -1956,7 +1956,11 @@ int kfd_ptl_disable_release(struct kfd_process_device *pdd,
 		goto out;
 
 	if (atomic_dec_return(&adev->psp.ptl_disable_ref) == 0) {
+		if (adev->kfd.init_complete)
+			amdgpu_amdkfd_stop_sched(adev, pdd->dev->node_id);
 		ret = kfd_ptl_control(pdd, true);
+		if (adev->kfd.init_complete)
+			amdgpu_amdkfd_start_sched(adev, pdd->dev->node_id);
 		if (ret) {
 			atomic_inc(&adev->psp.ptl_disable_ref);
 			dev_warn(pdd->dev->adev->dev,
@@ -1964,6 +1968,7 @@ int kfd_ptl_disable_release(struct kfd_process_device *pdd,
 			goto out;
 		}
 	}
+
 	pdd->ptl_disable_req = false;
 
 out:
