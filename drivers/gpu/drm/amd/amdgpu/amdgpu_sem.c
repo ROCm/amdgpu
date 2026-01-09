@@ -168,7 +168,7 @@ static int amdgpu_sem_create(struct amdgpu_fpriv *fpriv, u32 *handle)
 	idr_preload(GFP_KERNEL);
 	spin_lock(&fpriv->sem_handles_lock);
 
-	ret = idr_alloc(&fpriv->sem_handles, sem, 1, 0, GFP_NOWAIT);
+	ret = idr_alloc(&fpriv->sem_handles, sem, 1, INT_MAX, GFP_NOWAIT);
 
 	spin_unlock(&fpriv->sem_handles_lock);
 	idr_preload_end();
@@ -177,6 +177,7 @@ static int amdgpu_sem_create(struct amdgpu_fpriv *fpriv, u32 *handle)
 		return ret;
 
 	*handle = ret;
+
 	return 0;
 }
 
@@ -217,98 +218,113 @@ static int amdgpu_sem_wait(struct amdgpu_fpriv *fpriv,
 }
 
 static int amdgpu_sem_import(struct amdgpu_fpriv *fpriv,
-				       int fd, u32 *handle)
+			     int fd, u32 *handle)
 {
 	struct file *file = fget(fd);
 	struct amdgpu_sem *sem;
 	struct amdgpu_sem_core *core;
 	int ret;
 
-	if (!file)
+	if (unlikely(!handle || !fpriv || !file))
 		return -EINVAL;
 
+	if (unlikely(file->f_op != &amdgpu_sem_fops)) {
+		ret = -EINVAL;
+		goto err_file;
+	}
+
 	core = file->private_data;
-	if (!core) {
-		fput(file);
-		return -EINVAL;
+	if (unlikely(!core)) {
+		ret = -EINVAL;
+		goto err_file;
 	}
 
 	kref_get(&core->kref);
 	sem = amdgpu_sem_alloc();
-	if (!sem) {
+	if (unlikely(!sem)) {
 		ret = -ENOMEM;
-		goto err_sem;
+		goto err_kref;
 	}
 
 	sem->base = core;
 
 	idr_preload(GFP_KERNEL);
 	spin_lock(&fpriv->sem_handles_lock);
-
-	ret = idr_alloc(&fpriv->sem_handles, sem, 1, 0, GFP_NOWAIT);
-
+	ret = idr_alloc(&fpriv->sem_handles, sem, 1, INT_MAX, GFP_NOWAIT);
 	spin_unlock(&fpriv->sem_handles_lock);
 	idr_preload_end();
-
 	if (ret < 0)
-		goto err_out;
+		goto err_sem;
 
 	*handle = ret;
 	fput(file);
-	return 0;
-err_sem:
-	kref_put(&core->kref, amdgpu_sem_core_free);
-err_out:
-	amdgpu_sem_put(sem);
-	fput(file);
-	return ret;
 
+	return 0;
+
+err_sem:
+	amdgpu_sem_put(sem);
+err_kref:
+	kref_put(&core->kref, amdgpu_sem_core_free);
+err_file:
+	fput(file);
+
+	return ret;
 }
 
 static int amdgpu_sem_export(struct amdgpu_fpriv *fpriv,
-				       u32 handle, int *fd)
+			     u32 handle, int *fd)
 {
 	struct amdgpu_sem *sem;
 	struct amdgpu_sem_core *core;
-	int ret;
+	int new_fd, ret;
 
 	sem = amdgpu_sem_lookup(fpriv, handle);
-	if (!sem)
+	if (unlikely(!sem))
 		return -EINVAL;
 
 	core = sem->base;
+	if (unlikely(!core)) {
+		ret = -EINVAL;
+		goto err_put_sem;
+	}
+
 	kref_get(&core->kref);
 	mutex_lock(&core->lock);
 	if (!core->file) {
 		core->file = anon_inode_getfile("sem_file",
-					       &amdgpu_sem_fops,
-					       core, 0);
+						&amdgpu_sem_fops,
+						core, 0);
 		if (IS_ERR(core->file)) {
 			mutex_unlock(&core->lock);
-			ret = -ENOMEM;
-			goto err_put_sem;
+			ret = PTR_ERR(core->file);
+			goto err_put_kref;
 		}
 	} else {
 		get_file(core->file);
 	}
 	mutex_unlock(&core->lock);
 
-	ret = get_unused_fd_flags(O_CLOEXEC);
-	if (ret < 0)
+	new_fd = get_unused_fd_flags(O_CLOEXEC);
+	if (new_fd < 0) {
+		ret = new_fd;
 		goto err_put_file;
+	}
 
-	fd_install(ret, core->file);
+	fd_install(new_fd, core->file);
 
-	*fd = ret;
+	*fd = new_fd;
+
 	amdgpu_sem_put(sem);
 
 	return 0;
 
 err_put_file:
 	fput(core->file);
-err_put_sem:
+err_put_kref:
 	kref_put(&core->kref, amdgpu_sem_core_free);
+err_put_sem:
 	amdgpu_sem_put(sem);
+
 	return ret;
 }
 
