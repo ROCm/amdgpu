@@ -2013,10 +2013,18 @@ static void amdgpu_ttm_free_mmio_remap_bo(struct amdgpu_device *adev)
 }
 
 static int amdgpu_ttm_buffer_entity_init(struct amdgpu_ttm_buffer_entity *entity,
+					 enum drm_sched_priority prio,
+					 struct drm_gpu_scheduler **scheds,
+					 int num_schedulers,
 					 int starting_gart_window,
 					 u32 num_gart_windows)
 {
-	int i;
+	int i, r;
+
+	r = drm_sched_entity_init(&entity->base, prio, scheds, num_schedulers, NULL);
+	if (r)
+		return r;
+
 
 	mutex_init(&entity->lock);
 
@@ -2031,6 +2039,11 @@ static int amdgpu_ttm_buffer_entity_init(struct amdgpu_ttm_buffer_entity *entity
 	}
 
 	return starting_gart_window;
+}
+
+static void amdgpu_ttm_buffer_entity_fini(struct amdgpu_ttm_buffer_entity *entity)
+{
+	drm_sched_entity_destroy(&entity->base);
 }
 
 /*
@@ -2320,7 +2333,6 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 void amdgpu_ttm_set_buffer_funcs_status(struct amdgpu_device *adev, bool enable)
 {
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev, TTM_PL_VRAM);
-	u32 used_windows;
 	uint64_t size;
 	int r;
 
@@ -2334,47 +2346,36 @@ void amdgpu_ttm_set_buffer_funcs_status(struct amdgpu_device *adev, bool enable)
 
 		ring = adev->mman.buffer_funcs_ring;
 		sched = &ring->sched;
-		r = drm_sched_entity_init(&adev->mman.default_entity.base,
-					  DRM_SCHED_PRIORITY_KERNEL, &sched,
-					  1, NULL);
-		if (r) {
+		r = amdgpu_ttm_buffer_entity_init(&adev->mman.default_entity,
+						  DRM_SCHED_PRIORITY_KERNEL, &sched, 1,
+						  0, 0);
+		if (r < 0) {
 			dev_err(adev->dev,
-				"Failed setting up TTM BO move entity (%d)\n",
-				r);
+				"Failed setting up TTM entity (%d)\n", r);
 			return;
 		}
 
-		r = drm_sched_entity_init(&adev->mman.clear_entity.base,
-					  DRM_SCHED_PRIORITY_NORMAL, &sched,
-					  1, NULL);
-		if (r) {
+		r = amdgpu_ttm_buffer_entity_init(&adev->mman.clear_entity,
+						  DRM_SCHED_PRIORITY_NORMAL, &sched, 1,
+						  r, 1);
+		if (r < 0) {
 			dev_err(adev->dev,
-				"Failed setting up TTM BO clear entity (%d)\n",
-				r);
-			goto error_free_entity;
+				"Failed setting up TTM BO clear entity (%d)\n", r);
+			goto error_free_default_entity;
 		}
 
-		r = drm_sched_entity_init(&adev->mman.move_entity.base,
-					  DRM_SCHED_PRIORITY_NORMAL, &sched,
-					  1, NULL);
-		if (r) {
+		r = amdgpu_ttm_buffer_entity_init(&adev->mman.move_entity,
+						  DRM_SCHED_PRIORITY_NORMAL, &sched, 1,
+						  r, 2);
+		if (r < 0) {
 			dev_err(adev->dev,
-				"Failed setting up TTM BO move entity (%d)\n",
-				r);
-			drm_sched_entity_destroy(&adev->mman.clear_entity.base);
-			goto error_free_entity;
+				"Failed setting up TTM BO move entity (%d)\n", r);
+			goto error_free_clear_entity;
 		}
-
-		/* Statically assign GART windows to each entity. */
-		used_windows = amdgpu_ttm_buffer_entity_init(&adev->mman.default_entity, 0, 0);
-		used_windows = amdgpu_ttm_buffer_entity_init(&adev->mman.move_entity,
-							     used_windows, 2);
-		used_windows = amdgpu_ttm_buffer_entity_init(&adev->mman.clear_entity,
-							     used_windows, 1);
 	} else {
-		drm_sched_entity_destroy(&adev->mman.default_entity.base);
-		drm_sched_entity_destroy(&adev->mman.clear_entity.base);
-		drm_sched_entity_destroy(&adev->mman.move_entity.base);
+		amdgpu_ttm_buffer_entity_fini(&adev->mman.default_entity);
+		amdgpu_ttm_buffer_entity_fini(&adev->mman.clear_entity);
+		amdgpu_ttm_buffer_entity_fini(&adev->mman.move_entity);
 		/* Drop all the old fences since re-creating the scheduler entities
 		 * will allocate new contexts.
 		 */
@@ -2391,8 +2392,10 @@ void amdgpu_ttm_set_buffer_funcs_status(struct amdgpu_device *adev, bool enable)
 
 	return;
 
-error_free_entity:
-	drm_sched_entity_destroy(&adev->mman.default_entity.base);
+error_free_clear_entity:
+	amdgpu_ttm_buffer_entity_fini(&adev->mman.clear_entity);
+error_free_default_entity:
+	amdgpu_ttm_buffer_entity_fini(&adev->mman.default_entity);
 }
 
 static int amdgpu_ttm_prepare_job(struct amdgpu_device *adev,
