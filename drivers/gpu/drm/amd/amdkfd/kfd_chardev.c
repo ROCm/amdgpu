@@ -1903,10 +1903,17 @@ int kfd_ptl_control(struct kfd_process_device *pdd, bool enable)
 	if (!pdd->dev->kfd2kgd || !pdd->dev->kfd2kgd->ptl_ctrl)
 		return -EOPNOTSUPP;
 
+	if (adev->kfd.init_complete)
+		amdgpu_amdkfd_stop_sched(adev, pdd->dev->node_id);
+
 	ret = pdd->dev->kfd2kgd->ptl_ctrl(adev, PSP_PTL_PERF_MON_SET,
 					  &ptl_state,
 					  &pref_format1,
 					  &pref_format2);
+
+	if (adev->kfd.init_complete)
+		amdgpu_amdkfd_start_sched(adev, pdd->dev->node_id);
+
 	return ret;
 }
 
@@ -1956,11 +1963,7 @@ int kfd_ptl_disable_release(struct kfd_process_device *pdd,
 		goto out;
 
 	if (atomic_dec_return(&adev->psp.ptl_disable_ref) == 0) {
-		if (adev->kfd.init_complete)
-			amdgpu_amdkfd_stop_sched(adev, pdd->dev->node_id);
 		ret = kfd_ptl_control(pdd, true);
-		if (adev->kfd.init_complete)
-			amdgpu_amdkfd_start_sched(adev, pdd->dev->node_id);
 		if (ret) {
 			atomic_inc(&adev->psp.ptl_disable_ref);
 			dev_warn(pdd->dev->adev->dev,
@@ -3505,7 +3508,13 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 		if (!kfd->profiler_process) {
 			kfd->profiler_process = p;
 			status = 0;
-			kfd_ptl_disable_request(pdd, p);
+			if (pdd->dev->adev->psp.ptl_hw_supported) {
+				status = kfd_ptl_disable_request(pdd, p);
+				if (status != 0)
+					dev_err(kfd_device,
+						"Failed to lock device %d for profiling, error %d\n",
+						gpu_id, status);
+			}
 		} else if (kfd->profiler_process == p) {
 			status = -EALREADY;
 		} else {
@@ -3514,8 +3523,14 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 	} else if (op == 0 && kfd->profiler_process == p) {
 		kfd->profiler_process = NULL;
 		status = 0;
-		kfd_ptl_disable_release(pdd, p);
 
+		if (pdd->dev->adev->psp.ptl_hw_supported) {
+			status = kfd_ptl_disable_release(pdd, p);
+			if (status)
+				dev_err(kfd_device,
+						"Failed to unlock device %d for profiling, error %d\n",
+						gpu_id, status);
+		}
 	}
 	mutex_unlock(&kfd->profiler_lock);
 
