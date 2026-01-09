@@ -30,6 +30,10 @@
 #include <linux/xarray.h>
 #include <linux/workqueue.h>
 
+#ifndef HAVE_CONFIG_H
+#define HAVE_STRUCT_XARRAY	1
+#endif
+
 #define MAX_WAIT_SCHED_ENTITY_Q_EMPTY msecs_to_jiffies(1000)
 
 /**
