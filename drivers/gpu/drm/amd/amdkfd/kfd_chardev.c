@@ -1927,7 +1927,7 @@ int kfd_ptl_disable_request(struct kfd_process_device *pdd,
 		return -ENODEV;
 
 	adev = pdd->dev->adev;
-	mutex_lock(&p->mutex);
+	mutex_lock(&adev->psp.ptl_mutex);
 
 	if (pdd->ptl_disable_req)
 		goto out;
@@ -1944,7 +1944,7 @@ int kfd_ptl_disable_request(struct kfd_process_device *pdd,
 	pdd->ptl_disable_req = true;
 
 out:
-	mutex_unlock(&p->mutex);
+	mutex_unlock(&adev->psp.ptl_mutex);
 	return ret;
 }
 
@@ -1958,7 +1958,7 @@ int kfd_ptl_disable_release(struct kfd_process_device *pdd,
 		return -ENODEV;
 
 	adev = pdd->dev->adev;
-	mutex_lock(&p->mutex);
+	mutex_lock(&adev->psp.ptl_mutex);
 	if (!pdd->ptl_disable_req)
 		goto out;
 
@@ -1975,7 +1975,7 @@ int kfd_ptl_disable_release(struct kfd_process_device *pdd,
 	pdd->ptl_disable_req = false;
 
 out:
-	mutex_unlock(&p->mutex);
+	mutex_unlock(&adev->psp.ptl_mutex);
 	return ret;
 }
 
@@ -3508,6 +3508,7 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 		if (!kfd->profiler_process) {
 			kfd->profiler_process = p;
 			status = 0;
+			mutex_unlock(&kfd->profiler_lock);
 			if (pdd->dev->adev->psp.ptl_hw_supported) {
 				status = kfd_ptl_disable_request(pdd, p);
 				if (status != 0)
@@ -3515,6 +3516,7 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 						"Failed to lock device %d for profiling, error %d\n",
 						gpu_id, status);
 			}
+			return status;
 		} else if (kfd->profiler_process == p) {
 			status = -EALREADY;
 		} else {
@@ -3523,6 +3525,7 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 	} else if (op == 0 && kfd->profiler_process == p) {
 		kfd->profiler_process = NULL;
 		status = 0;
+		mutex_unlock(&kfd->profiler_lock);
 
 		if (pdd->dev->adev->psp.ptl_hw_supported) {
 			status = kfd_ptl_disable_release(pdd, p);
@@ -3531,6 +3534,7 @@ static inline uint32_t profile_lock_device(struct kfd_process *p,
 						"Failed to unlock device %d for profiling, error %d\n",
 						gpu_id, status);
 		}
+		return status;
 	}
 	mutex_unlock(&kfd->profiler_lock);
 

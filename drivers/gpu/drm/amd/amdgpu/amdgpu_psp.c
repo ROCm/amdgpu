@@ -1263,6 +1263,15 @@ int psp_performance_monitor_hw(struct psp_context *psp, u32 req_code,
 			psp_ptl_fmt_verify(psp, *fmt2, &ptl_fmt2))
 		return -EINVAL;
 
+	/*
+	 * Add check to skip if state and formats are identical to current ones
+	 */
+	if (req_code == PSP_PTL_PERF_MON_SET &&
+			psp->ptl_enabled == *ptl_state &&
+			psp->ptl_fmt1 == ptl_fmt1 &&
+			psp->ptl_fmt2 == ptl_fmt2)
+		return 0;
+
 	cmd = acquire_psp_cmd_buf(psp);
 
 	cmd->cmd_id                     = GFX_CMD_ID_PERF_HW;
@@ -1337,19 +1346,24 @@ static ssize_t ptl_enable_store(struct device *dev,
 	else
 		return -EINVAL;
 
+	mutex_lock(&psp->ptl_mutex);
 	fmt1 = psp->ptl_fmt1;
 	fmt2 = psp->ptl_fmt2;
 	ptl_state = enable ? 1 : 0;
 
 	cur_enabled = READ_ONCE(psp->ptl_enabled);
-	if (cur_enabled == enable)
+	if (cur_enabled == enable) {
+		mutex_unlock(&psp->ptl_mutex);
 		return count;
+	}
 
 	ret = psp_performance_monitor_hw(psp, PSP_PTL_PERF_MON_SET, &ptl_state, &fmt1, &fmt2);
 	if (ret) {
 		dev_err(adev->dev, "Failed to set PTL err = %d\n", ret);
+		mutex_unlock(&psp->ptl_mutex);
 		return ret;
 	}
+	mutex_unlock(&psp->ptl_mutex);
 
 	return count;
 }

@@ -454,6 +454,7 @@ struct psp_context {
 	bool				ptl_hw_supported;
 	/* PTL disable reference counting */
 	atomic_t			ptl_disable_ref;
+	struct mutex			ptl_mutex;
 };
 
 struct amdgpu_psp_funcs {
