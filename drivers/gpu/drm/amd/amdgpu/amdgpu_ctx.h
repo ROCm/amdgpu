@@ -56,7 +56,6 @@ struct amdgpu_ctx {
 	unsigned long			ras_counter_ce;
 	unsigned long			ras_counter_ue;
 	struct amdgpu_ctx_mgr		*mgr;
-	struct amdgpu_ctx_mgr		*ctx_mgr;
 	struct amdgpu_ctx_entity	*entities[AMDGPU_HW_IP_NUM][AMDGPU_MAX_ENTITY_NUM];
 };
 
