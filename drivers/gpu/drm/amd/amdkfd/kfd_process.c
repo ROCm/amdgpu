@@ -842,6 +842,12 @@ struct kfd_process *kfd_create_process(struct task_struct *thread)
 	 */
 	mutex_lock(&kfd_processes_mutex);
 
+	if (kfd_gpu_node_num() <= 0) {
+		pr_warn("no gpu node! Cannot create KFD process");
+		process = ERR_PTR(-EINVAL);
+		goto out;
+	}
+
 	if (kfd_is_locked(NULL)) {
 		pr_debug("KFD is locked! Cannot create process");
 		process = ERR_PTR(-EINVAL);
@@ -1184,7 +1190,15 @@ static void kfd_process_wq_release(struct work_struct *work)
 	if (ef)
 		dma_fence_signal(ef);
 
+<<<<<<< HEAD   (4d5b06 drm/amdgpu: Fix jpeg ring test order in vcn_v4_0_3)
 	kfd_process_remove_sysfs(p);
+=======
+	if (p->context_id != KFD_CONTEXT_ID_PRIMARY)
+		kfd_process_free_id(p);
+	else
+		ida_destroy(&p->id_table);
+
+>>>>>>> CHANGE (a482d0 drm/amdkfd: kfd driver supports hot unplug/replug amdgpu dev)
 	kfd_debugfs_remove_process(p);
 
 	kfd_process_kunmap_signal_bo(p);
@@ -1199,6 +1213,11 @@ static void kfd_process_wq_release(struct work_struct *work)
 	mutex_destroy(&p->mutex);
 
 	put_task_struct(p->lead_thread);
+
+	/* the last step is removing process entries under /sys
+	 * to indicate the process has been terminated.
+	 */
+	kfd_process_remove_sysfs(p);
 
 	kfree(p);
 }
