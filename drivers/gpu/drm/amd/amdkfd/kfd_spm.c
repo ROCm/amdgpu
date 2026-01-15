@@ -334,8 +334,8 @@ static int _kfd_acquire_spm(struct kfd_process_device *pdd, int inst, struct amd
 	spm->ring_size = order_base_2(4 * 1024 * 1024/4);
 	spm->ring_size = (1 << spm->ring_size) * 4;
 
-	ret = amdgpu_amdkfd_alloc_gtt_mem(adev,
-			spm->ring_size, &spm->spm_obj,
+	ret = amdgpu_amdkfd_alloc_kernel_mem(adev,
+			spm->ring_size, AMDGPU_GEM_DOMAIN_GTT, &spm->spm_obj,
 			&spm->gpu_addr, (void *)&spm->cpu_addr,
 			false, false);
 
@@ -361,7 +361,7 @@ static int _kfd_acquire_spm(struct kfd_process_device *pdd, int inst, struct amd
 	goto out;
 
 rlc_spm_acquire_failure:
-	amdgpu_amdkfd_free_gtt_mem(adev, &spm->spm_obj);
+	amdgpu_amdkfd_free_kernel_mem(adev, &spm->spm_obj);
 	memset(spm, 0, sizeof(*spm));
 out:
 	return ret;
@@ -422,7 +422,7 @@ static void _kfd_release_spm(struct kfd_process_device *pdd, int inst, struct am
 	if (!spm->ring_size)
 		return;
 	amdgpu_amdkfd_rlc_spm_release(adev, inst, drm_priv_to_vm(pdd->drm_priv));
-	amdgpu_amdkfd_free_gtt_mem(adev, &(spm->spm_obj));
+	amdgpu_amdkfd_free_kernel_mem(adev, &(spm->spm_obj));
 
 	spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 	memset(spm, 0, sizeof(*spm));
