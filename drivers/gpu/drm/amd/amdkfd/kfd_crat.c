@@ -2344,6 +2344,7 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	 *  Only direct links are added here which is Link from GPU to
 	 *  its NUMA node. Indirect links are added by userspace.
 	 */
+#ifdef CONFIG_X86_64
 	sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
 		sub_type_hdr->length);
 	ret = kfd_fill_gpu_direct_io_link_to_cpu(&avail_size, kdev,
@@ -2354,6 +2355,9 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 
 	crat_table->length += sub_type_hdr->length;
 	crat_table->total_entries++;
+#else
+	pr_info("IO link not available for non x86 platforms\n");
+#endif
 
 
 	/* Fill in Subtype: IO_LINKS
