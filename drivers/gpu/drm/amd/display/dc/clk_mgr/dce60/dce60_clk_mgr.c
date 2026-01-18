@@ -43,30 +43,6 @@
 #include "dce/dce_6_0_d.h"
 #include "dce/dce_6_0_sh_mask.h"
 
-#define REG(reg) \
-	(clk_mgr->regs->reg)
-
-#undef FN
-#define FN(reg_name, field_name) \
-	clk_mgr->clk_mgr_shift->field_name, clk_mgr->clk_mgr_mask->field_name
-
-/* set register offset */
-#define SR(reg_name)\
-	.reg_name = mm ## reg_name
-
-static const struct clk_mgr_registers disp_clk_regs = {
-		CLK_COMMON_REG_LIST_DCE60_BASE()
-};
-
-static const struct clk_mgr_shift disp_clk_shift = {
-		CLK_COMMON_MASK_SH_LIST_DCE60_COMMON_BASE(__SHIFT)
-};
-
-static const struct clk_mgr_mask disp_clk_mask = {
-		CLK_COMMON_MASK_SH_LIST_DCE60_COMMON_BASE(_MASK)
-};
-
-
 /* Max clock values for each state indexed by "enum clocks_state": */
 static const struct state_dependent_clocks dce60_max_clks_by_state[] = {
 /* ClocksStateInvalid - should not be used */
@@ -155,9 +131,9 @@ void dce60_clk_mgr_construct(
 		dce60_max_clks_by_state,
 		sizeof(dce60_max_clks_by_state));
 
-	clk_mgr->regs = &disp_clk_regs;
-	clk_mgr->clk_mgr_shift = &disp_clk_shift;
-	clk_mgr->clk_mgr_mask = &disp_clk_mask;
+	clk_mgr->regs = NULL;
+	clk_mgr->clk_mgr_shift = NULL;
+	clk_mgr->clk_mgr_mask = NULL;
 	clk_mgr->base.funcs = &dce60_funcs;
 
 	base->clks.max_supported_dispclk_khz =
