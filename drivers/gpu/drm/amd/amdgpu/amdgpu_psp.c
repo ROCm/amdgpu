@@ -1339,14 +1339,16 @@ static ssize_t ptl_enable_store(struct device *dev,
 	uint32_t ptl_state, fmt1, fmt2;
 	int ret;
 
-	if (sysfs_streq(buf, "enabled") || sysfs_streq(buf, "1"))
-		enable = true;
-	else if (sysfs_streq(buf, "disabled") || sysfs_streq(buf, "0"))
-		enable = false;
-	else
-		return -EINVAL;
-
 	mutex_lock(&psp->ptl_mutex);
+	if (sysfs_streq(buf, "enabled") || sysfs_streq(buf, "1")) {
+		enable = true;
+	} else if (sysfs_streq(buf, "disabled") || sysfs_streq(buf, "0")) {
+		enable = false;
+	} else {
+		mutex_unlock(&psp->ptl_mutex);
+		return -EINVAL;
+	}
+
 	fmt1 = psp->ptl_fmt1;
 	fmt2 = psp->ptl_fmt2;
 	ptl_state = enable ? 1 : 0;
@@ -1393,17 +1395,22 @@ static ssize_t ptl_format_store(struct device *dev,
 	if (!psp->ptl_enabled)
 		return -EPERM;
 
+	mutex_lock(&psp->ptl_mutex);
 	/* Parse input, expecting "FMT1,FMT2" */
-	if (sscanf(buf, "%7[^,],%7s", fmt1_str, fmt2_str) != 2)
+	if (sscanf(buf, "%7[^,],%7s", fmt1_str, fmt2_str) != 2) {
+		mutex_unlock(&psp->ptl_mutex);
 		return -EINVAL;
+	}
 
 	fmt1_enum = str_to_ptl_fmt(fmt1_str);
 	fmt2_enum = str_to_ptl_fmt(fmt2_str);
 
 	if (fmt1_enum >= AMDGPU_PTL_FMT_INVALID ||
 			fmt2_enum >= AMDGPU_PTL_FMT_INVALID ||
-			fmt1_enum == fmt2_enum)
+			fmt1_enum == fmt2_enum) {
+		mutex_unlock(&psp->ptl_mutex);
 		return -EINVAL;
+	}
 
 	ptl_state = psp->ptl_enabled;
 	fmt1 = fmt1_enum;
@@ -1411,8 +1418,10 @@ static ssize_t ptl_format_store(struct device *dev,
 	ret = psp_performance_monitor_hw(psp, PSP_PTL_PERF_MON_SET, &ptl_state, &fmt1, &fmt2);
 	if (ret) {
 		dev_err(adev->dev, "Failed to update PTL err = %d\n", ret);
+		mutex_unlock(&psp->ptl_mutex);
 		return ret;
 	}
+	mutex_unlock(&psp->ptl_mutex);
 
 	return count;
 }
