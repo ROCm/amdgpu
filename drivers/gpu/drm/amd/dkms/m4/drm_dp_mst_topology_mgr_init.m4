@@ -1,6 +1,6 @@
 dnl #
-dnl # v4.10-rc3-517-g7b0a89a6db9a
-dnl # drm/dp: Store drm_device in MST topology manager
+dnl # v5.12-rc7-1527-g98025a62cb00
+dnl # drm/dp_mst: Use Extended Base Receiver Capability DPCD space
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY_MGR_INIT], [
 	AC_KERNEL_DO_BACKGROUND([
