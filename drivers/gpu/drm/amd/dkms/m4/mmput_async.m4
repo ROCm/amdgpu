@@ -2,6 +2,7 @@ dnl #
 dnl # v4.14-rc3-117-ga1b2289cef92 android: binder: drop lru lock in isolate callback
 dnl # v4.13-4372-g212925802454 mm: oom: let oom_reap_task and exit_mmap run concurrently
 dnl # v4.6-6601-gec8d7c14ea14 mm, oom_reaper: do not mmput synchronously from the oom reaper context
+dnl # v6.0-rc1-16-g85eaeb5058f0 IB/core: Fix a nested dead lock as part of ODP flow (export symbol)
 dnl #
 AC_DEFUN([AC_AMDGPU_MMPUT_ASYNC], [
 	AC_KERNEL_DO_BACKGROUND([
