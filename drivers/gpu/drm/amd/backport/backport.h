@@ -65,6 +65,7 @@
 #include <kcl/kcl_bitops.h>
 #include <kcl/kcl_sched_mm.h>
 #include <kcl/kcl_bitmap.h>
+#include <kcl/kcl_find.h>
 #include <kcl/backport/kcl_numa_backport.h>
 #include <kcl/kcl_mmzone.h>
 #include <kcl/kcl_drm_file.h>
