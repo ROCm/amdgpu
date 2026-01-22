@@ -556,7 +556,7 @@ static uint32_t kgd_v9_4_3_ptl_ctrl(struct amdgpu_device *adev,
 				enum amdgpu_ptl_fmt *fmt1,
 				enum amdgpu_ptl_fmt *fmt2)
 {
-	return psp_performance_monitor_hw(&adev->psp, cmd,
+	return amdgpu_ptl_perf_monitor_ctrl(adev, cmd,
 			ptl_state, fmt1, fmt2);
 }
 

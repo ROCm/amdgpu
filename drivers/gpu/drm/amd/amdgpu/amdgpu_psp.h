@@ -630,7 +630,7 @@ int amdgpu_psp_reg_program_no_ring(struct psp_context *psp, uint32_t val,
 				   enum psp_reg_prog_id id);
 void amdgpu_psp_debugfs_init(struct amdgpu_device *adev);
 
-int psp_performance_monitor_hw(struct psp_context *psp, u32 req_code,
+int amdgpu_ptl_perf_monitor_ctrl(struct amdgpu_device *adev, u32 req_code,
 			       u32 *ptl_state, u32 *fmt1, u32 *fmt2);
 
 #endif

@@ -2415,8 +2415,8 @@ static int gfx_v9_4_3_perf_monitor_ptl_init(struct amdgpu_device *adev, bool sta
 	}
 
 	/* initialize PTL with default formats: GFX_FTYPE_I8 & GFX_FTYPE_BF16 */
-	r = psp_performance_monitor_hw(&adev->psp, PSP_PTL_PERF_MON_SET, &ptl_state,
-						&fmt1, &fmt2);
+	r = amdgpu_ptl_perf_monitor_ctrl(adev, PSP_PTL_PERF_MON_SET, &ptl_state,
+							&fmt1, &fmt2);
 	if (r) {
 		if (adev->psp.ptl_hw_supported_state == AMDGPU_PTL_HW_UNINIT)
 			adev->psp.ptl_hw_supported_state = AMDGPU_PTL_HW_NOT_SUPPORTED;

@@ -1242,15 +1242,52 @@ static int psp_ptl_fmt_verify(struct psp_context *psp, enum amdgpu_ptl_fmt fmt,
 	return 0;
 }
 
-int psp_performance_monitor_hw(struct psp_context *psp, u32 req_code,
-			       uint32_t *ptl_state, uint32_t *fmt1, uint32_t *fmt2)
+static int psp_ptl_invoke(struct psp_context *psp, u32 req_code,
+		uint32_t *ptl_state, uint32_t *fmt1, uint32_t *fmt2)
 {
 	struct psp_gfx_cmd_resp *cmd;
-	struct amdgpu_device *adev = psp->adev;
-	uint32_t ptl_fmt1, ptl_fmt2;
 	int ret;
 
-	if (!psp || !ptl_state || !fmt1 || !fmt2)
+	cmd = acquire_psp_cmd_buf(psp);
+
+	cmd->cmd_id                     = GFX_CMD_ID_PERF_HW;
+	cmd->cmd.cmd_req_perf_hw.req    = req_code;
+	cmd->cmd.cmd_req_perf_hw.ptl_state    = *ptl_state;
+	cmd->cmd.cmd_req_perf_hw.pref_format1 = *fmt1;
+	cmd->cmd.cmd_req_perf_hw.pref_format2 = *fmt2;
+
+	ret = psp_cmd_submit_buf(psp, NULL, cmd, psp->fence_buf_mc_addr);
+	if (ret)
+		goto out;
+
+	/* Parse response */
+	switch (req_code) {
+	case PSP_PTL_PERF_MON_QUERY:
+		*ptl_state = cmd->resp.uresp.perf_hw_info.ptl_state;
+		*fmt1      = cmd->resp.uresp.perf_hw_info.pref_format1;
+		*fmt2      = cmd->resp.uresp.perf_hw_info.pref_format2;
+		break;
+	case PSP_PTL_PERF_MON_SET:
+		/* Update cached state only on success */
+		psp->ptl_enabled = *ptl_state;
+		psp->ptl_fmt1    = *fmt1;
+		psp->ptl_fmt2    = *fmt2;
+		break;
+	}
+
+out:
+	release_psp_cmd_buf(psp);
+	return ret;
+}
+
+int amdgpu_ptl_perf_monitor_ctrl(struct amdgpu_device *adev, u32 req_code,
+		uint32_t *ptl_state, uint32_t *fmt1, uint32_t *fmt2)
+{
+	uint32_t ptl_fmt1, ptl_fmt2;
+	struct psp_context *psp;
+	int ret;
+
+	if (!adev || !ptl_state || !fmt1 || !fmt2)
 		return -EINVAL;
 
 	if (amdgpu_sriov_vf(adev)) {
@@ -1263,10 +1300,13 @@ int psp_performance_monitor_hw(struct psp_context *psp, u32 req_code,
 		return ret;
 	}
 
-	if (amdgpu_ip_version(psp->adev, GC_HWIP, 0) != IP_VERSION(9, 4, 4) ||
+	psp = &adev->psp;
+
+	if (amdgpu_ip_version(adev, GC_HWIP, 0) != IP_VERSION(9, 4, 4) ||
 			psp->sos.fw_version < 0x0036081a)
 		return -EOPNOTSUPP;
 
+	/* Verify formats */
 	if (psp_ptl_fmt_verify(psp, *fmt1, &ptl_fmt1) ||
 			psp_ptl_fmt_verify(psp, *fmt2, &ptl_fmt2))
 		return -EINVAL;
@@ -1280,34 +1320,7 @@ int psp_performance_monitor_hw(struct psp_context *psp, u32 req_code,
 			psp->ptl_fmt2 == ptl_fmt2)
 		return 0;
 
-	cmd = acquire_psp_cmd_buf(psp);
-
-	cmd->cmd_id                     = GFX_CMD_ID_PERF_HW;
-	cmd->cmd.cmd_req_perf_hw.req    = req_code;
-	cmd->cmd.cmd_req_perf_hw.ptl_state    = *ptl_state;
-	cmd->cmd.cmd_req_perf_hw.pref_format1 = ptl_fmt1;
-	cmd->cmd.cmd_req_perf_hw.pref_format2 = ptl_fmt2;
-
-	ret = psp_cmd_submit_buf(psp, NULL, cmd, psp->fence_buf_mc_addr);
-	if (ret)
-		goto out;
-
-	switch (req_code) {
-	case PSP_PTL_PERF_MON_QUERY:
-		*ptl_state = cmd->resp.uresp.perf_hw_info.ptl_state;
-		*fmt1      = cmd->resp.uresp.perf_hw_info.pref_format1;
-		*fmt2      = cmd->resp.uresp.perf_hw_info.pref_format2;
-		break;
-	case PSP_PTL_PERF_MON_SET:
-		psp->ptl_enabled = *ptl_state;
-		psp->ptl_fmt1    = ptl_fmt1;
-		psp->ptl_fmt2    = ptl_fmt2;
-		break;
-	}
-
-out:
-	release_psp_cmd_buf(psp);
-	return ret;
+	return psp_ptl_invoke(psp, req_code, ptl_state, &ptl_fmt1, &ptl_fmt2);
 }
 
 static enum amdgpu_ptl_fmt str_to_ptl_fmt(const char *str)
@@ -1367,7 +1380,7 @@ static ssize_t ptl_enable_store(struct device *dev,
 		return count;
 	}
 
-	ret = psp_performance_monitor_hw(psp, PSP_PTL_PERF_MON_SET, &ptl_state, &fmt1, &fmt2);
+	ret = amdgpu_ptl_perf_monitor_ctrl(adev, PSP_PTL_PERF_MON_SET, &ptl_state, &fmt1, &fmt2);
 	if (ret) {
 		dev_err(adev->dev, "Failed to set PTL err = %d\n", ret);
 		mutex_unlock(&psp->ptl_mutex);
@@ -1387,7 +1400,7 @@ static ssize_t ptl_enable_show(struct device *dev, struct device_attribute *attr
 	int ret;
 
 	if (amdgpu_sriov_vf(adev)) {
-		ret = psp_performance_monitor_hw(psp, PSP_PTL_PERF_MON_QUERY,
+		ret = amdgpu_ptl_perf_monitor_ctrl(adev, PSP_PTL_PERF_MON_QUERY,
 						 &ptl_state, &fmt1, &fmt2);
 		if (ret)
 			return ret;
@@ -1432,7 +1445,7 @@ static ssize_t ptl_format_store(struct device *dev,
 	ptl_state = psp->ptl_enabled;
 	fmt1 = fmt1_enum;
 	fmt2 = fmt2_enum;
-	ret = psp_performance_monitor_hw(psp, PSP_PTL_PERF_MON_SET, &ptl_state, &fmt1, &fmt2);
+	ret = amdgpu_ptl_perf_monitor_ctrl(adev, PSP_PTL_PERF_MON_SET, &ptl_state, &fmt1, &fmt2);
 	if (ret) {
 		dev_err(adev->dev, "Failed to update PTL err = %d\n", ret);
 		mutex_unlock(&psp->ptl_mutex);
@@ -1452,7 +1465,7 @@ static ssize_t ptl_format_show(struct device *dev, struct device_attribute *attr
 	int ret;
 
 	if (amdgpu_sriov_vf(adev)) {
-		ret = psp_performance_monitor_hw(psp, PSP_PTL_PERF_MON_QUERY,
+		ret = amdgpu_ptl_perf_monitor_ctrl(adev, PSP_PTL_PERF_MON_QUERY,
 						 &ptl_state, &fmt1, &fmt2);
 		if (ret)
 			return ret;
