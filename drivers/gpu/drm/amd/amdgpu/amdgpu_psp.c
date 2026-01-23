@@ -1328,6 +1328,21 @@ int amdgpu_ptl_perf_monitor_ctrl(struct amdgpu_device *adev, u32 req_code,
 			psp->ptl_fmt2 == ptl_fmt2)
 		return 0;
 
+	/* If enabling PTL, check disable bitmap */
+	if (req_code == PSP_PTL_PERF_MON_SET && *ptl_state == 1) {
+		if (!bitmap_empty(psp->disable_bitmap,
+					AMDGPU_PTL_DISABLE_MAX)) {
+			dev_dbg(adev->dev,
+					"PTL enable blocked: SYSFS=%d, PROFILER=%d (ref=%d)\n",
+					test_bit(AMDGPU_PTL_DISABLE_SYSFS,
+						psp->disable_bitmap),
+					test_bit(AMDGPU_PTL_DISABLE_PROFILER,
+						psp->disable_bitmap),
+					atomic_read(&psp->ptl_disable_ref));
+			return 0;
+		}
+	}
+
 	return psp_ptl_invoke(psp, req_code, ptl_state, &ptl_fmt1, &ptl_fmt2);
 }
 
@@ -1364,9 +1379,10 @@ static ssize_t ptl_enable_store(struct device *dev,
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
 	struct psp_context *psp = &adev->psp;
-	bool enable, cur_enabled;
 	uint32_t ptl_state, fmt1, fmt2;
 	int ret;
+	bool enable;
+	bool bit_changed = false;
 
 	mutex_lock(&psp->ptl_mutex);
 	if (sysfs_streq(buf, "enabled") || sysfs_streq(buf, "1")) {
@@ -1382,18 +1398,22 @@ static ssize_t ptl_enable_store(struct device *dev,
 	fmt2 = psp->ptl_fmt2;
 	ptl_state = enable ? 1 : 0;
 
-	cur_enabled = READ_ONCE(psp->ptl_enabled);
-	if (cur_enabled == enable) {
-		mutex_unlock(&psp->ptl_mutex);
-		return count;
-	}
+	if (enable)
+		bit_changed = test_and_clear_bit(AMDGPU_PTL_DISABLE_SYSFS,
+				psp->disable_bitmap);
 
 	ret = amdgpu_ptl_perf_monitor_ctrl(adev, PSP_PTL_PERF_MON_SET, &ptl_state, &fmt1, &fmt2);
 	if (ret) {
 		dev_err(adev->dev, "Failed to set PTL err = %d\n", ret);
+		if (enable && bit_changed)
+			set_bit(AMDGPU_PTL_DISABLE_SYSFS, psp->disable_bitmap);
 		mutex_unlock(&psp->ptl_mutex);
 		return ret;
 	}
+
+	if (!enable)
+		set_bit(AMDGPU_PTL_DISABLE_SYSFS, psp->disable_bitmap);
+
 	mutex_unlock(&psp->ptl_mutex);
 
 	return count;

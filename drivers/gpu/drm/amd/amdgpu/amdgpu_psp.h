@@ -32,6 +32,7 @@
 #include "ta_rap_if.h"
 #include "ta_secureDisplay_if.h"
 #include "amdgpu_ptl.h"
+#include <linux/bitops.h>
 
 #define PSP_FENCE_BUFFER_SIZE	0x1000
 #define PSP_CMD_BUFFER_SIZE	0x1000
@@ -455,6 +456,7 @@ struct psp_context {
 	atomic_t			ptl_disable_ref;
 	struct mutex			ptl_mutex;
 	enum amdgpu_ptl_hw_supported_state	ptl_hw_supported_state;
+	DECLARE_BITMAP(disable_bitmap, AMDGPU_PTL_DISABLE_MAX);
 };
 
 struct amdgpu_psp_funcs {

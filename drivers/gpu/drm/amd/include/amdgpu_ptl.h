@@ -64,6 +64,12 @@ struct psp_ptl_perf_req {
 	uint32_t pref_format2;
 };
 
+enum amdgpu_ptl_disable_source {
+	AMDGPU_PTL_DISABLE_SYSFS = 0,
+	AMDGPU_PTL_DISABLE_PROFILER,
+	AMDGPU_PTL_DISABLE_MAX,
+};
+
 extern const struct attribute_group amdgpu_ptl_attr_group;
 int amdgpu_ptl_sysfs_init(struct amdgpu_device *adev);
 void amdgpu_ptl_sysfs_fini(struct amdgpu_device *adev);
