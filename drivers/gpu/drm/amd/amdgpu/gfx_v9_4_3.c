@@ -39,7 +39,6 @@
 #include "gfx_v9_4_3.h"
 #include "gfx_v9_4_3_cleaner_shader.h"
 #include "amdgpu_xcp.h"
-#include "amdgpu_aca.h"
 
 MODULE_FIRMWARE("amdgpu/gc_9_4_3_mec.bin");
 MODULE_FIRMWARE("amdgpu/gc_9_4_4_mec.bin");
@@ -851,73 +850,6 @@ static const struct amdgpu_gfx_funcs gfx_v9_4_3_gfx_funcs = {
 	.ih_node_to_logical_xcc = &gfx_v9_4_3_ih_to_xcc_inst,
 	.get_xccs_per_xcp = &gfx_v9_4_3_get_xccs_per_xcp,
 	.get_hdp_flush_mask = &amdgpu_gfx_get_hdp_flush_mask,
-};
-
-static int gfx_v9_4_3_aca_bank_parser(struct aca_handle *handle,
-				      struct aca_bank *bank, enum aca_smu_type type,
-				      void *data)
-{
-	struct aca_bank_info info;
-	u64 misc0;
-	u32 instlo;
-	int ret;
-
-	ret = aca_bank_info_decode(bank, &info);
-	if (ret)
-		return ret;
-
-	/* NOTE: overwrite info.die_id with xcd id for gfx */
-	instlo = ACA_REG__IPID__INSTANCEIDLO(bank->regs[ACA_REG_IDX_IPID]);
-	instlo &= GENMASK(31, 1);
-	info.die_id = instlo == mmSMNAID_XCD0_MCA_SMU ? 0 : 1;
-
-	misc0 = bank->regs[ACA_REG_IDX_MISC0];
-
-	switch (type) {
-	case ACA_SMU_TYPE_UE:
-		bank->aca_err_type = ACA_ERROR_TYPE_UE;
-		ret = aca_error_cache_log_bank_error(handle, &info, bank->aca_err_type, 1ULL);
-		break;
-	case ACA_SMU_TYPE_CE:
-		bank->aca_err_type = ACA_ERROR_TYPE_CE;
-		ret = aca_error_cache_log_bank_error(handle, &info, bank->aca_err_type,
-						     ACA_REG__MISC0__ERRCNT(misc0));
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	return ret;
-}
-
-static bool gfx_v9_4_3_aca_bank_is_valid(struct aca_handle *handle, struct aca_bank *bank,
-					 enum aca_smu_type type, void *data)
-{
-	u32 instlo;
-
-	instlo = ACA_REG__IPID__INSTANCEIDLO(bank->regs[ACA_REG_IDX_IPID]);
-	instlo &= GENMASK(31, 1);
-	switch (instlo) {
-	case mmSMNAID_XCD0_MCA_SMU:
-	case mmSMNAID_XCD1_MCA_SMU:
-	case mmSMNXCD_XCD0_MCA_SMU:
-		return true;
-	default:
-		break;
-	}
-
-	return false;
-}
-
-static const struct aca_bank_ops gfx_v9_4_3_aca_bank_ops = {
-	.aca_bank_parser = gfx_v9_4_3_aca_bank_parser,
-	.aca_bank_is_valid = gfx_v9_4_3_aca_bank_is_valid,
-};
-
-static const struct aca_info gfx_v9_4_3_aca_info = {
-	.hwip = ACA_HWIP_TYPE_SMU,
-	.mask = ACA_ERROR_UE_MASK | ACA_ERROR_CE_MASK,
-	.bank_ops = &gfx_v9_4_3_aca_bank_ops,
 };
 
 static int gfx_v9_4_3_gpu_early_init(struct amdgpu_device *adev)
@@ -5373,32 +5305,9 @@ struct amdgpu_ras_block_hw_ops  gfx_v9_4_3_ras_ops = {
 	.reset_ras_error_count = &gfx_v9_4_3_reset_ras_error_count,
 };
 
-static int gfx_v9_4_3_ras_late_init(struct amdgpu_device *adev, struct ras_common_if *ras_block)
-{
-	int r;
-
-	r = amdgpu_ras_block_late_init(adev, ras_block);
-	if (r)
-		return r;
-
-	r = amdgpu_ras_bind_aca(adev, AMDGPU_RAS_BLOCK__GFX,
-				&gfx_v9_4_3_aca_info,
-				NULL);
-	if (r)
-		goto late_fini;
-
-	return 0;
-
-late_fini:
-	amdgpu_ras_block_late_fini(adev, ras_block);
-
-	return r;
-}
-
 struct amdgpu_gfx_ras gfx_v9_4_3_ras = {
 	.ras_block = {
 		.hw_ops = &gfx_v9_4_3_ras_ops,
-		.ras_late_init = &gfx_v9_4_3_ras_late_init,
 	},
 	.enable_watchdog_timer = &gfx_v9_4_3_enable_watchdog_timer,
 };
