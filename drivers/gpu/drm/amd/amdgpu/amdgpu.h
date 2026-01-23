@@ -791,6 +791,12 @@ struct amd_powerplay {
 					  (rid == 0x01) || \
 					  (rid == 0x10))))
 
+enum amdgpu_mqd_update_flag {
+       AMDGPU_UPDATE_FLAG_DBG_WA_ENABLE = 1,
+       AMDGPU_UPDATE_FLAG_DBG_WA_DISABLE = 2,
+       AMDGPU_UPDATE_FLAG_IS_GWS = 4, /* quirk for gfx9 IP */
+};
+
 struct amdgpu_mqd_prop {
 	uint64_t mqd_gpu_addr;
 	uint64_t hqd_base_gpu_addr;
@@ -811,6 +817,10 @@ struct amdgpu_mqd_prop {
 	uint64_t fence_address;
 	bool tmz_queue;
 	bool kernel_queue;
+	uint32_t *cu_mask;
+	uint32_t cu_mask_count;
+	uint32_t cu_flags;
+	bool is_user_cu_masked;
 };
 
 struct amdgpu_mqd {
