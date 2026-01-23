@@ -502,73 +502,6 @@ const struct amdgpu_ras_block_hw_ops umc_v12_0_ras_hw_ops = {
 	.query_ras_error_address = umc_v12_0_query_ras_error_address,
 };
 
-static int umc_v12_0_aca_bank_parser(struct aca_handle *handle, struct aca_bank *bank,
-				     enum aca_smu_type type, void *data)
-{
-	struct amdgpu_device *adev = handle->adev;
-	struct aca_bank_info info;
-	enum aca_error_type err_type;
-	u64 status, count;
-	u32 ext_error_code;
-	int ret;
-
-	status = bank->regs[ACA_REG_IDX_STATUS];
-	if (umc_v12_0_is_deferred_error(adev, status))
-		err_type = ACA_ERROR_TYPE_DEFERRED;
-	else if (umc_v12_0_is_uncorrectable_error(adev, status))
-		err_type = ACA_ERROR_TYPE_UE;
-	else if (umc_v12_0_is_correctable_error(adev, status))
-		err_type = ACA_ERROR_TYPE_CE;
-	else
-		return 0;
-	bank->aca_err_type = err_type;
-
-	ret = aca_bank_info_decode(bank, &info);
-	if (ret)
-		return ret;
-
-	amdgpu_umc_update_ecc_status(adev,
-		bank->regs[ACA_REG_IDX_STATUS],
-		bank->regs[ACA_REG_IDX_IPID],
-		bank->regs[ACA_REG_IDX_ADDR]);
-
-	ext_error_code = ACA_REG__STATUS__ERRORCODEEXT(status);
-	if (umc_v12_0_is_deferred_error(adev, status))
-		count = ext_error_code == 0 ?
-			adev->umc.err_addr_cnt / adev->umc.retire_unit : 1ULL;
-	else
-		count = ext_error_code == 0 ?
-			ACA_REG__MISC0__ERRCNT(bank->regs[ACA_REG_IDX_MISC0]) : 1ULL;
-
-	return aca_error_cache_log_bank_error(handle, &info, err_type, count);
-}
-
-static const struct aca_bank_ops umc_v12_0_aca_bank_ops = {
-	.aca_bank_parser = umc_v12_0_aca_bank_parser,
-};
-
-const struct aca_info umc_v12_0_aca_info = {
-	.hwip = ACA_HWIP_TYPE_UMC,
-	.mask = ACA_ERROR_UE_MASK | ACA_ERROR_CE_MASK | ACA_ERROR_DEFERRED_MASK,
-	.bank_ops = &umc_v12_0_aca_bank_ops,
-};
-
-static int umc_v12_0_ras_late_init(struct amdgpu_device *adev, struct ras_common_if *ras_block)
-{
-	int ret;
-
-	ret = amdgpu_umc_ras_late_init(adev, ras_block);
-	if (ret)
-		return ret;
-
-	ret = amdgpu_ras_bind_aca(adev, AMDGPU_RAS_BLOCK__UMC,
-				  &umc_v12_0_aca_info, NULL);
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
 static int umc_v12_0_update_ecc_status(struct amdgpu_device *adev,
 			uint64_t status, uint64_t ipid, uint64_t addr)
 {
@@ -758,7 +691,6 @@ static void umc_v12_0_mca_ipid_parse(struct amdgpu_device *adev, uint64_t ipid,
 struct amdgpu_umc_ras umc_v12_0_ras = {
 	.ras_block = {
 		.hw_ops = &umc_v12_0_ras_hw_ops,
-		.ras_late_init = umc_v12_0_ras_late_init,
 	},
 	.err_cnt_init = umc_v12_0_err_cnt_init,
 	.query_ras_poison_mode = umc_v12_0_query_ras_poison_mode,
