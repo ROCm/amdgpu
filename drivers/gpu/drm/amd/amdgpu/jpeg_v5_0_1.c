@@ -1017,73 +1017,6 @@ static const struct amdgpu_ras_block_hw_ops jpeg_v5_0_1_ras_hw_ops = {
 	.query_poison_status = jpeg_v5_0_1_query_ras_poison_status,
 };
 
-static int jpeg_v5_0_1_aca_bank_parser(struct aca_handle *handle, struct aca_bank *bank,
-				      enum aca_smu_type type, void *data)
-{
-	struct aca_bank_info info;
-	u64 misc0;
-	int ret;
-
-	ret = aca_bank_info_decode(bank, &info);
-	if (ret)
-		return ret;
-
-	misc0 = bank->regs[ACA_REG_IDX_MISC0];
-	switch (type) {
-	case ACA_SMU_TYPE_UE:
-		bank->aca_err_type = ACA_ERROR_TYPE_UE;
-		ret = aca_error_cache_log_bank_error(handle, &info, ACA_ERROR_TYPE_UE,
-						     1ULL);
-		break;
-	case ACA_SMU_TYPE_CE:
-		bank->aca_err_type = ACA_ERROR_TYPE_CE;
-		ret = aca_error_cache_log_bank_error(handle, &info, bank->aca_err_type,
-						     ACA_REG__MISC0__ERRCNT(misc0));
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	return ret;
-}
-
-/* reference to smu driver if header file */
-static int jpeg_v5_0_1_err_codes[] = {
-	16, 17, 18, 19, 20, 21, 22, 23, /* JPEG[0-9][S|D] */
-	24, 25, 26, 27, 28, 29, 30, 31,
-	48, 49, 50, 51,
-};
-
-static bool jpeg_v5_0_1_aca_bank_is_valid(struct aca_handle *handle, struct aca_bank *bank,
-					 enum aca_smu_type type, void *data)
-{
-	u32 instlo;
-
-	instlo = ACA_REG__IPID__INSTANCEIDLO(bank->regs[ACA_REG_IDX_IPID]);
-	instlo &= GENMASK(31, 1);
-
-	if (instlo != mmSMNAID_AID0_MCA_SMU)
-		return false;
-
-	if (aca_bank_check_error_codes(handle->adev, bank,
-				       jpeg_v5_0_1_err_codes,
-				       ARRAY_SIZE(jpeg_v5_0_1_err_codes)))
-		return false;
-
-	return true;
-}
-
-static const struct aca_bank_ops jpeg_v5_0_1_aca_bank_ops = {
-	.aca_bank_parser = jpeg_v5_0_1_aca_bank_parser,
-	.aca_bank_is_valid = jpeg_v5_0_1_aca_bank_is_valid,
-};
-
-static const struct aca_info jpeg_v5_0_1_aca_info = {
-	.hwip = ACA_HWIP_TYPE_SMU,
-	.mask = ACA_ERROR_UE_MASK,
-	.bank_ops = &jpeg_v5_0_1_aca_bank_ops,
-};
-
 static int jpeg_v5_0_1_ras_late_init(struct amdgpu_device *adev, struct ras_common_if *ras_block)
 {
 	int r;
@@ -1091,11 +1024,6 @@ static int jpeg_v5_0_1_ras_late_init(struct amdgpu_device *adev, struct ras_comm
 	r = amdgpu_ras_block_late_init(adev, ras_block);
 	if (r)
 		return r;
-
-	r = amdgpu_ras_bind_aca(adev, AMDGPU_RAS_BLOCK__JPEG,
-				&jpeg_v5_0_1_aca_info, NULL);
-	if (r)
-		goto late_fini;
 
 	if (amdgpu_ras_is_supported(adev, ras_block->block) &&
 		adev->jpeg.inst->ras_poison_irq.funcs) {
