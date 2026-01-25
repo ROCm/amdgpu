@@ -248,6 +248,7 @@ int amdgpu_damage_clips = -1; /* auto */
 int amdgpu_umsch_mm_fwlog;
 int amdgpu_rebar = -1; /* auto */
 int amdgpu_user_queue = -1;
+int amdgpu_ptl = -1; /* auto */
 
 DECLARE_DYNDBG_CLASSMAP(drm_debug_classes, DD_CLASS_TYPE_DISJOINT_BITS, 0,
 			"DRM_UT_CORE",
@@ -1143,6 +1144,18 @@ module_param_named(rebar, amdgpu_rebar, int, 0444);
  */
 MODULE_PARM_DESC(user_queue, "Enable user queues (-1 = auto (default), 0 = disable, 1 = enable, 2 = enable UQs and disable KQs)");
 module_param_named(user_queue, amdgpu_user_queue, int, 0444);
+
+/**
+ * DOC: ptl (int)
+ * Enable PTL feature at boot time. Possible values:
+ *
+ * - -1 = auto (ASIC specific default)
+ * -  0 = disable PTL (default)
+ * -  1 = enable PTL
+ * -  2 = permanently disable PTL (cannot be re-enabled at runtime)
+ */
+MODULE_PARM_DESC(ptl, "Enable PTL (-1 = auto, 0 = disable (default), 1 = enable, 2 = permanently disable)");
+module_param_named(ptl, amdgpu_ptl, int, 0444);
 
 /* These devices are not supported by amdgpu.
  * They are supported by the mach64, r128, radeon drivers

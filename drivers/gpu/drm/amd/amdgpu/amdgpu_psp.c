@@ -1310,6 +1310,9 @@ int amdgpu_ptl_perf_monitor_ctrl(struct amdgpu_device *adev, u32 req_code,
 
 	psp = &adev->psp;
 
+	if (psp->permanently_disabled && *ptl_state == 1)
+		return 0;
+
 	if (amdgpu_ip_version(adev, GC_HWIP, 0) != IP_VERSION(9, 4, 4) ||
 			psp->sos.fw_version < 0x0036081a)
 		return -EOPNOTSUPP;
@@ -1392,6 +1395,12 @@ static ssize_t ptl_enable_store(struct device *dev,
 	} else {
 		mutex_unlock(&psp->ptl_mutex);
 		return -EINVAL;
+	}
+
+	/* Block enable when permanently disabled */
+	if (psp->permanently_disabled) {
+		mutex_unlock(&psp->ptl_mutex);
+		return -EPERM;
 	}
 
 	fmt1 = psp->ptl_fmt1;

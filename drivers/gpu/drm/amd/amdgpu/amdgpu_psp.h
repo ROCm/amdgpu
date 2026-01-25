@@ -457,6 +457,7 @@ struct psp_context {
 	struct mutex			ptl_mutex;
 	enum amdgpu_ptl_hw_supported_state	ptl_hw_supported_state;
 	DECLARE_BITMAP(disable_bitmap, AMDGPU_PTL_DISABLE_MAX);
+	bool				permanently_disabled;
 };
 
 struct amdgpu_psp_funcs {
