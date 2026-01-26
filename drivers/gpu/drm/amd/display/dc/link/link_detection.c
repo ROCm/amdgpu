@@ -903,11 +903,18 @@ static bool link_detect_evaluate_edid_header(uint8_t edid_header[8])
  */
 static bool link_detect_ddc_probe(struct dc_link *link)
 {
+	enum signal_type signal = link_detect_sink_signal_type(link, DETECT_REASON_HPD);
+	enum ddc_transaction_type transaction_type = get_ddc_transaction_type(signal);
+	uint8_t edid_header[8] = {0};
+	uint8_t zero = 0;
+	bool ddc_probed;
+
 	if (!link->ddc)
 		return false;
 
-	uint8_t edid_header[8] = {0};
-	bool ddc_probed = i2c_read(link->ddc, 0x50, edid_header, sizeof(edid_header));
+	set_ddc_transaction_type(link->ddc, transaction_type);
+
+	ddc_probed = link_query_ddc_data(link->ddc, 0x50, &zero, 1, edid_header, sizeof(edid_header));
 
 	if (!ddc_probed)
 		return false;
