@@ -1188,6 +1188,7 @@ struct hw_sequencer_funcs {
 			const struct link_resource *link_res,
 			enum signal_type signal);
 	bool (*dac_load_detect)(struct dc_link *link);
+	void (*prepare_ddc)(struct dc_link *link);
 
 	void (*get_dcc_en_bits)(struct dc *dc, int *dcc_en_bits);
 

@@ -1016,6 +1016,9 @@ enum dc_edid_status dm_helpers_read_local_edid(
 	else
 		ddc = &aconnector->i2c->base;
 
+	if (link->dc->hwss.prepare_ddc)
+		link->dc->hwss.prepare_ddc(link);
+
 	/* some dongles read edid incorrectly the first time,
 	 * do check sum and retry to make sure read correct edid.
 	 */

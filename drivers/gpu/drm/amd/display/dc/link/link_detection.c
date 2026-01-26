@@ -912,6 +912,9 @@ static bool link_detect_ddc_probe(struct dc_link *link)
 	if (!link->ddc)
 		return false;
 
+	if (link->dc->hwss.prepare_ddc)
+		link->dc->hwss.prepare_ddc(link);
+
 	set_ddc_transaction_type(link->ddc, transaction_type);
 
 	ddc_probed = link_query_ddc_data(link->ddc, 0x50, &zero, 1, edid_header, sizeof(edid_header));
