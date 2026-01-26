@@ -56,6 +56,7 @@ struct amdgpu_gtt_mgr {
 struct amdgpu_ttm_buffer_entity {
 	struct drm_sched_entity base;
 	struct mutex		lock;
+	struct drm_mm_node	gart_node;
 	u64			gart_window_offs[2];
 };
 

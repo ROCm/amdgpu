@@ -2012,37 +2012,47 @@ static void amdgpu_ttm_free_mmio_remap_bo(struct amdgpu_device *adev)
 	adev->rmmio_remap.bo = NULL;
 }
 
-static int amdgpu_ttm_buffer_entity_init(struct amdgpu_ttm_buffer_entity *entity,
+static int amdgpu_ttm_buffer_entity_init(struct amdgpu_gtt_mgr *mgr,
+					 struct amdgpu_ttm_buffer_entity *entity,
 					 enum drm_sched_priority prio,
 					 struct drm_gpu_scheduler **scheds,
 					 int num_schedulers,
-					 int starting_gart_window,
 					 u32 num_gart_windows)
 {
-	int i, r;
+	int i, r, num_pages;
 
 	r = drm_sched_entity_init(&entity->base, prio, scheds, num_schedulers, NULL);
 	if (r)
 		return r;
 
-
 	mutex_init(&entity->lock);
 
 	if (ARRAY_SIZE(entity->gart_window_offs) < num_gart_windows)
-		return starting_gart_window;
+		return -EINVAL;
+	if (num_gart_windows == 0)
+		return 0;
+
+	num_pages = num_gart_windows * AMDGPU_GTT_MAX_TRANSFER_SIZE;
+	r = amdgpu_gtt_mgr_alloc_entries(mgr, &entity->gart_node, num_pages,
+					 DRM_MM_INSERT_BEST);
+	if (r) {
+		drm_sched_entity_destroy(&entity->base);
+		return r;
+	}
 
 	for (i = 0; i < num_gart_windows; i++) {
 		entity->gart_window_offs[i] =
-			(u64)starting_gart_window * AMDGPU_GTT_MAX_TRANSFER_SIZE *
-				AMDGPU_GPU_PAGE_SIZE;
-		starting_gart_window++;
+			amdgpu_gtt_node_to_byte_offset(&entity->gart_node) +
+				i * AMDGPU_GTT_MAX_TRANSFER_SIZE * PAGE_SIZE;
 	}
 
-	return starting_gart_window;
+	return 0;
 }
 
-static void amdgpu_ttm_buffer_entity_fini(struct amdgpu_ttm_buffer_entity *entity)
+static void amdgpu_ttm_buffer_entity_fini(struct amdgpu_gtt_mgr *mgr,
+					  struct amdgpu_ttm_buffer_entity *entity)
 {
+	amdgpu_gtt_mgr_free_entries(mgr, &entity->gart_node);
 	drm_sched_entity_destroy(&entity->base);
 }
 
@@ -2346,36 +2356,42 @@ void amdgpu_ttm_set_buffer_funcs_status(struct amdgpu_device *adev, bool enable)
 
 		ring = adev->mman.buffer_funcs_ring;
 		sched = &ring->sched;
-		r = amdgpu_ttm_buffer_entity_init(&adev->mman.default_entity,
-						  DRM_SCHED_PRIORITY_KERNEL, &sched, 1,
-						  0, 0);
+		r = amdgpu_ttm_buffer_entity_init(&adev->mman.gtt_mgr,
+						  &adev->mman.default_entity,
+						  DRM_SCHED_PRIORITY_KERNEL,
+						  &sched, 1, 0);
 		if (r < 0) {
 			dev_err(adev->dev,
 				"Failed setting up TTM entity (%d)\n", r);
 			return;
 		}
 
-		r = amdgpu_ttm_buffer_entity_init(&adev->mman.clear_entity,
-						  DRM_SCHED_PRIORITY_NORMAL, &sched, 1,
-						  r, 1);
+		r = amdgpu_ttm_buffer_entity_init(&adev->mman.gtt_mgr,
+						  &adev->mman.clear_entity,
+						  DRM_SCHED_PRIORITY_NORMAL,
+						  &sched, 1, 1);
 		if (r < 0) {
 			dev_err(adev->dev,
 				"Failed setting up TTM BO clear entity (%d)\n", r);
 			goto error_free_default_entity;
 		}
 
-		r = amdgpu_ttm_buffer_entity_init(&adev->mman.move_entity,
-						  DRM_SCHED_PRIORITY_NORMAL, &sched, 1,
-						  r, 2);
+		r = amdgpu_ttm_buffer_entity_init(&adev->mman.gtt_mgr,
+						  &adev->mman.move_entity,
+						  DRM_SCHED_PRIORITY_NORMAL,
+						  &sched, 1, 2);
 		if (r < 0) {
 			dev_err(adev->dev,
 				"Failed setting up TTM BO move entity (%d)\n", r);
 			goto error_free_clear_entity;
 		}
 	} else {
-		amdgpu_ttm_buffer_entity_fini(&adev->mman.default_entity);
-		amdgpu_ttm_buffer_entity_fini(&adev->mman.clear_entity);
-		amdgpu_ttm_buffer_entity_fini(&adev->mman.move_entity);
+		amdgpu_ttm_buffer_entity_fini(&adev->mman.gtt_mgr,
+					      &adev->mman.default_entity);
+		amdgpu_ttm_buffer_entity_fini(&adev->mman.gtt_mgr,
+					      &adev->mman.clear_entity);
+		amdgpu_ttm_buffer_entity_fini(&adev->mman.gtt_mgr,
+					      &adev->mman.move_entity);
 		/* Drop all the old fences since re-creating the scheduler entities
 		 * will allocate new contexts.
 		 */
@@ -2393,9 +2409,11 @@ void amdgpu_ttm_set_buffer_funcs_status(struct amdgpu_device *adev, bool enable)
 	return;
 
 error_free_clear_entity:
-	amdgpu_ttm_buffer_entity_fini(&adev->mman.clear_entity);
+	amdgpu_ttm_buffer_entity_fini(&adev->mman.gtt_mgr,
+				      &adev->mman.clear_entity);
 error_free_default_entity:
-	amdgpu_ttm_buffer_entity_fini(&adev->mman.default_entity);
+	amdgpu_ttm_buffer_entity_fini(&adev->mman.gtt_mgr,
+				      &adev->mman.default_entity);
 }
 
 static int amdgpu_ttm_prepare_job(struct amdgpu_device *adev,
