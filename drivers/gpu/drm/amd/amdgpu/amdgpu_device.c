@@ -4105,17 +4105,6 @@ bool amdgpu_device_asic_has_dc_support(struct pci_dev *pdev,
 	case CHIP_VERDE:
 	case CHIP_OLAND:
 		return amdgpu_dc != 0 && IS_ENABLED(CONFIG_DRM_AMD_DC_SI);
-	case CHIP_KAVERI:
-	case CHIP_KABINI:
-	case CHIP_MULLINS:
-		/*
-		 * We have systems in the wild with these ASICs that require
-		 * TRAVIS and NUTMEG support which is not supported with DC.
-		 *
-		 * Fallback to the non-DC driver here by default so as not to
-		 * cause regressions.
-		 */
-		return amdgpu_dc > 0;
 	default:
 		return amdgpu_dc != 0;
 #else
