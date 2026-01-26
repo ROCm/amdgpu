@@ -723,7 +723,8 @@ dce110_dac_load_detect(struct dc_link *link)
 	struct link_encoder *link_enc = link->link_enc;
 	enum bp_result bp_result;
 
-	bp_result = bios->funcs->dac_load_detection(bios, link_enc->analog_engine);
+	bp_result = bios->funcs->dac_load_detection(
+			bios, link_enc->analog_engine, link->ext_enc_id);
 	return bp_result == BP_RESULT_OK;
 }
 
