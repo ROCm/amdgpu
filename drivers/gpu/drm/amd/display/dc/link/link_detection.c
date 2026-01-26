@@ -932,28 +932,10 @@ static bool link_detect_ddc_probe(struct dc_link *link)
  */
 static bool link_detect_dac_load_detect(struct dc_link *link)
 {
-	struct dc_bios *bios = link->ctx->dc_bios;
-	struct link_encoder *link_enc = link->link_enc;
-	enum engine_id engine_id = link_enc->preferred_engine;
-	enum dal_device_type device_type = DEVICE_TYPE_CRT;
-	enum bp_result bp_result = BP_RESULT_UNSUPPORTED;
-	uint32_t enum_id;
+	if (!link->dc->hwss.dac_load_detect)
+		return false;
 
-	switch (engine_id) {
-	case ENGINE_ID_DACB:
-		enum_id = 2;
-		break;
-	case ENGINE_ID_DACA:
-	default:
-		engine_id = ENGINE_ID_DACA;
-		enum_id = 1;
-		break;
-	}
-
-	if (bios->funcs->dac_load_detection)
-		bp_result = bios->funcs->dac_load_detection(bios, engine_id, device_type, enum_id);
-
-	return bp_result == BP_RESULT_OK;
+	return link->dc->hwss.dac_load_detect(link);
 }
 
 /*
