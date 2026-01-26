@@ -289,40 +289,6 @@ struct cper_hdr *amdgpu_cper_alloc_entry(struct amdgpu_device *adev,
 	return hdr;
 }
 
-int amdgpu_cper_generate_ue_record(struct amdgpu_device *adev,
-				   struct aca_bank *bank)
-{
-	struct cper_hdr *fatal = NULL;
-	struct cper_sec_crashdump_reg_data reg_data = { 0 };
-	struct amdgpu_ring *ring = &adev->cper.ring_buf;
-	int ret;
-
-	fatal = amdgpu_cper_alloc_entry(adev, AMDGPU_CPER_TYPE_FATAL, 1);
-	if (!fatal) {
-		dev_err(adev->dev, "fail to alloc cper entry for ue record\n");
-		return -ENOMEM;
-	}
-
-	reg_data.status_lo = lower_32_bits(bank->regs[ACA_REG_IDX_STATUS]);
-	reg_data.status_hi = upper_32_bits(bank->regs[ACA_REG_IDX_STATUS]);
-	reg_data.addr_lo   = lower_32_bits(bank->regs[ACA_REG_IDX_ADDR]);
-	reg_data.addr_hi   = upper_32_bits(bank->regs[ACA_REG_IDX_ADDR]);
-	reg_data.ipid_lo   = lower_32_bits(bank->regs[ACA_REG_IDX_IPID]);
-	reg_data.ipid_hi   = upper_32_bits(bank->regs[ACA_REG_IDX_IPID]);
-	reg_data.synd_lo   = lower_32_bits(bank->regs[ACA_REG_IDX_SYND]);
-	reg_data.synd_hi   = upper_32_bits(bank->regs[ACA_REG_IDX_SYND]);
-
-	amdgpu_cper_entry_fill_hdr(adev, fatal, AMDGPU_CPER_TYPE_FATAL, CPER_SEV_FATAL_UNCORRECTED);
-	ret = amdgpu_cper_entry_fill_fatal_section(adev, fatal, 0, reg_data);
-	if (ret)
-		return ret;
-
-	amdgpu_cper_ring_write(ring, fatal, fatal->record_length);
-	kfree(fatal);
-
-	return 0;
-}
-
 int amdgpu_cper_generate_bp_threshold_record(struct amdgpu_device *adev)
 {
 	struct cper_hdr *bp_threshold = NULL;
@@ -344,83 +310,6 @@ int amdgpu_cper_generate_bp_threshold_record(struct amdgpu_device *adev)
 
 	amdgpu_cper_ring_write(ring, bp_threshold, bp_threshold->record_length);
 	kfree(bp_threshold);
-
-	return 0;
-}
-
-static enum cper_error_severity amdgpu_aca_err_type_to_cper_sev(struct amdgpu_device *adev,
-								enum aca_error_type aca_err_type)
-{
-	switch (aca_err_type) {
-	case ACA_ERROR_TYPE_UE:
-		return CPER_SEV_FATAL_UNCORRECTED;
-	case ACA_ERROR_TYPE_CE:
-		return CPER_SEV_NON_FATAL_CORRECTED;
-	case ACA_ERROR_TYPE_DEFERRED:
-		return CPER_SEV_NON_FATAL_UNCORRECTED;
-	default:
-		dev_err(adev->dev, "Unknown ACA error type!\n");
-		return CPER_SEV_FATAL_UNCORRECTED;
-	}
-}
-
-int amdgpu_cper_generate_ce_records(struct amdgpu_device *adev,
-				    struct aca_banks *banks,
-				    uint16_t bank_count)
-{
-	struct cper_hdr *corrected = NULL;
-	enum cper_error_severity sev = CPER_SEV_NON_FATAL_CORRECTED;
-	struct amdgpu_ring *ring = &adev->cper.ring_buf;
-	uint32_t reg_data[CPER_ACA_REG_COUNT] = { 0 };
-	struct aca_bank_node *node;
-	struct aca_bank *bank;
-	uint32_t i = 0;
-	int ret;
-
-	corrected = amdgpu_cper_alloc_entry(adev, AMDGPU_CPER_TYPE_RUNTIME, bank_count);
-	if (!corrected) {
-		dev_err(adev->dev, "fail to allocate cper entry for ce records\n");
-		return -ENOMEM;
-	}
-
-	/* Raise severity if any DE is detected in the ACA bank list */
-	list_for_each_entry(node, &banks->list, node) {
-		bank = &node->bank;
-		if (bank->aca_err_type == ACA_ERROR_TYPE_DEFERRED) {
-			sev = CPER_SEV_NON_FATAL_UNCORRECTED;
-			break;
-		}
-	}
-
-	amdgpu_cper_entry_fill_hdr(adev, corrected, AMDGPU_CPER_TYPE_RUNTIME, sev);
-
-	/* Combine CE and DE in cper record */
-	list_for_each_entry(node, &banks->list, node) {
-		bank = &node->bank;
-		reg_data[CPER_ACA_REG_CTL_LO]    = lower_32_bits(bank->regs[ACA_REG_IDX_CTL]);
-		reg_data[CPER_ACA_REG_CTL_HI]    = upper_32_bits(bank->regs[ACA_REG_IDX_CTL]);
-		reg_data[CPER_ACA_REG_STATUS_LO] = lower_32_bits(bank->regs[ACA_REG_IDX_STATUS]);
-		reg_data[CPER_ACA_REG_STATUS_HI] = upper_32_bits(bank->regs[ACA_REG_IDX_STATUS]);
-		reg_data[CPER_ACA_REG_ADDR_LO]   = lower_32_bits(bank->regs[ACA_REG_IDX_ADDR]);
-		reg_data[CPER_ACA_REG_ADDR_HI]   = upper_32_bits(bank->regs[ACA_REG_IDX_ADDR]);
-		reg_data[CPER_ACA_REG_MISC0_LO]  = lower_32_bits(bank->regs[ACA_REG_IDX_MISC0]);
-		reg_data[CPER_ACA_REG_MISC0_HI]  = upper_32_bits(bank->regs[ACA_REG_IDX_MISC0]);
-		reg_data[CPER_ACA_REG_CONFIG_LO] = lower_32_bits(bank->regs[ACA_REG_IDX_CONFIG]);
-		reg_data[CPER_ACA_REG_CONFIG_HI] = upper_32_bits(bank->regs[ACA_REG_IDX_CONFIG]);
-		reg_data[CPER_ACA_REG_IPID_LO]   = lower_32_bits(bank->regs[ACA_REG_IDX_IPID]);
-		reg_data[CPER_ACA_REG_IPID_HI]   = upper_32_bits(bank->regs[ACA_REG_IDX_IPID]);
-		reg_data[CPER_ACA_REG_SYND_LO]   = lower_32_bits(bank->regs[ACA_REG_IDX_SYND]);
-		reg_data[CPER_ACA_REG_SYND_HI]   = upper_32_bits(bank->regs[ACA_REG_IDX_SYND]);
-
-		ret = amdgpu_cper_entry_fill_runtime_section(adev, corrected, i++,
-				amdgpu_aca_err_type_to_cper_sev(adev, bank->aca_err_type),
-				reg_data, CPER_ACA_REG_COUNT);
-		if (ret)
-			return ret;
-	}
-
-	amdgpu_cper_ring_write(ring, corrected, corrected->record_length);
-	kfree(corrected);
 
 	return 0;
 }
