@@ -8482,6 +8482,12 @@ static int to_drm_connector_type(enum signal_type st, uint32_t connector_id)
 		return DRM_MODE_CONNECTOR_VGA;
 	case SIGNAL_TYPE_DISPLAY_PORT:
 	case SIGNAL_TYPE_DISPLAY_PORT_MST:
+		/* External DP bridges have a different connector type. */
+		if (connector_id == CONNECTOR_ID_VGA)
+			return DRM_MODE_CONNECTOR_VGA;
+		else if (connector_id == CONNECTOR_ID_LVDS)
+			return DRM_MODE_CONNECTOR_LVDS;
+
 		return DRM_MODE_CONNECTOR_DisplayPort;
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
@@ -9154,8 +9160,7 @@ static int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
 	    connector_type == DRM_MODE_CONNECTOR_HDMIB)
 		amdgpu_dm_initialize_hdmi_connector(aconnector);
 
-	if (connector_type == DRM_MODE_CONNECTOR_DisplayPort
-		|| connector_type == DRM_MODE_CONNECTOR_eDP)
+	if (dc_is_dp_signal(link->connector_signal))
 		amdgpu_dm_initialize_dp_connector(dm, aconnector, link->link_index);
 
 out_free:
