@@ -150,14 +150,6 @@ static enum signal_type get_basic_signal_type(struct graphics_object_id encoder,
 		default:
 			return SIGNAL_TYPE_NONE;
 		}
-	} else if (downstream.type == OBJECT_TYPE_ENCODER) {
-		switch (downstream.id) {
-		case ENCODER_ID_EXTERNAL_NUTMEG:
-		case ENCODER_ID_EXTERNAL_TRAVIS:
-			return SIGNAL_TYPE_DISPLAY_PORT;
-		default:
-			return SIGNAL_TYPE_NONE;
-		}
 	}
 
 	return SIGNAL_TYPE_NONE;
@@ -173,6 +165,10 @@ static enum signal_type link_detect_sink_signal_type(struct dc_link *link,
 	enum signal_type result;
 	struct audio_support *aud_support;
 	struct graphics_object_id enc_id;
+
+	/* External DP bridges should use DP signal regardless of connector type. */
+	if (link->ext_enc_id.id)
+		return SIGNAL_TYPE_DISPLAY_PORT;
 
 	if (link->is_dig_mapping_flexible)
 		enc_id = (struct graphics_object_id){.id = ENCODER_ID_UNKNOWN};
@@ -618,6 +614,14 @@ static bool detect_dp(struct dc_link *link,
 		link->dpcd_caps.is_dongle_type_one = sink_caps->is_dongle_type_one;
 		link->dpcd_caps.dpcd_rev.raw = 0;
 		link->dpcd_caps.usb4_dp_tun_info.dp_tun_cap.raw = 0;
+	}
+
+	if (link->ext_enc_id.id) {
+		/* Fix number of connected sinks reported by external DP bridge */
+		link->dpcd_caps.sink_count.bits.SINK_COUNT = 1;
+		/* NUTMEG requires that we use HBR, doesn't work with RBR. */
+		if (link->dpcd_caps.branch_dev_id == DP_BRANCH_DEVICE_ID_00001A)
+			link->preferred_link_setting.link_rate = LINK_RATE_HIGH;
 	}
 
 	return true;
