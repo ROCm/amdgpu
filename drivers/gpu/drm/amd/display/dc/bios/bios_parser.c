@@ -780,6 +780,18 @@ static enum bp_result bios_parser_encoder_control(
 	return bp->cmd_tbl.dig_encoder_control(bp, cntl);
 }
 
+static enum bp_result bios_parser_external_encoder_control(
+	struct dc_bios *dcb,
+	struct bp_external_encoder_control *cntl)
+{
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
+	if (!bp->cmd_tbl.external_encoder_control)
+		return BP_RESULT_UNSUPPORTED;
+
+	return bp->cmd_tbl.external_encoder_control(bp, cntl);
+}
+
 static enum bp_result bios_parser_dac_load_detection(
 	struct dc_bios *dcb,
 	enum engine_id engine_id)
@@ -2908,6 +2920,8 @@ static const struct dc_vbios_funcs vbios_funcs = {
 	.select_crtc_source = bios_parser_select_crtc_source,
 
 	.encoder_control = bios_parser_encoder_control,
+
+	.external_encoder_control = bios_parser_external_encoder_control,
 
 	.dac_load_detection = bios_parser_dac_load_detection,
 

@@ -2521,6 +2521,7 @@ static enum bp_result external_encoder_control_v3(
 				cpu_to_le16((uint16_t)cntl->connector_obj_id.id);
 		break;
 	case EXTERNAL_ENCODER_CONTROL_SETUP:
+	case EXTERNAL_ENCODER_CONTROL_ENABLE:
 		/* EXTERNAL_ENCODER_CONTROL_PARAMETERS_V3 pixel clock unit in
 		 * 10KHz
 		 * output display device pixel clock frequency in unit of 10KHz.
@@ -2537,25 +2538,23 @@ static enum bp_result external_encoder_control_v3(
 		if (is_input_signal_dp) {
 			/* Bit[0]: indicate link rate, =1: 2.7Ghz, =0: 1.62Ghz,
 			 * only valid in encoder setup with DP mode. */
-			if (LINK_RATE_HIGH == cntl->link_rate)
-				cntl_params->ucConfig |= 1;
+			if (cntl->link_rate == LINK_RATE_LOW)
+				cntl_params->ucConfig |=
+					EXTERNAL_ENCODER_CONFIG_V3_DPLINKRATE_1_62GHZ;
+			else if (cntl->link_rate == LINK_RATE_HIGH)
+				cntl_params->ucConfig |=
+					EXTERNAL_ENCODER_CONFIG_V3_DPLINKRATE_2_70GHZ;
+			else
+				dm_error("Link rate not supported by external encoder");
+
 			/* output color depth Indicate encoder data bpc format
 			 * in DP mode, only valid in encoder setup in DP mode.
 			 */
-			cntl_params->ucBitPerColor =
-					(uint8_t)(cntl->color_depth);
+			cntl_params->ucBitPerColor = dc_color_depth_to_atom(cntl->color_depth);
 		}
 		/* Indicate how many lanes used by external encoder, only valid
 		 * in encoder setup and enableoutput. */
 		cntl_params->ucLaneNum = (uint8_t)(cntl->lanes_number);
-		break;
-	case EXTERNAL_ENCODER_CONTROL_ENABLE:
-		cntl_params->usPixelClock =
-				cpu_to_le16((uint16_t)(cntl->pixel_clock / 10));
-		cntl_params->ucEncoderMode =
-				(uint8_t)bp->cmd_helper->encoder_mode_bp_to_atom(
-						cntl->signal, false);
-		cntl_params->ucLaneNum = (uint8_t)cntl->lanes_number;
 		break;
 	default:
 		break;

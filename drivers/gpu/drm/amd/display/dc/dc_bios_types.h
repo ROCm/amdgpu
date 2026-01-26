@@ -97,6 +97,9 @@ struct dc_vbios_funcs {
 	enum bp_result (*encoder_control)(
 		struct dc_bios *bios,
 		struct bp_encoder_control *cntl);
+	enum bp_result (*external_encoder_control)(
+		struct dc_bios *bios,
+		struct bp_external_encoder_control *cntl);
 	enum bp_result (*dac_load_detection)(
 		struct dc_bios *bios,
 		enum engine_id engine_id);
