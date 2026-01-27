@@ -30,6 +30,26 @@
 #define AMDGPU_USERQ_PROC_CTX_SZ PAGE_SIZE
 #define AMDGPU_USERQ_GANG_CTX_SZ PAGE_SIZE
 
+/* Mapping queue priority to pipe priority, indexed by queue priority */
+int amdgpu_userq_pipe_priority_map[] = {
+	AMDGPU_RING_PRIO_0,
+	AMDGPU_RING_PRIO_0,
+	AMDGPU_RING_PRIO_0,
+	AMDGPU_RING_PRIO_0,
+	AMDGPU_RING_PRIO_0,
+	AMDGPU_RING_PRIO_0,
+	AMDGPU_RING_PRIO_0,
+	AMDGPU_RING_PRIO_1,
+	AMDGPU_RING_PRIO_1,
+	AMDGPU_RING_PRIO_1,
+	AMDGPU_RING_PRIO_1,
+	AMDGPU_RING_PRIO_2,
+	AMDGPU_RING_PRIO_2,
+	AMDGPU_RING_PRIO_2,
+	AMDGPU_RING_PRIO_2,
+	AMDGPU_RING_PRIO_2
+};
+
 static int
 mes_userq_map_gtt_bo_to_gart(struct amdgpu_bo *bo)
 {
@@ -272,6 +292,105 @@ static int mes_userq_detect_and_reset(struct amdgpu_device *adev,
 	return r;
 }
 
+/**
+ * amdgpu_userq_set_compute_mqd - Parse compute MQD and update queue props
+ * @queue: Target user mode queue
+ * @props: Queue property structure to be updated
+ * @args: User queue input arguments
+ * @uq_mgr: User queue manager (for logging)
+ *
+ * This function only parses and validates user input, updating queue props
+ * (no hardware MQD configuration - that's handled in MES layer)
+ * Returns: 0 on success, negative error code on failure
+ */
+static int amdgpu_userq_set_compute_mqd(struct amdgpu_usermode_queue *queue,
+					struct amdgpu_mqd_prop *props,
+					struct drm_amdgpu_userq_mqd_compute_gfx11 *compute_mqd)
+{
+	struct amdgpu_userq_mgr *uq_mgr = queue->userq_mgr;
+	struct amdgpu_device *adev = uq_mgr->adev;
+	const int max_num_cus = 1024;
+	size_t cu_mask_size;
+	uint32_t count;
+	uint32_t *cu_mask = NULL;
+	int ret = 0;
+
+	if (!queue || !props || !compute_mqd)
+		return -EINVAL;
+
+	if (compute_mqd->queue_percentage > AMDGPU_USERQ_MAX_QUEUE_PERCENTAGE) {
+		DRM_ERROR("Queue percentage must be between 0 to AMDGPU_USERQ_MAX_QUEUE_PERCENTAGE.\n");
+		return -EINVAL;
+	}
+
+	/* Validate priority */
+	if (compute_mqd->hqd_queue_priority > AMDGPU_GFX_QUEUE_PRIORITY_MAXIMUM) {
+		DRM_ERROR("Queue priority must be between 0 to AMDGPU_GFX_QUEUE_PRIORITY_MAXIMUM.\n");
+		return -EINVAL;
+	}
+
+
+	/* validate and set CU mask property */
+	if (compute_mqd->cu_mask_count) {
+		if (compute_mqd->cu_mask_count % 32 != 0) {
+			DRM_ERROR("CU mask count must be a multiple of 32.\n");
+			return -EINVAL;
+		}
+		count = compute_mqd->cu_mask_count;
+
+		/* Limit CU mask size to prevent excessive memory allocation */
+		if (count > max_num_cus) {
+			DRM_ERROR("CU mask cannot be greater than 1024 bits.\n");
+			count = max_num_cus;
+			cu_mask_size = sizeof(uint32_t) * (max_num_cus / 32);
+		} else {
+			cu_mask_size = sizeof(uint32_t) * (compute_mqd->cu_mask_count / 32);
+		}
+
+		/* Copy CU mask from user space */
+		cu_mask = memdup_user(u64_to_user_ptr(compute_mqd->cu_mask_ptr), cu_mask_size);
+		if (IS_ERR(cu_mask)) {
+			ret = PTR_ERR(cu_mask);
+			cu_mask = NULL;
+			goto cleanup;
+		}
+
+		/* Validate pairwise CU mask for WGP-based ASICs */
+		if (cu_mask && adev->ip_versions[GC_HWIP][0] >= IP_VERSION(10, 0, 0)) {
+			for (int i = 0; i < count; i += 2) {
+			       uint32_t cu_pair = (cu_mask[i / 32] >> (i % 32)) & 0x3;
+			       if (cu_pair && cu_pair != 0x3) {
+				       DRM_ERROR("CUs must be adjacent pairwise enabled.\n");
+				       kfree(cu_mask);
+				       cu_mask = NULL;
+				       ret = -EINVAL;
+				       goto cleanup;
+			       }
+			}
+		}
+
+		/* Free old CU mask */
+		if (props->cu_mask) {
+			kfree(props->cu_mask);
+			props->cu_mask = NULL;
+		}
+
+		props->cu_mask = cu_mask;
+		props->cu_mask_count = count;
+		props->is_user_cu_masked = (cu_mask != NULL);
+	}
+
+	/* Parse HQD priority and other compute properties */
+	props->queue_percentage = compute_mqd->queue_percentage;
+	props->pm4_target_xcc = compute_mqd->pm4_target_xcc;
+	props->hqd_queue_priority = compute_mqd->hqd_queue_priority;
+	props->hqd_pipe_priority = amdgpu_userq_pipe_priority_map[compute_mqd->hqd_queue_priority];
+	props->eop_gpu_addr = compute_mqd->eop_va;
+
+cleanup:
+	return ret;
+}
+
 static int mes_userq_mqd_create(struct amdgpu_usermode_queue *queue,
 				struct drm_amdgpu_userq_in *args_in)
 {
@@ -326,10 +445,10 @@ static int mes_userq_mqd_create(struct amdgpu_usermode_queue *queue,
 						   2048);
 		if (r)
 			goto free_mqd;
+		r = amdgpu_userq_set_compute_mqd(queue, userq_props, compute_mqd);
+		if (r)
+			goto free_mqd;
 
-		userq_props->eop_gpu_addr = compute_mqd->eop_va;
-		userq_props->hqd_pipe_priority = AMDGPU_GFX_PIPE_PRIO_NORMAL;
-		userq_props->hqd_queue_priority = AMDGPU_GFX_QUEUE_PRIORITY_MINIMUM;
 		userq_props->hqd_active = false;
 		userq_props->tmz_queue =
 			mqd_user->flags & AMDGPU_USERQ_CREATE_FLAGS_QUEUE_SECURE;
@@ -433,11 +552,51 @@ free_props:
 	return r;
 }
 
+static int mes_userq_mqd_update(struct amdgpu_usermode_queue *queue, struct drm_amdgpu_userq_in *args_in)
+{
+	int retval = 0;
+	struct amdgpu_device *adev = queue->userq_mgr->adev;
+	struct amdgpu_mqd_prop *userq_props = queue->userq_prop;
+	struct amdgpu_mqd *mqd_hw_default = &adev->mqds[queue->queue_type];
+	struct drm_amdgpu_userq_mqd_compute_gfx11 *compute_mqd_v11;
+
+	if (!queue || !userq_props)
+		return -EINVAL;
+
+	if (queue->queue_type != AMDGPU_HW_IP_COMPUTE)
+		return -EINVAL;
+
+	if (args_in->mqd_size != sizeof(*compute_mqd_v11)) {
+		DRM_ERROR("Invalid compute IP MQD size\n");
+		return -EINVAL;
+	}
+
+	compute_mqd_v11 = memdup_user(u64_to_user_ptr(args_in->mqd), args_in->mqd_size);
+	if (IS_ERR(compute_mqd_v11)) {
+		DRM_ERROR("Failed to read user MQD\n");
+		return -ENOMEM;
+	}
+
+	retval = amdgpu_userq_set_compute_mqd(queue, userq_props, compute_mqd_v11);
+	if (retval)
+		goto free;
+
+	userq_props->queue_size = args_in->queue_size;
+	userq_props->hqd_base_gpu_addr = args_in->queue_va;
+
+	retval = mqd_hw_default->init_mqd(adev, (void *)queue->mqd.cpu_ptr, userq_props);
+
+free:
+	kfree(compute_mqd_v11);
+	return retval;
+}
+
 static void mes_userq_mqd_destroy(struct amdgpu_usermode_queue *queue)
 {
 	struct amdgpu_userq_mgr *uq_mgr = queue->userq_mgr;
 
 	amdgpu_userq_destroy_object(uq_mgr, &queue->fw_obj);
+	kfree(queue->userq_prop->cu_mask);
 	kfree(queue->userq_prop);
 	amdgpu_userq_destroy_object(uq_mgr, &queue->mqd);
 }
@@ -514,6 +673,7 @@ static int mes_userq_restore(struct amdgpu_usermode_queue *queue)
 
 const struct amdgpu_userq_funcs userq_mes_funcs = {
 	.mqd_create = mes_userq_mqd_create,
+	.mqd_update = mes_userq_mqd_update,
 	.mqd_destroy = mes_userq_mqd_destroy,
 	.unmap = mes_userq_unmap,
 	.map = mes_userq_map,
