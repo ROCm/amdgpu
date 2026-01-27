@@ -2407,8 +2407,8 @@ static int gfx_v9_4_3_perf_monitor_ptl_init(struct amdgpu_device *adev, bool sta
 		return -EOPNOTSUPP;
 
 	if (adev->psp.ptl_hw_supported_state == AMDGPU_PTL_HW_UNINIT) {
-		fmt1 = GFX_FTYPE_I8;
-		fmt2 = GFX_FTYPE_BF16;
+		fmt1 = GFX_FTYPE_VECTOR;
+		fmt2 = GFX_FTYPE_F8;
 	} else {
 		fmt1 = adev->psp.ptl_fmt1;
 		fmt2 = adev->psp.ptl_fmt2;

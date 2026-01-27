@@ -29,7 +29,9 @@ enum amdgpu_ptl_fmt {
 	AMDGPU_PTL_FMT_BF16    = 2,
 	AMDGPU_PTL_FMT_F32     = 3,
 	AMDGPU_PTL_FMT_F64     = 4,
-	AMDGPU_PTL_FMT_INVALID = 5,
+	AMDGPU_PTL_FMT_F8      = 5,
+	AMDGPU_PTL_FMT_VECTOR  = 6,
+	AMDGPU_PTL_FMT_INVALID = 7,
 };
 
 enum amdgpu_ptl_hw_supported_state {
@@ -50,6 +52,8 @@ enum psp_ptl_format_type
 	GFX_FTYPE_BF16        = 0x00000002,
 	GFX_FTYPE_F32         = 0x00000003,
 	GFX_FTYPE_F64         = 0x00000004,
+	GFX_FTYPE_F8          = 0x00000005,
+	GFX_FTYPE_VECTOR      = 0x00000006,
 	GFX_FTYPE_INVALID     = 0xFFFFFFFF,
 };
 
