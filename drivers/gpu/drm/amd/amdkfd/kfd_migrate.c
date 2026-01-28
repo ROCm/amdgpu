@@ -587,7 +587,7 @@ out:
 					node->xcp ? node->xcp->id : 0);
 	return r < 0 ? r : 0;
 }
-
+#ifdef HAVE_DEV_PAGEMAP_OPS_FOLIO_FREE
 static void svm_migrate_folio_free(struct folio *folio)
 {
 	struct page *page = &folio->page;
@@ -598,6 +598,17 @@ static void svm_migrate_folio_free(struct folio *folio)
 		svm_range_bo_unref_async(svm_bo);
 	}
 }
+#else
+static void svm_migrate_page_free(struct page *page)
+{
+	struct svm_range_bo *svm_bo = page->zone_device_data;
+
+	if (svm_bo) {
+		pr_debug_ratelimited("ref: %d\n", kref_read(&svm_bo->kref));
+		svm_range_bo_unref_async(svm_bo);
+	}
+}
+#endif
 
 static int
 svm_migrate_copy_to_ram(struct amdgpu_device *adev, struct svm_range *prange,
@@ -1039,7 +1050,11 @@ out_mmput:
 }
 
 static const struct dev_pagemap_ops svm_migrate_pgmap_ops = {
+#ifdef HAVE_DEV_PAGEMAP_OPS_FOLIO_FREE
 	.folio_free		= svm_migrate_folio_free,
+#else
+	.page_free		= svm_migrate_page_free,
+#endif
 	.migrate_to_ram		= svm_migrate_to_ram,
 };
 
