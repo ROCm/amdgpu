@@ -1,0 +1,21 @@
+dnl #
+dnl # commit v6.8-rc1-123-gd35b4e13b8b8
+dnl # drm/plane: Add color pipeline property
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_PLANE_COLOR_PIPELINE_PROPERTY], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_plane.h>
+		],[
+			struct drm_plane *plane = NULL;
+			plane->color_pipeline_property = NULL;
+		],[
+			AC_DEFINE(HAVE_DRM_PLANE_COLOR_PIPELINE_PROPERTY, 1,
+				[drm_plane->color_pipeline_property is available])
+		])
+	])
+])
+
+AC_DEFUN([AC_AMDGPU_STRUCT_DRM_PLANE], [
+	AC_AMDGPU_DRM_PLANE_COLOR_PIPELINE_PROPERTY
+])

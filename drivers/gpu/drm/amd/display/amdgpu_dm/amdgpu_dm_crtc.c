@@ -789,9 +789,11 @@ int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	 * 2. DCE since it doesn't support programmable degamma anywhere.
 	 * 3. DCN401 since pre-blending degamma LUT doesn't apply to cursor.
 	 */
+#ifdef HAVE_DRM_PLANE_COLOR_PIPELINE_PROPERTY
 	if (plane->color_pipeline_property)
 		has_degamma = false;
 	else
+#endif
 		has_degamma = dm->adev->dm.dc->caps.color.dpp.dcn_arch &&
 			      dm->adev->dm.dc->ctx->dce_version != DCN_VERSION_4_01;
 
