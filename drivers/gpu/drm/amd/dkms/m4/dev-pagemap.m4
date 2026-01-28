@@ -15,7 +15,26 @@ AC_DEFUN([AC_AMDGPU_DEV_PAGEMAP_RANGE], [
 		])
 	])
 ])
+
+dnl #
+dnl # Check for folio_free in dev_pagemap_ops
+dnl #
+AC_DEFUN([AC_AMDGPU_DEV_PAGEMAP_OPS_FOLIO_FREE], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/memremap.h>
+		], [
+			const struct dev_pagemap_ops *ops = NULL;
+			void (*func)(struct folio *) = ops->folio_free;
+		], [
+			AC_DEFINE(HAVE_DEV_PAGEMAP_OPS_FOLIO_FREE, 1,
+				[dev_pagemap_ops has folio_free member])
+		])
+	])
+])
+
 AC_DEFUN([AC_AMDGPU_DEV_PAGEMAP], [
 	AC_AMDGPU_DEV_PAGEMAP_RANGE
+	AC_AMDGPU_DEV_PAGEMAP_OPS_FOLIO_FREE
 ])
 
