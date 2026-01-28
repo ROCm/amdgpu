@@ -220,6 +220,14 @@ static inline u64 amdgpu_compute_gart_address(struct amdgpu_gmc *gmc,
 	return gmc->gart_start + entity->gart_window_offs[index];
 }
 
+/**
+ * amdgpu_gtt_node_to_byte_offset() - Returns a byte offset of a gtt node
+ */
+static inline u64 amdgpu_gtt_node_to_byte_offset(const struct drm_mm_node *gtt_node)
+{
+	return gtt_node->start * (u64)PAGE_SIZE;
+}
+
 void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct amdgpu_hmm_range *range);
 int amdgpu_ttm_tt_get_userptr(const struct ttm_buffer_object *tbo,
 			      uint64_t *user_addr);
