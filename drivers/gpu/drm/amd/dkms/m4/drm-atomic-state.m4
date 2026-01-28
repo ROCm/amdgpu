@@ -16,3 +16,19 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_ATOMIC_STATE_DUPLICATED], [
 	])
 ])
 
+dnl #
+dnl # drm/atomic: Add drm_atomic_state->plane_color_pipeline
+dnl #
+AC_DEFUN([AC_AMDGPU_STRUCT_DRM_ATOMIC_STATE_PLANE_COLOR_PIPELINE], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_atomic.h>
+		],[
+			struct drm_atomic_state *state = NULL;
+			state->plane_color_pipeline = 0;
+		],[
+			AC_DEFINE(HAVE_STRUCT_DRM_ATOMIC_STATE_PLANE_COLOR_PIPELINE, 1,
+				[struct drm_atomic_state->plane_color_pipeline is available])
+		])
+	])
+])
