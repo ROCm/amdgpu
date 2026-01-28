@@ -34,6 +34,7 @@
 #include "amdgpu_dm_kunit_helpers.h"
 #include "dc.h"
 
+#ifdef HAVE_DRM_DRM_COLOROP_H
 const u64 amdgpu_dm_supported_degam_tfs =
 	BIT(DRM_COLOROP_1D_CURVE_SRGB_EOTF) |
 	BIT(DRM_COLOROP_1D_CURVE_PQ_125_EOTF) |
@@ -235,3 +236,4 @@ int amdgpu_dm_initialize_default_pipeline(struct drm_plane *plane, struct drm_pr
 
 	return amdgpu_dm_build_default_pipeline(dev, plane, hw_3d_lut, list);
 }
+#endif
