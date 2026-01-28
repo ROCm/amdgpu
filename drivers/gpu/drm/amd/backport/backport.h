@@ -52,6 +52,7 @@
 #include <kcl/backport/kcl_drm_drv.h>
 #include <kcl/kcl_drm_modes.h>
 #include <kcl/kcl_drm_connector.h>
+#include <kcl/kcl_drm_color_mgmt.h>
 #include <kcl/backport/kcl_drm_dp_helper_backport.h>
 #include <kcl/backport/kcl_drm_dp_mst_helper_backport.h>
 #include <kcl/kcl_drm_atomic_helper.h>
