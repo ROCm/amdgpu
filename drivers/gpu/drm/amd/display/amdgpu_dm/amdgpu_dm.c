@@ -6425,8 +6425,10 @@ fill_plane_color_attributes(const struct drm_plane_state *plane_state,
 	*color_space = COLOR_SPACE_SRGB;
 
 	/* Ignore properties when DRM_CLIENT_CAP_PLANE_COLOR_PIPELINE is set */
+#ifdef HAVE_STRUCT_DRM_ATOMIC_STATE_PLANE_COLOR_PIPELINE
 	if (plane_state->state && plane_state->state->plane_color_pipeline)
 		return 0;
+#endif
 
 	/* DRM color properties only affect non-RGB formats. */
 	if (format < SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
