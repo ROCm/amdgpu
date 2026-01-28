@@ -906,6 +906,7 @@ static int amdgpu_userq_input_args_validate(struct drm_device *dev,
 
 	switch (args->in.op) {
 	case AMDGPU_USERQ_OP_CREATE:
+	case AMDGPU_USERQ_OP_MODIFY:
 		if (args->in.flags & ~(AMDGPU_USERQ_CREATE_FLAGS_QUEUE_PRIORITY_MASK |
 				       AMDGPU_USERQ_CREATE_FLAGS_QUEUE_SECURE))
 			return -EINVAL;
@@ -981,6 +982,60 @@ bool amdgpu_userq_enabled(struct drm_device *dev)
 	return false;
 }
 
+static int amdgpu_modify_queue(struct drm_file *filp, union drm_amdgpu_userq *args)
+{
+	struct amdgpu_fpriv *fpriv = filp->driver_priv;
+	struct amdgpu_userq_mgr *uq_mgr = &fpriv->userq_mgr;
+	struct amdgpu_device *adev = uq_mgr->adev;
+	struct amdgpu_usermode_queue *queue;
+	const struct amdgpu_userq_funcs *userq_funcs;
+	int r;
+
+	mutex_lock(&uq_mgr->userq_mutex);
+	queue = amdgpu_userq_find(uq_mgr, args->in.queue_id);
+	if (!queue) {
+		drm_file_err(uq_mgr->file, "Queue %u not found\n", args->in.queue_id);
+		r = -EINVAL;
+		goto unlock;
+	}
+
+	userq_funcs = adev->userq_funcs[queue->queue_type];
+
+	/*
+	 * Unmap the queue if it's mapped or preempted to ensure a clean update.
+	 * If the queue is already unmapped or hung, we skip this step.
+	 */
+	if (queue->state == AMDGPU_USERQ_STATE_MAPPED ||
+	    queue->state == AMDGPU_USERQ_STATE_PREEMPTED) {
+		r = amdgpu_userq_unmap_helper(queue);
+		if (r) {
+			drm_file_err(uq_mgr->file, "Failed to unmap queue %llu\n",
+					queue->doorbell_index);
+			goto unlock;
+		}
+	}
+
+	r = userq_funcs->mqd_update(queue, &args->in);
+	if (r)
+		goto unlock;
+	/*
+	 * If the queue is considered active (has valid size, address, and percentage),
+	 * we attempt to map it. This effectively starts the queue or restarts it
+	 * if it was previously running.
+	 */
+	if (AMDGPU_USERQ_IS_ACTIVE(queue)) {
+		r = amdgpu_userq_map_helper(queue);
+		if (r)
+			drm_file_err(uq_mgr->file, "Failed to remap queue %llu after update\n",
+				queue->doorbell_index);
+	}
+
+unlock:
+	mutex_unlock(&uq_mgr->userq_mutex);
+
+	return r;
+}
+
 int amdgpu_userq_ioctl(struct drm_device *dev, void *data,
 		       struct drm_file *filp)
 {
@@ -1000,6 +1055,12 @@ int amdgpu_userq_ioctl(struct drm_device *dev, void *data,
 			drm_file_err(filp, "Failed to create usermode queue\n");
 		break;
 
+
+	case AMDGPU_USERQ_OP_MODIFY:
+		r = amdgpu_modify_queue(filp, args);
+		if (r)
+			drm_file_err(filp, "Failed to modify usermode queue\n");
+		break;
 	case AMDGPU_USERQ_OP_FREE:
 		r = amdgpu_userq_destroy(filp, args->in.queue_id);
 		if (r)
