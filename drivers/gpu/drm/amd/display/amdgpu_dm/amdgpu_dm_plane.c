@@ -2031,9 +2031,11 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 #ifdef AMD_PRIVATE_COLOR
 	dm_atomic_plane_attach_color_mgmt_properties(dm, plane);
 #else
+#ifdef HAVE_DRM_PLANE_COLOR_PIPELINE_PROPERTY
 	res = dm_plane_init_colorops(plane);
 	if (res)
 		return res;
+#endif
 #endif
 
 	/* Create (reset) the plane state */
