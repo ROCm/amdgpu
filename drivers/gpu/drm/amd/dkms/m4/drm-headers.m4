@@ -146,4 +146,9 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
     dnl # drm/client: Move client event handlers to drm_client_event.c
     dnl #
     AC_KERNEL_CHECK_HEADERS([drm/drm_client_event.h])
+
+    dnl #
+    dnl # drm: Add color operation
+    dnl #
+    AC_KERNEL_CHECK_HEADERS([drm/drm_colorop.h])
 ])
