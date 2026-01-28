@@ -416,6 +416,14 @@ static int amdgpu_gem_object_mmap(struct drm_gem_object *obj, struct vm_area_str
 }
 #endif
 
+static void amdgpu_gem_object_handle_free(struct drm_gem_object *gobj)
+{
+	struct amdgpu_bo *aobj = gem_to_amdgpu_bo(gobj);
+
+	amdgpu_ualink_revoke_exported_memory(aobj);
+
+}
+
 #ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
 	.free = amdgpu_gem_object_free,
@@ -434,6 +442,7 @@ const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
 #endif
 	.mmap = amdgpu_gem_object_mmap,
 	.vm_ops = &amdgpu_gem_vm_ops,
+	.handle_free = amdgpu_gem_object_handle_free
 };
 #endif
 
