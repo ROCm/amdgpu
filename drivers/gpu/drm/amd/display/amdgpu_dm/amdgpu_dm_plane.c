@@ -1856,7 +1856,7 @@ dm_atomic_plane_get_property(struct drm_plane *plane,
 	return 0;
 }
 #else
-
+#ifdef HAVE_DRM_PLANE_COLOR_PIPELINE_PROPERTY
 #define MAX_COLOR_PIPELINES 5
 
 static int
@@ -1875,14 +1875,16 @@ dm_plane_init_colorops(struct drm_plane *plane)
 
 	/* initialize pipeline */
 	if (dc->ctx->dce_version >= DCN_VERSION_3_0) {
+#ifdef HAVE_DRM_DRM_COLOROP_H
 		ret = amdgpu_dm_initialize_default_pipeline(plane, &pipelines[len]);
 		if (ret) {
 			drm_err(plane->dev, "Failed to create color pipeline for plane %d: %d\n",
 				plane->base.id, ret);
 			goto out;
 		}
-		len++;
 
+		len++;
+#endif
 		/* Create COLOR_PIPELINE property and attach */
 		drm_plane_create_color_pipeline_property(plane, pipelines, len);
 	}
@@ -1893,6 +1895,7 @@ out:
 
 	return ret;
 }
+#endif
 #endif
 
 static const struct drm_plane_funcs dm_plane_funcs = {

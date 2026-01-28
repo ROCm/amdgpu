@@ -33,6 +33,7 @@
 #include "amdgpu_dm_colorop.h"
 #include "dc.h"
 
+#ifdef HAVE_DRM_DRM_COLOROP_H
 const u64 amdgpu_dm_supported_degam_tfs =
 	BIT(DRM_COLOROP_1D_CURVE_SRGB_EOTF) |
 	BIT(DRM_COLOROP_1D_CURVE_PQ_125_EOTF) |
@@ -209,3 +210,4 @@ cleanup:
 
 	return ret;
 }
+#endif

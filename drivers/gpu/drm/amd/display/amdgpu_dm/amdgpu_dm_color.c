@@ -880,6 +880,7 @@ amdgpu_tf_to_dc_tf(enum amdgpu_transfer_function tf)
 	}
 }
 
+#ifdef HAVE_DRM_DRM_COLOROP_H
 static enum dc_transfer_func_predefined
 amdgpu_colorop_tf_to_dc_tf(enum drm_colorop_curve_1d_type tf)
 {
@@ -900,6 +901,7 @@ amdgpu_colorop_tf_to_dc_tf(enum drm_colorop_curve_1d_type tf)
 		return TRANSFER_FUNCTION_LINEAR;
 	}
 }
+#endif
 
 static void __to_dc_lut3d_color(struct dc_rgb *rgb,
 				const struct drm_color_lut lut,
@@ -1464,6 +1466,7 @@ __set_dm_plane_degamma(struct drm_plane_state *plane_state,
 	return 0;
 }
 
+#ifdef HAVE_DRM_DRM_COLOROP_H
 static int
 __set_colorop_in_tf_1d_curve(struct dc_plane_state *dc_plane_state,
 			     struct drm_colorop_state *colorop_state)
@@ -1491,6 +1494,7 @@ __set_colorop_in_tf_1d_curve(struct dc_plane_state *dc_plane_state,
 
 	return 0;
 }
+
 
 static int
 __set_dm_plane_colorop_degamma(struct drm_plane_state *plane_state,
@@ -1817,6 +1821,7 @@ __set_dm_plane_colorop_blend(struct drm_plane_state *plane_state,
 
 	return 0;
 }
+#endif
 
 static int
 amdgpu_dm_plane_set_color_properties(struct drm_plane_state *plane_state,
@@ -1868,6 +1873,7 @@ amdgpu_dm_plane_set_color_properties(struct drm_plane_state *plane_state,
 	return 0;
 }
 
+#ifdef HAVE_DRM_DRM_COLOROP_H
 static int
 amdgpu_dm_plane_set_colorop_properties(struct drm_plane_state *plane_state,
 				       struct dc_plane_state *dc_plane_state)
@@ -1954,7 +1960,7 @@ amdgpu_dm_plane_set_colorop_properties(struct drm_plane_state *plane_state,
 
 	return 0;
 }
-
+#endif
 /**
  * amdgpu_dm_update_plane_color_mgmt: Maps DRM color management to DC plane.
  * @crtc: amdgpu_dm crtc state
@@ -2050,9 +2056,11 @@ int amdgpu_dm_update_plane_color_mgmt(struct dm_crtc_state *crtc,
 		dc_plane_state->gamut_remap_matrix.enable_remap = false;
 		dc_plane_state->input_csc_color_matrix.enable_adjustment = false;
 	}
-
+ 
+#ifdef HAVE_DRM_DRM_COLOROP_H 
 	if (!amdgpu_dm_plane_set_colorop_properties(plane_state, dc_plane_state))
 		return 0;
+#endif
 
 	return amdgpu_dm_plane_set_color_properties(plane_state, dc_plane_state);
 }
