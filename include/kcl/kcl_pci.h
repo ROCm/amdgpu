@@ -216,4 +216,17 @@ static inline struct pci_dev *pci_get_base_class(unsigned int class,
 #define PCI_IRQ_INTX PCI_IRQ_LEGACY
 #endif
 
+#ifndef HAVE_PCI_REBAR_GET_MAX_SIZE
+static inline int pci_rebar_get_max_size(struct pci_dev *pdev, int bar)
+{
+	u32 sizes;
+
+	sizes = pci_rebar_get_possible_sizes(pdev, bar);
+	if (!sizes)
+		return -ENOENT;
+
+	return __fls(sizes);
+}
+#endif
+
 #endif /* AMDKCL_PCI_H */
