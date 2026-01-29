@@ -223,16 +223,32 @@ void link_get_master_pipes_with_dpms_on(const struct dc_link *link,
 	}
 }
 
-static bool get_ext_hdmi_settings(struct pipe_ctx *pipe_ctx,
-		enum engine_id eng_id,
-		struct ext_hdmi_settings *settings)
+static struct ext_hdmi_settings create_ext_hdmi_settings(
+		uint8_t address,
+		uint8_t reg_num,
+		uint8_t reg_num_6g,
+		const struct i2c_reg_info *reg_settings,
+		const struct i2c_reg_info *reg_settings_6g
+)
 {
-	bool result = false;
-	int i = 0;
-	struct integrated_info *integrated_info =
-			pipe_ctx->stream->ctx->dc_bios->integrated_info;
+	struct ext_hdmi_settings result = {
+		.slv_addr = address,
+		.reg_num = reg_num,
+		.reg_num_6g = reg_num_6g,
+	};
 
-	if (integrated_info == NULL)
+	memcpy(result.reg_settings, reg_settings, sizeof(result.reg_settings));
+	memcpy(result.reg_settings_6g, reg_settings_6g, sizeof(result.reg_settings_6g));
+	return result;
+}
+
+static bool get_ext_hdmi_settings(
+		const struct integrated_info *info,
+		enum engine_id eng_id,
+		struct ext_hdmi_settings *settings
+)
+{
+	if (!settings || !info)
 		return false;
 
 	/*
@@ -242,82 +258,69 @@ static bool get_ext_hdmi_settings(struct pipe_ctx *pipe_ctx,
 	 */
 
 	// Check if current bios contains ext Hdmi settings
-	if (integrated_info->gpu_cap_info & 0x20) {
-		switch (eng_id) {
-		case ENGINE_ID_DIGA:
-			settings->slv_addr = integrated_info->dp0_ext_hdmi_slv_addr;
-			settings->reg_num = integrated_info->dp0_ext_hdmi_6g_reg_num;
-			settings->reg_num_6g = integrated_info->dp0_ext_hdmi_6g_reg_num;
-			memmove(settings->reg_settings,
-					integrated_info->dp0_ext_hdmi_reg_settings,
-					sizeof(integrated_info->dp0_ext_hdmi_reg_settings));
-			memmove(settings->reg_settings_6g,
-					integrated_info->dp0_ext_hdmi_6g_reg_settings,
-					sizeof(integrated_info->dp0_ext_hdmi_6g_reg_settings));
-			result = true;
-			break;
-		case ENGINE_ID_DIGB:
-			settings->slv_addr = integrated_info->dp1_ext_hdmi_slv_addr;
-			settings->reg_num = integrated_info->dp1_ext_hdmi_6g_reg_num;
-			settings->reg_num_6g = integrated_info->dp1_ext_hdmi_6g_reg_num;
-			memmove(settings->reg_settings,
-					integrated_info->dp1_ext_hdmi_reg_settings,
-					sizeof(integrated_info->dp1_ext_hdmi_reg_settings));
-			memmove(settings->reg_settings_6g,
-					integrated_info->dp1_ext_hdmi_6g_reg_settings,
-					sizeof(integrated_info->dp1_ext_hdmi_6g_reg_settings));
-			result = true;
-			break;
-		case ENGINE_ID_DIGC:
-			settings->slv_addr = integrated_info->dp2_ext_hdmi_slv_addr;
-			settings->reg_num = integrated_info->dp2_ext_hdmi_6g_reg_num;
-			settings->reg_num_6g = integrated_info->dp2_ext_hdmi_6g_reg_num;
-			memmove(settings->reg_settings,
-					integrated_info->dp2_ext_hdmi_reg_settings,
-					sizeof(integrated_info->dp2_ext_hdmi_reg_settings));
-			memmove(settings->reg_settings_6g,
-					integrated_info->dp2_ext_hdmi_6g_reg_settings,
-					sizeof(integrated_info->dp2_ext_hdmi_6g_reg_settings));
-			result = true;
-			break;
-		case ENGINE_ID_DIGD:
-			settings->slv_addr = integrated_info->dp3_ext_hdmi_slv_addr;
-			settings->reg_num = integrated_info->dp3_ext_hdmi_6g_reg_num;
-			settings->reg_num_6g = integrated_info->dp3_ext_hdmi_6g_reg_num;
-			memmove(settings->reg_settings,
-					integrated_info->dp3_ext_hdmi_reg_settings,
-					sizeof(integrated_info->dp3_ext_hdmi_reg_settings));
-			memmove(settings->reg_settings_6g,
-					integrated_info->dp3_ext_hdmi_6g_reg_settings,
-					sizeof(integrated_info->dp3_ext_hdmi_6g_reg_settings));
-			result = true;
-			break;
-		default:
-			break;
-		}
+	if (!(info->gpu_cap_info & 0x20))
+		return false;
 
-		if (result == true) {
-			// Validate settings from bios integrated info table
-			if (settings->slv_addr == 0)
-				return false;
-			if (settings->reg_num > 9)
-				return false;
-			if (settings->reg_num_6g > 3)
-				return false;
-
-			for (i = 0; i < settings->reg_num; i++) {
-				if (settings->reg_settings[i].i2c_reg_index > 0x20)
-					return false;
-			}
-
-			for (i = 0; i < settings->reg_num_6g; i++) {
-				if (settings->reg_settings_6g[i].i2c_reg_index > 0x20)
-					return false;
-			}
-		}
+	switch (eng_id) {
+	case ENGINE_ID_DIGA:
+		*settings = create_ext_hdmi_settings(
+				info->dp0_ext_hdmi_slv_addr,
+				info->dp0_ext_hdmi_reg_num,
+				info->dp0_ext_hdmi_6g_reg_num,
+				info->dp0_ext_hdmi_reg_settings,
+				info->dp0_ext_hdmi_6g_reg_settings
+		);
+		break;
+	case ENGINE_ID_DIGB:
+		*settings = create_ext_hdmi_settings(
+				info->dp1_ext_hdmi_slv_addr,
+				info->dp1_ext_hdmi_reg_num,
+				info->dp1_ext_hdmi_6g_reg_num,
+				info->dp1_ext_hdmi_reg_settings,
+				info->dp1_ext_hdmi_6g_reg_settings
+		);
+		break;
+	case ENGINE_ID_DIGC:
+		*settings = create_ext_hdmi_settings(
+				info->dp2_ext_hdmi_slv_addr,
+				info->dp2_ext_hdmi_reg_num,
+				info->dp2_ext_hdmi_6g_reg_num,
+				info->dp2_ext_hdmi_reg_settings,
+				info->dp2_ext_hdmi_6g_reg_settings
+		);
+		break;
+	case ENGINE_ID_DIGD:
+		*settings = create_ext_hdmi_settings(
+				info->dp3_ext_hdmi_slv_addr,
+				info->dp3_ext_hdmi_reg_num,
+				info->dp3_ext_hdmi_6g_reg_num,
+				info->dp3_ext_hdmi_reg_settings,
+				info->dp3_ext_hdmi_6g_reg_settings
+		);
+		break;
+	default:
+		return false;
 	}
 
-	return result;
+	// Validate settings from bios integrated info table
+	if (
+			!settings->slv_addr
+			|| settings->reg_num > ARRAY_SIZE(settings->reg_settings)
+			|| settings->reg_num_6g > ARRAY_SIZE(settings->reg_settings_6g)
+	) {
+		return false;
+	}
+
+	for (size_t i = 0; i < settings->reg_num; i++) {
+		if (settings->reg_settings[i].i2c_reg_index > 0x20)
+			return false;
+	}
+
+	for (size_t i = 0; i < settings->reg_num_6g; i++) {
+		if (settings->reg_settings_6g[i].i2c_reg_index > 0x20)
+			return false;
+	}
+	return true;
 }
 
 static bool write_i2c(
@@ -1792,7 +1795,7 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 			/* DP159, Retimer settings */
 			eng_id = pipe_ctx->stream_res.stream_enc->id;
 
-			if (get_ext_hdmi_settings(pipe_ctx, eng_id, &settings)) {
+			if (get_ext_hdmi_settings(stream->ctx->dc_bios->integrated_info, eng_id, &settings)) {
 				write_i2c_retimer_setting(link, is_vga_mode, is_over_340mhz, &settings);
 			} else {
 				write_i2c_default_retimer_setting(link, is_vga_mode, is_over_340mhz);
@@ -2209,7 +2212,7 @@ void link_set_dpms_off(struct pipe_ctx *pipe_ctx)
 			false);
 		if (masked_chip_caps == AMD_EXT_DISPLAY_PATH_CAPS__HDMI20_TISN65DP159RSBT) {
 			/* DP159, Retimer settings */
-			if (get_ext_hdmi_settings(pipe_ctx, eng_id, &settings))
+			if (get_ext_hdmi_settings(stream->ctx->dc_bios->integrated_info, eng_id, &settings))
 				write_i2c_retimer_setting(link, false, false, &settings);
 			else
 				write_i2c_default_retimer_setting(link, false, false);
