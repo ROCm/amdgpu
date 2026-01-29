@@ -12,6 +12,15 @@ AC_DEFUN([AC_AMDGPU_ZONE_DEVICE_PAGE_INIT], [
 			], [zone_device_page_init], [mm/memremap.c], [
 				AC_DEFINE(HAVE_ZONE_DEVICE_PAGE_INIT, 1, 
 					[zone_device_page_init() is available])
+		], [
+		AC_KERNEL_TRY_COMPILE_SYMBOL([
+				#include <linux/memremap.h>
+			], [
+				zone_device_page_init(NULL,NULL, 0);
+			], [zone_device_page_init], [mm/memremap.c], [
+				AC_DEFINE(HAVE_ZONE_DEVICE_PAGE_INIT_3ARG, 1,
+					[zone_device_page_init() takes 3 arguments])
+			])
 		])
 	])
 ])

@@ -51,4 +51,9 @@ long _kcl_get_user_pages(unsigned long start, unsigned long nr_pages,
 }
 #define get_user_pages _kcl_get_user_pages
 
+#ifndef HAVE_ZONE_DEVICE_PAGE_INIT_3ARG
+void _kcl_zone_device_page_init(struct page *page, struct dev_pagemap *pgmap, unsigned int order);
+#define zone_device_page_init _kcl_zone_device_page_init
+#endif
+
 #endif
