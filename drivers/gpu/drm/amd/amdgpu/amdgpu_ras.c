@@ -4120,9 +4120,9 @@ int amdgpu_ras_block_late_init(struct amdgpu_device *adev,
 			goto cleanup;
 	}
 
-	if (ras_obj->hw_ops &&
+	if (amdgpu_uniras_enabled(adev) || (ras_obj->hw_ops &&
 	    (ras_obj->hw_ops->query_ras_error_count ||
-	     ras_obj->hw_ops->query_ras_error_status)) {
+	     ras_obj->hw_ops->query_ras_error_status))) {
 		r = amdgpu_ras_sysfs_create(adev, ras_block);
 		if (r)
 			goto interrupt;
