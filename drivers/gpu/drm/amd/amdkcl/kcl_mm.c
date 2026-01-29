@@ -17,9 +17,10 @@ void __kcl_mmput_async(struct mm_struct *mm)
 }
 #endif
 
+#ifndef HAVE_ZONE_DEVICE_PAGE_INIT_3ARG
 #ifndef HAVE_ZONE_DEVICE_PAGE_INIT
 /* copied from v6.0-rc3-597-g0dc45ca1ce18 mm/memremap.c and modified for kcl usage */
-void zone_device_page_init(struct page *page)
+void _kcl_zone_device_page_init(struct page *page, struct dev_pagemap *pgmap, unsigned int order)
 {
 /* v5.17-rc4-75-g27674ef6c73f mm: remove the extra ZONE_DEVICE struct page refcount */
 #if IS_ENABLED(CONFIG_DEV_PAGEMAP_OPS)
@@ -27,8 +28,17 @@ void zone_device_page_init(struct page *page)
 #endif
 	lock_page(page);
 }
-EXPORT_SYMBOL_GPL(zone_device_page_init);
+#else
+void _kcl_zone_device_page_init(struct page *page, struct dev_pagemap *pgmap, unsigned int order)
+{
+	VM_WARN_ON_ONCE(order > MAX_ORDER_NR_PAGES);
+
+	WARN_ONCE(order, "legacy kernel without zone_device_page_init pgmap and order arg\n");
+	zone_device_page_init(page);
+}
 #endif
+EXPORT_SYMBOL_GPL(_kcl_zone_device_page_init);
+#endif /* HAVE_ZONE_DEVICE_PAGE_INIT_3ARG */
 
 #ifndef HAVE_KMALLOC_SIZE_ROUNDUP
 #ifndef CONFIG_SLOB
