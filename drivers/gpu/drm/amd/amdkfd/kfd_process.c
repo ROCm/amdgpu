@@ -2087,6 +2087,9 @@ void *kfd_process_device_translate_handle(struct kfd_process_device *pdd,
 
 	buf_obj = kfd_process_device_find_bo(pdd, handle);
 
+	if (!buf_obj)
+		return NULL;
+
 	return buf_obj->mem;
 }
 
@@ -2131,6 +2134,8 @@ void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 		return;
 
 	buf_obj = kfd_process_device_find_bo(pdd, handle);
+	if (!buf_obj)
+		return;
 
 	idr_remove(&pdd->alloc_idr, handle);
 
