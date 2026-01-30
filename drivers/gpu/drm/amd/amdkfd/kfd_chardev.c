@@ -2686,6 +2686,11 @@ static int criu_restore_memory_of_gpu_ipc(struct kfd_process_device *pdd,
 	}
 
 	kfd_bo = kfd_process_device_find_bo(pdd, bo_priv->idr_handle);
+	if (!kfd_bo) {
+		pr_err("Failed to find BO\n");
+		return -EINVAL;
+	}
+
 	*kgd_mem = kfd_bo->mem;
 	(*kgd_mem)->is_imported = bo_priv->is_imported;
 
