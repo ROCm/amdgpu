@@ -1257,9 +1257,6 @@ void dce110_disable_stream(struct pipe_ctx *pipe_ctx)
 					       link_enc->transmitter - TRANSMITTER_UNIPHY_A);
 	}
 
-	if (dc_is_rgb_signal(pipe_ctx->stream->signal))
-		dce110_dac_encoder_control(pipe_ctx, false);
-
 	if (link->ext_enc_id.id)
 		dce110_external_encoder_control(EXTERNAL_ENCODER_CONTROL_DISABLE, link, NULL);
 }
