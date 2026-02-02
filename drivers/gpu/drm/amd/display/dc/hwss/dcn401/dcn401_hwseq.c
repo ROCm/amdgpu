@@ -1202,6 +1202,25 @@ void dcn401_set_cursor_position(struct pipe_ctx *pipe_ctx)
 	x_pos = pos_cpy.x - param.recout.x;
 	y_pos = pos_cpy.y - param.recout.y;
 
+	/**
+	 * If the cursor position is negative after recout adjustment, we need
+	 * to shift the hotspot to compensate and clamp position to 0. This
+	 * handles the case where cursor straddles the left/top edge of an
+	 * overlay plane - the cursor is partially visible and needs correct
+	 * hotspot adjustment to render the visible portion.
+	 */
+	if (x_pos < 0) {
+		pos_cpy.x_hotspot -= x_pos;
+		if (hubp->curs_attr.attribute_flags.bits.ENABLE_MAGNIFICATION)
+			adjust_hotspot_between_slices_for_2x_magnify(hubp->curs_attr.width, &pos_cpy);
+		x_pos = 0;
+	}
+
+	if (y_pos < 0) {
+		pos_cpy.y_hotspot -= y_pos;
+		y_pos = 0;
+	}
+
 	recout_x_pos = x_pos - pos_cpy.x_hotspot;
 	recout_y_pos = y_pos - pos_cpy.y_hotspot;
 
