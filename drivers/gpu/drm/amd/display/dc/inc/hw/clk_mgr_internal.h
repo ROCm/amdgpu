@@ -1,5 +1,6 @@
+/* SPDX-License-Identifier: MIT */
 /*
- * Copyright 2018 Advanced Micro Devices, Inc.
+ * Copyright 2018-2026 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -223,6 +224,29 @@ enum dentist_divider_range {
 #define CLK_COMMON_MASK_SH_LIST_DCN401(mask_sh) \
 	CLK_COMMON_MASK_SH_LIST_DCN321(mask_sh)
 
+#define CLK_REG_LIST_DCN42()	  \
+	SR(DENTIST_DISPCLK_CNTL), \
+	CLK_SR_DCN42(CLK8_CLK_TICK_CNT_CONFIG_REG), \
+	CLK_SR_DCN42(CLK8_CLK0_CURRENT_CNT), \
+	CLK_SR_DCN42(CLK8_CLK1_CURRENT_CNT), \
+	CLK_SR_DCN42(CLK8_CLK2_CURRENT_CNT), \
+	CLK_SR_DCN42(CLK8_CLK3_CURRENT_CNT), \
+	CLK_SR_DCN42(CLK8_CLK4_CURRENT_CNT), \
+	CLK_SR_DCN42(CLK8_CLK0_BYPASS_CNTL), \
+	CLK_SR_DCN42(CLK8_CLK1_BYPASS_CNTL), \
+	CLK_SR_DCN42(CLK8_CLK2_BYPASS_CNTL), \
+	CLK_SR_DCN42(CLK8_CLK3_BYPASS_CNTL), \
+	CLK_SR_DCN42(CLK8_CLK4_BYPASS_CNTL), \
+	CLK_SR_DCN42(CLK8_CLK0_DS_CNTL), \
+	CLK_SR_DCN42(CLK8_CLK1_DS_CNTL), \
+	CLK_SR_DCN42(CLK8_CLK2_DS_CNTL), \
+	CLK_SR_DCN42(CLK8_CLK3_DS_CNTL), \
+	CLK_SR_DCN42(CLK8_CLK4_DS_CNTL)
+
+#define CLK_COMMON_MASK_SH_LIST_DCN42(mask_sh) 0
+
+
+
 #define CLK_REG_FIELD_LIST(type) \
 	type DPREFCLK_SRC_SEL; \
 	type DENTIST_DPREFCLK_WDIVIDER; \
@@ -298,6 +322,22 @@ struct clk_mgr_registers {
 	uint32_t CLK1_CLK5_ALLOW_DS;
 	uint32_t CLK5_spll_field_8;
 	uint32_t CLK6_spll_field_8;
+	uint32_t CLK8_CLK0_CURRENT_CNT;
+	uint32_t CLK8_CLK1_CURRENT_CNT;
+	uint32_t CLK8_CLK2_CURRENT_CNT;
+	uint32_t CLK8_CLK3_CURRENT_CNT;
+	uint32_t CLK8_CLK4_CURRENT_CNT;
+	uint32_t CLK8_CLK0_DS_CNTL;
+	uint32_t CLK8_CLK1_DS_CNTL;
+	uint32_t CLK8_CLK2_DS_CNTL;
+	uint32_t CLK8_CLK3_DS_CNTL;
+	uint32_t CLK8_CLK4_DS_CNTL;
+	uint32_t CLK8_CLK0_BYPASS_CNTL;
+	uint32_t CLK8_CLK1_BYPASS_CNTL;
+	uint32_t CLK8_CLK2_BYPASS_CNTL;
+	uint32_t CLK8_CLK3_BYPASS_CNTL;
+	uint32_t CLK8_CLK4_BYPASS_CNTL;
+	uint32_t CLK8_CLK_TICK_CNT_CONFIG_REG;
 };
 
 struct clk_mgr_shift {

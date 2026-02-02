@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2023 Advanced Micro Devices, Inc.
+ * Copyright 2012-2026 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -733,6 +733,8 @@ struct dc_clocks {
 	struct {
 		uint8_t base_efficiency; //LP1
 		uint8_t low_power_efficiency; //LP2
+		uint8_t z8_stutter_efficiency;
+		int z8_stutter_period;
 	} stutter_efficiency;
 };
 
@@ -1211,6 +1213,7 @@ struct dc_debug_options {
 	unsigned int num_fast_flips_to_steady_state_override;
 	bool enable_dmu_recovery;
 	unsigned int force_vmin_threshold;
+	bool enable_otg_frame_sync_pwa;
 };
 
 
@@ -1419,6 +1422,7 @@ struct dc_plane_status {
 	struct dc_plane_address current_address;
 	bool is_flip_pending;
 	bool is_right_eye;
+	struct cm_hist cm_hist;
 };
 
 union surface_update_flags {
@@ -1455,6 +1459,7 @@ union surface_update_flags {
 		uint32_t mcm_transfer_function_enable_change:1; /* disable or enable MCM transfer func */
 		uint32_t full_update:1;
 		uint32_t sdr_white_level_nits:1;
+		uint32_t cm_hist_change:1;
 	} bits;
 
 	uint32_t raw;
@@ -1539,6 +1544,7 @@ struct dc_plane_state {
 	int sharpness_level;
 	enum linear_light_scaling linear_light_scaling;
 	unsigned int sdr_white_level_nits;
+	struct cm_hist_control cm_hist_control;
 	struct spl_sharpness_range sharpness_range;
 	enum sharpness_range_source sharpness_source;
 };
@@ -1847,6 +1853,7 @@ struct dc_fast_update {
 	struct dc_transfer_func *out_transfer_func;
 	struct dc_csc_transform *output_csc_transform;
 	const struct dc_csc_transform *cursor_csc_color_matrix;
+	struct cm_hist_control *cm_hist_control;
 };
 
 struct dc_surface_update {
@@ -1879,6 +1886,7 @@ struct dc_surface_update {
 	const struct dc_csc_transform *cursor_csc_color_matrix;
 	unsigned int sdr_white_level_nits;
 	struct dc_bias_and_scale bias_and_scale;
+	struct cm_hist_control *cm_hist_control;
 };
 
 struct dc_underflow_debug_data {

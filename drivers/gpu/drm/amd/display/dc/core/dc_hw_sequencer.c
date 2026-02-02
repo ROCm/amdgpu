@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Advanced Micro Devices, Inc.
+ * Copyright 2015-2026 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -846,6 +846,16 @@ void hwss_build_fast_sequence(struct dc *dc,
 					block_sequence[*num_steps].func = DPP_PROGRAM_BIAS_AND_SCALE;
 					(*num_steps)++;
 				}
+				if (current_mpc_pipe->plane_state->update_flags.bits.cm_hist_change) {
+					block_sequence[*num_steps].params.control_cm_hist_params.dpp
+						= current_mpc_pipe->plane_res.dpp;
+					block_sequence[*num_steps].params.control_cm_hist_params.cm_hist_control
+						= current_mpc_pipe->plane_state->cm_hist_control;
+					block_sequence[*num_steps].params.control_cm_hist_params.color_space
+						= current_mpc_pipe->plane_state->color_space;
+					block_sequence[*num_steps].func = DPP_PROGRAM_CM_HIST;
+					(*num_steps)++;
+				}
 			}
 			if (hws->funcs.set_output_transfer_func && current_mpc_pipe->stream->update_flags.bits.out_tf) {
 				block_sequence[*num_steps].params.set_output_transfer_func_params.dc = dc;
@@ -1028,6 +1038,9 @@ void hwss_execute_sequence(struct dc *dc,
 			break;
 		case HUBP_PROGRAM_MCACHE_ID:
 			hwss_program_mcache_id_and_split_coordinate(params);
+			break;
+		case DPP_PROGRAM_CM_HIST:
+			hwss_program_cm_hist(params);
 			break;
 		case PROGRAM_CURSOR_UPDATE_NOW:
 			dc->hwss.program_cursor_offload_now(
@@ -2052,6 +2065,16 @@ void hwss_program_mcache_id_and_split_coordinate(union block_sequence_params *pa
 
 	hubp->funcs->hubp_program_mcache_id_and_split_coordinate(hubp, mcache_regs);
 
+}
+
+void hwss_program_cm_hist(union block_sequence_params *params)
+{
+	struct dpp *dpp = params->control_cm_hist_params.dpp;
+
+	if (dpp && dpp->funcs->dpp_cm_hist_control)
+		dpp->funcs->dpp_cm_hist_control(dpp,
+			params->control_cm_hist_params.cm_hist_control,
+			params->control_cm_hist_params.color_space);
 }
 
 void get_surface_tile_visual_confirm_color(
@@ -3366,6 +3389,20 @@ void hwss_add_opp_program_bit_depth_reduction(struct block_sequence_state *seq_s
 		seq_state->steps[*seq_state->num_steps].params.opp_program_bit_depth_reduction_params.opp = opp;
 		seq_state->steps[*seq_state->num_steps].params.opp_program_bit_depth_reduction_params.use_default_params = use_default_params;
 		seq_state->steps[*seq_state->num_steps].params.opp_program_bit_depth_reduction_params.pipe_ctx = pipe_ctx;
+		(*seq_state->num_steps)++;
+	}
+}
+
+void hwss_add_dpp_program_cm_hist(struct block_sequence_state *seq_state,
+		struct dpp *dpp,
+		struct cm_hist_control cm_hist_control,
+		enum dc_color_space color_space)
+{
+	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
+		seq_state->steps[*seq_state->num_steps].func = DPP_PROGRAM_CM_HIST;
+		seq_state->steps[*seq_state->num_steps].params.control_cm_hist_params.dpp = dpp;
+		seq_state->steps[*seq_state->num_steps].params.control_cm_hist_params.cm_hist_control = cm_hist_control;
+		seq_state->steps[*seq_state->num_steps].params.control_cm_hist_params.color_space = color_space;
 		(*seq_state->num_steps)++;
 	}
 }
