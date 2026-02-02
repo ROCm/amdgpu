@@ -2229,8 +2229,11 @@ static bool signal_eviction_fence(struct kfd_process *p)
 	rcu_read_unlock();
 	if (!ef)
 		return true;
-
+#ifdef HAVE_DMA_FENCE_CHECK_AND_SIGNAL
 	ret = dma_fence_check_and_signal(ef);
+#else
+	ret = dma_fence_signal(ef);
+#endif
 	dma_fence_put(ef);
 
 	return ret;
