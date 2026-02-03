@@ -290,10 +290,10 @@ struct clk_mgr_registers {
 	uint32_t CLK2_CLK2_DFS_CNTL;
 
 	uint32_t CLK1_CLK0_CURRENT_CNT;
-    uint32_t CLK1_CLK1_CURRENT_CNT;
-    uint32_t CLK1_CLK2_CURRENT_CNT;
-    uint32_t CLK1_CLK3_CURRENT_CNT;
-    uint32_t CLK1_CLK4_CURRENT_CNT;
+	uint32_t CLK1_CLK1_CURRENT_CNT;
+	uint32_t CLK1_CLK2_CURRENT_CNT;
+	uint32_t CLK1_CLK3_CURRENT_CNT;
+	uint32_t CLK1_CLK4_CURRENT_CNT;
 	uint32_t CLK1_CLK5_CURRENT_CNT;
 
 	uint32_t CLK0_CLK0_DFS_CNTL;
@@ -362,6 +362,8 @@ enum clock_type {
 	clock_type_dscclk,
 	clock_type_uclk,
 	clock_type_dramclk,
+	clock_type_dprefclk,
+	clock_type_dtbclk,
 };
 
 
