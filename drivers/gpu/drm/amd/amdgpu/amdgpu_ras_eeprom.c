@@ -1928,3 +1928,26 @@ int amdgpu_ras_smu_erase_ras_table(struct amdgpu_device *adev,
 									   result);
 	return -EOPNOTSUPP;
 }
+
+void amdgpu_ras_check_bad_page_status(struct amdgpu_device *adev)
+{
+	struct amdgpu_ras *ras = amdgpu_ras_get_context(adev);
+	struct amdgpu_ras_eeprom_control *control = ras ? &ras->eeprom_control : NULL;
+
+	if (!control || amdgpu_bad_page_threshold == 0)
+		return;
+
+	if (control->ras_num_bad_pages >= ras->bad_page_cnt_threshold) {
+		if (amdgpu_dpm_send_rma_reason(adev))
+			dev_warn(adev->dev, "Unable to send out-of-band RMA CPER");
+		else
+			dev_dbg(adev->dev, "Sent out-of-band RMA CPER");
+
+		if (adev->cper.enabled && !amdgpu_uniras_enabled(adev)) {
+			if (amdgpu_cper_generate_bp_threshold_record(adev))
+				dev_warn(adev->dev, "Unable to send in-band RMA CPER");
+			else
+				dev_dbg(adev->dev, "Sent in-band RMA CPER");
+		}
+	}
+}
