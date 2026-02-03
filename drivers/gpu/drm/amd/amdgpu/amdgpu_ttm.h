@@ -83,6 +83,7 @@ struct amdgpu_mman {
 	/* @default_entity: for workarounds, has no gart windows */
 	struct amdgpu_ttm_buffer_entity default_entity;
 	struct amdgpu_ttm_buffer_entity *clear_entities;
+	atomic_t next_clear_entity;
 	u32 num_clear_entities;
 	struct amdgpu_ttm_buffer_entity move_entities[TTM_NUM_MOVE_FENCES];
 	u32 num_move_entities;
@@ -206,6 +207,7 @@ int amdgpu_fill_buffer(struct amdgpu_ttm_buffer_entity *entity,
 		       struct dma_resv *resv,
 		       struct dma_fence **f,
 		       u64 k_job_id);
+struct amdgpu_ttm_buffer_entity *amdgpu_ttm_next_clear_entity(struct amdgpu_device *adev);
 
 #ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 int amdgpu_mmap(struct file *filp, struct vm_area_struct *vma);
