@@ -319,10 +319,14 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 			ret = vfs_iocb_iter_read(filep, &kiocb, &iter);
 		else
 			ret = vfs_iocb_iter_write(filep, &kiocb, &iter);
-		if (ret <= 0) {
+		if (ret < 0) {
 			dev_err(adev->dev, "AIS: vfs transfer failed %d\n", ret);
 			break;
-		} else if (cur_pos == kiocb.ki_pos) {
+		}
+		if (ret == 0 && is_read) {
+			break; /* EOF */
+		}
+		if (cur_pos == kiocb.ki_pos) {
 			/* No progress made, retry */
 			if (retry-- > 0) {
 				dev_warn(adev->dev, "AIS: vfs transfer stalled, retrying...\n");
@@ -337,7 +341,7 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	}
 
 
-	if (ret > 0) {
+	if (ret > 0 || (ret == 0 && is_read)) {
 		dev_dbg(adev->dev, "AIS: vfs transfer %llu bytes\n", *size_copied);
 		ret = kfd_ais_update_counters(*size_copied, pdev, pdd, is_read);
 	}
