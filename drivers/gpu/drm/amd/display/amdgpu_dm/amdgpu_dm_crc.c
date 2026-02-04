@@ -33,6 +33,7 @@
 #include "amdgpu_securedisplay.h"
 #include "amdgpu_dm_psr.h"
 #include "amdgpu_dm_replay.h"
+#include "amdgpu_dm_kunit_helpers.h"
 
 static const char *const pipe_crc_sources[] = {
 	"none",
@@ -43,7 +44,8 @@ static const char *const pipe_crc_sources[] = {
 	"auto",
 };
 
-static enum amdgpu_dm_pipe_crc_source dm_parse_crc_source(const char *source)
+STATIC_IFN_KUNIT
+enum amdgpu_dm_pipe_crc_source dm_parse_crc_source(const char *source)
 {
 	if (!source || !strcmp(source, "none"))
 		return AMDGPU_DM_PIPE_CRC_SOURCE_NONE;
@@ -58,25 +60,32 @@ static enum amdgpu_dm_pipe_crc_source dm_parse_crc_source(const char *source)
 
 	return AMDGPU_DM_PIPE_CRC_SOURCE_INVALID;
 }
+EXPORT_IF_KUNIT(dm_parse_crc_source);
 
-static bool dm_is_crc_source_crtc(enum amdgpu_dm_pipe_crc_source src)
+STATIC_IFN_KUNIT
+bool dm_is_crc_source_crtc(enum amdgpu_dm_pipe_crc_source src)
 {
 	return (src == AMDGPU_DM_PIPE_CRC_SOURCE_CRTC) ||
 	       (src == AMDGPU_DM_PIPE_CRC_SOURCE_CRTC_DITHER);
 }
+EXPORT_IF_KUNIT(dm_is_crc_source_crtc);
 
-static bool dm_is_crc_source_dprx(enum amdgpu_dm_pipe_crc_source src)
+STATIC_IFN_KUNIT
+bool dm_is_crc_source_dprx(enum amdgpu_dm_pipe_crc_source src)
 {
 	return (src == AMDGPU_DM_PIPE_CRC_SOURCE_DPRX) ||
 	       (src == AMDGPU_DM_PIPE_CRC_SOURCE_DPRX_DITHER);
 }
+EXPORT_IF_KUNIT(dm_is_crc_source_dprx);
 
-static bool dm_need_crc_dither(enum amdgpu_dm_pipe_crc_source src)
+STATIC_IFN_KUNIT
+bool dm_need_crc_dither(enum amdgpu_dm_pipe_crc_source src)
 {
 	return (src == AMDGPU_DM_PIPE_CRC_SOURCE_CRTC_DITHER) ||
 	       (src == AMDGPU_DM_PIPE_CRC_SOURCE_DPRX_DITHER) ||
 	       (src == AMDGPU_DM_PIPE_CRC_SOURCE_NONE);
 }
+EXPORT_IF_KUNIT(dm_need_crc_dither);
 
 const char *const *amdgpu_dm_crtc_get_crc_sources(struct drm_crtc *crtc,
 						  size_t *count)

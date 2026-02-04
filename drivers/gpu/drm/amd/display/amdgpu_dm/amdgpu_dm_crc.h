@@ -148,4 +148,11 @@ void amdgpu_dm_crtc_secure_display_create_contexts(struct amdgpu_device *adev);
 #define amdgpu_dm_crtc_secure_display_create_contexts(x)
 #endif
 
+#ifdef CONFIG_DRM_AMD_DC_KUNIT_TEST
+enum amdgpu_dm_pipe_crc_source dm_parse_crc_source(const char *source);
+bool dm_is_crc_source_crtc(enum amdgpu_dm_pipe_crc_source src);
+bool dm_is_crc_source_dprx(enum amdgpu_dm_pipe_crc_source src);
+bool dm_need_crc_dither(enum amdgpu_dm_pipe_crc_source src);
+#endif
+
 #endif /* AMD_DAL_DEV_AMDGPU_DM_AMDGPU_DM_CRC_H_ */

@@ -59,3 +59,8 @@ AMDGPU_DM = $(addprefix $(AMDDALPATH)/amdgpu_dm/,$(AMDGPUDM))
 
 AMD_DISPLAY_FILES += $(AMDGPU_DM)
 endif
+
+# KUnit tests as separate module
+ifneq ($(CONFIG_DRM_AMD_DC_KUNIT_TEST),)
+obj-y += $(AMDDALPATH)/amdgpu_dm/tests/
+endif
