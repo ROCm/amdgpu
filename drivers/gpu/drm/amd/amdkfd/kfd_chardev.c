@@ -3759,13 +3759,17 @@ static int kfd_ioctl_ais(struct file *filep, struct kfd_process *p, void *data)
 	}
 
 	/*
-	 * Concurrent data transfers on the same buffer is allowed. Pin it before
-	 * releasing the lock. This ensures that BO remains valid when file system
-	 * is accessing it
+	 * Pin the BO before using it for AIS file I/O operations.
+	 * Take a reference to prevent UAF if the BO is freed
+	 * concurrently via FREE_MEMORY_OF_GPU. The reference ensures the
+	 * BO remains valid until we unpin and release it.
 	 */
+	amdgpu_amdkfd_gpuvm_get_bo_ref(buf_obj->mem, NULL);
+
 	err = amdgpu_amdkfd_gpuvm_pin_bo(bo, AMDGPU_GEM_DOMAIN_VRAM);
 	if (err) {
 		pr_err("Pinning of buffer failed.\n");
+		amdgpu_amdkfd_gpuvm_put_bo_ref(bo);
 		goto err_bind_process;
 	}
 
@@ -3779,6 +3783,7 @@ static int kfd_ioctl_ais(struct file *filep, struct kfd_process *p, void *data)
 	}
 
 	amdgpu_amdkfd_gpuvm_unpin_bo(bo);
+	amdgpu_amdkfd_gpuvm_put_bo_ref(bo);
 	memcpy(out, &out_args, sizeof(out_args));
 	return err;
 
