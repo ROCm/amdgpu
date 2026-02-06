@@ -216,6 +216,14 @@ static inline struct pci_dev *pci_get_base_class(unsigned int class,
 #define PCI_IRQ_INTX PCI_IRQ_LEGACY
 #endif
 
+#ifndef HAVE_PCI_DEV_IS_DISCONNECTED
+static inline bool kcl_pci_dev_is_disconnected(const struct pci_dev *dev)
+{
+	return READ_ONCE(dev->error_state) == pci_channel_io_perm_failure;
+}
+#define pci_dev_is_disconnected kcl_pci_dev_is_disconnected
+#endif
+
 #ifndef HAVE_PCI_REBAR_GET_MAX_SIZE
 static inline int pci_rebar_get_max_size(struct pci_dev *pdev, int bar)
 {
