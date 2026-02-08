@@ -1200,6 +1200,9 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 		kfd_pc_sample_release(pdd);
 		kfd_spm_release_process_device(pdd);
 
+		if (pdd->ptl_disable_req)
+			kfd_ptl_disable_release(pdd, p);
+
 		kfd_process_device_destroy_cwsr_dgpu(pdd);
 		kfd_process_device_destroy_ib_mem(pdd);
 

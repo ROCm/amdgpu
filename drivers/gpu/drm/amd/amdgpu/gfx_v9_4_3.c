@@ -2420,6 +2420,8 @@ static int gfx_v9_4_3_perf_monitor_ptl_init(struct amdgpu_device *adev, bool ena
 
 	ptl->hw_supported = true;
 
+	atomic_set(&ptl->disable_ref, 0);
+
 	return 0;
 }
 
