@@ -31,6 +31,7 @@
 #include "ta_ras_if.h"
 #include "ta_rap_if.h"
 #include "ta_secureDisplay_if.h"
+#include "amdgpu_ptl.h"
 
 #define PSP_FENCE_BUFFER_SIZE	0x1000
 #define PSP_CMD_BUFFER_SIZE	0x1000
@@ -469,6 +470,7 @@ struct psp_context {
 #if defined(CONFIG_DEBUG_FS)
 	struct spirom_bo *spirom_dump_trip;
 #endif
+	struct amdgpu_ptl		ptl;
 };
 
 struct amdgpu_psp_funcs {
@@ -651,6 +653,5 @@ int amdgpu_psp_reg_program_no_ring(struct psp_context *psp, uint32_t val,
 void amdgpu_psp_debugfs_init(struct amdgpu_device *adev);
 int amdgpu_psp_get_fw_type(struct amdgpu_firmware_info *ucode,
 			   enum psp_gfx_fw_type *type);
-
 
 #endif
