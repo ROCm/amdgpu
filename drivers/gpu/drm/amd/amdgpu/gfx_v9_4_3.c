@@ -2425,6 +2425,32 @@ static int gfx_v9_4_3_perf_monitor_ptl_init(struct amdgpu_device *adev, bool ena
 	return 0;
 }
 
+static int gfx_v9_4_3_ptl_hw_init(struct amdgpu_device *adev)
+{
+	struct amdgpu_ptl *ptl = &adev->psp.ptl;
+	bool enable;
+
+	switch (amdgpu_ptl) {
+	case 1:
+		enable = true;
+		break;
+	case 2:
+		/* Permanently disabled - cannot be re-enabled */
+		enable = false;
+		ptl->permanently_disabled = true;
+		break;
+	case -1:
+	case 0:
+	default:
+		enable = false;
+		break;
+	}
+
+	gfx_v9_4_3_perf_monitor_ptl_init(adev, enable ? 1 : 0);
+
+	return 0;
+}
+
 static int gfx_v9_4_3_hw_fini(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
@@ -2712,7 +2738,7 @@ static int gfx_v9_4_3_late_init(struct amdgpu_ip_block *ip_block)
 	    adev->gfx.ras->enable_watchdog_timer)
 		adev->gfx.ras->enable_watchdog_timer(adev);
 
-	gfx_v9_4_3_perf_monitor_ptl_init(adev, true);
+	gfx_v9_4_3_ptl_hw_init(adev);
 
 	return 0;
 }

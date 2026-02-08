@@ -44,6 +44,7 @@ struct amdgpu_ptl {
 	enum amdgpu_ptl_fmt		fmt2;
 	bool				enabled;
 	bool				hw_supported;
+	bool				permanently_disabled;
 	/* PTL disable reference counting */
 	atomic_t			disable_ref;
 	struct mutex			mutex;
