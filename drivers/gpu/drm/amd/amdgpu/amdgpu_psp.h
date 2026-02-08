@@ -371,6 +371,8 @@ enum psp_ptl_format_type {
 	GFX_FTYPE_BF16        = 0x00000002,
 	GFX_FTYPE_F32         = 0x00000003,
 	GFX_FTYPE_F64         = 0x00000004,
+	GFX_FTYPE_F8          = 0x00000005,
+	GFX_FTYPE_VECTOR      = 0x00000006,
 	GFX_FTYPE_INVALID     = 0xFFFFFFFF,
 };
 

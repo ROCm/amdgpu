@@ -58,6 +58,8 @@ static const char * const amdgpu_ptl_fmt_str[] = {
 	[AMDGPU_PTL_FMT_BF16]    = "BF16",
 	[AMDGPU_PTL_FMT_F32]     = "F32",
 	[AMDGPU_PTL_FMT_F64]     = "F64",
+	[AMDGPU_PTL_FMT_F8]      = "F8",
+	[AMDGPU_PTL_FMT_VECTOR]  = "VECTOR",
 	[AMDGPU_PTL_FMT_INVALID] = "INVALID",
 };
 
@@ -1235,6 +1237,12 @@ static int psp_ptl_fmt_verify(struct psp_context *psp, enum amdgpu_ptl_fmt fmt,
 		break;
 	case AMDGPU_PTL_FMT_F64:
 		*ptl_fmt = GFX_FTYPE_F64;
+		break;
+	case AMDGPU_PTL_FMT_F8:
+		*ptl_fmt = GFX_FTYPE_F8;
+		break;
+	case AMDGPU_PTL_FMT_VECTOR:
+		*ptl_fmt = GFX_FTYPE_VECTOR;
 		break;
 	default:
 		return -EINVAL;
