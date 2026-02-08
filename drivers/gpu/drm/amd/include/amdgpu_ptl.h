@@ -34,6 +34,11 @@ enum amdgpu_ptl_fmt {
 	AMDGPU_PTL_FMT_INVALID = 7,
 };
 
+enum amdgpu_ptl_disable_source {
+	AMDGPU_PTL_DISABLE_SYSFS = 0,
+	AMDGPU_PTL_DISABLE_PROFILER,
+	AMDGPU_PTL_DISABLE_MAX,
+};
 struct amdgpu_ptl {
 	enum amdgpu_ptl_fmt		fmt1;
 	enum amdgpu_ptl_fmt		fmt2;
@@ -42,6 +47,7 @@ struct amdgpu_ptl {
 	/* PTL disable reference counting */
 	atomic_t			disable_ref;
 	struct mutex			mutex;
+	DECLARE_BITMAP(disable_bitmap, AMDGPU_PTL_DISABLE_MAX);
 };
 
 int amdgpu_ptl_perf_monitor_ctrl(struct amdgpu_device *adev, u32 req_code,

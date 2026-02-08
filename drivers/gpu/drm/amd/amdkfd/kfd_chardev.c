@@ -1964,6 +1964,7 @@ int kfd_ptl_disable_request(struct kfd_process_device *pdd,
 			goto out;
 		}
 	}
+	set_bit(AMDGPU_PTL_DISABLE_PROFILER, ptl->disable_bitmap);
 	pdd->ptl_disable_req = true;
 
 out:
@@ -1984,9 +1985,11 @@ int kfd_ptl_disable_release(struct kfd_process_device *pdd,
 		goto out;
 
 	if (atomic_dec_return(&ptl->disable_ref) == 0) {
+		clear_bit(AMDGPU_PTL_DISABLE_PROFILER, ptl->disable_bitmap);
 		ret = kfd_ptl_control(pdd, true);
 		if (ret) {
 			atomic_inc(&ptl->disable_ref);
+			set_bit(AMDGPU_PTL_DISABLE_PROFILER, ptl->disable_bitmap);
 			dev_warn(adev->dev, "Failed to enable PTL on release: %d\n", ret);
 			goto out;
 		}
