@@ -47,4 +47,8 @@ int amdgpu_ptl_perf_monitor_ctrl(struct amdgpu_device *adev, u32 req_code,
 		enum amdgpu_ptl_fmt *fmt1,
 		enum amdgpu_ptl_fmt *fmt2);
 
+int amdgpu_ptl_sysfs_init(struct amdgpu_device *adev);
+void amdgpu_ptl_sysfs_fini(struct amdgpu_device *adev);
+
+extern const struct attribute_group amdgpu_ptl_attr_group;
 #endif /* __AMDGPU_PTL_H__ */
