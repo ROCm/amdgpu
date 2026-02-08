@@ -1932,6 +1932,11 @@ static int kfd_ptl_control(struct kfd_process_device *pdd, bool enable)
 	if (adev->kfd.init_complete)
 		amdgpu_amdkfd_stop_sched(adev, pdd->dev->node_id);
 
+	/* Wait for GFX to be idle before PTL operation */
+	ret = amdgpu_device_ip_wait_for_idle(adev, AMD_IP_BLOCK_TYPE_GFX);
+	if (ret)
+		return -ETIMEDOUT;
+
 	ret = pdd->dev->kfd2kgd->ptl_ctrl(adev, PSP_PTL_PERF_MON_SET,
 					  &ptl_state,
 					  &pref_format1,
