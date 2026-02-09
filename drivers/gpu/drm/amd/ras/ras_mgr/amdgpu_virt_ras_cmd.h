@@ -30,11 +30,14 @@ struct remote_batch_trace_mgr {
 	struct ras_cmd_batch_trace_record_rsp  batch_trace;
 };
 
-struct vram_blocks_ecc {
-	struct amdgpu_bo *bo;
-	uint64_t mc_addr;
+struct amdgpu_virt_shared_mem {
+	uint64_t gpa;
 	void *cpu_addr;
 	uint32_t size;
+};
+
+struct vram_blocks_ecc {
+	struct amdgpu_virt_shared_mem shared_mem;
 	bool auto_update_actived;
 };
 
@@ -42,6 +45,7 @@ struct amdgpu_virt_ras_cmd {
 	bool remote_uniras_supported;
 	struct remote_batch_trace_mgr batch_mgr;
 	struct vram_blocks_ecc blocks_ecc;
+	struct mutex remote_access_lock;
 };
 
 int amdgpu_virt_ras_sw_init(struct amdgpu_device *adev);
