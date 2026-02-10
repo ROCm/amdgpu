@@ -107,16 +107,14 @@ static void amdgpu_fence_save_fence_wptr_end(struct amdgpu_fence *af)
  * @flags: flags to pass into the subordinate .emit_fence() call
  *
  * Emits a fence command on the requested ring (all asics).
- * Returns 0 on success, -ENOMEM on failure.
  */
-int amdgpu_fence_emit(struct amdgpu_ring *ring, struct amdgpu_fence *af,
-		      unsigned int flags)
+void amdgpu_fence_emit(struct amdgpu_ring *ring, struct amdgpu_fence *af,
+		       unsigned int flags)
 {
 	struct amdgpu_device *adev = ring->adev;
 	struct dma_fence *fence;
 	struct dma_fence __rcu **ptr;
 	uint32_t seq;
-	int r;
 
 	fence = &af->base;
 	af->ring = ring;
@@ -141,10 +139,13 @@ int amdgpu_fence_emit(struct amdgpu_ring *ring, struct amdgpu_fence *af,
 		rcu_read_unlock();
 
 		if (old) {
-			r = dma_fence_wait(old, false);
+			/*
+			 * dma_fence_wait(old, false) is not interruptible.
+			 * It will not return an error in this case.
+			 * So we can safely ignore the return value.
+			 */
+			dma_fence_wait(old, false);
 			dma_fence_put(old);
-			if (r)
-				return r;
 		}
 	}
 
@@ -154,8 +155,6 @@ int amdgpu_fence_emit(struct amdgpu_ring *ring, struct amdgpu_fence *af,
 	 * emitting the fence would mess up the hardware ring buffer.
 	 */
 	rcu_assign_pointer(*ptr, dma_fence_get(fence));
-
-	return 0;
 }
 
 /**
