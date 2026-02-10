@@ -401,6 +401,33 @@ int amdgpu_virt_ras_check_address_validity(struct amdgpu_device *adev,
 	return RAS_CMD__SUCCESS;
 }
 
+int amdgpu_virt_ras_convert_retired_address(struct amdgpu_device *adev,
+			uint64_t address, uint64_t *pfn, uint32_t max_pfn_sz)
+{
+	struct ras_cmd_convert_retired_address_req req = {0};
+	struct ras_cmd_convert_retired_address_rsp rsp = {0};
+	int ret = 0, i;
+	int retired_page_count;
+
+	if (!pfn || !max_pfn_sz)
+		return -EINVAL;
+
+	req.address = address;
+
+	ret = amdgpu_ras_mgr_handle_ras_cmd(adev, RAS_CMD__CONVERT_RETIRED_ADDRESS,
+		&req, sizeof(req), &rsp, sizeof(rsp));
+
+	if (ret || rsp.retired_count == 0)
+		return -EINVAL;
+
+	retired_page_count = rsp.retired_count > max_pfn_sz ? max_pfn_sz : rsp.retired_count;
+
+	for (i = 0; i < retired_page_count; i++)
+		pfn[i] = rsp.retired_addr[i] >> AMDGPU_GPU_PAGE_SHIFT;
+
+	return retired_page_count;
+}
+
 static struct ras_cmd_func_map amdgpu_virt_ras_cmd_maps[] = {
 	{RAS_CMD__GET_CPER_SNAPSHOT, amdgpu_virt_ras_get_cper_snapshot},
 	{RAS_CMD__GET_CPER_RECORD, amdgpu_virt_ras_get_cper_records},

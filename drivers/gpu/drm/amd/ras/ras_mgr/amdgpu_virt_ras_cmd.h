@@ -60,4 +60,6 @@ void amdgpu_virt_ras_set_remote_uniras(struct amdgpu_device *adev, bool en);
 bool amdgpu_virt_ras_remote_uniras_enabled(struct amdgpu_device *adev);
 int amdgpu_virt_ras_check_address_validity(struct amdgpu_device *adev,
 			uint64_t address, bool *hit);
+int amdgpu_virt_ras_convert_retired_address(struct amdgpu_device *adev,
+			uint64_t address, uint64_t *pfn, uint32_t max_pfn_sz);
 #endif
