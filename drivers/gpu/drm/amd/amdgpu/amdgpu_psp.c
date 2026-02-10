@@ -1270,6 +1270,18 @@ static int psp_ptl_invoke(struct psp_context *psp, u32 req_code,
 	if (ret)
 		goto out;
 
+	/*
+	 * Check response status explicitly to avoid
+	 * updating cached PTL state with invalid data.
+	 */
+	if (cmd->resp.status) {
+		dev_err(psp->adev->dev,
+				"PTL command 0x%x failed, PSP response status: 0x%X\n",
+				req_code, cmd->resp.status);
+		ret = -EIO;
+		goto out;
+	}
+
 	/* Parse response */
 	switch (req_code) {
 	case PSP_PTL_PERF_MON_QUERY:
