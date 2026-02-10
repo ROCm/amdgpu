@@ -77,6 +77,7 @@ enum ras_cmd_id {
 	RAS_CMD__GET_BATCH_TRACE_RECORD,
 	RAS_CMD__GET_ALL_BLOCK_ECC_STATUS,
 	RAS_CMD__SET_CMD_AUTO_UPDATE,
+	RAS_CMD__CHECK_ADDRESS_VALIDITY,
 	RAS_CMD__SUPPORTED_MAX = RAS_CMD_ID_COMMON_END,
 };
 
@@ -425,6 +426,20 @@ struct ras_cmd_auto_update_req {
 struct ras_cmd_auto_update_rsp {
 	uint32_t version;
 	uint32_t reserved[4];
+};
+
+struct ras_cmd_address_check_req {
+	struct ras_cmd_dev_handle dev;
+	uint64_t address;
+	uint32_t flags;
+	uint32_t vf_idx;
+	uint32_t reserved[4];
+};
+
+struct ras_cmd_address_check_rsp {
+	uint32_t version;
+	uint32_t result;
+	uint32_t reserved[6];
 };
 
 struct ras_cmd_blocks_ecc_req {
