@@ -33,7 +33,6 @@
 #include <linux/dma-fence.h>
 #include "amdgpu_irq.h"
 #include "amdgpu_gfx.h"
-#include "amdgpu_ptl.h"
 
 struct pci_dev;
 struct amdgpu_device;
