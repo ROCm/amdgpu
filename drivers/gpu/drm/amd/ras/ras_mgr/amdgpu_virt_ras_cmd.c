@@ -381,6 +381,26 @@ static int amdgpu_virt_ras_get_block_ecc(struct ras_core_context *ras_core,
 	return RAS_CMD__SUCCESS;
 }
 
+int amdgpu_virt_ras_check_address_validity(struct amdgpu_device *adev,
+			uint64_t address, bool *hit)
+{
+	struct ras_cmd_address_check_req req = {0};
+	struct ras_cmd_address_check_rsp rsp = {0};
+	int ret = 0;
+
+	req.address = address;
+
+	ret = amdgpu_ras_mgr_handle_ras_cmd(adev, RAS_CMD__CHECK_ADDRESS_VALIDITY,
+		&req, sizeof(req), &rsp, sizeof(rsp));
+
+	if (ret)
+		return RAS_CMD__ERROR_GENERIC;
+
+	*hit = rsp.result ? true : false;
+
+	return RAS_CMD__SUCCESS;
+}
+
 static struct ras_cmd_func_map amdgpu_virt_ras_cmd_maps[] = {
 	{RAS_CMD__GET_CPER_SNAPSHOT, amdgpu_virt_ras_get_cper_snapshot},
 	{RAS_CMD__GET_CPER_RECORD, amdgpu_virt_ras_get_cper_records},
