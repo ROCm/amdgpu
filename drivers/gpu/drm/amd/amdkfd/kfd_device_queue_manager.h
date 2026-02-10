@@ -200,8 +200,6 @@ struct device_queue_manager_ops {
 				  const struct queue *q,
 				  void *mqd,
 				  void *ctl_stack);
-	void	(*set_perfcount)(struct device_queue_manager *dqm,
-				  int enable);
 };
 
 struct device_queue_manager_asic_ops {
