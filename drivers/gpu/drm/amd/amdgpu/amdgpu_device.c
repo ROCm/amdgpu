@@ -3684,7 +3684,6 @@ static int amdgpu_device_ip_fini_early(struct amdgpu_device *adev)
 	}
 
 	amdgpu_amdkfd_suspend(adev, true);
-	amdgpu_amdkfd_teardown_processes(adev);
 	amdgpu_userq_suspend(adev);
 
 	/* Workaround for ASICs need to disable SMC first */

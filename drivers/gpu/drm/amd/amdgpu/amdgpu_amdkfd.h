@@ -162,7 +162,6 @@ struct amdkfd_process_info {
 
 int amdgpu_amdkfd_init(void);
 void amdgpu_amdkfd_fini(void);
-void amdgpu_amdkfd_teardown_processes(struct amdgpu_device *adev);
 
 void amdgpu_amdkfd_suspend(struct amdgpu_device *adev, bool suspend_proc);
 int amdgpu_amdkfd_resume(struct amdgpu_device *adev, bool resume_proc);
@@ -508,8 +507,6 @@ int kgd2kfd_stop_sched_all_nodes(struct kfd_dev *kfd);
 bool kgd2kfd_compute_active(struct kfd_dev *kfd, uint32_t node_id);
 bool kgd2kfd_vmfault_fast_path(struct amdgpu_device *adev, struct amdgpu_iv_entry *entry,
 			       bool retry_fault);
-void kgd2kfd_lock_kfd(void);
-void kgd2kfd_teardown_processes(struct amdgpu_device *adev);
 
 #else
 static inline int kgd2kfd_init(void)
@@ -620,14 +617,6 @@ static inline bool kgd2kfd_vmfault_fast_path(struct amdgpu_device *adev, struct 
 				      bool retry_fault)
 {
 	return false;
-}
-
-static inline void kgd2kfd_lock_kfd(void)
-{
-}
-
-static inline void kgd2kfd_teardown_processes(struct amdgpu_device *adev)
-{
 }
 
 #endif
