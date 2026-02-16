@@ -3065,7 +3065,7 @@ struct surface_update_descriptor dc_check_update_surfaces_for_stream(
 {
 	if (stream_update)
 		stream_update->stream->update_flags.raw = 0;
-	for (size_t i = 0; i < surface_count; i++)
+	for (int i = 0; i < surface_count; i++)
 		updates[i].surface->update_flags.raw = 0;
 
 	return check_update_surfaces_for_stream(check_config, updates, surface_count, stream_update);
