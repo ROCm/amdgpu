@@ -523,20 +523,19 @@ int amdgpu_userq_signal_ioctl(struct drm_device *dev, void *data,
 			      struct drm_file *filp)
 {
 	struct amdgpu_device *adev = drm_to_adev(dev);
+	struct drm_amdgpu_userq_signal *args = data;
+	const unsigned int num_write_bo_handles = args->num_bo_write_handles;
+	const unsigned int num_read_bo_handles = args->num_bo_read_handles;
 	struct amdgpu_fpriv *fpriv = filp->driver_priv;
 	struct amdgpu_userq_mgr *userq_mgr = &fpriv->userq_mgr;
-	struct drm_amdgpu_userq_signal *args = data;
-	struct drm_gem_object **gobj_write = NULL;
-	struct drm_gem_object **gobj_read = NULL;
-	struct amdgpu_usermode_queue *queue;
-	struct amdgpu_userq_fence *userq_fence;
-	struct drm_syncobj **syncobj = NULL;
-	u32 *bo_handles_write, num_write_bo_handles;
+	struct drm_gem_object **gobj_write, **gobj_read;
 	u32 *syncobj_handles, num_syncobj_handles;
-	u32 *bo_handles_read, num_read_bo_handles;
-	int r, i, entry, rentry, wentry;
+	struct amdgpu_userq_fence *userq_fence;
+	struct amdgpu_usermode_queue *queue;
+	struct drm_syncobj **syncobj = NULL;
 	struct dma_fence *fence;
 	struct drm_exec exec;
+	int r, i, entry;
 	u64 wptr;
 
 	if (!amdgpu_userq_enabled(dev))
@@ -563,51 +562,19 @@ int amdgpu_userq_signal_ioctl(struct drm_device *dev, void *data,
 		}
 	}
 
-	num_read_bo_handles = args->num_bo_read_handles;
-	bo_handles_read = memdup_user(u64_to_user_ptr(args->bo_read_handles),
-				      sizeof(u32) * num_read_bo_handles);
-	if (IS_ERR(bo_handles_read)) {
-		r = PTR_ERR(bo_handles_read);
+	r = drm_gem_objects_lookup(filp,
+				   u64_to_user_ptr(args->bo_read_handles),
+				   num_read_bo_handles,
+				   &gobj_read);
+	if (r)
 		goto free_syncobj;
-	}
 
-	/* Array of pointers to the GEM read objects */
-	gobj_read = kmalloc_array(num_read_bo_handles, sizeof(*gobj_read), GFP_KERNEL);
-	if (!gobj_read) {
-		r = -ENOMEM;
-		goto free_bo_handles_read;
-	}
-
-	for (rentry = 0; rentry < num_read_bo_handles; rentry++) {
-		gobj_read[rentry] = drm_gem_object_lookup(filp, bo_handles_read[rentry]);
-		if (!gobj_read[rentry]) {
-			r = -ENOENT;
-			goto put_gobj_read;
-		}
-	}
-
-	num_write_bo_handles = args->num_bo_write_handles;
-	bo_handles_write = memdup_user(u64_to_user_ptr(args->bo_write_handles),
-				       sizeof(u32) * num_write_bo_handles);
-	if (IS_ERR(bo_handles_write)) {
-		r = PTR_ERR(bo_handles_write);
+	r = drm_gem_objects_lookup(filp,
+				   u64_to_user_ptr(args->bo_write_handles),
+				   num_write_bo_handles,
+				   &gobj_write);
+	if (r)
 		goto put_gobj_read;
-	}
-
-	/* Array of pointers to the GEM write objects */
-	gobj_write = kmalloc_array(num_write_bo_handles, sizeof(*gobj_write), GFP_KERNEL);
-	if (!gobj_write) {
-		r = -ENOMEM;
-		goto free_bo_handles_write;
-	}
-
-	for (wentry = 0; wentry < num_write_bo_handles; wentry++) {
-		gobj_write[wentry] = drm_gem_object_lookup(filp, bo_handles_write[wentry]);
-		if (!gobj_write[wentry]) {
-			r = -ENOENT;
-			goto put_gobj_write;
-		}
-	}
 
 	/* Retrieve the user queue */
 	queue = xa_load(&userq_mgr->userq_xa, args->queue_id);
@@ -686,17 +653,13 @@ int amdgpu_userq_signal_ioctl(struct drm_device *dev, void *data,
 exec_fini:
 	drm_exec_fini(&exec);
 put_gobj_write:
-	while (wentry-- > 0)
-		drm_gem_object_put(gobj_write[wentry]);
+	for (i = 0; i < num_write_bo_handles; i++)
+		drm_gem_object_put(gobj_write[i]);
 	kfree(gobj_write);
-free_bo_handles_write:
-	kfree(bo_handles_write);
 put_gobj_read:
-	while (rentry-- > 0)
-		drm_gem_object_put(gobj_read[rentry]);
+	for (i = 0; i < num_read_bo_handles; i++)
+		drm_gem_object_put(gobj_read[i]);
 	kfree(gobj_read);
-free_bo_handles_read:
-	kfree(bo_handles_read);
 free_syncobj:
 	while (entry-- > 0)
 		if (syncobj[entry])
