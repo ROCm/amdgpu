@@ -1294,7 +1294,7 @@ void dcn42_calc_blocks_to_ungate(struct dc *dc, struct dc_state *context,
  *	ONO Region 9, DCPG 2: dchubp2, dpp2
  *	ONO Region 11, DCPG 3: dchubp3, dpp3
  *	ONO Region 4, DCPG 25: hpo
-
+ *
  *  No sequential power up/down ordering for DCN42
  *
  * @dc: Current DC state
