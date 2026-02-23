@@ -2486,12 +2486,21 @@ static bool gfx_v9_4_3_is_idle(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
 	int i, num_xcc;
+	u32 gc_ip_version;
 
 	num_xcc = NUM_XCC(adev->gfx.xcc_mask);
+	gc_ip_version = amdgpu_ip_version(adev, GC_HWIP, 0);
+
 	for (i = 0; i < num_xcc; i++) {
-		if (REG_GET_FIELD(RREG32_SOC15(GC, GET_INST(GC, i), regGRBM_STATUS),
-					GRBM_STATUS, GUI_ACTIVE))
-			return false;
+		if (gc_ip_version == IP_VERSION(9, 4, 4)) {
+			if (REG_GET_FIELD(RREG32_SOC15(GC, GET_INST(GC, i), regGRBM_STATUS),
+					  GRBM_STATUS, SPI_BUSY))
+				return false;
+		} else {
+			if (REG_GET_FIELD(RREG32_SOC15(GC, GET_INST(GC, i), regGRBM_STATUS),
+					  GRBM_STATUS, GUI_ACTIVE))
+				return false;
+		}
 	}
 	return true;
 }

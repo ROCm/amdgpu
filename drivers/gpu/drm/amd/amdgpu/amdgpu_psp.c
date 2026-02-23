@@ -1276,8 +1276,9 @@ static int psp_ptl_invoke(struct psp_context *psp, u32 req_code,
 	 */
 	if (cmd->resp.status) {
 		dev_err(psp->adev->dev,
-				"PTL command 0x%x failed, PSP response status: 0x%X\n",
-				req_code, cmd->resp.status);
+				"PTL command 0x%x failed, PSP response status: 0x%X fw resp=0x%X\n",
+				req_code, cmd->resp.status,
+				cmd->resp.uresp.perf_hw_info.resp);
 		ret = -EIO;
 		goto out;
 	}
@@ -1310,6 +1311,7 @@ int amdgpu_ptl_perf_monitor_ctrl(struct amdgpu_device *adev, u32 req_code,
 	uint32_t ptl_fmt1, ptl_fmt2;
 	struct psp_context *psp;
 	struct amdgpu_ptl *ptl;
+	int ret;
 
 	if (!adev || !ptl_state || !fmt1 || !fmt2)
 		return -EINVAL;
@@ -1353,6 +1355,16 @@ int amdgpu_ptl_perf_monitor_ctrl(struct amdgpu_device *adev, u32 req_code,
 						ptl->disable_bitmap),
 					atomic_read(&ptl->disable_ref));
 			return 0;
+		}
+	}
+
+	/* Wait for GFX engine idle before PTL state transition */
+	if (req_code == PSP_PTL_PERF_MON_SET) {
+		ret = amdgpu_device_ip_wait_for_idle(adev,
+				AMD_IP_BLOCK_TYPE_GFX);
+		if (ret) {
+			dev_err(adev->dev, "GFX not idle before PTL operation (%d)\n", ret);
+			return ret;
 		}
 	}
 
