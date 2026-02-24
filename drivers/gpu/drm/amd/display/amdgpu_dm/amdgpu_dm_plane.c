@@ -1378,10 +1378,12 @@ STATIC_IFN_KUNIT void amdgpu_dm_plane_get_min_max_dc_plane_scaling(struct drm_de
 	case DRM_FORMAT_ARGB16161616F:
 	case DRM_FORMAT_XBGR16161616F:
 	case DRM_FORMAT_ABGR16161616F:
+#ifdef DRM_FORMAT_XRGB16161616
 	case DRM_FORMAT_XRGB16161616:
 	case DRM_FORMAT_ARGB16161616:
 	case DRM_FORMAT_XBGR16161616:
 	case DRM_FORMAT_ABGR16161616:
+#endif
 		*max_upscale = plane_cap->max_upscale_factor.fp16;
 		*min_downscale = plane_cap->max_downscale_factor.fp16;
 		break;
