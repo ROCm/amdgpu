@@ -211,8 +211,10 @@ static int kfd_ais_update_counters(uint64_t size_copied, struct pci_dev *pdev,
 				    struct kfd_process_device *pdd, bool is_read)
 {
 	struct ais_counter_entry *counter;
+	struct ais_counter_entry *new_counter = NULL;
 	int ret = 0;
 
+	/* Fast path: update existing counter */
 	xa_lock(&pdd->ais_counters_xa);
 	counter = (struct ais_counter_entry *)xa_load(&pdd->ais_counters_xa, pdev->devfn);
 	if (counter) {
@@ -220,44 +222,72 @@ static int kfd_ais_update_counters(uint64_t size_copied, struct pci_dev *pdev,
 			counter->bytes_read += size_copied;
 		else
 			counter->bytes_written += size_copied;
-
-		goto out;
+		xa_unlock(&pdd->ais_counters_xa);
+		return 0;
 	}
-
-	counter = kzalloc(sizeof(struct ais_counter_entry), GFP_KERNEL);
-	if (!counter) {
-		ret = -ENOMEM;
-		goto out;
-	}
-
-	counter->pci_devfn = pdev->devfn;
-	if (is_read)
-		counter->bytes_read = size_copied;
-	else
-		counter->bytes_written = size_copied;
-
-	ret = __xa_insert(&pdd->ais_counters_xa, pdev->devfn, counter, GFP_KERNEL);
-	if (ret) {
-		/* xa_insert failing means the entry is not empty, which shouldn't be possible */
-		kvfree(counter);
-		goto out;
-	}
-
-	ret = kfd_ais_init_attr(&counter->attr_bytes_read, pdev, true);
-	if (ret)
-		goto out;
-	ret = sysfs_create_file(pdd->kobj_ais, &counter->attr_bytes_read);
-	if (ret)
-		goto out;
-
-	ret = kfd_ais_init_attr(&counter->attr_bytes_written, pdev, false);
-	if (ret)
-		goto out;
-	ret = sysfs_create_file(pdd->kobj_ais, &counter->attr_bytes_written);
-
-out:
 	xa_unlock(&pdd->ais_counters_xa);
+
+	/* Slow path: create new counter entry (outside lock) */
+	new_counter = kzalloc(sizeof(struct ais_counter_entry), GFP_KERNEL);
+	if (!new_counter)
+		return -ENOMEM;
+
+	new_counter->pci_devfn = pdev->devfn;
+	if (is_read)
+		new_counter->bytes_read = size_copied;
+	else
+		new_counter->bytes_written = size_copied;
+
+	ret = xa_insert(&pdd->ais_counters_xa, pdev->devfn, new_counter,
+			GFP_KERNEL);
+
+	if (ret == -EBUSY) {
+		/* Race: another thread created it - update and free ours */
+		kvfree(new_counter);
+		xa_lock(&pdd->ais_counters_xa);
+		counter = xa_load(&pdd->ais_counters_xa, pdev->devfn);
+		if (counter) {
+			if (is_read)
+				counter->bytes_read += size_copied;
+			else
+				counter->bytes_written += size_copied;
+		}
+		xa_unlock(&pdd->ais_counters_xa);
+		return 0;
+	}
+	if (ret) {
+		kvfree(new_counter);
+		return ret;
+	}
+
+	/* Successfully inserted - create sysfs (NO LOCK HELD - can sleep!) */
+	ret = kfd_ais_init_attr(&new_counter->attr_bytes_read, pdev, true);
+	if (ret)
+		goto cleanup_entry;
+	ret = sysfs_create_file(pdd->kobj_ais, &new_counter->attr_bytes_read);
+	if (ret)
+		goto cleanup_attr_read;
+
+	ret = kfd_ais_init_attr(&new_counter->attr_bytes_written, pdev, false);
+	if (ret)
+		goto cleanup_sysfs_read;
+	ret = sysfs_create_file(pdd->kobj_ais,
+				&new_counter->attr_bytes_written);
+	if (ret)
+		goto cleanup_attr_write;
+
 	return 0;
+
+cleanup_attr_write:
+	kfree(new_counter->attr_bytes_written.name);
+cleanup_sysfs_read:
+	sysfs_remove_file(pdd->kobj_ais, &new_counter->attr_bytes_read);
+cleanup_attr_read:
+	kfree(new_counter->attr_bytes_read.name);
+cleanup_entry:
+	xa_erase(&pdd->ais_counters_xa, pdev->devfn);
+	kvfree(new_counter);
+	return ret;
 }
 
 static int kfd_ais_get_dio_align(struct file *filep, unsigned int *offset_align,
