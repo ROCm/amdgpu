@@ -699,6 +699,12 @@ int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
 	if (!amdgpu_userq_enabled(dev))
 		return -ENOTSUPP;
 
+	if (wait_info->num_syncobj_handles > AMDGPU_USERQ_MAX_HANDLES ||
+	    wait_info->num_syncobj_timeline_handles > AMDGPU_USERQ_MAX_HANDLES ||
+	    wait_info->num_bo_write_handles > AMDGPU_USERQ_MAX_HANDLES ||
+	    wait_info->num_bo_read_handles > AMDGPU_USERQ_MAX_HANDLES)
+		return -EINVAL;
+
 	num_syncobj = wait_info->num_syncobj_handles;
 	syncobj_handles = memdup_array_user(u64_to_user_ptr(wait_info->syncobj_handles),
 					    num_syncobj, sizeof(u32));
