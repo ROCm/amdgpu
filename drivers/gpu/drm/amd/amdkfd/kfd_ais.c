@@ -207,52 +207,49 @@ static int kfd_ais_init_attr(struct attribute *attr, struct pci_dev *pdev, bool 
 	return 0;
 }
 
-static int kfd_ais_update_counters(uint64_t size_copied, struct pci_dev *pdev,
-				    struct kfd_process_device *pdd, bool is_read)
+/**
+ * kfd_ais_make_key() - Create unique xarray key for PCI device
+ * @pdev: PCI device
+ *
+ * Returns: Composite key encoding domain:bus:devfn
+ *
+ * Format: [domain(16-bit)][bus(8-bit)][devfn(8-bit)] = 32-bit value
+ * This ensures xarray entries are unique across the entire system.
+ */
+static unsigned long kfd_ais_make_key(struct pci_dev *pdev)
 {
-	struct ais_counter_entry *counter;
-	struct ais_counter_entry *new_counter = NULL;
-	int ret = 0;
+	return ((unsigned long)pci_domain_nr(pdev->bus) << 16) | pci_dev_id(pdev);
+}
 
-	/* Fast path: update existing counter */
-	xa_lock(&pdd->ais_counters_xa);
-	counter = (struct ais_counter_entry *)xa_load(&pdd->ais_counters_xa, pdev->devfn);
-	if (counter) {
-		if (is_read)
-			counter->bytes_read += size_copied;
-		else
-			counter->bytes_written += size_copied;
-		xa_unlock(&pdd->ais_counters_xa);
-		return 0;
-	}
-	xa_unlock(&pdd->ais_counters_xa);
+/**
+ * kfd_ais_create_counter() - Create a new counter entry for a peer device
+ * @pdev: PCI device
+ * @pdd: Process device data
+ *
+ * Returns: 0 on success, negative error code on failure
+ *
+ * Creates an ais_counter_entry for the given device and its sysfs files.
+ * Called once per peer device after pci_p2pdma_distance() validates P2P.
+ * If another thread creates the entry first, returns 0 (entry exists).
+ */
+static int kfd_ais_create_counter(struct pci_dev *pdev,
+				  struct kfd_process_device *pdd)
+{
+	struct ais_counter_entry *new_counter;
+	int ret;
 
-	/* Slow path: create new counter entry (outside lock) */
 	new_counter = kzalloc(sizeof(struct ais_counter_entry), GFP_KERNEL);
 	if (!new_counter)
 		return -ENOMEM;
 
 	new_counter->pci_devfn = pdev->devfn;
-	if (is_read)
-		new_counter->bytes_read = size_copied;
-	else
-		new_counter->bytes_written = size_copied;
 
-	ret = xa_insert(&pdd->ais_counters_xa, pdev->devfn, new_counter,
-			GFP_KERNEL);
+	ret = xa_insert(&pdd->ais_counters_xa, kfd_ais_make_key(pdev),
+			new_counter, GFP_KERNEL);
 
 	if (ret == -EBUSY) {
-		/* Race: another thread created it - update and free ours */
+		/* Race: another thread already created it */
 		kvfree(new_counter);
-		xa_lock(&pdd->ais_counters_xa);
-		counter = xa_load(&pdd->ais_counters_xa, pdev->devfn);
-		if (counter) {
-			if (is_read)
-				counter->bytes_read += size_copied;
-			else
-				counter->bytes_written += size_copied;
-		}
-		xa_unlock(&pdd->ais_counters_xa);
 		return 0;
 	}
 	if (ret) {
@@ -285,9 +282,47 @@ cleanup_sysfs_read:
 cleanup_attr_read:
 	kfree(new_counter->attr_bytes_read.name);
 cleanup_entry:
-	xa_erase(&pdd->ais_counters_xa, pdev->devfn);
+	xa_erase(&pdd->ais_counters_xa, kfd_ais_make_key(pdev));
 	kvfree(new_counter);
 	return ret;
+}
+
+static int kfd_ais_update_counters(uint64_t size_copied, struct pci_dev *pdev,
+				    struct kfd_process_device *pdd, bool is_read)
+{
+	struct ais_counter_entry *counter;
+
+	xa_lock(&pdd->ais_counters_xa);
+	counter = (struct ais_counter_entry *)xa_load(&pdd->ais_counters_xa,
+						      kfd_ais_make_key(pdev));
+	if (counter) {
+		if (is_read)
+			counter->bytes_read += size_copied;
+		else
+			counter->bytes_written += size_copied;
+	}
+	xa_unlock(&pdd->ais_counters_xa);
+
+	return 0;
+}
+
+/**
+ * kfd_ais_check_p2p_cached() - Check if P2P distance already validated
+ * @pdd: Process device data
+ * @pdev: PCI device
+ *
+ * Returns: true if P2P already validated (skip distance check), false otherwise
+ *
+ * If an entry exists in ais_counters_xa for this device, pci_p2pdma_distance()
+ * has already passed for it. The entry is created right after a successful
+ * distance check, so its existence alone indicates P2P accessibility.
+ *
+ * The xarray is keyed by composite domain:bus:devfn to ensure uniqueness.
+ */
+static bool kfd_ais_check_p2p_cached(struct kfd_process_device *pdd,
+				     struct pci_dev *pdev)
+{
+	return xa_load(&pdd->ais_counters_xa, kfd_ais_make_key(pdev)) != NULL;
 }
 
 static int kfd_ais_get_dio_align(struct file *filep, unsigned int *offset_align,
@@ -349,10 +384,17 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		goto out;
 	}
 
-	if (pci_p2pdma_distance(pdev, adev->dev, false) < 0) {
-		dev_info(adev->dev, "DMA-BUF p2p not accessible!\n");
-		ret = -ENODEV;
-		goto out;
+	/* Check if P2P already validated; on miss, check and create entry */
+	if (!kfd_ais_check_p2p_cached(pdd, pdev)) {
+		if (pci_p2pdma_distance(pdev, adev->dev, false) < 0) {
+			dev_info(adev->dev, "DMA-BUF p2p not accessible!\n");
+			ret = -ENODEV;
+			goto out;
+		}
+		/* P2P accessible - create counter entry so future calls skip
+		 * the distance check.
+		 */
+		kfd_ais_create_counter(pdev, pdd);
 	}
 
 	if (WARN_ON(bo->preferred_domains != AMDGPU_GEM_DOMAIN_VRAM)) {
