@@ -700,7 +700,6 @@ int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
 		return -ENOTSUPP;
 
 	if (wait_info->num_syncobj_handles > AMDGPU_USERQ_MAX_HANDLES ||
-	    wait_info->num_syncobj_timeline_handles > AMDGPU_USERQ_MAX_HANDLES ||
 	    wait_info->num_bo_write_handles > AMDGPU_USERQ_MAX_HANDLES ||
 	    wait_info->num_bo_read_handles > AMDGPU_USERQ_MAX_HANDLES)
 		return -EINVAL;
