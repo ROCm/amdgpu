@@ -29,6 +29,7 @@
 #include <linux/mmzone.h>
 #include <linux/dma-direct.h>
 #include <linux/mount.h>
+#include <linux/stat.h>
 /* Each VRAM page uses sizeof(struct page) on system memory */
 #define AIS_P2P_PAGE_STRUCT_SIZE(size) ((size)/PAGE_SIZE * sizeof(struct page))
 
@@ -248,6 +249,25 @@ out:
 	return 0;
 }
 
+static int kfd_ais_get_dio_align(struct file *filep, unsigned int *offset_align,
+			unsigned int *mem_align)
+{
+	struct kstat st;
+
+	if (!vfs_getattr(&filep->f_path, &st, STATX_DIOALIGN, 0) &&
+		(st.result_mask & STATX_DIOALIGN)) {
+		if (!st.dio_offset_align || !st.dio_mem_align)
+			return -EINVAL;
+		*offset_align = st.dio_offset_align;
+		*mem_align = st.dio_mem_align;
+		return 0;
+	}
+
+	*offset_align = PAGE_SIZE;
+	*mem_align = PAGE_SIZE;
+	return 0;
+}
+
 int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		    struct kfd_ais_in_args *in, struct kfd_process_device *pdd,
 		    uint64_t *size_copied)
@@ -262,16 +282,25 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	loff_t cur_pos;
 	int ret = 0;
 	bool is_read = (in->op == KFD_IOC_AIS_READ);
-
-	/* For now support only page-aligned offsets and sizes. It could be
-	 * improved to fs block size in the future
-	 */
-	if (!PAGE_ALIGNED(in->file_offset) || !PAGE_ALIGNED(in->size))
-		return -EINVAL;
+	unsigned int dio_offset_align, dio_mem_align;
 
 	filep = fget((unsigned int)in->fd);
 	if (!filep)
 		return -EBADF;
+
+	if (filep->f_flags & O_DIRECT) {
+		ret = kfd_ais_get_dio_align(filep, &dio_offset_align, &dio_mem_align);
+		if (ret) {
+			dev_err(adev->dev, "AIS: file does not support direct I/O\n");
+			goto out;
+		}
+		if (!IS_ALIGNED(in->file_offset, dio_offset_align) ||
+			!IS_ALIGNED(in->size, dio_offset_align) ||
+			!IS_ALIGNED(in->handle_offset, dio_mem_align)) {
+			ret = -EINVAL;
+			goto out;
+		}
+	}
 
 	pdev = get_pci_dev_from_file(filep);
 	if (!pdev) {
