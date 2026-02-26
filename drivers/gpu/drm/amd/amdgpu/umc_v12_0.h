@@ -26,31 +26,6 @@
 #include "soc15_common.h"
 #include "amdgpu.h"
 
-#define UMC_V12_0_NODE_DIST		0x40000000
-#define UMC_V12_0_INST_DIST		0x40000
-
-/* UMC register per channel offset */
-#define UMC_V12_0_PER_CHANNEL_OFFSET	0x400
-
-/* UMC cross node offset */
-#define UMC_V12_0_CROSS_NODE_OFFSET		0x100000000
-
-/* OdEccErrCnt max value */
-#define UMC_V12_0_CE_CNT_MAX		0xffff
-/* umc ce interrupt threshold */
-#define UMC_V12_0_CE_INT_THRESHOLD	0xffff
-/* umc ce count initial value */
-#define UMC_V12_0_CE_CNT_INIT	(UMC_V12_0_CE_CNT_MAX - UMC_V12_0_CE_INT_THRESHOLD)
-
-/* number of umc channel instance with memory map register access */
-#define UMC_V12_0_CHANNEL_INSTANCE_NUM		8
-/* number of umc instance with memory map register access */
-#define UMC_V12_0_UMC_INSTANCE_NUM		4
-
-/* Total channel instances for all available umc nodes */
-#define UMC_V12_0_TOTAL_CHANNEL_NUM(adev) \
-	(UMC_V12_0_CHANNEL_INSTANCE_NUM * (adev)->gmc.num_umc)
-
 /* one piece of normalized address is mapped to 8 pieces of physical address */
 #define UMC_V12_0_NA_MAP_PA_NUM        8
 /* R13 bit shift should be considered, double the number */
