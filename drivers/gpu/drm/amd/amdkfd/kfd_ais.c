@@ -44,16 +44,27 @@ static struct pci_dev *get_pci_dev_from_file(struct file *file)
 {
 	struct device *dev;
 	struct pci_dev *pdev = NULL;
+	struct block_device *bdev;
 
-	if (!file->f_path.mnt || !file->f_path.mnt->mnt_sb ||
-	    !file->f_path.mnt->mnt_sb->s_bdev) {
+	if (S_ISBLK(file_inode(file)->i_mode)) {
+		/* For block device nodes on devtmpfs, file_inode() is the
+		 * devtmpfs inode, not the bd_inode embedded in block_device.
+		 * However, blkdev_open() remaps file->f_mapping to the real
+		 * block device mapping, so f_mapping->host IS the bd_inode.
+		 */
+		bdev = I_BDEV(file->f_mapping->host);
+	} else if (file->f_path.mnt && file->f_path.mnt->mnt_sb &&
+		   file->f_path.mnt->mnt_sb->s_bdev) {
+		bdev = file->f_path.mnt->mnt_sb->s_bdev;
+	} else {
 		pr_err("Invalid file path or mount point\n");
 		return NULL;
 	}
+
 #ifdef HAVE_BLOCK_DEVICE_BD_DEVICE
-	dev = file->f_path.mnt->mnt_sb->s_bdev->bd_device.parent;
+	dev = bdev->bd_device.parent;
 #else
-	dev = disk_to_dev(file->f_path.mnt->mnt_sb->s_bdev->bd_disk)->parent;
+	dev = disk_to_dev(bdev->bd_disk)->parent;
 #endif
 	if (!dev) {
 		pr_debug("No parent device found for the file\n");
