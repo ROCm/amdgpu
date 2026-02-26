@@ -508,8 +508,10 @@ int kgd2kfd_check_and_lock_kfd(struct kfd_dev *kfd);
 void kgd2kfd_unlock_kfd(struct kfd_dev *kfd);
 int kgd2kfd_start_sched(struct kfd_dev *kfd, uint32_t node_id);
 int kgd2kfd_start_sched_all_nodes(struct kfd_dev *kfd);
+int amdgpu_amdkfd_start_sched_all(struct amdgpu_device *adev);
 int kgd2kfd_stop_sched(struct kfd_dev *kfd, uint32_t node_id);
 int kgd2kfd_stop_sched_all_nodes(struct kfd_dev *kfd);
+int amdgpu_amdkfd_stop_sched_all(struct amdgpu_device *adev);
 bool kgd2kfd_compute_active(struct kfd_dev *kfd, uint32_t node_id);
 bool kgd2kfd_vmfault_fast_path(struct amdgpu_device *adev, struct amdgpu_iv_entry *entry,
 			       bool retry_fault);
@@ -606,12 +608,22 @@ static inline int kgd2kfd_start_sched_all_nodes(struct kfd_dev *kfd)
 	return 0;
 }
 
+static inline int amdgpu_amdkfd_start_sched_all(struct amdgpu_device *adev)
+{
+	return 0;
+}
+
 static inline int kgd2kfd_stop_sched(struct kfd_dev *kfd, uint32_t node_id)
 {
 	return 0;
 }
 
 static inline int kgd2kfd_stop_sched_all_nodes(struct kfd_dev *kfd)
+{
+	return 0;
+}
+
+static inline int amdgpu_amdkfd_stop_sched_all(struct amdgpu_device *adev)
 {
 	return 0;
 }

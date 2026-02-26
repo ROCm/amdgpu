@@ -1358,17 +1358,23 @@ int amdgpu_ptl_perf_monitor_ctrl(struct amdgpu_device *adev, u32 req_code,
 		}
 	}
 
-	/* Wait for GFX engine idle before PTL state transition */
 	if (req_code == PSP_PTL_PERF_MON_SET) {
+		amdgpu_amdkfd_stop_sched_all(adev);
+		/* Wait for GFX engine idle before PTL state transition */
 		ret = amdgpu_device_ip_wait_for_idle(adev,
 				AMD_IP_BLOCK_TYPE_GFX);
 		if (ret) {
+			amdgpu_amdkfd_start_sched_all(adev);
 			dev_err(adev->dev, "GFX not idle before PTL operation (%d)\n", ret);
 			return ret;
 		}
+		ret = psp_ptl_invoke(psp, req_code, ptl_state, &ptl_fmt1, &ptl_fmt2);
+		amdgpu_amdkfd_start_sched_all(adev);
+	} else {
+		ret = psp_ptl_invoke(psp, req_code, ptl_state, &ptl_fmt1, &ptl_fmt2);
 	}
 
-	return psp_ptl_invoke(psp, req_code, ptl_state, &ptl_fmt1, &ptl_fmt2);
+	return ret;
 }
 
 static enum amdgpu_ptl_fmt str_to_ptl_fmt(const char *str)

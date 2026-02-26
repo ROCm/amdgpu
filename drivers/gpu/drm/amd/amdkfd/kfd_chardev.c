@@ -1929,16 +1929,10 @@ static int kfd_ptl_control(struct kfd_process_device *pdd, bool enable)
 	if (!pdd->dev->kfd2kgd || !pdd->dev->kfd2kgd->ptl_ctrl)
 		return -EOPNOTSUPP;
 
-	if (adev->kfd.init_complete)
-		amdgpu_amdkfd_stop_sched(adev, pdd->dev->node_id);
-
 	ret = pdd->dev->kfd2kgd->ptl_ctrl(adev, PSP_PTL_PERF_MON_SET,
 					  &ptl_state,
 					  &pref_format1,
 					  &pref_format2);
-
-	if (adev->kfd.init_complete)
-		amdgpu_amdkfd_start_sched(adev, pdd->dev->node_id);
 
 	return ret;
 }

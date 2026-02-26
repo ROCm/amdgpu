@@ -1669,6 +1669,22 @@ int kgd2kfd_stop_sched_all_nodes(struct kfd_dev *kfd)
 	return 0;
 }
 
+int amdgpu_amdkfd_stop_sched_all(struct amdgpu_device *adev)
+{
+	if (!adev->kfd.init_complete)
+		return 0;
+
+	return kgd2kfd_stop_sched_all_nodes(adev->kfd.dev);
+}
+
+int amdgpu_amdkfd_start_sched_all(struct amdgpu_device *adev)
+{
+	if (!adev->kfd.init_complete)
+		return 0;
+
+	return kgd2kfd_start_sched_all_nodes(adev->kfd.dev);
+}
+
 bool kgd2kfd_compute_active(struct kfd_dev *kfd, uint32_t node_id)
 {
 	struct kfd_node *node;
