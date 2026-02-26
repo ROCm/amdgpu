@@ -465,6 +465,8 @@ int amdgpu_amdkfd_rlc_spm_acquire(struct amdgpu_device *adev, int xcc_id,
 void amdgpu_amdkfd_rlc_spm_release(struct amdgpu_device *adev, int xcc_id, struct amdgpu_vm *vm);
 void amdgpu_amdkfd_rlc_spm_set_rdptr(struct amdgpu_device *adev, int xcc_id, u32 rptr);
 void amdgpu_amdkfd_rlc_spm_interrupt(struct amdgpu_device *adev, int xcc_id);
+int amdgpu_amdkfd_stop_sched_all(struct amdgpu_device *adev);
+int amdgpu_amdkfd_start_sched_all(struct amdgpu_device *adev);
 
 #if IS_ENABLED(CONFIG_HSA_AMD_SVM)
 int kgd2kfd_init_zone_device(struct amdgpu_device *adev);
@@ -601,12 +603,22 @@ static inline int kgd2kfd_start_sched_all_nodes(struct kfd_dev *kfd)
 	return 0;
 }
 
+static inline int amdgpu_amdkfd_start_sched_all(struct kfd_dev *kfd)
+{
+	return 0;
+}
+
 static inline int kgd2kfd_stop_sched(struct kfd_dev *kfd, uint32_t node_id)
 {
 	return 0;
 }
 
 static inline int kgd2kfd_stop_sched_all_nodes(struct kfd_dev *kfd)
+{
+	return 0;
+}
+
+static inline int amdgpu_amdkfd_stop_sched_all(struct kfd_dev *kfd)
 {
 	return 0;
 }
