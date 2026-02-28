@@ -2430,6 +2430,7 @@ static int gfx_v9_4_3_perf_monitor_ptl_init(struct amdgpu_device *adev, bool sta
 	adev->psp.ptl_hw_supported_state = AMDGPU_PTL_HW_SUPPORTED;
 
 	atomic_set(&adev->psp.ptl_disable_ref, 0);
+	set_bit(AMDGPU_PTL_DISABLE_SYSFS, adev->psp.disable_bitmap);
 
 	return 0;
 }
