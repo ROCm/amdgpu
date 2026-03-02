@@ -881,9 +881,9 @@ size_t smu_cmn_get_pp_feature_mask(struct smu_context *smu,
 				   char *buf)
 {
 #ifdef MAX
-	int8_t sort_feature[MAX(SMU_FEATURE_COUNT, SMU_FEATURE_MAX)];
+	int16_t sort_feature[MAX(SMU_FEATURE_COUNT, SMU_FEATURE_MAX)];
 #else
-	int8_t sort_feature[max(SMU_FEATURE_COUNT, SMU_FEATURE_MAX)];
+	int16_t sort_feature[max(SMU_FEATURE_COUNT, SMU_FEATURE_MAX)];
 #endif
 	struct smu_feature_bits feature_mask;
 	uint32_t features[2];
