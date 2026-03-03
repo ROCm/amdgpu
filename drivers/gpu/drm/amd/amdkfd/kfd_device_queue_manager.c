@@ -1852,10 +1852,11 @@ static int halt_cpsch(struct device_queue_manager *dqm)
 static int unhalt_cpsch(struct device_queue_manager *dqm)
 {
 	int ret = 0;
+	struct amdgpu_device *adev = dqm->dev->adev;
 
 	dqm_lock(dqm);
 	if (!dqm->sched_running || !dqm->sched_halt) {
-		WARN_ONCE(!dqm->sched_halt, "Scheduling is not on halt.\n");
+		dev_dbg(adev->dev, "Scheduling is not on halt.\n");
 		dqm_unlock(dqm);
 		return 0;
 	}
