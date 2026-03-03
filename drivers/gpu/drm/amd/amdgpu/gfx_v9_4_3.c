@@ -2414,7 +2414,7 @@ static int gfx_v9_4_3_perf_monitor_ptl_init(struct amdgpu_device *adev, bool sta
 		fmt2 = adev->psp.ptl_fmt2;
 	}
 
-	/* initialize PTL with default formats: GFX_FTYPE_I8 & GFX_FTYPE_BF16 */
+	/* initialize PTL with default formats: GFX_FTYPE_VECTOR & GFX_FTYPE_F8 */
 	r = amdgpu_ptl_perf_monitor_ctrl(adev, PSP_PTL_PERF_MON_SET, &ptl_state,
 							&fmt1, &fmt2);
 	if (r) {
@@ -2430,7 +2430,13 @@ static int gfx_v9_4_3_perf_monitor_ptl_init(struct amdgpu_device *adev, bool sta
 	adev->psp.ptl_hw_supported_state = AMDGPU_PTL_HW_SUPPORTED;
 
 	atomic_set(&adev->psp.ptl_disable_ref, 0);
-	set_bit(AMDGPU_PTL_DISABLE_SYSFS, adev->psp.disable_bitmap);
+	if (!state) {
+		dev_dbg(adev->dev,
+			"PTL disabled (amdgpu.ptl=%d)\
+			To enable, set amdgpu.ptl=1 via module param or kernel cmdline\n",
+			amdgpu_ptl);
+		set_bit(AMDGPU_PTL_DISABLE_SYSFS, adev->psp.disable_bitmap);
+	}
 
 	return 0;
 }
