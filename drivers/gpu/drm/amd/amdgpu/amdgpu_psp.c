@@ -1559,7 +1559,10 @@ int amdgpu_ptl_sysfs_init(struct amdgpu_device *adev)
 {
 	if (adev->psp.ptl_hw_supported_state != AMDGPU_PTL_HW_SUPPORTED)
 		return 0;
+	if (adev->psp.ptl_sysfs_created)
+		return 0;
 
+	adev->psp.ptl_sysfs_created = true;
 	return sysfs_create_group(&adev->dev->kobj, &amdgpu_ptl_attr_group);
 }
 
@@ -1567,6 +1570,11 @@ void amdgpu_ptl_sysfs_fini(struct amdgpu_device *adev)
 {
 	if (adev->psp.ptl_hw_supported_state != AMDGPU_PTL_HW_SUPPORTED)
 		return;
+
+	if (!adev->psp.ptl_sysfs_created)
+		return;
+
+	adev->psp.ptl_sysfs_created = false;
 
 	sysfs_remove_group(&adev->dev->kobj, &amdgpu_ptl_attr_group);
 }
