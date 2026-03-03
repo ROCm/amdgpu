@@ -49,6 +49,7 @@ struct amdgpu_ptl {
 	atomic_t			disable_ref;
 	struct mutex			mutex;
 	DECLARE_BITMAP(disable_bitmap, AMDGPU_PTL_DISABLE_MAX);
+	bool				ptl_sysfs_created;
 };
 
 int amdgpu_ptl_perf_monitor_ctrl(struct amdgpu_device *adev, u32 req_code,
