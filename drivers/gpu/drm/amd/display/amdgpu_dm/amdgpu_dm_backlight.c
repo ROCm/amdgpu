@@ -565,7 +565,6 @@ EXPORT_IF_KUNIT(amdgpu_dm_update_connector_ext_caps);
 void amdgpu_dm_setup_backlight_device(struct amdgpu_display_manager *dm,
 			    struct amdgpu_dm_connector *aconnector)
 {
-	struct amdgpu_dm_backlight_caps *caps;
 	struct dc_link *link = aconnector->dc_link;
 	int bl_idx = dm->num_of_edps;
 
@@ -585,10 +584,12 @@ void amdgpu_dm_setup_backlight_device(struct amdgpu_display_manager *dm,
 	dm->num_of_edps++;
 
 	amdgpu_dm_update_connector_ext_caps(aconnector);
-	caps = &dm->backlight_caps[aconnector->bl_idx];
 
-	/* Only offer ABM property when non-OLED and user didn't turn off by module parameter */
-	if (caps->ext_caps && !caps->ext_caps->bits.oled && amdgpu_dm_abm_level < 0)
+	/* Offer ABM property when user didn't turn off by module parameter.
+	 * OLED panels are included to support CACP (Content Adaptive
+	 * Contrast and Power) feature via set_abm_level.
+	 */
+	if (amdgpu_dm_abm_level < 0)
 		drm_object_attach_property(&aconnector->base.base,
 					   dm->adev->mode_info.abm_level_property,
 					   ABM_SYSFS_CONTROL);
@@ -672,22 +673,16 @@ const struct attribute_group amdgpu_group = {
 bool
 amdgpu_dm_should_create_sysfs(struct amdgpu_dm_connector *amdgpu_dm_connector)
 {
+	struct dc_link *link = amdgpu_dm_connector->dc_link;
+
 	if (amdgpu_dm_abm_level >= 0)
 		return false;
 
 	if (amdgpu_dm_connector->base.connector_type != DRM_MODE_CONNECTOR_eDP)
 		return false;
 
-	/* check for OLED panels */
-	if (amdgpu_dm_connector->bl_idx >= 0) {
-		struct drm_device *drm = amdgpu_dm_connector->base.dev;
-		struct amdgpu_display_manager *dm = &drm_to_adev(drm)->dm;
-		struct amdgpu_dm_backlight_caps *caps;
-
-		caps = &dm->backlight_caps[amdgpu_dm_connector->bl_idx];
-		if (caps->aux_support)
-			return false;
-	}
+	if (link->panel_type != PANEL_TYPE_LCD && !link->panel_config.cacp.cacp_supported)
+		return false;
 
 	return true;
 }

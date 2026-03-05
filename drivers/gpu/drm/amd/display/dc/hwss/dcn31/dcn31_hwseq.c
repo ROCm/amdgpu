@@ -54,6 +54,7 @@
 #include "dce/dce_i2c_hw.h"
 #include "dce/dmub_abm_lcd.h"
 #include "dio/dcn10/dcn10_dio.h"
+#include "dce/dmub_abm_cacp.h"
 
 #define DC_LOGGER_INIT(logger)
 
@@ -725,12 +726,19 @@ bool dcn31_set_backlight_level(struct pipe_ctx *pipe_ctx,
 	struct timing_generator *tg = pipe_ctx->stream_res.tg;
 	struct panel_cntl *panel_cntl = pipe_ctx->stream->link->panel_cntl;
 	uint32_t otg_inst;
+	struct dc_link *link = pipe_ctx->stream->link;
 
 	if (!abm || !tg || !panel_cntl)
 		return false;
 
 	otg_inst = tg->inst;
 
+	if (link && link->panel_config.cacp.cacp_supported)
+		dcn21_dmub_cacp_set_pipe(abm, otg_inst,
+			SET_CACP_PIPE_NORMAL,
+			panel_cntl->inst,
+			panel_cntl->pwrseq_inst);
+	else
 		dcn21_dmub_abm_set_pipe(abm,
 			otg_inst,
 			SET_ABM_PIPE_NORMAL,

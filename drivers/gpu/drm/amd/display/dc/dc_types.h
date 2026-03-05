@@ -1347,6 +1347,14 @@ struct dc_panel_config {
 	struct ilr {
 		bool optimize_edp_link_rate; /* eDP ILR */
 	} ilr;
+	/* CACP*/
+	struct cacp {
+		unsigned int cacp_supported;
+		unsigned int cacp_control_mode;
+		unsigned int strscl_valid;
+		unsigned int strscl_sdr[4];
+		unsigned int strscl_hdr[4];
+	} cacp;
 	/* Adaptive VariBright*/
 	struct adaptive_vb {
 		bool disable_adaptive_vb;
