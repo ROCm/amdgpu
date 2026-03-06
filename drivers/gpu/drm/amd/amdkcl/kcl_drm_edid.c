@@ -104,6 +104,16 @@ const struct edid *_kcl_drm_edid_raw(const struct drm_edid *drm_edid)
 EXPORT_SYMBOL(_kcl_drm_edid_raw);
 #endif
 
+#ifndef HAVE_DRM_EDID_CONNECTOR_UPDATE
+int kcl_drm_edid_connector_update(struct drm_connector *connector,
+      const struct drm_edid *drm_edid)
+{
+	const struct edid *edid = _kcl_drm_edid_raw(drm_edid);
+	return drm_connector_update_edid_property(connector, edid);
+}
+EXPORT_SYMBOL(kcl_drm_edid_connector_update);
+#endif
+
 #ifndef HAVE_DRM_EDID_CONNECTOR_ADD_MODES
 int kcl_drm_edid_connector_add_modes(struct drm_connector *connector)
 {
