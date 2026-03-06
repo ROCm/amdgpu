@@ -1612,7 +1612,7 @@ bool amdgpu_display_crtc_scaling_mode_fixup(struct drm_crtc *crtc,
 #if defined(HAVE_DRM_DISPLAY_INFO_IS_HDMI)
 		      connector && connector->display_info.is_hdmi &&
 #else
-		      drm_detect_hdmi_monitor(to_amdgpu_connector(connector)->edid) &&
+		      drm_detect_hdmi_monitor(drm_edid_raw(to_amdgpu_connector(connector)->edid)) &&
 #endif
 		      amdgpu_display_is_hdtv_mode(mode)))) {
 			if (amdgpu_encoder->underscan_hborder != 0)
