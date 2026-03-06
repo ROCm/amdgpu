@@ -601,6 +601,9 @@
 /* drm_fb_helper_fill_info() is available */
 #define HAVE_DRM_FB_HELPER_FILL_INFO 1
 
+/* drm_fb_helper_gem_is_fb is available */
+#define HAVE_DRM_FB_HELPER_GEM_IS_FB 1
+
 /* drm_fb_helper_init() has 2 args */
 #define HAVE_DRM_FB_HELPER_INIT_2ARGS 1
 

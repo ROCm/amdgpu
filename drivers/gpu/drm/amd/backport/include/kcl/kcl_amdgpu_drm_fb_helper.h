@@ -41,4 +41,10 @@ void drm_fb_helper_lastclose(struct drm_device *dev);
 void drm_fb_helper_output_poll_changed(struct drm_device *dev);
 #endif
 
+#ifndef HAVE_DRM_FB_HELPER_GEM_IS_FB
+bool kcl_drm_fb_helper_gem_is_fb(struct drm_fb_helper *fb_helper,
+					   struct drm_gem_object *obj);
+#define drm_fb_helper_gem_is_fb kcl_drm_fb_helper_gem_is_fb
+#endif
+
 #endif
