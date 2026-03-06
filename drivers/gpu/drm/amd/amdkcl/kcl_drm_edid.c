@@ -53,6 +53,15 @@ void _kcl_drm_edid_free(const struct drm_edid *drm_edid)
 	kfree(drm_edid);
 }
 EXPORT_SYMBOL(_kcl_drm_edid_free);
+
+const struct drm_edid *kcl_drm_edid_dup(const struct drm_edid *drm_edid)
+{
+	if (!drm_edid)
+		return NULL;
+	return _kcl_drm_edid_alloc(drm_edid->edid, drm_edid->size);
+}
+EXPORT_SYMBOL(kcl_drm_edid_dup);
+
 #endif
 
 #ifndef HAVE_DRM_EDID_RAW
