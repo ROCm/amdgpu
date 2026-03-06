@@ -64,6 +64,26 @@ const struct drm_edid *kcl_drm_edid_dup(const struct drm_edid *drm_edid)
 }
 EXPORT_SYMBOL(kcl_drm_edid_dup);
 
+const struct drm_edid *kcl_drm_edid_read_ddc(struct drm_connector *connector,
+ struct i2c_adapter *adapter)
+{
+	struct edid *edid;
+
+	if (connector->force == DRM_FORCE_OFF)
+		return NULL;
+
+	if (connector->force == DRM_FORCE_ON && !connector->override_edid)
+		edid = drm_get_edid(connector, adapter);
+	else
+		edid = drm_get_edid(connector, adapter);
+
+	if (!edid)
+		return NULL;
+
+	return __kcl_drm_edid_alloc(edid, (edid->extensions + 1) * EDID_LENGTH);
+}
+EXPORT_SYMBOL(kcl_drm_edid_read_ddc);
+
 #endif
 
 #ifndef HAVE_DRM_EDID_RAW
