@@ -586,6 +586,9 @@
 /* drm_edid_connector_add_modes is available */
 #define HAVE_DRM_EDID_CONNECTOR_ADD_MODES 1
 
+/* drm_edid_connector_update is available */
+#define HAVE_DRM_EDID_CONNECTOR_UPDATE 1
+
 /* drm_edid_is_digital is available */
 #define HAVE_DRM_EDID_IS_DIGITAL 1
 

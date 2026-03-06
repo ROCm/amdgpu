@@ -75,4 +75,10 @@ int kcl_drm_edid_connector_add_modes(struct drm_connector *connector);
 #define drm_edid_connector_add_modes kcl_drm_edid_connector_add_modes
 #endif
 
+#ifndef HAVE_DRM_EDID_CONNECTOR_UPDATE
+int kcl_drm_edid_connector_update(struct drm_connector *connector,
+      const struct drm_edid *drm_edid);
+#define drm_edid_connector_update kcl_drm_edid_connector_update
+#endif
+
 #endif
