@@ -37,9 +37,12 @@ struct drm_edid {
 #ifndef HAVE_DRM_EDID_MALLOC
 const struct drm_edid *_kcl_drm_edid_alloc(const void *edid, size_t size);
 const struct drm_edid *kcl_drm_edid_dup(const struct drm_edid *drm_edid);
+const struct drm_edid *kcl_drm_edid_read_ddc(struct drm_connector *connector,
+ struct i2c_adapter *adapter);
 void _kcl_drm_edid_free(const struct drm_edid *drm_edid);
 #define  drm_edid_alloc _kcl_drm_edid_alloc
 #define  drm_edid_dup kcl_drm_edid_dup
+#define  drm_edid_read_ddc kcl_drm_edid_read_ddc
 #define  drm_edid_free _kcl_drm_edid_free
 #endif
 
