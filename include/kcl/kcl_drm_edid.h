@@ -25,7 +25,8 @@
 
 /*	commit v5.18-rc5-1046-ge4ccf9a777d3
 	drm/edid: add struct drm_edid container	*/
-#if !defined(HAVE_DRM_EDID_MALLOC) || !defined(HAVE_DRM_EDID_RAW) || !defined(HAVE_DRM_EDID_VALID)
+#if !defined(HAVE_DRM_EDID_MALLOC) || !defined(HAVE_DRM_EDID_RAW) || !defined(HAVE_DRM_EDID_VALID) \
+	|| !defined(HAVE_DRM_EDID_IS_DIGITAL)
 struct drm_edid {
 	/* Size allocated for edid */
 	size_t size;
@@ -54,6 +55,17 @@ static inline bool _kcl_drm_edid_valid(const struct drm_edid *drm_edid)
 	return drm_edid_is_valid(drm_edid->edid);
 }
 #define  drm_edid_valid _kcl_drm_edid_valid
+#endif
+
+#ifndef HAVE_DRM_EDID_IS_DIGITAL
+static inline bool kcl_drm_edid_is_digital(const struct drm_edid *drm_edid)
+{
+	if (!drm_edid || !drm_edid->edid)
+		return false;
+
+	return drm_edid->edid->input & DRM_EDID_INPUT_DIGITAL;
+}
+#define drm_edid_is_digital kcl_drm_edid_is_digital
 #endif
 
 #endif
