@@ -583,6 +583,9 @@
 /* drm_dsc_pps_payload_pack() is available */
 #define HAVE_DRM_DSC_PPS_PAYLOAD_PACK 1
 
+/* drm_edid_is_digital is available */
+#define HAVE_DRM_EDID_IS_DIGITAL 1
+
 /* drm_edid_alloc() is available */
 #define HAVE_DRM_EDID_MALLOC 1
 
