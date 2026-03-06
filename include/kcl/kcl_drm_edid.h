@@ -70,4 +70,9 @@ static inline bool kcl_drm_edid_is_digital(const struct drm_edid *drm_edid)
 #define drm_edid_is_digital kcl_drm_edid_is_digital
 #endif
 
+#ifndef HAVE_DRM_EDID_CONNECTOR_ADD_MODES
+int kcl_drm_edid_connector_add_modes(struct drm_connector *connector);
+#define drm_edid_connector_add_modes kcl_drm_edid_connector_add_modes
+#endif
+
 #endif
