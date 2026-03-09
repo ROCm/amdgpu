@@ -4053,12 +4053,13 @@ void amdgpu_dm_update_connector_after_detect(
 
 		aconnector->dc_sink = sink;
 		dc_sink_retain(aconnector->dc_sink);
-		if (sink->dc_edid.length == 0) {
 #ifdef HAVE_DRM_DP_MST_EDID_READ
-			aconnector->drm_edid = NULL;
+		drm_edid_free(aconnector->drm_edid);
+		aconnector->drm_edid = NULL;
 #else
-			aconnector->edid = NULL;
+		aconnector->edid = NULL;
 #endif
+		if (sink->dc_edid.length == 0) {
 			hdmi_cec_unset_edid(aconnector);
 			if (aconnector->dc_link->aux_mode) {
 				drm_dp_cec_unset_edid(&aconnector->dm_dp_aux.aux);
