@@ -1092,6 +1092,7 @@ static struct link_encoder *dcn31_link_encoder_create(
 	struct dc_context *ctx,
 	const struct encoder_init_data *enc_init_data)
 {
+	(void)ctx;
 	struct dcn20_link_encoder *enc20 =
 		kzalloc(sizeof(struct dcn20_link_encoder), GFP_KERNEL);
 
@@ -2247,6 +2248,7 @@ enum dc_status dcn31_update_dc_state_for_encoder_switch(struct dc_link *link,
 	struct pipe_ctx *pipes,
 	struct audio_output *audio_output)
 {
+	(void)link_setting;
 	struct dc_state *state = link->dc->current_state;
 	int i;
 
