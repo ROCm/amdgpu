@@ -100,12 +100,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
         AC_KERNEL_CHECK_HEADERS([drm/drm_fbdev_generic.h])
 
         dnl #
-        dnl # v6.2-rc6-1265-g849ee8a2f0df
-        dnl # drm/suballoc: Extract amdgpu_sa.c as generic suballocation helper
-        dnl #
-        AC_KERNEL_CHECK_HEADERS([drm/drm_suballoc.h])
-
-        dnl #
         dnl # v6.6-rc2-771-g8eb80946ab0c
         dnl # drm/edid: split out drm_eld.h from drm_edid.h
         dnl #

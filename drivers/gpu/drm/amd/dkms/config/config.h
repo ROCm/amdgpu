@@ -565,9 +565,6 @@
 /* Define to 1 if you have the <drm/drm_probe_helper.h> header file. */
 #define HAVE_DRM_DRM_PROBE_HELPER_H 1
 
-/* Define to 1 if you have the <drm/drm_suballoc.h> header file. */
-#define HAVE_DRM_DRM_SUBALLOC_H 1
-
 /* drm_driver_feature DRIVER_IRQ_SHARED is available */
 /* #undef HAVE_DRM_DRV_DRIVER_IRQ_SHARED */
 
@@ -756,9 +753,6 @@
 
 /* drm_simple_encoder is available */
 #define HAVE_DRM_SIMPLE_ENCODER_INIT 1
-
-/* Has function drm_suballoc_manager_init() */
-#define HAVE_DRM_SUBALLOC_MANAGER_INIT 1
 
 /* drm_syncobj_add_point() is available */
 #define HAVE_DRM_SYNCOBJ_ADD_POINT 1

@@ -14,7 +14,7 @@ amdkcl-y += kcl_ioctl.o \
 	kcl_acpi_table.o kcl_page_alloc.o kcl_numa.o kcl_fs_read_write.o kcl_drm_aperture.o \
 	kcl_drm_simple_kms_helper.o kcl_bitmap.o kcl_vmscan.o kcl_dma_fence_chain.o \
 	kcl_mce_amd.o kcl_workqueue.o kcl_cpumask.o kcl_drm_dsc_helper.o kcl_mm_slab.o \
-	kcl_irqdesc.o kcl_drm_suballoc.o kcl_drm_dp_helper.o kcl_drm_prime.o \
+	kcl_irqdesc.o kcl_drm_dp_helper.o kcl_drm_prime.o \
 	kcl_drm_vblank.o kcl_drm_dp_mst_topology.o kcl_drm_syncobj.o kcl_drm_client_event.o \
 	kcl_scatterlist.o kcl_kfifo.o kcl_cec_adap.o kcl_drm_hdcp.o kcl_drm_drv.o \
 	kcl_dma_fence_array.o kcl_dma_fence_unwrap.o kcl_drm_probe_helper.o kcl_i2c_core_base.o \

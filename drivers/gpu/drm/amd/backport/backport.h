@@ -111,7 +111,6 @@
 #include <kcl/kcl_debugfs.h>
 #include <kcl/kcl_irqdesc.h>
 #include <kcl/kcl_pci_ids.h>
-#include <kcl/kcl_drm_suballoc.h>
 #include <kcl/kcl_drm_edid.h>
 #include <kcl/kcl_local64.h>
 #include <kcl/kcl_class.h>
