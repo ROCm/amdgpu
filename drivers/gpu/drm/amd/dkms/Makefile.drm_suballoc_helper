@@ -1,0 +1,8 @@
+export CONFIG_DRM_SUBALLOC_HELPER=m
+
+subdir-ccflags-y += -DCONFIG_DRM_SUBALLOC_HELPER
+CFLAGS_drm_suballoc.o += -include $(src)/amd/dkms/backport_drm_sublloc.h \
+                                -DHAVE_CONFIG_H
+
+amddrm_suballoc_helper-y := drm_suballoc.o
+obj-$(CONFIG_DRM_SUBALLOC_HELPER) += amddrm_suballoc_helper.o
