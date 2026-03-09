@@ -35,3 +35,5 @@ drivers/gpu/drm/drm_buddy.c .
 include/drm/drm_buddy.h include/drm/
 drivers/gpu/drm/drm_exec.c .
 include/drm/drm_exec.h include/drm/
+drivers/gpu/drm/drm_suballoc.c .
+include/drm/drm_suballoc.h include/drm/

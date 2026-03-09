@@ -84,5 +84,6 @@ endif
 include  $(src)/amd/dkms/Makefile.drm_ttm_helper
 include  $(src)/amd/dkms/Makefile.drm_exec
 include  $(src)/amd/dkms/Makefile.drm_buddy
+include  $(src)/amd/dkms/Makefile.drm_suballoc_helper
 
 obj-m += scheduler/ amd/amdgpu/ amd/amdxcp/ ttm/ amd/amdkcl/
