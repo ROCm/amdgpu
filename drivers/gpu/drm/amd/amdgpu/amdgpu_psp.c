@@ -1287,12 +1287,16 @@ static int psp_ptl_invoke(struct psp_context *psp, u32 req_code,
 		*ptl_state = cmd->resp.uresp.perf_hw_info.ptl_state;
 		*fmt1      = cmd->resp.uresp.perf_hw_info.pref_format1;
 		*fmt2      = cmd->resp.uresp.perf_hw_info.pref_format2;
+		dev_dbg(psp->adev->dev, "PTL query: state=%d, fmt1=%d, fmt2=%d\n",
+				*ptl_state, *fmt1, *fmt2);
 		break;
 	case PSP_PTL_PERF_MON_SET:
 		/* Update cached state only on success */
 		psp->ptl_enabled = *ptl_state;
 		psp->ptl_fmt1    = *fmt1;
 		psp->ptl_fmt2    = *fmt2;
+		dev_dbg(psp->adev->dev, "PTL set: state=%d, fmt1=%d, fmt2=%d\n",
+				*ptl_state, *fmt1, *fmt2);
 		break;
 	}
 
