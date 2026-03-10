@@ -2421,7 +2421,7 @@ static int gfx_v9_4_3_perf_monitor_ptl_init(struct amdgpu_device *adev, bool ena
 	ptl->hw_supported = true;
 
 	atomic_set(&ptl->disable_ref, 0);
-	if (!enable) {
+	if (!enable && !amdgpu_in_reset(adev) && !adev->in_suspend) {
 		dev_dbg(adev->dev,
 			"PTL disabled (amdgpu.ptl=%d)\
 			To enable, set amdgpu.ptl=1 via module param or kernel cmdline\n",
