@@ -4057,7 +4057,7 @@ void amdgpu_dm_update_connector_after_detect(
 
 		if (sink) {
 			if (aconnector->dc_sink) {
-				amdgpu_dm_update_freesync_caps(connector, NULL);
+				amdgpu_dm_update_freesync_caps(connector, NULL, true);
 				/*
 				 * retain and release below are used to
 				 * bump up refcount for sink because the link doesn't point
@@ -4070,12 +4070,12 @@ void amdgpu_dm_update_connector_after_detect(
 			dc_sink_retain(aconnector->dc_sink);
 			amdgpu_dm_update_freesync_caps(connector,
 #ifdef HAVE_DRM_DP_MST_EDID_READ
-					aconnector->drm_edid);
+					aconnector->drm_edid, true);
 #else
-					aconnector->edid);
+					aconnector->edid, true);
 #endif
 		} else {
-			amdgpu_dm_update_freesync_caps(connector, NULL);
+			amdgpu_dm_update_freesync_caps(connector, NULL, true);
 			if (!aconnector->dc_sink) {
 				aconnector->dc_sink = aconnector->dc_em_sink;
 				dc_sink_retain(aconnector->dc_sink);
@@ -4119,7 +4119,7 @@ void amdgpu_dm_update_connector_after_detect(
 		 * If yes, put it here.
 		 */
 		if (aconnector->dc_sink) {
-			amdgpu_dm_update_freesync_caps(connector, NULL);
+			amdgpu_dm_update_freesync_caps(connector, NULL, true);
 			dc_sink_release(aconnector->dc_sink);
 		}
 
@@ -4165,9 +4165,9 @@ void amdgpu_dm_update_connector_after_detect(
 		}
 
 #ifdef HAVE_DRM_DP_MST_EDID_READ
-		amdgpu_dm_update_freesync_caps(connector, aconnector->drm_edid);
+		amdgpu_dm_update_freesync_caps(connector, aconnector->drm_edid, true);
 #else
-		amdgpu_dm_update_freesync_caps(connector, aconnector->edid);
+		amdgpu_dm_update_freesync_caps(connector, aconnector->edid, true);
 #endif
 		update_connector_ext_caps(aconnector);
 #ifdef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
@@ -4176,7 +4176,7 @@ void amdgpu_dm_update_connector_after_detect(
 	} else {
 		hdmi_cec_unset_edid(aconnector);
 		drm_dp_cec_unset_edid(&aconnector->dm_dp_aux.aux);
-		amdgpu_dm_update_freesync_caps(connector, NULL);
+		amdgpu_dm_update_freesync_caps(connector, NULL, true);
 		aconnector->num_modes = 0;
 		dc_sink_release(aconnector->dc_sink);
 		aconnector->dc_sink = NULL;
@@ -9124,9 +9124,9 @@ static void amdgpu_dm_connector_ddc_get_modes(struct drm_connector *connector,
 		 * restored here.
 		 */
 #ifdef HAVE_DRM_DP_MST_EDID_READ
-		amdgpu_dm_update_freesync_caps(connector, drm_edid);
+		amdgpu_dm_update_freesync_caps(connector, drm_edid, false);
 #else
-		amdgpu_dm_update_freesync_caps(connector, edid);
+		amdgpu_dm_update_freesync_caps(connector, edid, false);
 #endif
 	} else {
 		amdgpu_dm_connector->num_modes = 0;
@@ -13728,9 +13728,9 @@ static int parse_hdmi_amd_vsdb(struct amdgpu_dm_connector *aconnector,
  */
 void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 #ifdef HAVE_DRM_DP_MST_EDID_READ
-				    const struct drm_edid *drm_edid)
+				    const struct drm_edid *drm_edid, bool do_mccs)
 #else
-				    struct edid *edid)
+				    struct edid *edid, bool do_mccs)
 #endif
 {
 	int i = 0;
@@ -13864,13 +13864,16 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 	}
 
 	/* Handle MCCS */
-	dm_helpers_read_mccs_caps(adev->dm.dc->ctx, amdgpu_dm_connector->dc_link, sink);
+	if (do_mccs)
+		dm_helpers_read_mccs_caps(adev->dm.dc->ctx, amdgpu_dm_connector->dc_link, sink);
+
 	if ((sink->sink_signal == SIGNAL_TYPE_HDMI_TYPE_A ||
 		as_type == FREESYNC_TYPE_PCON_IN_WHITELIST) &&
 		(!sink->edid_caps.freesync_vcp_code ||
 		(sink->edid_caps.freesync_vcp_code && !sink->mccs_caps.freesync_supported)))
 		freesync_capable = false;
-	if (sink->mccs_caps.freesync_supported && freesync_capable)
+
+	if (do_mccs && sink->mccs_caps.freesync_supported && freesync_capable)
 		dm_helpers_mccs_vcp_set(adev->dm.dc->ctx, amdgpu_dm_connector->dc_link, sink);
 
 update:

@@ -547,9 +547,9 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		if (aconnector->dc_sink) {
 			amdgpu_dm_update_freesync_caps(
 #ifdef HAVE_DRM_DP_MST_EDID_READ
-					connector, aconnector->drm_edid);
+					connector, aconnector->drm_edid, true);
 #else
-					connector, aconnector->edid);
+					connector, aconnector->edid, true);
 #endif
 
 #if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)

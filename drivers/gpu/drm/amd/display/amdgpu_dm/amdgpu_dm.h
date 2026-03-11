@@ -1106,9 +1106,9 @@ void dm_restore_drm_connector_state(struct drm_device *dev,
 
 void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 #ifdef HAVE_DRM_DP_MST_EDID_READ
-				    const struct drm_edid *drm_edid);
+				    const struct drm_edid *drm_edid, bool do_mccs);
 #else
-					struct edid *edid);
+					struct edid *edid, bool do_mccs);
 #endif
 
 void amdgpu_dm_trigger_timing_sync(struct drm_device *dev);
