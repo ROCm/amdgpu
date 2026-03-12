@@ -1207,6 +1207,9 @@
 /* struct drm_memory_stats is defined */
 #define HAVE_STRUCT_DRM_MEMORY_STATS 1
 
+/* struct drm_mode_config has member panel_type_property */
+#define HAVE_STRUCT_DRM_MODE_CONFIG_PANEL_TYPE_PROPERTY 1
+
 /* drm_plane_helper_funcs->atomic_async_check() have three arguments */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK_THREE_ARGUMENTS 1
 
