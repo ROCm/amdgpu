@@ -2035,7 +2035,8 @@ void amdgpu_smu_phase_det_debugfs_init(struct amdgpu_device *adev);
 
 int amdgpu_smu_ras_send_msg(struct amdgpu_device *adev, enum smu_message_type msg,
 			    uint32_t param, uint32_t *readarg);
-
+int amdgpu_smu_ras_feature_is_enabled(struct amdgpu_device *adev,
+					enum smu_feature_mask mask);
 #endif
 
 void smu_feature_cap_set(struct smu_context *smu, enum smu_feature_cap_id fea_id);

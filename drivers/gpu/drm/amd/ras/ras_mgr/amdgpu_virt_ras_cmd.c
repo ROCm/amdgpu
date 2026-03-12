@@ -63,7 +63,7 @@ static int amdgpu_virt_ras_get_cmd_shared_mem(struct ras_core_context *ras_core,
 				ras_telemetry_offset);
 
 	if (cmd == RAS_CMD__GET_ALL_BLOCK_ECC_STATUS) {
-		if (mem_size > PAGE_SIZE)
+		if (mem_size > AMD_SRIOV_UNIRAS_BLOCKS_BUF_SIZE)
 			return -ENOMEM;
 
 		shared_mem->cpu_addr = ras_telemetry_cpu->uniras_shared_mem.blocks_ecc_buf;
@@ -381,6 +381,53 @@ static int amdgpu_virt_ras_get_block_ecc(struct ras_core_context *ras_core,
 	return RAS_CMD__SUCCESS;
 }
 
+int amdgpu_virt_ras_check_address_validity(struct amdgpu_device *adev,
+			uint64_t address, bool *hit)
+{
+	struct ras_cmd_address_check_req req = {0};
+	struct ras_cmd_address_check_rsp rsp = {0};
+	int ret = 0;
+
+	req.address = address;
+
+	ret = amdgpu_ras_mgr_handle_ras_cmd(adev, RAS_CMD__CHECK_ADDRESS_VALIDITY,
+		&req, sizeof(req), &rsp, sizeof(rsp));
+
+	if (ret)
+		return RAS_CMD__ERROR_GENERIC;
+
+	*hit = rsp.result ? true : false;
+
+	return RAS_CMD__SUCCESS;
+}
+
+int amdgpu_virt_ras_convert_retired_address(struct amdgpu_device *adev,
+			uint64_t address, uint64_t *pfn, uint32_t max_pfn_sz)
+{
+	struct ras_cmd_convert_retired_address_req req = {0};
+	struct ras_cmd_convert_retired_address_rsp rsp = {0};
+	int ret = 0, i;
+	int retired_page_count;
+
+	if (!pfn || !max_pfn_sz)
+		return -EINVAL;
+
+	req.address = address;
+
+	ret = amdgpu_ras_mgr_handle_ras_cmd(adev, RAS_CMD__CONVERT_RETIRED_ADDRESS,
+		&req, sizeof(req), &rsp, sizeof(rsp));
+
+	if (ret || rsp.retired_count == 0)
+		return -EINVAL;
+
+	retired_page_count = rsp.retired_count > max_pfn_sz ? max_pfn_sz : rsp.retired_count;
+
+	for (i = 0; i < retired_page_count; i++)
+		pfn[i] = rsp.retired_addr[i] >> AMDGPU_GPU_PAGE_SHIFT;
+
+	return retired_page_count;
+}
+
 static struct ras_cmd_func_map amdgpu_virt_ras_cmd_maps[] = {
 	{RAS_CMD__GET_CPER_SNAPSHOT, amdgpu_virt_ras_get_cper_snapshot},
 	{RAS_CMD__GET_CPER_RECORD, amdgpu_virt_ras_get_cper_records},
@@ -457,7 +504,7 @@ int amdgpu_virt_ras_hw_init(struct amdgpu_device *adev)
 	memset(blks_ecc, 0, sizeof(*blks_ecc));
 	if (amdgpu_virt_ras_get_cmd_shared_mem(ras_mgr->ras_core,
 			RAS_CMD__GET_ALL_BLOCK_ECC_STATUS,
-			PAGE_SIZE, &blks_ecc->shared_mem))
+			AMD_SRIOV_UNIRAS_BLOCKS_BUF_SIZE, &blks_ecc->shared_mem))
 		return -ENOMEM;
 
 	return 0;
