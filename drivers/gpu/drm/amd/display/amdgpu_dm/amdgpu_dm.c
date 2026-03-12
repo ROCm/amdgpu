@@ -4122,6 +4122,12 @@ static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 	caps->ext_caps = &aconnector->dc_link->dpcd_sink_ext_caps;
 	caps->aux_support = false;
 
+#if defined(HAVE_STRUCT_DRM_MODE_CONFIG_PANEL_TYPE_PROPERTY)
+	drm_object_property_set_value(&conn_base->base,
+				      adev_to_drm(adev)->mode_config.panel_type_property,
+				      caps->ext_caps->bits.oled ? DRM_MODE_PANEL_TYPE_OLED : DRM_MODE_PANEL_TYPE_UNKNOWN);
+#endif
+
 	if (caps->ext_caps->bits.oled == 1
 	    /*
 	     * ||
@@ -9720,7 +9726,9 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 	if (connector_type == DRM_MODE_CONNECTOR_eDP) {
 		struct drm_privacy_screen *privacy_screen;
 
+#if defined(HAVE_STRUCT_DRM_MODE_CONFIG_PANEL_TYPE_PROPERTY)
 		drm_connector_attach_panel_type_property(&aconnector->base);
+#endif
 
 		privacy_screen = drm_privacy_screen_get(adev_to_drm(adev)->dev, NULL);
 		if (!IS_ERR(privacy_screen)) {
