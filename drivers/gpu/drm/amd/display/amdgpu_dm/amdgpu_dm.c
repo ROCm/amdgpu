@@ -573,7 +573,7 @@ static void schedule_dc_vmin_vmax(struct amdgpu_device *adev,
 	offload_work->stream = stream;
 	offload_work->adjust = adjust_copy;
 
-	queue_work(system_wq, &offload_work->work);
+	queue_work(system_percpu_wq, &offload_work->work);
 }
 #ifndef HAVE_KTIME_IS_UNION
 static inline ktime_t get_drm_vblank_crtc_time(struct drm_vblank_crtc *vblank)
@@ -4290,7 +4290,7 @@ static void handle_hpd_irq_helper(struct amdgpu_dm_connector *aconnector)
 			dc_sink_retain(aconnector->hdmi_prev_sink);
 
 		/* Schedule delayed detection. */
-		if (mod_delayed_work(system_wq,
+		if (mod_delayed_work(system_percpu_wq,
 				 &aconnector->hdmi_hpd_debounce_work,
 				 msecs_to_jiffies(aconnector->hdmi_hpd_debounce_delay_ms)))
 			drm_dbg_kms(dev, "HDMI HPD: Re-scheduled debounce work\n");
