@@ -49,6 +49,7 @@ AC_DEFUN([AC_AMDGPU_DRM_GEM_DMABUF_VMAP_HAS_IOSYS_MAP_ARG], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE_SYMBOL([
 			#include <drm/drm_prime.h>
+			#include <linux/iosys-map.h>
 		],[
 			struct iosys_map map;
 			drm_gem_dmabuf_vmap(NULL, &map);
