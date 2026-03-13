@@ -2463,7 +2463,7 @@ static int gfx_v9_4_3_hw_fini(struct amdgpu_ip_block *ip_block)
 	struct amdgpu_device *adev = ip_block->adev;
 	int i, num_xcc;
 
-	if (adev->psp.ptl.hw_supported)
+	if (adev->psp.ptl.hw_supported && !amdgpu_in_reset(adev))
 		gfx_v9_4_3_perf_monitor_ptl_init(adev, false);
 
 	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
