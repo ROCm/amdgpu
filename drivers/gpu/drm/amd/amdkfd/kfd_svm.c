@@ -1224,6 +1224,7 @@ svm_range_get_pte_flags(struct kfd_node *node, struct amdgpu_vm *vm,
 	bool coherent = flags & (KFD_IOCTL_SVM_FLAG_COHERENT | KFD_IOCTL_SVM_FLAG_EXT_COHERENT);
 	bool ext_coherent = flags & KFD_IOCTL_SVM_FLAG_EXT_COHERENT;
 	unsigned int mtype_local, mtype_remote;
+	bool is_aid_a1, is_local;
 
 	if (domain == SVM_RANGE_VRAM_DOMAIN)
 		bo_node = prange->svm_bo->node;
@@ -1310,9 +1311,9 @@ svm_range_get_pte_flags(struct kfd_node *node, struct amdgpu_vm *vm,
 	case IP_VERSION(12, 0, 1):
 		mapping_flags |= AMDGPU_VM_MTYPE_NC;
 		break;
-	case IP_VERSION(12, 1, 0): {
-		bool is_aid_a1 = (node->adev->rev_id & 0x10);
-		bool is_local = (domain == SVM_RANGE_VRAM_DOMAIN) &&
+	case IP_VERSION(12, 1, 0):
+		is_aid_a1 = (node->adev->rev_id & 0x10);
+		is_local = (domain == SVM_RANGE_VRAM_DOMAIN) &&
 				(bo_node->adev == node->adev);
 
 		mtype_local = amdgpu_mtype_local == 0 ? AMDGPU_VM_MTYPE_RW :
@@ -1330,7 +1331,6 @@ svm_range_get_pte_flags(struct kfd_node *node, struct amdgpu_vm *vm,
 			mapping_flags |= mtype_remote;
 		}
 		break;
-	}
 	default:
 		mapping_flags |= coherent ?
 			AMDGPU_VM_MTYPE_UC : AMDGPU_VM_MTYPE_NC;
