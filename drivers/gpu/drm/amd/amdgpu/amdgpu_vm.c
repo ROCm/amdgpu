@@ -2962,6 +2962,7 @@ void amdgpu_vm_manager_fini(struct amdgpu_device *adev)
 #endif
 
 	amdgpu_vmid_mgr_fini(adev);
+	amdgpu_pasid_mgr_cleanup();
 }
 
 /**
