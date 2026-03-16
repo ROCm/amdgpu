@@ -8,7 +8,7 @@ AC_DEFUN([AC_AMDGPU_DMA_FENCE_CHECK_AND_SIGNAL], [
 			#include <linux/dma-fence.h>
 		], [
 			dma_fence_check_and_signal(NULL);
-		], [dma_fence_check_and_signal], [drivers/dma-buf/st-dma-fence.c],[
+		], [dma_fence_check_and_signal], [drivers/dma-buf/dma-fence.c],[
 			AC_DEFINE(HAVE_DMA_FENCE_CHECK_AND_SIGNAL, 1,
 				[dma_fence_check_and_signal() is available])
 		])
