@@ -635,7 +635,7 @@
 #define HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED 1
 
 /* drm_gem_dmabuf_vmap() has struct iosys_map arg */
-/* #undef HAVE_DRM_GEM_DMABUF_VMAP_HAS_IOSYS_MAP_ARG */
+#define HAVE_DRM_GEM_DMABUF_VMAP_HAS_IOSYS_MAP_ARG 1
 
 /* drm_gem_is_imported() is available */
 #define HAVE_DRM_GEM_IS_IMPORTED 1
