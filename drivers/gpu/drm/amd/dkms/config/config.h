@@ -1141,6 +1141,9 @@
 /* sg_alloc_table_from_pages_segment() is available */
 #define HAVE_SG_ALLOC_TABLE_FROM_PAGES_SEGMENT 1
 
+/* shmem_file_setup() takes vma_flags_t arg */
+/* #undef HAVE_SHMEM_FILE_SETUP_VMA_FLAGS */
+
 /* shmem_read_folio() is available */
 #define HAVE_SHMEM_READ_FOLIO 1
 
