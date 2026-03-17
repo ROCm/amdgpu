@@ -197,6 +197,10 @@ EXPORT_SYMBOL_GPL(ttm_backup_bytes_avail);
  */
 struct file *ttm_backup_shmem_create(loff_t size)
 {
+#ifdef HAVE_SHMEM_FILE_SETUP_VMA_FLAGS
 	return shmem_file_setup("ttm shmem backup", size,
 				EMPTY_VMA_FLAGS);
+#else
+	return shmem_file_setup("ttm shmem backup", size, 0);
+#endif
 }

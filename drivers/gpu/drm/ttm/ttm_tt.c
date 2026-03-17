@@ -335,7 +335,11 @@ int ttm_tt_swapout(struct ttm_device *bdev, struct ttm_tt *ttm,
 	struct page *to_page;
 	int i, ret;
 
+#ifdef HAVE_SHMEM_FILE_SETUP_VMA_FLAGS
 	swap_storage = shmem_file_setup("ttm swap", size, EMPTY_VMA_FLAGS);
+#else
+	swap_storage = shmem_file_setup("ttm swap", size, 0);
+#endif
 	if (IS_ERR(swap_storage)) {
 		pr_err("Failed allocating swap storage\n");
 		return PTR_ERR(swap_storage);
