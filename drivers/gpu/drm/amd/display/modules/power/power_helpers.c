@@ -993,8 +993,8 @@ bool psr_su_set_dsc_slice_height(struct dc *dc, struct dc_link *link,
 
 void set_replay_frame_skip_number(struct dc_link *link,
 	enum replay_coasting_vtotal_type type,
-	uint32_t coasting_vtotal_refresh_rate_mhz,
-	uint32_t flicker_free_refresh_rate_mhz,
+	uint32_t coasting_vtotal_refresh_rate_uhz,
+	uint32_t flicker_free_refresh_rate_uhz,
 	bool is_defer)
 {
 	uint32_t *frame_skip_number_array = NULL;
@@ -1006,7 +1006,7 @@ void set_replay_frame_skip_number(struct dc_link *link,
 	if (false == link->replay_settings.config.frame_skip_supported)
 		return;
 
-	if (flicker_free_refresh_rate_mhz == 0 || coasting_vtotal_refresh_rate_mhz == 0)
+	if (flicker_free_refresh_rate_uhz == 0 || coasting_vtotal_refresh_rate_uhz == 0)
 		return;
 
 	if (is_defer)
@@ -1017,7 +1017,7 @@ void set_replay_frame_skip_number(struct dc_link *link,
 	if (frame_skip_number_array == NULL)
 		return;
 
-	frame_skip_number = coasting_vtotal_refresh_rate_mhz / flicker_free_refresh_rate_mhz;
+	frame_skip_number = (coasting_vtotal_refresh_rate_uhz + 500000) / flicker_free_refresh_rate_uhz;
 
 	if (frame_skip_number >= 1)
 		frame_skip_number_array[type] = frame_skip_number - 1;
