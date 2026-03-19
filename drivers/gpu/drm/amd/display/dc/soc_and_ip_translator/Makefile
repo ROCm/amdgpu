@@ -46,11 +46,14 @@ endif
 endif #CONFIG_ARCH_HAS_KERNEL_FPU_SUPPORT
 
 CFLAGS_$(AMDDALPATH)/dc/soc_and_ip_translator/dcn401/dcn401_soc_and_ip_translator.o := $(soc_and_ip_translator_ccflags)
+CFLAGS_$(AMDDALPATH)/dc/soc_and_ip_translator/dcn42/dcn42_soc_and_ip_translator.o := $(soc_and_ip_translator_ccflags)
 
 CFLAGS_REMOVE_$(AMDDALPATH)/dc/soc_and_ip_translator/dcn401/dcn401_soc_and_ip_translator.o := $(soc_and_ip_translator_rcflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/soc_and_ip_translator/dcn42/dcn42_soc_and_ip_translator.o := $(soc_and_ip_translator_rcflags)
 
 soc_and_ip_translator := soc_and_ip_translator.o
 soc_and_ip_translator += dcn401/dcn401_soc_and_ip_translator.o
+soc_and_ip_translator += dcn42/dcn42_soc_and_ip_translator.o
 
 AMD_DAL_soc_and_ip_translator := $(addprefix $(AMDDALPATH)/dc/soc_and_ip_translator/, $(soc_and_ip_translator))
 

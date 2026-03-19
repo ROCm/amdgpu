@@ -1612,7 +1612,7 @@ bool amdgpu_display_crtc_scaling_mode_fixup(struct drm_crtc *crtc,
 #if defined(HAVE_DRM_DISPLAY_INFO_IS_HDMI)
 		      connector && connector->display_info.is_hdmi &&
 #else
-		      drm_detect_hdmi_monitor(to_amdgpu_connector(connector)->edid) &&
+		      drm_detect_hdmi_monitor(drm_edid_raw(to_amdgpu_connector(connector)->edid)) &&
 #endif
 		      amdgpu_display_is_hdtv_mode(mode)))) {
 			if (amdgpu_encoder->underscan_hborder != 0)
@@ -1817,21 +1817,6 @@ bool amdgpu_crtc_get_scanout_position(struct drm_crtc *crtc,
 						  stime, etime, mode);
 }
 
-static bool
-amdgpu_display_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj)
-{
-	struct drm_device *dev = adev_to_drm(adev);
-	struct drm_fb_helper *fb_helper = dev->fb_helper;
-
-	if (!fb_helper || !fb_helper->buffer)
-		return false;
-
-	if (gem_to_amdgpu_bo(fb_helper->buffer->gem) != robj)
-		return false;
-
-	return true;
-}
-
 int amdgpu_display_suspend_helper(struct amdgpu_device *adev)
 {
 	struct drm_device *dev = adev_to_drm(adev);
@@ -1854,7 +1839,6 @@ int amdgpu_display_suspend_helper(struct amdgpu_device *adev)
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
 		struct drm_framebuffer *fb = crtc->primary->fb;
-		struct amdgpu_bo *robj;
 
 		if (amdgpu_crtc->cursor_bo && !adev->enable_virtual_display) {
 			struct amdgpu_bo *aobj = gem_to_amdgpu_bo(amdgpu_crtc->cursor_bo);
@@ -1866,12 +1850,12 @@ int amdgpu_display_suspend_helper(struct amdgpu_device *adev)
 			}
 		}
 
-		if (!fb || !drm_gem_fb_get_obj(fb, 0))
+		if (!fb || !fb->obj[0])
 			continue;
 
-		robj = gem_to_amdgpu_bo(drm_gem_fb_get_obj(fb, 0));
+		if (!drm_fb_helper_gem_is_fb(dev->fb_helper, fb->obj[0])) {
+			struct amdgpu_bo *robj = gem_to_amdgpu_bo(fb->obj[0]);
 
-		if (!amdgpu_display_robj_is_fb(adev, robj)) {
 			r = amdgpu_bo_reserve(robj, true);
 			if (r == 0) {
 				amdgpu_bo_unpin(robj);

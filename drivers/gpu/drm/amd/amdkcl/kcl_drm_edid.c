@@ -7,6 +7,8 @@
  */
 #include <kcl/kcl_drm_edid.h>
 #include <linux/slab.h>
+#include <drm/drm_connector.h>
+#include <drm/drm_property.h>
 
 #ifndef HAVE_DRM_EDID_MALLOC
 static const struct drm_edid *__kcl_drm_edid_alloc(const void *edid, size_t size)
@@ -53,6 +55,35 @@ void _kcl_drm_edid_free(const struct drm_edid *drm_edid)
 	kfree(drm_edid);
 }
 EXPORT_SYMBOL(_kcl_drm_edid_free);
+
+const struct drm_edid *kcl_drm_edid_dup(const struct drm_edid *drm_edid)
+{
+	if (!drm_edid)
+		return NULL;
+	return _kcl_drm_edid_alloc(drm_edid->edid, drm_edid->size);
+}
+EXPORT_SYMBOL(kcl_drm_edid_dup);
+
+const struct drm_edid *kcl_drm_edid_read_ddc(struct drm_connector *connector,
+ struct i2c_adapter *adapter)
+{
+	struct edid *edid;
+
+	if (connector->force == DRM_FORCE_OFF)
+		return NULL;
+
+	if (connector->force == DRM_FORCE_ON && !connector->override_edid)
+		edid = drm_get_edid(connector, adapter);
+	else
+		edid = drm_get_edid(connector, adapter);
+
+	if (!edid)
+		return NULL;
+
+	return __kcl_drm_edid_alloc(edid, (edid->extensions + 1) * EDID_LENGTH);
+}
+EXPORT_SYMBOL(kcl_drm_edid_read_ddc);
+
 #endif
 
 #ifndef HAVE_DRM_EDID_RAW
@@ -93,3 +124,28 @@ const struct edid *_kcl_drm_edid_raw(const struct drm_edid *drm_edid)
 EXPORT_SYMBOL(_kcl_drm_edid_raw);
 #endif
 
+#ifndef HAVE_DRM_EDID_CONNECTOR_UPDATE
+int kcl_drm_edid_connector_update(struct drm_connector *connector,
+      const struct drm_edid *drm_edid)
+{
+	const struct edid *edid = _kcl_drm_edid_raw(drm_edid);
+	return drm_connector_update_edid_property(connector, edid);
+}
+EXPORT_SYMBOL(kcl_drm_edid_connector_update);
+#endif
+
+#ifndef HAVE_DRM_EDID_CONNECTOR_ADD_MODES
+int kcl_drm_edid_connector_add_modes(struct drm_connector *connector)
+{
+	struct edid *edid = NULL;
+
+	if (connector->edid_blob_ptr)
+		edid = (struct edid *)connector->edid_blob_ptr->data;
+
+	if (edid)
+		return drm_add_edid_modes(connector, edid);
+
+	return 0;
+}
+EXPORT_SYMBOL(kcl_drm_edid_connector_add_modes);
+#endif

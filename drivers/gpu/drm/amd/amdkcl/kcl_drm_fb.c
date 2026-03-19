@@ -33,6 +33,7 @@
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_fourcc.h>
+#include <drm/drm_gem_framebuffer_helper.h>
 #include <kcl/kcl_drm_fb.h>
 
 #ifndef HAVE_DRM_FB_HELPER_FILL_INFO
@@ -52,4 +53,22 @@ void drm_fb_helper_fill_info(struct fb_info *info,
 
 }
 EXPORT_SYMBOL(drm_fb_helper_fill_info);
+#endif
+
+#ifndef HAVE_DRM_FB_HELPER_GEM_IS_FB
+bool kcl_drm_fb_helper_gem_is_fb(const struct drm_fb_helper *fb_helper,
+			     const struct drm_gem_object *obj)
+{
+	const struct drm_gem_object *gem = NULL;
+
+	if (!fb_helper || !obj)
+		return false;
+	if (fb_helper->buffer && fb_helper->buffer->gem)
+		gem = fb_helper->buffer->gem;
+	else if (fb_helper->fb)
+		gem = drm_gem_fb_get_obj(fb_helper->fb, 0);
+
+	return gem == obj;
+}
+EXPORT_SYMBOL_GPL(kcl_drm_fb_helper_gem_is_fb);
 #endif

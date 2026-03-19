@@ -225,7 +225,7 @@ bool amdgpu_dig_monitor_is_duallink(struct drm_encoder *encoder,
 #if defined(HAVE_DRM_DISPLAY_INFO_IS_HDMI)
 			if (connector->display_info.is_hdmi) {
 #else
-			if (drm_detect_hdmi_monitor(amdgpu_connector->edid)) {
+			if (drm_detect_hdmi_monitor(drm_edid_raw(amdgpu_connector->edid))) {
 #endif
 				if (pixel_clock > 340000)
 					return true;
@@ -251,7 +251,7 @@ bool amdgpu_dig_monitor_is_duallink(struct drm_encoder *encoder,
 #if defined(HAVE_DRM_DISPLAY_INFO_IS_HDMI)
 			if (connector->display_info.is_hdmi) {
 #else
-			if (drm_detect_hdmi_monitor(amdgpu_connector->edid)) {
+			if (drm_detect_hdmi_monitor(drm_edid_raw(amdgpu_connector->edid))) {
 #endif
 				if (pixel_clock > 340000)
 					return true;
