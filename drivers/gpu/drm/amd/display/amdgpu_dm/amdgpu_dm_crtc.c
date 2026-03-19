@@ -703,7 +703,7 @@ static int amdgpu_dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
         if ((crtc->state->pageflip_flags &
                 DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
 #endif
-	    dm_crtc_state->update_type > UPDATE_TYPE_FAST) {
+	    dm_crtc_state->update_type != UPDATE_TYPE_FAST) {
 		drm_dbg_atomic(crtc->dev,
 			       "[CRTC:%d:%s] async flips are only supported for fast updates\n",
 			       crtc->base.id, crtc->name);
