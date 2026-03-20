@@ -99,4 +99,19 @@ int kcl_dma_fence_dedup_array(struct dma_fence **array, int num_fences);
 
 #define dma_fence_dedup_array kcl_dma_fence_dedup_array
 #endif
+
+#ifndef HAVE_DMA_FENCE_UNWRAP_MERGE
+struct dma_fence *kcl__dma_fence_unwrap_merge(unsigned int num_fences,
+					      struct dma_fence **fences,
+					      struct dma_fence_unwrap *cursors);
+
+#define kcl_dma_fence_unwrap_merge(...)					\
+	({								\
+		struct dma_fence *__f[] = { __VA_ARGS__ };		\
+		struct dma_fence_unwrap __c[ARRAY_SIZE(__f)];		\
+									\
+		kcl__dma_fence_unwrap_merge(ARRAY_SIZE(__f), __f, __c);	\
+	})
+#define dma_fence_unwrap_merge kcl_dma_fence_unwrap_merge
+#endif
 #endif
