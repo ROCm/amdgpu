@@ -175,6 +175,9 @@
 /* struct dma_fence_ops has use_64bit_seqno field */
 /* #undef HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO */
 
+/* test whether dma_fence_begin_signalling are available */
+#define HAVE_DMA_FENCE_SIGNALLING 1
+
 /* dma_fence_TIMESTAMP() is available */
 #define HAVE_DMA_FENCE_TIMESTAMP 1
 
