@@ -1195,15 +1195,28 @@ int amdgpu_device_resize_fb_bar(struct amdgpu_device *adev)
 	r = pci_resize_resource(adev->pdev, 0, rbar_size,
 				(adev->asic_type >= CHIP_BONAIRE) ? 1 << 5
 								  : 1 << 2);
-#else
-	r = pci_resize_resource(adev->pdev, 0, rbar_size);
-#endif
 
 	if (r == -ENOSPC)
 		dev_info(adev->dev,
 			 "Not enough PCI address space for a large BAR.");
 	else if (r && r != -ENOTSUPP)
 		dev_err(adev->dev, "Problem resizing BAR0 (%d).", r);
+#else
+	if (adev->asic_type >= CHIP_BONAIRE)
+		pci_release_resource(adev->pdev, 2);
+
+	pci_release_resource(adev->pdev, 0);
+
+	r = pci_resize_resource(adev->pdev, 0, rbar_size);
+
+	if (r == -ENOSPC)
+		dev_info(adev->dev,
+			 "Not enough PCI address space for a large BAR.");
+	else if (r && r != -ENOTSUPP)
+		dev_err(adev->dev, "Problem resizing BAR0 (%d).", r);
+
+	pci_assign_unassigned_bus_resources(adev->pdev->bus);
+#endif
 
 	/* When the doorbell or fb BAR isn't available we have no chance of
 	 * using the device.
