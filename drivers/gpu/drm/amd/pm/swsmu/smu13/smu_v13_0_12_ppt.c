@@ -1137,16 +1137,10 @@ static const struct ras_eeprom_smu_funcs smu_v13_0_12_eeprom_smu_funcs = {
 
 static void smu_v13_0_12_ras_smu_feature_flags(struct amdgpu_device *adev, uint64_t *flags)
 {
-	struct smu_context *smu = adev->powerplay.pp_handle;
-
 	if (!flags)
 		return;
 
 	*flags = 0ULL;
-
-	if (smu_v13_0_6_cap_supported(smu, SMU_CAP(RAS_EEPROM)))
-		*flags |= RAS_SMU_FEATURE_BIT__RAS_EEPROM;
-
 }
 
 const struct ras_smu_drv smu_v13_0_12_ras_smu_drv = {
