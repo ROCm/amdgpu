@@ -89,6 +89,12 @@ for config in $AMDGPU_CONFIG $TTM_CONFIG $SCHED_CONFIG; do
 	sed -i "/${config}$/s/$/_AMDKCL/" amd/dkms/Kbuild
 done
 
+# Fix "Argument list too long" in recursive make for large modules (700+ .o files).
+# Makefile.build recurses into subdirectories via sub-makes that don't inherit
+# overrides. Inject the include into amd/amdgpu/Makefile; cmd_mod_fix.mk itself
+# checks whether the fix is needed and is a no-op on newer kernels.
+sed -i '1i\-include $(src)/../dkms/cmd_mod_fix.mk' amd/amdgpu/Makefile
+
 export KERNELVER
 ln -s $DKMS_TREE $MODULE_BUILD_DIR
 echo "PATH=$PATH" >$MODULE_BUILD_DIR/.env
