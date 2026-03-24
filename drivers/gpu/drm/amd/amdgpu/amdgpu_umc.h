@@ -104,8 +104,6 @@ struct amdgpu_umc_ras {
 	bool (*check_ecc_err_status)(struct amdgpu_device *adev,
 			enum amdgpu_mca_error_type type, void *ras_error_status);
 	void (*get_retire_flip_bits)(struct amdgpu_device *adev);
-	void (*mca_ipid_parse)(struct amdgpu_device *adev, uint64_t ipid,
-			uint32_t *did, uint32_t *ch, uint32_t *umc_inst, uint32_t *sid);
 };
 
 struct amdgpu_umc_funcs {

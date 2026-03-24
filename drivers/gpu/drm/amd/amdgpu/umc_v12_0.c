@@ -197,25 +197,11 @@ static bool umc_v12_0_check_ecc_err_status(struct amdgpu_device *adev,
 	return false;
 }
 
-static void umc_v12_0_mca_ipid_parse(struct amdgpu_device *adev, uint64_t ipid,
-		uint32_t *did, uint32_t *ch, uint32_t *umc_inst, uint32_t *sid)
-{
-	if (did)
-		*did = MCA_IPID_2_DIE_ID(ipid);
-	if (ch)
-		*ch = MCA_IPID_2_UMC_CH(ipid);
-	if (umc_inst)
-		*umc_inst = MCA_IPID_2_UMC_INST(ipid);
-	if (sid)
-		*sid = MCA_IPID_2_SOCKET_ID(ipid);
-}
-
 struct amdgpu_umc_ras umc_v12_0_ras = {
 	.ras_block = {
 		.hw_ops = NULL,
 	},
 	.check_ecc_err_status = umc_v12_0_check_ecc_err_status,
 	.get_retire_flip_bits = umc_v12_0_get_retire_flip_bits,
-	.mca_ipid_parse = umc_v12_0_mca_ipid_parse,
 };
 
