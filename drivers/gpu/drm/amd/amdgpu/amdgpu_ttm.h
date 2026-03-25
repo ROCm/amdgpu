@@ -114,8 +114,6 @@ struct amdgpu_mman {
 	struct amdgpu_dgma_import_mgr dgma_import_mgr;
 	struct ttm_resource_manager preempt_mgr;
 
-	uint64_t		stolen_extended_size;
-	struct amdgpu_bo	*stolen_extended_memory;
 	bool			keep_stolen_vga_memory;
 
 	struct amdgpu_bo	*stolen_reserved_memory;
