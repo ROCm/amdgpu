@@ -662,13 +662,13 @@ static int smu_v14_0_2_get_smu_metrics_data(struct smu_context *smu,
 			*value = metrics->AverageGfxclkFrequencyPreDs;
 		break;
 	case METRICS_AVERAGE_FCLK:
-		if (metrics->AverageUclkActivity <= SMU_14_0_2_BUSY_THRESHOLD)
+		if (smu_safe_u16_nn(metrics->AverageUclkActivity) <= SMU_14_0_2_BUSY_THRESHOLD)
 			*value = metrics->AverageFclkFrequencyPostDs;
 		else
 			*value = metrics->AverageFclkFrequencyPreDs;
 		break;
 	case METRICS_AVERAGE_UCLK:
-		if (metrics->AverageUclkActivity <= SMU_14_0_2_BUSY_THRESHOLD)
+		if (smu_safe_u16_nn(metrics->AverageUclkActivity) <= SMU_14_0_2_BUSY_THRESHOLD)
 			*value = metrics->AverageMemclkFrequencyPostDs;
 		else
 			*value = metrics->AverageMemclkFrequencyPreDs;
@@ -689,7 +689,7 @@ static int smu_v14_0_2_get_smu_metrics_data(struct smu_context *smu,
 		*value = metrics->AverageGfxActivity;
 		break;
 	case METRICS_AVERAGE_MEMACTIVITY:
-		*value = metrics->AverageUclkActivity;
+		*value = smu_safe_u16_nn(metrics->AverageUclkActivity);
 		break;
 	case METRICS_AVERAGE_VCNACTIVITY:
 		*value = max(metrics->AverageVcn0ActivityPercentage,
@@ -2148,7 +2148,7 @@ static ssize_t smu_v14_0_2_get_gpu_metrics(struct smu_context *smu,
 					     metrics->AvgTemperature[TEMP_VR_MEM1]);
 
 	gpu_metrics->average_gfx_activity = metrics->AverageGfxActivity;
-	gpu_metrics->average_umc_activity = metrics->AverageUclkActivity;
+	gpu_metrics->average_umc_activity = smu_safe_u16_nn(metrics->AverageUclkActivity);
 	gpu_metrics->average_mm_activity = max(metrics->AverageVcn0ActivityPercentage,
 					       metrics->Vcn1ActivityPercentage);
 
@@ -2160,7 +2160,7 @@ static ssize_t smu_v14_0_2_get_gpu_metrics(struct smu_context *smu,
 	else
 		gpu_metrics->average_gfxclk_frequency = metrics->AverageGfxclkFrequencyPreDs;
 
-	if (metrics->AverageUclkActivity <= SMU_14_0_2_BUSY_THRESHOLD)
+	if (smu_safe_u16_nn(metrics->AverageUclkActivity) <= SMU_14_0_2_BUSY_THRESHOLD)
 		gpu_metrics->average_uclk_frequency = metrics->AverageMemclkFrequencyPostDs;
 	else
 		gpu_metrics->average_uclk_frequency = metrics->AverageMemclkFrequencyPreDs;
