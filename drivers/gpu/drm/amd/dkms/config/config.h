@@ -997,6 +997,9 @@
 /* Define to 1 if you have the <linux/stdarg.h> header file. */
 #define HAVE_LINUX_STDARG_H 1
 
+/* Define to 1 if you have the <linux/string_choices.h> header file. */
+#define HAVE_LINUX_STRING_CHOICES_H 1
+
 /* Define to 1 if you have the <linux/unaligned.h> header file. */
 #define HAVE_LINUX_UNALIGNED_H 1
 
