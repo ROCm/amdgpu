@@ -661,11 +661,11 @@ exec_fini:
 put_gobj_write:
 	for (i = 0; i < num_write_bo_handles; i++)
 		drm_gem_object_put(gobj_write[i]);
-	kfree(gobj_write);
+	kvfree(gobj_write);
 put_gobj_read:
 	for (i = 0; i < num_read_bo_handles; i++)
 		drm_gem_object_put(gobj_read[i]);
-	kfree(gobj_read);
+	kvfree(gobj_read);
 free_syncobj:
 	while (entry-- > 0)
 		if (syncobj[entry])
@@ -945,12 +945,9 @@ int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
 				 * be good for now
 				 */
 				r = dma_fence_wait(fences[i], true);
-				if (r) {
-					dma_fence_put(fences[i]);
+				if (r)
 					goto free_fences;
-				}
 
-				dma_fence_put(fences[i]);
 				continue;
 			}
 
@@ -980,7 +977,6 @@ int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
 			fence_info[cnt].va = fence_drv->va;
 			fence_info[cnt].value = fences[i]->seqno;
 
-			dma_fence_put(fences[i]);
 			/* Increment the actual userq fence count */
 			cnt++;
 		}
@@ -1007,11 +1003,11 @@ exec_fini:
 put_gobj_write:
 	for (i = 0; i < num_write_bo_handles; i++)
 		drm_gem_object_put(gobj_write[i]);
-	kfree(gobj_write);
+	kvfree(gobj_write);
 put_gobj_read:
 	for (i = 0; i < num_read_bo_handles; i++)
 		drm_gem_object_put(gobj_read[i]);
-	kfree(gobj_read);
+	kvfree(gobj_read);
 free_timeline_points:
 	kfree(timeline_points);
 free_timeline_handles:

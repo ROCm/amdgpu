@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Advanced Micro Devices, Inc.
+ * Copyright 2026 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -20,20 +20,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-#ifndef __SOC_V1_0_H__
-#define __SOC_V1_0_H__
 
-extern const struct amdgpu_ip_block_version soc_v1_0_common_ip_block;
+#ifndef __LSDMA_V7_1_H__
+#define __LSDMA_V7_1_H__
 
-void soc_v1_0_grbm_select(struct amdgpu_device *adev,
-			  u32 me, u32 pipe,
-			  u32 queue, u32 vmid,
-			  int xcc_id);
-int soc_v1_0_init_soc_config(struct amdgpu_device *adev);
-bool soc_v1_0_normalize_xcc_reg_range(uint32_t reg);
-bool soc_v1_0_mid1_reg_range(uint32_t reg);
-uint32_t soc_v1_0_normalize_xcc_reg_offset(uint32_t reg);
-uint32_t soc_v1_0_normalize_reg_offset(uint32_t reg);
-u64 soc_v1_0_encode_ext_smn_addressing(int ext_id);
+#include "soc15_common.h"
 
-#endif
+extern const struct amdgpu_lsdma_funcs lsdma_v7_1_funcs;
+
+#endif /* __LSDMA_V7_1_H__ */
