@@ -178,4 +178,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #device.h: move dev_printk()-like functions to dev_printk.h
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/dev_printk.h])
+
+	dnl #v6.3-rc1-1-gfca76071bab2
+	dnl #lib/string_helpers: Split out string_choices.h
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/string_choices.h])
 ])
