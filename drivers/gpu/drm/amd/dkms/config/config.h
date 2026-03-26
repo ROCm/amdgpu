@@ -154,9 +154,6 @@
 /* dma_fence_dedup_array() is available */
 #define HAVE_DMA_FENCE_DEDUP_ARRAY 1
 
-/* dma_fence_unwrap_merge() is available */
-#define HAVE_DMA_FENCE_UNWRAP_MERGE 1
-
 /* dma_fence_describe() is available */
 #define HAVE_DMA_FENCE_DESCRIBE 1
 
@@ -180,6 +177,9 @@
 
 /* dma_fence_TIMESTAMP() is available */
 #define HAVE_DMA_FENCE_TIMESTAMP 1
+
+/* dma_fence_unwrap_merge() is available */
+#define HAVE_DMA_FENCE_UNWRAP_MERGE 1
 
 /* dma_map_sgtable() is enabled */
 #define HAVE_DMA_MAP_SGTABLE 1
