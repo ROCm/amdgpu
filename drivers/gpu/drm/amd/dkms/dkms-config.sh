@@ -108,9 +108,7 @@ append_mk "subdir-ccflags-y += -DDRM_VER=${DRM_VER} -DDRM_PATCH=${DRM_PATCH} -DD
 # Check for P2PDMA configuration
 _enable=0
 if [[ "$(get_config CONFIG_PCI_P2PDMA)" == "y" ]]; then
-    if [[ "$(get_config CONFIG_DMABUF_MOVENOTIFY)" == "y" ]]; then
-        _enable=1
-    fi
+    _enable=1
 fi
 export_macro_mk CONFIG_HSA_AMD_P2P ${_enable}
 
