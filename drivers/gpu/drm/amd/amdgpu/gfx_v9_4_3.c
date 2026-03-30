@@ -2701,11 +2701,12 @@ static void gfx_v9_4_3_set_spm_perfmon_ring_buf(struct amdgpu_device *adev,
 {
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[xcc_id].ring;
 
-	gfx_v9_4_3_write_data_to_reg(kiq_ring, 0, false, SOC15_REG_OFFSET(GC, 0,
-			regRLC_SPM_PERFMON_RING_BASE_LO), lower_32_bits(gpu_addr));
+	gfx_v9_4_3_write_data_to_reg(kiq_ring, 0, false,
+			SOC15_REG_OFFSET(GC, GET_INST(GC, xcc_id),
+				regRLC_SPM_PERFMON_RING_BASE_LO), lower_32_bits(gpu_addr));
 
 	gfx_v9_4_3_write_data_to_reg(kiq_ring, 0, false,
-			SOC15_REG_OFFSET(GC, 0,
+			SOC15_REG_OFFSET(GC, GET_INST(GC, xcc_id),
 				regRLC_SPM_PERFMON_RING_BASE_HI), upper_32_bits(gpu_addr));
 
 	gfx_v9_4_3_write_data_to_reg(kiq_ring, 0, false,
