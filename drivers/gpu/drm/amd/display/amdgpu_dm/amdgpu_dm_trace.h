@@ -869,9 +869,9 @@ TRACE_EVENT(amdgpu_dm_ism_event,
 	),
 	TP_fast_assign(
 		__entry->crtc_id = crtc_id;
-		__assign_str(prev_state);
-		__assign_str(curr_state);
-		__assign_str(event);
+		__amdkcl_assign_str(prev_state, prev_state);
+		__amdkcl_assign_str(curr_state, curr_state);
+		__amdkcl_assign_str(event, event);
 	),
 	TP_printk(
 		"[CRTC %d] %s -> %s on event %s",
