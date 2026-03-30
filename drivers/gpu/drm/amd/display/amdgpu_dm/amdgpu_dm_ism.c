@@ -564,8 +564,14 @@ void amdgpu_dm_ism_disable(struct amdgpu_display_manager *dm)
 		acrtc = to_amdgpu_crtc(crtc);
 		ism = &acrtc->ism;
 
+#ifdef HAVE_DISABLE_DELAYED_WORK_SYNC
+		/* Cancel and disable any pending work */
 		disable_delayed_work_sync(&ism->delayed_work);
 		disable_delayed_work_sync(&ism->sso_delayed_work);
+#else
+		cancel_delayed_work_sync(&ism->delayed_work);
+		cancel_delayed_work_sync(&ism->sso_delayed_work);
+#endif
 	}
 }
 
@@ -622,8 +628,10 @@ void amdgpu_dm_ism_enable(struct amdgpu_display_manager *dm)
 		acrtc = to_amdgpu_crtc(crtc);
 		ism = &acrtc->ism;
 
+#ifdef HAVE_DISABLE_DELAYED_WORK_SYNC
 		enable_delayed_work(&ism->delayed_work);
 		enable_delayed_work(&ism->sso_delayed_work);
+#endif
 	}
 }
 
