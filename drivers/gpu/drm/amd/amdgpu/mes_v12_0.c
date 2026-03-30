@@ -1207,6 +1207,32 @@ static int mes_v12_0_inv_tlbs_pasid(struct amdgpu_mes *mes,
 
 }
 
+static int mes_v12_0_set_host_trap(struct amdgpu_mes *mes,
+				    struct mes_set_host_trap_input *input)
+{
+	union MESAPI__SEND_HOST_TRAP mes_send_host_trap;
+
+	memset(&mes_send_host_trap, 0, sizeof(mes_send_host_trap));
+
+	mes_send_host_trap.header.type = MES_API_TYPE_SCHEDULER;
+	mes_send_host_trap.header.opcode = MES_SCH_API_SEND_HOST_TRAP;
+	mes_send_host_trap.header.dwsize = API_FRAME_SIZE_IN_DWORDS;
+
+	/* process_context_addr has only one entry, process_context_array_index uses default 0 */
+	mes_send_host_trap.send_host_trap.process_context_addr = input->process_context_addr;
+	mes_send_host_trap.send_host_trap.cmd = input->cmd;
+	mes_send_host_trap.send_host_trap.mode = input->mode;
+	mes_send_host_trap.send_host_trap.data = input->data;
+	mes_send_host_trap.send_host_trap.wave_hw_id = input->wave_hw_id;
+
+	if (!input->process_context_addr)
+		mes_send_host_trap.send_host_trap.flags.broadcast_all_vmids_and_waves = 1;
+
+	return mes_v12_0_submit_pkt_and_poll_completion(mes, AMDGPU_MES_KIQ_PIPE,
+			&mes_send_host_trap, sizeof(mes_send_host_trap),
+			offsetof(union MESAPI__SEND_HOST_TRAP, api_status));
+}
+
 static const struct amdgpu_mes_funcs mes_v12_0_funcs = {
 	.add_hw_queue = mes_v12_0_add_hw_queue,
 	.remove_hw_queue = mes_v12_0_remove_hw_queue,
@@ -1217,6 +1243,7 @@ static const struct amdgpu_mes_funcs mes_v12_0_funcs = {
 	.misc_op = mes_v12_0_misc_op,
 	.reset_hw_queue = mes_v12_0_reset_hw_queue,
 	.invalidate_tlbs_pasid = mes_v12_0_inv_tlbs_pasid,
+	.send_host_trap = mes_v12_0_set_host_trap,
 	.detect_and_reset_hung_queues = mes_v12_0_detect_and_reset_hung_queues,
 };
 
