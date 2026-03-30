@@ -128,11 +128,32 @@ static int kfd_pc_sample_thread(void *param)
 			next_trap_time = ktime_add_us(ktime_get_raw(), timeout);
 
 			for_each_inst(inst, node->xcc_mask) {
-			node->kfd2kgd->trigger_pc_sample_trap(adev, node->vm_info.last_vmid_kfd,
-					&node->pcs_data.hosttrap_entry.target_simd,
-					&node->pcs_data.hosttrap_entry.target_wave_slot,
-					node->pcs_data.hosttrap_entry.base.pc_sample_info.method,
-					inst);
+				struct pc_sampling_entry *pcs_entry;
+				unsigned int id;
+
+				if ((KFD_GC_VERSION(node) >= IP_VERSION(12, 0, 0)) &&
+					(KFD_GC_VERSION(node) <= IP_VERSION(12, 0, 1))) {
+					mutex_lock(&node->pcs_data.mutex);
+					idr_for_each_entry(&node->pcs_data.sampling_idr, pcs_entry, id) {
+						struct kfd_process_device *pdd = pcs_entry->pdd;
+
+						if (pcs_entry->method == KFD_IOCTL_PCS_METHOD_HOSTTRAP)
+							/* only send one host trap to one process once */
+							node->kfd2kgd->trigger_pc_sample_trap(adev,
+								pdd->proc_ctx_gpu_addr,
+								&node->pcs_data.hosttrap_entry.target_simd,
+								&node->pcs_data.hosttrap_entry.target_wave_slot,
+								node->pcs_data.hosttrap_entry.base.pc_sample_info.method,
+								inst);
+					}
+					mutex_unlock(&node->pcs_data.mutex);
+				} else { /* broadcast to all VMID processes */
+					node->kfd2kgd->trigger_pc_sample_trap(adev, 0,
+						&node->pcs_data.hosttrap_entry.target_simd,
+						&node->pcs_data.hosttrap_entry.target_wave_slot,
+						node->pcs_data.hosttrap_entry.base.pc_sample_info.method,
+						inst);
+				}
 			}
 			pr_debug_ratelimited("triggered a host trap.");
 			need_wait = true;
