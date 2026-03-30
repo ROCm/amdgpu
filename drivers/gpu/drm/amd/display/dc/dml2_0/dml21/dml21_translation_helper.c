@@ -36,6 +36,8 @@ static void dml21_populate_pmo_options(struct dml2_pmo_options *pmo_options,
 	pmo_options->disable_drr_var_when_var_active = in_dc->debug.disable_fams_gaming == INGAME_FAMS_DISABLE ||
 			in_dc->debug.disable_fams_gaming == INGAME_FAMS_MULTI_DISP_CLAMPED_ONLY;
 	pmo_options->disable_drr_clamped_when_var_active = in_dc->debug.disable_fams_gaming == INGAME_FAMS_DISABLE;
+
+	pmo_options->force_mandatory_uclk_pstate_support = config->pmo.force_mandatory_uclk_pstate_support;
 }
 
 static enum dml2_project_id dml21_dcn_revision_to_dml2_project_id(enum dce_version dcn_version)
@@ -690,7 +692,8 @@ static void populate_dml21_plane_config_from_plane_state(struct dml2_context *dm
 	plane->overrides.gpuvm_min_page_size_kbytes = soc_bb->gpuvm_min_page_size_kbytes;
 	plane->overrides.hostvm_min_page_size_kbytes = soc_bb->hostvm_min_page_size_kbytes;
 
-	plane->immediate_flip = plane_state->flip_immediate;
+	//Always true for DAL, we want to validate the worst case scenario as we have to switch b/w the two without possibility of failure.
+	plane->immediate_flip = true;
 
 	plane->composition.rect_out_height_spans_vactive =
 		plane_state->dst_rect.height >= stream->src.height &&
