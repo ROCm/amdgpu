@@ -67,6 +67,7 @@ enum MES_SCH_API_OPCODE {
 	MES_SCH_API_SET_GANG_SUBMIT		= 18,
 	MES_SCH_API_SET_HW_RSRC_1               = 19,
 	MES_SCH_API_INV_TLBS                    = 20,
+	MES_SCH_API_SEND_HOST_TRAP              = 21,
 
 	MES_SCH_API_MAX = 0xFF
 };
@@ -951,6 +952,40 @@ union MESAPI__INV_TLBS {
 		union MES_API_HEADER    header;
 		struct MES_API_STATUS   api_status;
 		struct INV_TLBS         invalidate_tlbs;
+	};
+
+	uint32_t max_dwords_in_api[API_FRAME_SIZE_IN_DWORDS];
+};
+
+struct SEND_HOST_TRAP {
+	uint64_t process_context_addr;
+	uint32_t process_context_array_index;
+
+	/* Below fields are used to fill in SQ_CMD register */
+	uint32_t cmd;
+	uint32_t mode;
+	uint32_t data;
+	/* 0xffffffff indicates broadcast to all waves */
+	uint32_t wave_hw_id;
+	union {
+		struct {
+			/* 0 = check vmid and wave for a process
+			 * 1 = broadcast to all vmids and waves
+			 */
+			uint32_t broadcast_all_vmids_and_waves : 1;
+			/* 0 = non-gfx debugger host trap; 1 = gfx debugger host trap */
+			uint32_t debugger_trap       : 1;
+			uint32_t reserved            : 30;
+		};
+		uint32_t u32all;
+	} flags;
+};
+
+union MESAPI__SEND_HOST_TRAP {
+	struct {
+		union MES_API_HEADER    header;
+		struct MES_API_STATUS   api_status;
+		struct SEND_HOST_TRAP   send_host_trap;
 	};
 
 	uint32_t max_dwords_in_api[API_FRAME_SIZE_IN_DWORDS];
