@@ -120,7 +120,7 @@ static void set_reg_field_values(struct dc_reg_value_masks *field_value_mask,
 		field_value = va_arg(ap, uint32_t);
 
 		set_reg_field_value_masks(field_value_mask,
-				field_value, mask, shift);
+				field_value, mask, (uint8_t)shift);
 		i++;
 	}
 }
@@ -457,7 +457,7 @@ void generic_reg_wait(const struct dc_context *ctx,
 
 		reg_val = dm_read_reg(ctx, addr);
 
-		field_value = get_reg_field_value_ex(reg_val, mask, shift);
+		field_value = get_reg_field_value_ex(reg_val, mask, (uint8_t)shift);
 
 		if (field_value == condition_value) {
 			if (i * delay_between_poll_us > 1000)
@@ -523,7 +523,7 @@ uint32_t generic_indirect_reg_get(const struct dc_context *ctx,
 		mask = va_arg(ap, uint32_t);
 		field_value = va_arg(ap, uint32_t *);
 
-		*field_value = get_reg_field_value_ex(value, mask, shift);
+		*field_value = get_reg_field_value_ex(value, mask, (uint8_t)shift);
 		i++;
 	}
 
@@ -552,7 +552,7 @@ uint32_t generic_indirect_reg_update_ex(const struct dc_context *ctx,
 		mask = va_arg(ap, uint32_t);
 		field_value = va_arg(ap, uint32_t);
 
-		reg_val = set_reg_field_value_ex(reg_val, field_value, mask, shift);
+		reg_val = set_reg_field_value_ex(reg_val, field_value, mask, (uint8_t)shift);
 		i++;
 	}
 
@@ -582,7 +582,7 @@ uint32_t generic_indirect_reg_update_ex_sync(const struct dc_context *ctx,
 		mask = va_arg(ap, uint32_t);
 		field_value = va_arg(ap, uint32_t);
 
-		reg_val = set_reg_field_value_ex(reg_val, field_value, mask, shift);
+		reg_val = set_reg_field_value_ex(reg_val, field_value, mask, (uint8_t)shift);
 		i++;
 	}
 
@@ -613,7 +613,7 @@ uint32_t generic_indirect_reg_get_sync(const struct dc_context *ctx,
 		mask = va_arg(ap, uint32_t);
 		field_value = va_arg(ap, uint32_t *);
 
-		*field_value = get_reg_field_value_ex(value, mask, shift);
+		*field_value = get_reg_field_value_ex(value, mask, (uint8_t)shift);
 		i++;
 	}
 
