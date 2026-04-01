@@ -325,6 +325,7 @@ static bool kfd_ais_check_p2p_cached(struct kfd_process_device *pdd,
 	return xa_load(&pdd->ais_counters_xa, kfd_ais_make_key(pdev)) != NULL;
 }
 
+#ifdef HAVE_STATX_DIOALIGN
 static int kfd_ais_get_dio_align(struct file *filep, unsigned int *offset_align,
 			unsigned int *mem_align)
 {
@@ -343,6 +344,7 @@ static int kfd_ais_get_dio_align(struct file *filep, unsigned int *offset_align,
 	*mem_align = PAGE_SIZE;
 	return 0;
 }
+#endif
 
 int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		    struct kfd_ais_in_args *in, struct kfd_process_device *pdd,
@@ -358,12 +360,20 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	loff_t cur_pos;
 	int ret = 0;
 	bool is_read = (in->op == KFD_IOC_AIS_READ);
+#ifdef HAVE_STATX_DIOALIGN
 	unsigned int dio_offset_align, dio_mem_align;
+#else
+	/* For now support only page-aligned offsets and sizes. It could be
+	 * improved to fs block size in the future
+	 */
+	if (!PAGE_ALIGNED(in->file_offset) || !PAGE_ALIGNED(in->size))
+		return -EINVAL;
+#endif
 
 	filep = fget((unsigned int)in->fd);
 	if (!filep)
 		return -EBADF;
-
+#ifdef HAVE_STATX_DIOALIGN
 	if (filep->f_flags & O_DIRECT) {
 		ret = kfd_ais_get_dio_align(filep, &dio_offset_align, &dio_mem_align);
 		if (ret) {
@@ -377,6 +387,7 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 			goto out;
 		}
 	}
+#endif
 
 	pdev = get_pci_dev_from_file(filep);
 	if (!pdev) {
