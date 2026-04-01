@@ -41,6 +41,7 @@
 #include "psp_v13_0_4.h"
 #include "psp_v14_0.h"
 #include "psp_v15_0.h"
+#include "psp_v15_0_3.h"
 #include "psp_v15_0_8.h"
 
 #include "amdgpu_ras.h"
@@ -282,6 +283,9 @@ static int psp_early_init(struct amdgpu_ip_block *ip_block)
 	case IP_VERSION(15, 0, 9):
 		psp_v15_0_0_set_psp_funcs(psp);
 		psp->boot_time_tmr = false;
+		break;
+	case IP_VERSION(15, 0, 3):
+		psp_v15_0_3_set_psp_funcs(psp);
 		break;
 	case IP_VERSION(15, 0, 8):
 		psp_v15_0_8_set_psp_funcs(psp);
@@ -5536,6 +5540,14 @@ const struct amdgpu_ip_block_version psp_v15_0_ip_block = {
 	.major = 15,
 	.minor = 0,
 	.rev = 0,
+	.funcs = &psp_ip_funcs,
+};
+
+const struct amdgpu_ip_block_version psp_v15_0_3_ip_block = {
+	.type = AMD_IP_BLOCK_TYPE_PSP,
+	.major = 15,
+	.minor = 0,
+	.rev = 3,
 	.funcs = &psp_ip_funcs,
 };
 

@@ -2878,6 +2878,9 @@ static int amdgpu_discovery_set_psp_ip_blocks(struct amdgpu_device *adev)
 	case IP_VERSION(15, 0, 9):
 		amdgpu_device_ip_block_add(adev, &psp_v15_0_ip_block);
 		break;
+	case IP_VERSION(15, 0, 3):
+		amdgpu_device_ip_block_add(adev, &psp_v15_0_3_ip_block);
+		break;
 	case IP_VERSION(15, 0, 8):
 		amdgpu_device_ip_block_add(adev, &psp_v15_0_8_ip_block);
 		break;
