@@ -1171,9 +1171,6 @@
 /* enum SMCA_UMC_V2 is available */
 #define HAVE_SMCA_UMC_V2 1
 
-/* STATX_DIOALIGN and kstat dio_offset_align/dio_mem_align are available */
-#define HAVE_STATX_DIOALIGN 1
-
 /* strscpy() allows two arguments */
 #define HAVE_STRSCPY_ALLOW_TWO_ARGUMENTS 1
 
