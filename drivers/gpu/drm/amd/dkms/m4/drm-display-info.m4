@@ -74,9 +74,29 @@ AC_DEFUN([AC_AMDGPU_DRM_DISPLAY_INFO_LUMINANCE_RANGE], [
 ])
 
 
+dnl #
+dnl # v6.19-2267-g2c342d237b80
+dnl # drm/edid: Parse AMD Vendor-Specific Data Block
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_DISPLAY_INFO_AMD_VSDB], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_connector.h>
+		], [
+			struct drm_display_info *display_info = NULL;
+			struct drm_amd_vsdb_info vsdb_info = {};
+			display_info->amd_vsdb = vsdb_info;
+		], [
+			AC_DEFINE(HAVE_DRM_DISPLAY_INFO_AMD_VSDB, 1,
+				[display_info->amd_vsdb is available])
+		])
+	])
+])
+
 AC_DEFUN([AC_AMDGPU_DRM_DISPLAY_INFO], [
 	AC_AMDGPU_DRM_DISPLAY_INFO_EDID_HDMI_RGB444_DC_MODES
 	AC_AMDGPU_DRM_DISPLAY_INFO_MONITOR_RANGE
 	AC_AMDGPU_DRM_DISPLAY_INFO_MAX_DSC_BPP
 	AC_AMDGPU_DRM_DISPLAY_INFO_LUMINANCE_RANGE
+	AC_AMDGPU_DRM_DISPLAY_INFO_AMD_VSDB
 ])
