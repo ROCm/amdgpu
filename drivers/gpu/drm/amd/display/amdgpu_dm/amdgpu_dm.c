@@ -4037,6 +4037,7 @@ static struct drm_mode_config_helper_funcs amdgpu_dm_mode_config_helperfuncs = {
 #endif
 };
 
+#ifdef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
 #define DDC_MANUFACTURERNAME_SAMSUNG 0x2D4C
 
 static void dm_set_panel_type(struct amdgpu_dm_connector *aconnector)
@@ -4096,6 +4097,7 @@ static void dm_set_panel_type(struct amdgpu_dm_connector *aconnector)
 
 	drm_dbg_kms(aconnector->base.dev, "Panel type: %d\n", link->panel_type);
 }
+#endif
 
 static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 {
@@ -4122,10 +4124,12 @@ static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 	caps->ext_caps = &aconnector->dc_link->dpcd_sink_ext_caps;
 	caps->aux_support = false;
 
+#ifndef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
 #if defined(HAVE_STRUCT_DRM_MODE_CONFIG_PANEL_TYPE_PROPERTY)
 	drm_object_property_set_value(&conn_base->base,
-				      adev_to_drm(adev)->mode_config.panel_type_property,
-				      caps->ext_caps->bits.oled ? DRM_MODE_PANEL_TYPE_OLED : DRM_MODE_PANEL_TYPE_UNKNOWN);
+					adev_to_drm(adev)->mode_config.panel_type_property,
+					caps->ext_caps->bits.oled ? DRM_MODE_PANEL_TYPE_OLED : DRM_MODE_PANEL_TYPE_UNKNOWN);
+#endif
 #endif
 
 	if (caps->ext_caps->bits.oled == 1
@@ -4325,7 +4329,9 @@ void amdgpu_dm_update_connector_after_detect(
 		amdgpu_dm_update_freesync_caps(connector, aconnector->edid, true);
 #endif
 		update_connector_ext_caps(aconnector);
+#ifdef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
 		dm_set_panel_type(aconnector);
+#endif
 	} else {
 		hdmi_cec_unset_edid(aconnector);
 		drm_dp_cec_unset_edid(&aconnector->dm_dp_aux.aux);
@@ -14078,6 +14084,7 @@ static void parse_edid_displayid_vrr(struct drm_connector *connector,
 }
 #endif
 
+#ifdef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
 static int get_amd_vsdb(struct amdgpu_dm_connector *aconnector,
 			struct amdgpu_hdmi_vsdb_info *vsdb_info)
 {
@@ -14088,6 +14095,59 @@ static int get_amd_vsdb(struct amdgpu_dm_connector *aconnector,
 
 	return connector->display_info.amd_vsdb.version != 0;
 }
+#else
+static int parse_amd_vsdb(struct amdgpu_dm_connector *aconnector,
+			  const struct edid *edid, struct amdgpu_hdmi_vsdb_info *vsdb_info)
+{
+	u8 *edid_ext = NULL;
+	int i;
+	int j = 0;
+	int total_ext_block_len;
+
+	if (edid == NULL || edid->extensions == 0)
+		return -ENODEV;
+
+	/* Find DisplayID extension */
+	for (i = 0; i < edid->extensions; i++) {
+		edid_ext = (void *)(edid + (i + 1));
+		if (edid_ext[0] == DISPLAYID_EXT)
+			break;
+	}
+
+	total_ext_block_len = EDID_LENGTH * edid->extensions;
+	while (j < total_ext_block_len - sizeof(struct amd_vsdb_block)) {
+		struct amd_vsdb_block *amd_vsdb = (struct amd_vsdb_block *)&edid_ext[j];
+		unsigned int ieeeId = (amd_vsdb->ieee_id[2] << 16) | (amd_vsdb->ieee_id[1] << 8) | (amd_vsdb->ieee_id[0]);
+
+		if (ieeeId == HDMI_AMD_VENDOR_SPECIFIC_DATA_BLOCK_IEEE_REGISTRATION_ID &&
+				amd_vsdb->version == HDMI_AMD_VENDOR_SPECIFIC_DATA_BLOCK_VERSION_3) {
+			u8 panel_type;
+			vsdb_info->replay_mode = (amd_vsdb->feature_caps & AMD_VSDB_VERSION_3_FEATURECAP_REPLAYMODE) ? true : false;
+			vsdb_info->amd_vsdb_version = HDMI_AMD_VENDOR_SPECIFIC_DATA_BLOCK_VERSION_3;
+			drm_dbg_kms(aconnector->base.dev, "Panel supports Replay Mode: %d\n", vsdb_info->replay_mode);
+			panel_type = (amd_vsdb->color_space_eotf_support & AMD_VDSB_VERSION_3_PANEL_TYPE_MASK) >> AMD_VDSB_VERSION_3_PANEL_TYPE_SHIFT;
+			switch (panel_type) {
+			case AMD_VSDB_PANEL_TYPE_OLED:
+				aconnector->dc_link->panel_type = PANEL_TYPE_OLED;
+				break;
+			case AMD_VSDB_PANEL_TYPE_MINILED:
+				aconnector->dc_link->panel_type = PANEL_TYPE_MINILED;
+				break;
+			default:
+				aconnector->dc_link->panel_type = PANEL_TYPE_NONE;
+				break;
+			}
+			drm_dbg_kms(aconnector->base.dev, "Panel type: %d\n",
+				    aconnector->dc_link->panel_type);
+
+			return true;
+		}
+		j++;
+	}
+
+	return false;
+}
+#endif
 
 static int parse_hdmi_amd_vsdb(struct amdgpu_dm_connector *aconnector,
 			       const struct edid *edid,
@@ -14211,7 +14271,11 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 		}
 #endif
 
+#ifdef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
 		get_amd_vsdb(amdgpu_dm_connector, &vsdb_info);
+#else
+		parse_amd_vsdb(amdgpu_dm_connector, edid, &vsdb_info);
+#endif
 
 		if (vsdb_info.replay_mode) {
 			amdgpu_dm_connector->vsdb_info.replay_mode = vsdb_info.replay_mode;

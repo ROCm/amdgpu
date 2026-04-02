@@ -353,6 +353,9 @@
 /* Define to 1 if you have the <drm/display/drm_hdmi_helper.h> header file. */
 #define HAVE_DRM_DISPLAY_DRM_HDMI_HELPER_H 1
 
+/* display_info->amd_vsdb is available */
+#define HAVE_DRM_DISPLAY_INFO_AMD_VSDB 1
+
 /* display_info->edid_hdmi_rgb444_dc_modes is available */
 #define HAVE_DRM_DISPLAY_INFO_EDID_HDMI_RGB444_DC_MODES 1
 
