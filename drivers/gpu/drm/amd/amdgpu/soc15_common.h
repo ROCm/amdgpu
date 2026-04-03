@@ -210,10 +210,4 @@ do { \
 			amdgpu_reg_get_smn_base64(adev, ip##_HWIP, inst),   \
 		value)
 
-#define RREG64_MCA(smn_base, mca_base, idx) \
-	RREG64_PCIE_EXT(smn_base + mca_base + (idx * 8))
-
-#define WREG64_MCA(smn_base, mca_base, idx, val) \
-	WREG64_PCIE_EXT(smn_base + mca_base + (idx * 8), val)
-
 #endif
