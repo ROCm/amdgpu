@@ -243,16 +243,12 @@ static int amdgpu_check_address_validity(struct amdgpu_device *adev,
 	    (address >= RAS_UMC_INJECT_ADDR_LIMIT))
 		return -EFAULT;
 
-	if (amdgpu_uniras_enabled(adev)) {
-		if (amdgpu_sriov_vf(adev))
-			count = amdgpu_virt_ras_convert_retired_address(adev, address,
-				page_pfns, ARRAY_SIZE(page_pfns));
-		else
-			count = amdgpu_ras_mgr_lookup_bad_pages_in_a_row(adev, address,
-				page_pfns, ARRAY_SIZE(page_pfns));
-	} else
-		count = amdgpu_umc_lookup_bad_pages_in_a_row(adev,
-				address, page_pfns, ARRAY_SIZE(page_pfns));
+	if (amdgpu_sriov_vf(adev))
+		count = amdgpu_virt_ras_convert_retired_address(adev, address,
+			page_pfns, ARRAY_SIZE(page_pfns));
+	else
+		count = amdgpu_ras_mgr_lookup_bad_pages_in_a_row(adev, address,
+			page_pfns, ARRAY_SIZE(page_pfns));
 
 	if (count <= 0)
 		return -EPERM;

@@ -519,37 +519,6 @@ int amdgpu_umc_pages_in_a_row(struct amdgpu_device *adev,
 		return -EINVAL;
 }
 
-int amdgpu_umc_lookup_bad_pages_in_a_row(struct amdgpu_device *adev,
-			uint64_t pa_addr, uint64_t *pfns, int len)
-{
-	int i, ret;
-	struct ras_err_data err_data;
-
-	err_data.err_addr = kzalloc_objs(struct eeprom_table_record,
-					 adev->umc.retire_unit);
-	if (!err_data.err_addr) {
-		dev_warn(adev->dev, "Failed to alloc memory in bad page lookup!\n");
-		return 0;
-	}
-
-	ret = amdgpu_umc_pages_in_a_row(adev, &err_data, pa_addr);
-	if (ret)
-		goto out;
-
-	for (i = 0; i < adev->umc.retire_unit; i++) {
-		if (i >= len)
-			goto out;
-
-		pfns[i] = err_data.err_addr[i].retired_page;
-	}
-	ret = i;
-	adev->umc.err_addr_cnt = err_data.err_addr_cnt;
-
-out:
-	kfree(err_data.err_addr);
-	return ret;
-}
-
 int amdgpu_umc_pa2mca(struct amdgpu_device *adev,
 		uint64_t pa, uint64_t *mca, enum amdgpu_memory_partition nps)
 {

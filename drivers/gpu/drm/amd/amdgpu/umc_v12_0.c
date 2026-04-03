@@ -28,8 +28,6 @@
 #include "umc/umc_12_0_0_sh_mask.h"
 #include "mp/mp_13_0_6_sh_mask.h"
 
-#define MAX_ECC_NUM_PER_RETIREMENT  32
-
 bool umc_v12_0_is_deferred_error(struct amdgpu_device *adev, uint64_t mc_umc_status)
 {
 	dev_dbg(adev->dev,
@@ -291,64 +289,6 @@ static bool umc_v12_0_check_ecc_err_status(struct amdgpu_device *adev,
 	return false;
 }
 
-static int umc_v12_0_fill_error_record(struct amdgpu_device *adev,
-				struct ras_ecc_err *ecc_err, void *ras_error_status)
-{
-	struct ras_err_data *err_data = (struct ras_err_data *)ras_error_status;
-	uint64_t page_pfn[UMC_V12_0_BAD_PAGE_NUM_PER_CHANNEL];
-	int ret, i, count;
-
-	if (!err_data || !ecc_err)
-		return -EINVAL;
-
-	memset(page_pfn, 0, sizeof(page_pfn));
-	count = amdgpu_umc_lookup_bad_pages_in_a_row(adev,
-				ecc_err->pa_pfn << AMDGPU_GPU_PAGE_SHIFT,
-				page_pfn, ARRAY_SIZE(page_pfn));
-
-	for (i = 0; i < count; i++) {
-		ret = amdgpu_umc_fill_error_record(err_data,
-				ecc_err->addr,
-				page_pfn[i] << AMDGPU_GPU_PAGE_SHIFT,
-				ecc_err->channel_idx,
-				MCA_IPID_2_UMC_INST(ecc_err->ipid));
-		if (ret)
-			break;
-	}
-
-	err_data->de_count++;
-
-	return ret;
-}
-
-static void umc_v12_0_query_ras_ecc_err_addr(struct amdgpu_device *adev,
-					void *ras_error_status)
-{
-	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
-	struct ras_ecc_err *entries[MAX_ECC_NUM_PER_RETIREMENT];
-	struct radix_tree_root *ecc_tree;
-	int new_detected, ret, i;
-
-	ecc_tree = &con->umc_ecc_log.de_page_tree;
-
-	mutex_lock(&con->umc_ecc_log.lock);
-	new_detected = radix_tree_gang_lookup_tag(ecc_tree, (void **)entries,
-			0, ARRAY_SIZE(entries), UMC_ECC_NEW_DETECTED_TAG);
-	for (i = 0; i < new_detected; i++) {
-		if (!entries[i])
-			continue;
-
-		ret = umc_v12_0_fill_error_record(adev, entries[i], ras_error_status);
-		if (ret) {
-			dev_err(adev->dev, "Fail to fill umc error record, ret:%d\n", ret);
-			break;
-		}
-		radix_tree_tag_clear(ecc_tree,
-				entries[i]->pa_pfn, UMC_ECC_NEW_DETECTED_TAG);
-	}
-	mutex_unlock(&con->umc_ecc_log.lock);
-}
-
 static uint32_t umc_v12_0_get_die_id(struct amdgpu_device *adev,
 		uint64_t mca_addr, uint64_t retired_page)
 {
@@ -391,7 +331,6 @@ struct amdgpu_umc_ras umc_v12_0_ras = {
 	.ras_block = {
 		.hw_ops = NULL,
 	},
-	.ecc_info_query_ras_error_address = umc_v12_0_query_ras_ecc_err_addr,
 	.check_ecc_err_status = umc_v12_0_check_ecc_err_status,
 	.convert_ras_err_addr = umc_v12_0_convert_error_address,
 	.get_die_id_from_pa = umc_v12_0_get_die_id,
