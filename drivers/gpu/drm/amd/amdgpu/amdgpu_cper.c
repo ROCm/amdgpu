@@ -481,8 +481,7 @@ int amdgpu_cper_init(struct amdgpu_device *adev)
 
 	if (amdgpu_sriov_vf(adev) && !amdgpu_sriov_ras_cper_en(adev))
 		return 0;
-	else if (!amdgpu_sriov_vf(adev) && !amdgpu_uniras_enabled(adev) &&
-		!amdgpu_aca_is_enabled(adev))
+	else if (!amdgpu_sriov_vf(adev) && !amdgpu_uniras_enabled(adev))
 		return 0;
 
 	r = amdgpu_cper_ring_init(adev);
@@ -501,7 +500,7 @@ int amdgpu_cper_init(struct amdgpu_device *adev)
 
 int amdgpu_cper_fini(struct amdgpu_device *adev)
 {
-	if (!amdgpu_aca_is_enabled(adev) && !amdgpu_sriov_ras_cper_en(adev))
+	if (amdgpu_sriov_vf(adev))
 		return 0;
 
 	adev->cper.enabled = false;
