@@ -82,7 +82,6 @@ struct amdgpu_ras_eeprom_control {
 	/* Number of records in the table.
 	 */
 	u32 ras_num_recs;
-	u32 ras_num_recs_old;
 
 	/* the bad page number is ras_num_recs or
 	 * ras_num_recs * umc.retire_unit
@@ -190,8 +189,6 @@ int amdgpu_ras_smu_erase_ras_table(struct amdgpu_device *adev,
 int amdgpu_ras_eeprom_read_idx(struct amdgpu_ras_eeprom_control *control,
 			struct eeprom_table_record *record, u32 rec_idx,
 			const u32 num);
-
-int amdgpu_ras_eeprom_update_record_num(struct amdgpu_ras_eeprom_control *control);
 
 void amdgpu_ras_check_bad_page_status(struct amdgpu_device *adev);
 

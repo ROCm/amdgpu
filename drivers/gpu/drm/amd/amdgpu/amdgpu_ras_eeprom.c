@@ -124,8 +124,6 @@
 					RAS_TABLE_V2_1_INFO_SIZE) \
 					/ RAS_TABLE_RECORD_SIZE)
 
-#define RAS_SMU_MESSAGE_TIMEOUT_MS 1000 /* 1s */
-
 /* Given a zero-based index of an EEPROM RAS record, yields the EEPROM
  * offset off of RAS_TABLE_START.  That is, this is something you can
  * add to control->i2c_address, and then tell I2C layer to read
@@ -878,44 +876,6 @@ Out:
 	return res;
 }
 
-int amdgpu_ras_eeprom_update_record_num(struct amdgpu_ras_eeprom_control *control)
-{
-	struct amdgpu_device *adev = to_amdgpu_device(control);
-	int ret, retry = 20;
-
-	if (!amdgpu_ras_smu_eeprom_supported(adev))
-		return 0;
-
-	control->ras_num_recs_old = control->ras_num_recs;
-
-	do {
-		/* 1000ms timeout is long enough, smu_get_badpage_count won't
-		 * return -EBUSY before timeout.
-		 */
-		ret = amdgpu_ras_smu_get_badpage_count(adev,
-			&(control->ras_num_recs), RAS_SMU_MESSAGE_TIMEOUT_MS);
-		if (!ret &&
-		    (control->ras_num_recs_old == control->ras_num_recs)) {
-			/* record number update in PMFW needs some time,
-			 * smu_get_badpage_count may return immediately without
-			 * count update, sleep for a while and retry again.
-			 */
-			msleep(50);
-			retry--;
-		} else {
-			break;
-		}
-	} while (retry);
-
-	/* no update of record number is not a real failure,
-	 * don't print warning here
-	 */
-	if (!ret && (control->ras_num_recs_old == control->ras_num_recs))
-		ret = -EINVAL;
-
-	return ret;
-}
-
 /**
  * amdgpu_ras_eeprom_append -- append records to the EEPROM RAS table
  * @control: pointer to control structure
@@ -934,11 +894,10 @@ int amdgpu_ras_eeprom_append(struct amdgpu_ras_eeprom_control *control,
 			     const u32 num)
 {
 	struct amdgpu_device *adev = to_amdgpu_device(control);
-	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 	int res, i;
 	uint64_t nps = AMDGPU_NPS1_PARTITION_MODE;
 
-	if (!__is_ras_eeprom_supported(adev) || !con)
+	if (!__is_ras_eeprom_supported(adev))
 		return 0;
 
 	if (num == 0) {
