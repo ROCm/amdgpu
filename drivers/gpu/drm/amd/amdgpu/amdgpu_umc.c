@@ -276,7 +276,7 @@ int amdgpu_umc_pasid_poison_handler(struct amdgpu_device *adev,
 			}
 
 			amdgpu_ras_error_data_fini(&err_data);
-		} else if (amdgpu_uniras_enabled(adev)) {
+		} else {
 			struct ras_ih_info ih_info = {0};
 
 			ih_info.block = block;
@@ -285,17 +285,6 @@ int amdgpu_umc_pasid_poison_handler(struct amdgpu_device *adev,
 			ih_info.pasid_fn = pasid_fn;
 			ih_info.data = data;
 			amdgpu_ras_mgr_handle_consumer_interrupt(adev, &ih_info);
-		} else {
-			struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
-			int ret;
-
-			ret = amdgpu_ras_put_poison_req(adev,
-				block, pasid, pasid_fn, data, reset);
-			if (!ret) {
-				atomic_inc(&con->page_retirement_req_cnt);
-				atomic_inc(&con->poison_consumption_count);
-				wake_up(&con->page_retirement_wq);
-			}
 		}
 	} else {
 		if (adev->virt.ops && adev->virt.ops->ras_poison_handler)

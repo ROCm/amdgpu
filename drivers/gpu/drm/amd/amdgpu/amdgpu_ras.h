@@ -466,14 +466,6 @@ struct ras_query_context {
 typedef int (*pasid_notify)(struct amdgpu_device *adev,
 		uint16_t pasid, void *data);
 
-struct ras_poison_msg {
-	enum amdgpu_ras_block block;
-	uint16_t pasid;
-	uint32_t reset;
-	pasid_notify pasid_fn;
-	void *data;
-};
-
 struct ras_err_pages {
 	uint32_t count;
 	uint64_t *pfn;
@@ -549,7 +541,6 @@ struct amdgpu_ras {
 	/* gpu recovery */
 	struct work_struct recovery_work;
 	atomic_t in_recovery;
-	atomic_t rma_in_recovery;
 	struct amdgpu_device *adev;
 	/* error handler data */
 	struct ras_err_handler_data *eh_data;
@@ -587,16 +578,9 @@ struct amdgpu_ras {
 	/* Record special requirements of gpu reset caller */
 	uint32_t  gpu_reset_flags;
 
-	struct task_struct *page_retirement_thread;
-	wait_queue_head_t page_retirement_wq;
 	struct mutex page_retirement_lock;
-	atomic_t page_retirement_req_cnt;
-	atomic_t poison_creation_count;
-	atomic_t poison_consumption_count;
 	struct mutex page_rsv_lock;
-	DECLARE_KFIFO(poison_fifo, struct ras_poison_msg, 128);
 	struct ras_ecc_log_info  umc_ecc_log;
-	struct delayed_work page_retirement_dwork;
 
 	/* ras errors detected */
 	unsigned long ras_err_state;
@@ -614,9 +598,6 @@ struct amdgpu_ras {
 
 	struct list_head critical_region_head;
 	struct mutex critical_region_lock;
-
-	/* Protect poison injection */
-	struct mutex poison_lock;
 
 	/* Disable/Enable uniras switch */
 	bool uniras_enabled;
@@ -1028,10 +1009,6 @@ int amdgpu_ras_reserve_page(struct amdgpu_device *adev, uint64_t pfn);
 
 int amdgpu_ras_add_critical_region(struct amdgpu_device *adev, struct amdgpu_bo *bo);
 bool amdgpu_ras_check_critical_address(struct amdgpu_device *adev, uint64_t addr);
-
-int amdgpu_ras_put_poison_req(struct amdgpu_device *adev,
-		enum amdgpu_ras_block block, uint16_t pasid,
-		pasid_notify pasid_fn, void *data, uint32_t reset);
 
 bool amdgpu_ras_in_recovery(struct amdgpu_device *adev);
 
