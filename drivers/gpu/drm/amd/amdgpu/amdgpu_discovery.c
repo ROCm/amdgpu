@@ -112,8 +112,10 @@
 #include "smuio_v15_0_8.h"
 #include "vcn_v5_0_0.h"
 #include "vcn_v5_0_1.h"
+#include "vcn_v5_0_2.h"
 #include "jpeg_v5_0_0.h"
 #include "jpeg_v5_0_1.h"
+#include "jpeg_v5_0_2.h"
 #include "jpeg_v5_3_0.h"
 
 #include "amdgpu_ras_mgr.h"
@@ -322,7 +324,7 @@ static int amdgpu_discovery_get_tmr_info(struct amdgpu_device *adev,
 			ret = amdgpu_acpi_get_tmr_info(adev, &tmr_offset, &tmr_size);
 			if (ret)
 				return ret;
-			adev->discovery.size = (u32)tmr_size;
+			adev->discovery.size = DISCOVERY_TMR_SIZE;
 			adev->discovery.offset = tmr_offset + tmr_size - DISCOVERY_TMR_OFFSET;
 		}
 	}
@@ -1409,6 +1411,9 @@ static void amdgpu_discovery_sysfs_fini(struct amdgpu_device *adev)
 	struct list_head *el, *tmp;
 	struct kset *die_kset;
 
+	if (!ip_top)
+		return;
+
 	die_kset = &ip_top->die_kset;
 	spin_lock(&die_kset->list_lock);
 	list_for_each_prev_safe(el, tmp, &die_kset->list) {
@@ -1433,9 +1438,13 @@ void amdgpu_discovery_dump(struct amdgpu_device *adev, struct drm_printer *p)
 	struct ip_hw_instance *ip_inst;
 	int i = 0, j;
 
+	if (!ip_top)
+		return;
+
 	die_kset = &ip_top->die_kset;
 
 	drm_printf(p, "\nHW IP Discovery\n");
+
 	spin_lock(&die_kset->list_lock);
 	list_for_each(el_die, &die_kset->list) {
 		drm_printf(p, "die %d\n", i++);
@@ -1992,11 +2001,10 @@ static int amdgpu_discovery_refresh_nps_info(struct amdgpu_device *adev,
 
 int amdgpu_discovery_get_nps_info(struct amdgpu_device *adev,
 				  uint32_t *nps_type,
-				  struct amdgpu_gmc_memrange **ranges,
+				  struct amdgpu_gmc_memrange *ranges,
 				  int *range_cnt, bool refresh)
 {
 	uint8_t *discovery_bin = adev->discovery.bin;
-	struct amdgpu_gmc_memrange *mem_ranges;
 	struct table_info *info;
 	union nps_info *nps_info;
 	union nps_info nps_data;
@@ -2034,22 +2042,22 @@ int amdgpu_discovery_get_nps_info(struct amdgpu_device *adev,
 
 	switch (le16_to_cpu(nps_info->v1.header.version_major)) {
 	case 1:
-		mem_ranges = kvcalloc(nps_info->v1.count,
-				      sizeof(*mem_ranges),
-				      GFP_KERNEL);
-		if (!mem_ranges)
-			return -ENOMEM;
 		*nps_type = nps_info->v1.nps_type;
+		if (*range_cnt < nps_info->v1.count) {
+			dev_dbg(adev->dev,
+				"not enough space for nps ranges: %d < %d\n",
+				*range_cnt, nps_info->v1.count);
+			return -ENOSPC;
+		}
 		*range_cnt = nps_info->v1.count;
 		for (i = 0; i < *range_cnt; i++) {
-			mem_ranges[i].base_address =
+			ranges[i].base_address =
 				nps_info->v1.instance_info[i].base_address;
-			mem_ranges[i].limit_address =
+			ranges[i].limit_address =
 				nps_info->v1.instance_info[i].limit_address;
-			mem_ranges[i].nid_mask = -1;
-			mem_ranges[i].flags = 0;
+			ranges[i].nid_mask = -1;
+			ranges[i].flags = 0;
 		}
-		*ranges = mem_ranges;
 		break;
 	default:
 		dev_err(adev->dev, "Unhandled NPS info table %d.%d\n",
@@ -2351,6 +2359,7 @@ static int amdgpu_discovery_set_smu_ip_blocks(struct amdgpu_device *adev)
 		amdgpu_device_ip_block_add(adev, &smu_v14_0_ip_block);
 		break;
 	case IP_VERSION(15, 0, 0):
+	case IP_VERSION(15, 0, 8):
 		amdgpu_device_ip_block_add(adev, &smu_v15_0_ip_block);
 		break;
 	default:
@@ -2667,6 +2676,10 @@ static int amdgpu_discovery_set_mm_ip_blocks(struct amdgpu_device *adev)
 		case IP_VERSION(5, 0, 1):
 			amdgpu_device_ip_block_add(adev, &vcn_v5_0_1_ip_block);
 			amdgpu_device_ip_block_add(adev, &jpeg_v5_0_1_ip_block);
+			break;
+		case IP_VERSION(5, 0, 2):
+			amdgpu_device_ip_block_add(adev, &vcn_v5_0_2_ip_block);
+			amdgpu_device_ip_block_add(adev, &jpeg_v5_0_2_ip_block);
 			break;
 		default:
 			dev_err(adev->dev,

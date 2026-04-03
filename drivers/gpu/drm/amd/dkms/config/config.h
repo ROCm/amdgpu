@@ -154,6 +154,9 @@
 /* dma_fence_dedup_array() is available */
 #define HAVE_DMA_FENCE_DEDUP_ARRAY 1
 
+/* dma_fence_unwrap_merge() is available */
+#define HAVE_DMA_FENCE_UNWRAP_MERGE 1
+
 /* dma_fence_describe() is available */
 #define HAVE_DMA_FENCE_DESCRIBE 1
 
@@ -171,6 +174,9 @@
 
 /* struct dma_fence_ops has use_64bit_seqno field */
 /* #undef HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO */
+
+/* test whether dma_fence_begin_signalling are available */
+#define HAVE_DMA_FENCE_SIGNALLING 1
 
 /* dma_fence_TIMESTAMP() is available */
 #define HAVE_DMA_FENCE_TIMESTAMP 1
@@ -635,7 +641,7 @@
 #define HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED 1
 
 /* drm_gem_dmabuf_vmap() has struct iosys_map arg */
-/* #undef HAVE_DRM_GEM_DMABUF_VMAP_HAS_IOSYS_MAP_ARG */
+#define HAVE_DRM_GEM_DMABUF_VMAP_HAS_IOSYS_MAP_ARG 1
 
 /* drm_gem_is_imported() is available */
 #define HAVE_DRM_GEM_IS_IMPORTED 1

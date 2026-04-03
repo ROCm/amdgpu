@@ -78,4 +78,23 @@ static inline bool dma_fence_is_later_or_same(struct dma_fence *f1,
 #ifndef HAVE_DMA_FENCE_INIT64
 #define dma_fence_init64 dma_fence_init
 #endif
+
+#ifndef HAVE_DMA_FENCE_SIGNALLING
+/*
+ * For older kernels where these functions are not available,
+ * we provide no-op implementations since LOCKDEP tracking may not be needed
+ */
+static inline bool kcl_dma_fence_begin_signalling(void)
+{
+	return true;
+}
+
+static inline void kcl_dma_fence_end_signalling(bool cookie)
+{
+}
+
+#define dma_fence_begin_signalling kcl_dma_fence_begin_signalling
+#define dma_fence_end_signalling kcl_dma_fence_end_signalling
+#endif
+
 #endif
