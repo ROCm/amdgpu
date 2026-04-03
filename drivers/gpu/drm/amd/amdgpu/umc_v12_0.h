@@ -50,9 +50,6 @@
 /* row bits in MCA address */
 #define UMC_V12_0_MA_R0_BIT 10
 
-#define MCA_UMC_HWID_V12_0     0x96
-#define MCA_UMC_MCATYPE_V12_0  0x0
-
 #define MCA_IPID_LO_2_UMC_CH(_ipid_lo) (((((_ipid_lo) >> 20) & 0x1) * 4) + \
 			(((_ipid_lo) >> 12) & 0xF))
 #define MCA_IPID_LO_2_UMC_INST(_ipid_lo) (((_ipid_lo) >> 21) & 0x7)

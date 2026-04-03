@@ -483,8 +483,6 @@ struct ras_ecc_err {
 struct ras_ecc_log_info {
 	struct mutex lock;
 	struct radix_tree_root de_page_tree;
-	uint64_t de_queried_count;
-	uint64_t consumption_q_count;
 };
 
 struct ras_critical_region {

@@ -502,34 +502,6 @@ int amdgpu_umc_loop_channels(struct amdgpu_device *adev,
 	return 0;
 }
 
-int amdgpu_umc_update_ecc_status(struct amdgpu_device *adev,
-				uint64_t status, uint64_t ipid, uint64_t addr)
-{
-	if (adev->umc.ras->update_ecc_status)
-		return adev->umc.ras->update_ecc_status(adev,
-					status, ipid, addr);
-	return 0;
-}
-
-int amdgpu_umc_logs_ecc_err(struct amdgpu_device *adev,
-		struct radix_tree_root *ecc_tree, struct ras_ecc_err *ecc_err)
-{
-	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
-	struct ras_ecc_log_info *ecc_log;
-	int ret;
-
-	ecc_log = &con->umc_ecc_log;
-
-	mutex_lock(&ecc_log->lock);
-	ret = radix_tree_insert(ecc_tree, ecc_err->pa_pfn, ecc_err);
-	if (!ret)
-		radix_tree_tag_set(ecc_tree,
-			ecc_err->pa_pfn, UMC_ECC_NEW_DETECTED_TAG);
-	mutex_unlock(&ecc_log->lock);
-
-	return ret;
-}
-
 int amdgpu_umc_pages_in_a_row(struct amdgpu_device *adev,
 			struct ras_err_data *err_data, uint64_t pa_addr)
 {
@@ -576,33 +548,6 @@ int amdgpu_umc_lookup_bad_pages_in_a_row(struct amdgpu_device *adev,
 out:
 	kfree(err_data.err_addr);
 	return ret;
-}
-
-int amdgpu_umc_mca_to_addr(struct amdgpu_device *adev,
-			uint64_t err_addr, uint32_t ch, uint32_t umc,
-			uint32_t node, uint32_t socket,
-			struct ta_ras_query_address_output *addr_out, bool dump_addr)
-{
-	struct ta_ras_query_address_input addr_in;
-	int ret;
-
-	memset(&addr_in, 0, sizeof(addr_in));
-	addr_in.ma.err_addr = err_addr;
-	addr_in.ma.ch_inst = ch;
-	addr_in.ma.umc_inst = umc;
-	addr_in.ma.node_inst = node;
-	addr_in.ma.socket_id = socket;
-
-	if (adev->umc.ras && adev->umc.ras->convert_ras_err_addr) {
-		ret = adev->umc.ras->convert_ras_err_addr(adev, NULL, &addr_in,
-				addr_out, dump_addr);
-		if (ret)
-			return ret;
-	} else {
-		return 0;
-	}
-
-	return 0;
 }
 
 int amdgpu_umc_pa2mca(struct amdgpu_device *adev,

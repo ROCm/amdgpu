@@ -29,7 +29,6 @@
 #include "mp/mp_13_0_6_sh_mask.h"
 
 #define MAX_ECC_NUM_PER_RETIREMENT  32
-#define DELAYED_TIME_FOR_GPU_RESET  1000  //ms
 
 bool umc_v12_0_is_deferred_error(struct amdgpu_device *adev, uint64_t mc_umc_status)
 {
@@ -292,96 +291,6 @@ static bool umc_v12_0_check_ecc_err_status(struct amdgpu_device *adev,
 	return false;
 }
 
-static int umc_v12_0_update_ecc_status(struct amdgpu_device *adev,
-			uint64_t status, uint64_t ipid, uint64_t addr)
-{
-	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
-	uint16_t hwid, mcatype;
-	uint64_t page_pfn[UMC_V12_0_BAD_PAGE_NUM_PER_CHANNEL];
-	uint64_t err_addr, pa_addr = 0;
-	struct ras_ecc_err *ecc_err;
-	struct ta_ras_query_address_output addr_out;
-	uint32_t shift_bit = adev->umc.flip_bits.flip_bits_in_pa[2];
-	int count, ret, i;
-
-	hwid = REG_GET_FIELD(ipid, MCMP1_IPIDT0, HardwareID);
-	mcatype = REG_GET_FIELD(ipid, MCMP1_IPIDT0, McaType);
-
-	/* The IP block decode of consumption is SMU */
-	if (hwid != MCA_UMC_HWID_V12_0 || mcatype != MCA_UMC_MCATYPE_V12_0) {
-		con->umc_ecc_log.consumption_q_count++;
-		return 0;
-	}
-
-	if (!status)
-		return 0;
-
-	if (!umc_v12_0_is_deferred_error(adev, status))
-		return 0;
-
-	err_addr = REG_GET_FIELD(addr,
-				MCA_UMC_UMC0_MCUMC_ADDRT0, ErrorAddr);
-
-	dev_dbg(adev->dev,
-		"UMC:IPID:0x%llx, socket:%llu, aid:%llu, inst:%llu, ch:%llu, err_addr:0x%llx\n",
-		ipid,
-		MCA_IPID_2_SOCKET_ID(ipid),
-		MCA_IPID_2_DIE_ID(ipid),
-		MCA_IPID_2_UMC_INST(ipid),
-		MCA_IPID_2_UMC_CH(ipid),
-		err_addr);
-
-	ret = amdgpu_umc_mca_to_addr(adev,
-			err_addr, MCA_IPID_2_UMC_CH(ipid),
-			MCA_IPID_2_UMC_INST(ipid), MCA_IPID_2_DIE_ID(ipid),
-			MCA_IPID_2_SOCKET_ID(ipid), &addr_out, true);
-	if (ret)
-		return ret;
-
-	ecc_err = kzalloc_obj(*ecc_err);
-	if (!ecc_err)
-		return -ENOMEM;
-
-	pa_addr = addr_out.pa.pa;
-	ecc_err->status = status;
-	ecc_err->ipid = ipid;
-	ecc_err->addr = addr;
-	ecc_err->pa_pfn = pa_addr >> AMDGPU_GPU_PAGE_SHIFT;
-	ecc_err->channel_idx = addr_out.pa.channel_idx;
-
-	/* If converted pa_pfn is 0, use pa C4 pfn. */
-	if (!ecc_err->pa_pfn)
-		ecc_err->pa_pfn = BIT_ULL(shift_bit) >> AMDGPU_GPU_PAGE_SHIFT;
-
-	ret = amdgpu_umc_logs_ecc_err(adev, &con->umc_ecc_log.de_page_tree, ecc_err);
-	if (ret) {
-		if (ret == -EEXIST)
-			con->umc_ecc_log.de_queried_count++;
-		else
-			dev_err(adev->dev, "Fail to log ecc error! ret:%d\n", ret);
-
-		kfree(ecc_err);
-		return ret;
-	}
-
-	con->umc_ecc_log.de_queried_count++;
-
-	memset(page_pfn, 0, sizeof(page_pfn));
-	count = amdgpu_umc_lookup_bad_pages_in_a_row(adev,
-				pa_addr,
-				page_pfn, ARRAY_SIZE(page_pfn));
-	if (count <= 0) {
-		dev_warn(adev->dev, "Fail to convert error address! count:%d\n", count);
-		return 0;
-	}
-
-	/* Reserve memory */
-	for (i = 0; i < count; i++)
-		amdgpu_ras_reserve_page(adev, page_pfn[i]);
-
-	return 0;
-}
-
 static int umc_v12_0_fill_error_record(struct amdgpu_device *adev,
 				struct ras_ecc_err *ecc_err, void *ras_error_status)
 {
@@ -484,7 +393,6 @@ struct amdgpu_umc_ras umc_v12_0_ras = {
 	},
 	.ecc_info_query_ras_error_address = umc_v12_0_query_ras_ecc_err_addr,
 	.check_ecc_err_status = umc_v12_0_check_ecc_err_status,
-	.update_ecc_status = umc_v12_0_update_ecc_status,
 	.convert_ras_err_addr = umc_v12_0_convert_error_address,
 	.get_die_id_from_pa = umc_v12_0_get_die_id,
 	.get_retire_flip_bits = umc_v12_0_get_retire_flip_bits,
