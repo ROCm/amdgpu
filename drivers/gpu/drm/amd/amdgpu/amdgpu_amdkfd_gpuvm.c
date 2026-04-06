@@ -2561,10 +2561,11 @@ int amdgpu_amdkfd_gpuvm_get_sg_table(struct amdgpu_device *adev,
 	unsigned int page_size;
 	unsigned int cur_page;
 	size_t max_segment = 0;
+	uint64_t end;
 	int ret;
 
 	/* Determine access does not cross memory boundary */
-	if (size + offset > amdgpu_bo_size(bo))
+	if (check_add_overflow(offset, size, &end) || end > amdgpu_bo_size(bo))
 		return -EFAULT;
 
 	/* For GPU memory use VRAM Mgr to build SG Table */
