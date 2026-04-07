@@ -476,6 +476,25 @@ static int kfd_ais_get_dio_align(struct file *filep, unsigned int *offset_align,
 }
 #endif
 
+static int kfd_ais_zerosize_io_rw_file(struct file *file, struct kfd_ais_in_args *in)
+{
+	struct iov_iter iter;
+	struct kiocb kiocb;
+	struct bio_vec bvec;
+	bool is_read = (in->op == KFD_IOC_AIS_READ);
+
+	memset(&bvec, 0, sizeof(bvec));
+	iov_iter_bvec(&iter, is_read ? ITER_DEST : ITER_SOURCE, &bvec, 0, 0);
+
+	init_sync_kiocb(&kiocb, file);
+	kiocb.ki_pos = in->file_offset;
+	if (file->f_flags & O_DIRECT)
+		kiocb.ki_flags |= IOCB_DIRECT;
+
+	return is_read ? vfs_iocb_iter_read(file, &kiocb, &iter) :
+			 vfs_iocb_iter_write(file, &kiocb, &iter);
+}
+
 int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		    struct kfd_ais_in_args *in, struct kfd_process_device *pdd,
 		    uint64_t *size_copied)
@@ -540,6 +559,15 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 
 	if (WARN_ON(bo->preferred_domains != AMDGPU_GEM_DOMAIN_VRAM)) {
 		ret = -EINVAL;
+		goto put_pdev;
+	}
+	/*
+	 * Zero sized IO is supported by read and write operations.
+	 */
+	if (in->size == 0) {
+		ret = kfd_ais_zerosize_io_rw_file(filep, in);
+		if (ret)
+			dev_err(adev->dev, "AIS: failed to read/write zero size IO\n");
 		goto put_pdev;
 	}
 	/* Use NULL instead of peer pdev. This is deliberate so that
