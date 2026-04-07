@@ -21,7 +21,7 @@ AC_DEFUN([AC_AMDGPU_KFD_PEERDIRECT_SUPPORT], [
         ], [
             AC_DEFINE(HAVE_KFD_PEERDIRECT_SUPPORT, 1, [HAVE_KFD_PEERDIRECT_SUPPORT is available])
         ], [
-            AS_IF([ grep -qw ib_register_peer_memory_client /usr/src/ofa_kernel/x86_64/${KERNELVER}/Module.symvers ], [
+            AS_IF([ grep -qw ib_register_peer_memory_client /usr/src/ofa_kernel*/x86_64/${KERNELVER}/Module.symvers ], [
             AC_DEFINE(HAVE_KFD_PEERDIRECT_SUPPORT, 1, [HAVE_KFD_PEERDIRECT_SUPPORT is available])
             AC_DEFINE(HAVE_KFD_PEERDIRECT_SUPPORT_NEED_OFAPATH, 1, [HAVE_KFD_PEERDIRECT_SUPPORT is available and needs OFA path])
             ])
