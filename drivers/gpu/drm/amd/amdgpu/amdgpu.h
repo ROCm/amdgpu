@@ -117,6 +117,7 @@
 #include "amdgpu_mes.h"
 #include "amdgpu_sa.h"
 #include "amdgpu_acpi.h"
+#include "amdgpu_ualink.h"
 #if defined(CONFIG_DRM_AMD_ISP)
 #include "amdgpu_isp.h"
 #endif
@@ -803,6 +804,9 @@ struct amdgpu_device {
 
 	/* display related functionality */
 	struct amdgpu_display_manager dm;
+
+	/* UALink manager */
+	struct amdgpu_ualink_mgr	ualink;
 
 #if defined(CONFIG_DRM_AMD_ISP)
 	/* isp */
