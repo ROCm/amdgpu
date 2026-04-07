@@ -1,7 +1,7 @@
 ifneq ($(KERNELRELEASE),)
 include $(src)/amd/dkms/Kbuild
 else
-KERNELVER := $(shell uname -r)
+KERNELVER ?= $(shell uname -r)
 kernel_build_dir := /lib/modules/$(KERNELVER)/build
 module_src_dir := $(CURDIR)
 module_build_dir := $(shell mktemp -ut amd.XXXXXXXX)
