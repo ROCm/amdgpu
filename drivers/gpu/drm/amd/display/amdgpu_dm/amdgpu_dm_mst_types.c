@@ -984,7 +984,7 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		 aconnector, connector->base.id, aconnector->mst_root);
 
 	if (aconnector->dc_sink) {
-		amdgpu_dm_update_freesync_caps(connector, NULL);
+		amdgpu_dm_update_freesync_caps(connector, NULL, true);
 		dc_link_remove_remote_sink(aconnector->dc_link,
 		aconnector->dc_sink);
 		dc_sink_release(aconnector->dc_sink);
