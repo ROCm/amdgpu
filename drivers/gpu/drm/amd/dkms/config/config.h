@@ -916,6 +916,9 @@
 /* Define to 1 if you have the <linux/args.h> header file. */
 #define HAVE_LINUX_ARGS_H 1
 
+/* Define to 1 if you have the <linux/array_size.h> header file. */
+#define HAVE_LINUX_ARRAY_SIZE_H 1
+
 /* atomic_long_try_cmpxchg() is available */
 #define HAVE_LINUX_ATOMIC_LONG_TRY_CMPXCHG 1
 
