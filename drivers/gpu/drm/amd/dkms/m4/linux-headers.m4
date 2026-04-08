@@ -183,4 +183,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #lib/string_helpers: Split out string_choices.h
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/string_choices.h])
+
+	dnl #v6.6-rc1-4-g3cd39bc3b11b
+	dnl #kernel.h: Move ARRAY_SIZE() to a separate header
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/array_size.h])
 ])
