@@ -108,11 +108,67 @@ echo "PATH=$PATH" >$MODULE_BUILD_DIR/.env
 unset TMPDIR
 
 # Provide vmlinux for BTF generation when building out-of-tree (e.g. DKMS)
+#
+# BTF generation is OFF by default. To enable it, explicitly set:
+#   export AMDGPU_BTF=1
+#   sudo -E dkms install amdgpu
+#
+# When enabled, the following checks must all pass before the vmlinux
+# symlink is created:
+#   1. CONFIG_DEBUG_INFO_BTF_MODULES=y in kernel config
+#   2. pahole (from dwarves package) is installed
+#   3. resolve_btfids is available (if the kernel modfinal stage requires it)
+#   4. /sys/kernel/btf/vmlinux is readable
+#   5. vmlinux does not already exist in the build dir
+#   6. build dir is writable
 KVER="${KERNELVER}"
 KDIR="/lib/modules/${KVER}/build"
-if [ -r /sys/kernel/btf/vmlinux ] && [ ! -e "${KDIR}/vmlinux" ] && [ -w "${KDIR}" ]; then
-	ln -sf /sys/kernel/btf/vmlinux "${KDIR}/vmlinux" && \
-    touch "${MODULE_BUILD_DIR}/.btf_vmlinux_symlink_created" || true
+AMDGPU_BTF="${AMDGPU_BTF:-0}"
+
+if [ "${AMDGPU_BTF}" = "1" ]; then
+	echo "BTF: enabled by AMDGPU_BTF=1, running safety checks..."
+
+	KCONFIG=""
+	if [ -f "/boot/config-${KVER}" ]; then
+		KCONFIG="/boot/config-${KVER}"
+	elif [ -f "${KDIR}/.config" ]; then
+		KCONFIG="${KDIR}/.config"
+	fi
+
+	BTF_OK=true
+	# Check 1: kernel must require BTF module generation
+	if [ -z "${KCONFIG}" ] || ! grep -q 'CONFIG_DEBUG_INFO_BTF_MODULES=y' "${KCONFIG}"; then
+		BTF_OK=false
+		echo "BTF: skipping — CONFIG_DEBUG_INFO_BTF_MODULES=y not found in kernel config"
+	fi
+	# Check 2: pahole must be available
+	if ! command -v pahole >/dev/null 2>&1; then
+		BTF_OK=false
+		echo "BTF: skipping — pahole not found"
+	fi
+	# Check 3: resolve_btfids must be available (if the kernel requires it)
+	# On SUSE, kernel source and build dirs are split: Makefile.modfinal lives
+	# in the source tree (/lib/modules/<ver>/source/), not the build obj dir
+	# that KDIR points to.  Check both locations.
+	MODFINAL=""
+	if [ -f "${KDIR}/scripts/Makefile.modfinal" ]; then
+		MODFINAL="${KDIR}/scripts/Makefile.modfinal"
+	elif [ -d "/lib/modules/${KVER}/source" ] && \
+	     [ -f "/lib/modules/${KVER}/source/scripts/Makefile.modfinal" ]; then
+		MODFINAL="/lib/modules/${KVER}/source/scripts/Makefile.modfinal"
+	fi
+	if [ -n "${MODFINAL}" ] && \
+	   grep -qi resolve_btfids "${MODFINAL}" && \
+	   [ ! -x "${KDIR}/tools/bpf/resolve_btfids/resolve_btfids" ]; then
+		BTF_OK=false
+		echo "BTF: skipping — resolve_btfids required by ${MODFINAL}" \
+		     "but not found at ${KDIR}/tools/bpf/resolve_btfids/resolve_btfids"
+	fi
+
+	if $BTF_OK && [ -r /sys/kernel/btf/vmlinux ] && [ ! -e "${KDIR}/vmlinux" ] && [ -w "${KDIR}" ]; then
+		ln -sf /sys/kernel/btf/vmlinux "${KDIR}/vmlinux" && \
+		touch "${MODULE_BUILD_DIR}/.btf_vmlinux_symlink_created" || true
+	fi
 fi
 
 (cd $SRC && ./configure CC=${CC})
