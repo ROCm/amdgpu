@@ -107,14 +107,6 @@ echo "PATH=$PATH" >$MODULE_BUILD_DIR/.env
 # otherwise conflicting package libpam-tmpdir incorrectly generates config
 unset TMPDIR
 
-# Provide vmlinux for BTF generation when building out-of-tree (e.g. DKMS)
-KVER="${KERNELVER}"
-KDIR="/lib/modules/${KVER}/build"
-if [ -r /sys/kernel/btf/vmlinux ] && [ ! -e "${KDIR}/vmlinux" ] && [ -w "${KDIR}" ]; then
-	ln -sf /sys/kernel/btf/vmlinux "${KDIR}/vmlinux" && \
-    touch "${MODULE_BUILD_DIR}/.btf_vmlinux_symlink_created" || true
-fi
-
 (cd $SRC && ./configure CC=${CC})
 
 # rename CFLAGS_<path>target.o / CFLAGS_REMOVE_<path> to CFLAGS_target.o
