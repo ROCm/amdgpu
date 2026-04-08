@@ -534,6 +534,10 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 			(dev->gpu->adev->sdma.supported_reset & AMDGPU_RESET_TYPE_PER_QUEUE))
 				dev->node_props.capability2 |= HSA_CAP2_PER_SDMA_QUEUE_RESET_SUPPORTED;
 
+		/* Temporarily reuse VA_LIMIT capability bit to indicate AIS is initialized */
+		if (dev->gpu->kfd->ais_initialized)
+			dev->node_props.capability |= HSA_CAP_VA_LIMIT;
+
 		sysfs_show_32bit_prop(buffer, offs, "max_engine_clk_fcompute",
 			dev->node_props.max_engine_clk_fcompute);
 
