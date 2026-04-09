@@ -33,25 +33,7 @@ AC_DEFUN([AC_AMDGPU_QUEUE_WORK_NODE], [
 	])
 ])
 
-dnl #
-dnl # v6.11-rc1-3-g86898fa6b8cd
-dnl # workqueue: Implement disable/enable for (delayed) work items
-dnl #
-AC_DEFUN([AC_AMDGPU_DISABLE_DELAYED_WORK_SYNC], [
-	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_TRY_COMPILE_SYMBOL([
-			#include <linux/workqueue.h>
-		], [
-			disable_delayed_work_sync(NULL);
-		], [disable_delayed_work_sync], [kernel/workqueue.c], [
-			AC_DEFINE(HAVE_DISABLE_DELAYED_WORK_SYNC, 1,
-				[disable_delayed_work_sync() is available])
-		])
-	])
-])
-
 AC_DEFUN([AC_AMDGPU_WORKQUEUE], [
 	AC_AMDGPU_CANCEL_WORK
 	AC_AMDGPU_QUEUE_WORK_NODE
-	AC_AMDGPU_DISABLE_DELAYED_WORK_SYNC
 ])

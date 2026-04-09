@@ -130,9 +130,6 @@
 /* there is 'range' field within dev_pagemap structure */
 #define HAVE_DEV_PAGEMAP_RANGE 1
 
-/* disable_delayed_work_sync() is available */
-#define HAVE_DISABLE_DELAYED_WORK_SYNC 1
-
 /* dma_buf_is_dynamic() is available */
 #define HAVE_DMA_BUF_IS_DYNAMIC 1
 
