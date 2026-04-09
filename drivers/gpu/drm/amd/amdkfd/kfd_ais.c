@@ -30,15 +30,139 @@
 #include <linux/dma-direct.h>
 #include <linux/mount.h>
 #include <linux/stat.h>
+#include <linux/netdevice.h>
+#include <net/route.h>
+#include <linux/inet.h>
 /* Each VRAM page uses sizeof(struct page) on system memory */
 #define AIS_P2P_PAGE_STRUCT_SIZE(size) ((size)/PAGE_SIZE * sizeof(struct page))
 
+/* Walk a net_device's parent chain to find its PCI device */
+static struct pci_dev *netdev_to_pci_dev(struct net_device *netdev)
+{
+	struct device *dev = netdev->dev.parent;
+
+	while (dev && !dev_is_pci(dev))
+		dev = dev->parent;
+
+	return dev ? to_pci_dev(dev) : NULL;
+}
+
 /*
- * get_pci_dev_from_file - Get the PCI device that is hosting the file.
- *  For e.g., the NVME PCI device that is hosting the file.
+ * nvmeof_get_target_netdev - Find the network device for an NVMeoF target
  *
- * @file: The file pointer from which to derive the PCI device.
- * Returns: Pointer to the PCI device if found, NULL otherwise.
+ * Reads the NVMe controller's sysfs address attribute to get the
+ * target IP, then uses kernel routing to find which NIC routes to it.
+ *
+ * @disk_name: NVMe disk name (e.g., "nvme0n1")
+ * Return: net_device with refcount held, or NULL. Caller must dev_put().
+ */
+static struct net_device *nvmeof_get_target_netdev(const char *disk_name)
+{
+	unsigned int ctrl_num;
+	char path[48];
+	char buf[256];
+	struct file *f;
+	ssize_t len;
+	loff_t pos = 0;
+	char *p;
+	__be32 dst_ip;
+	struct flowi4 fl4 = {};
+	struct rtable *rt;
+	struct net_device *netdev;
+
+	if (sscanf(disk_name, "nvme%u", &ctrl_num) != 1)
+		return NULL;
+
+	snprintf(path, sizeof(path), "/sys/class/nvme/nvme%u/address", ctrl_num);
+
+	f = filp_open(path, O_RDONLY, 0);
+	if (IS_ERR(f)) {
+		pr_debug("AIS: cannot open %s\n", path);
+		return NULL;
+	}
+
+	len = kernel_read(f, buf, sizeof(buf) - 1, &pos);
+	filp_close(f, NULL);
+
+	if (len <= 0) {
+		pr_debug("AIS: empty or unreadable %s\n", path);
+		return NULL;
+	}
+	buf[len] = '\0';
+
+	pr_debug("AIS: NVMeoF address for %s: %.*s\n", disk_name,
+		 (int)(len - (buf[len - 1] == '\n' ? 1 : 0)), buf);
+
+	p = strstr(buf, "traddr=");
+	if (!p) {
+		pr_debug("AIS: no traddr in address for %s\n", disk_name);
+		return NULL;
+	}
+
+	p += strlen("traddr=");
+	if (!in4_pton(p, -1, (u8 *)&dst_ip, ',', NULL)) {
+		pr_debug("AIS: traddr not IPv4 for %s (IPv6 unsupported)\n",
+			 disk_name);
+		return NULL;
+	}
+
+	fl4.daddr = dst_ip;
+	rt = ip_route_output_flow(&init_net, &fl4, NULL);
+	if (IS_ERR(rt)) {
+		pr_debug("AIS: no route to traddr for %s\n", disk_name);
+		return NULL;
+	}
+
+	netdev = rt->dst.dev;
+	dev_hold(netdev);
+	ip_rt_put(rt);
+
+	pr_debug("AIS: route for %s -> %s\n", disk_name, netdev->name);
+	return netdev;
+}
+
+/*
+ * get_rdma_nic_pci_dev - Find the RDMA NIC for an NVMeoF target
+ *
+ * Maps an NVMeoF block device to the specific RDMA NIC carrying its
+ * traffic by reading the controller's transport address and resolving
+ * via kernel routing. Validates P2P distance to the GPU.
+ *
+ * @disk_name: NVMe disk name (e.g., "nvme0n1")
+ * Return: PCI device pointer, or NULL if not found
+ */
+static struct pci_dev *get_rdma_nic_pci_dev(const char *disk_name)
+{
+	struct net_device *netdev;
+	struct pci_dev *pdev;
+
+	netdev = nvmeof_get_target_netdev(disk_name);
+	if (!netdev)
+		return NULL;
+
+	pdev = netdev_to_pci_dev(netdev);
+	dev_put(netdev);
+
+	if (!pdev) {
+		pr_debug("AIS: NIC for %s has no PCI parent\n", disk_name);
+		return NULL;
+	}
+
+	pr_debug("AIS: NVMeoF %s -> RDMA NIC %s\n",
+		 disk_name, pci_name(pdev));
+	return pdev;
+}
+
+/*
+ * get_pci_dev_from_file - Get the PCI device that hosts file I/O
+ *
+ * For local NVMe/virtio, walks the block device parent chain to the
+ * PCI controller. For NVMeoF-RDMA (where the parent chain ends at a
+ * synthetic nvmf_device with no PCI parent), falls back to finding
+ * the RDMA NIC with valid GPU P2P distance.
+ *
+ * @file: The file pointer from which to derive the PCI device
+ * Returns: PCI device with reference held, or NULL. Caller must pci_dev_put().
  */
 static struct pci_dev *get_pci_dev_from_file(struct file *file)
 {
@@ -66,10 +190,6 @@ static struct pci_dev *get_pci_dev_from_file(struct file *file)
 #else
 	dev = disk_to_dev(bdev->bd_disk)->parent;
 #endif
-	if (!dev) {
-		pr_debug("No parent device found for the file\n");
-		return NULL;
-	}
 
 	/* Traverse up the device hierarchy to find a PCI device */
 	while (dev && !dev_is_pci(dev))
@@ -78,6 +198,16 @@ static struct pci_dev *get_pci_dev_from_file(struct file *file)
 	if (dev && dev_is_pci(dev))
 		pdev = to_pci_dev(dev);
 
+	/* NVMeoF fallback: local NVMe always has a PCI parent. If the
+	 * walk found nothing and this is an NVMe disk, the device is
+	 * NVMeoF -- find the RDMA NIC via route lookup instead.
+	 */
+	if (!pdev && bdev->bd_disk &&
+	    strncmp(bdev->bd_disk->disk_name, "nvme", 4) == 0)
+		pdev = get_rdma_nic_pci_dev(bdev->bd_disk->disk_name);
+
+	if (pdev)
+		pci_dev_get(pdev);
 
 	return pdev;
 }
@@ -400,7 +530,7 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		if (pci_p2pdma_distance(pdev, adev->dev, false) < 0) {
 			dev_info(adev->dev, "DMA-BUF p2p not accessible!\n");
 			ret = -ENODEV;
-			goto out;
+			goto put_pdev;
 		}
 		/* P2P accessible - create counter entry so future calls skip
 		 * the distance check.
@@ -410,7 +540,7 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 
 	if (WARN_ON(bo->preferred_domains != AMDGPU_GEM_DOMAIN_VRAM)) {
 		ret = -EINVAL;
-		goto out;
+		goto put_pdev;
 	}
 	/* Use NULL instead of peer pdev. This is deliberate so that
 	 * sg_dma_address is set to physical address instead of dma mapped
@@ -421,7 +551,7 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 					       in->size, NULL, DMA_BIDIRECTIONAL, &sgt);
 	if (ret) {
 		dev_err(adev->dev, "AIS: failed to get SG table\n");
-		goto out;
+		goto put_pdev;
 	}
 
 	bvec = amdgpu_init_bvec(sgt, in->size, &nr_segs);
@@ -472,6 +602,8 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	kvfree(bvec);
 put_sg:
 	amdgpu_amdkfd_gpuvm_put_sg_table(bo, NULL, DMA_BIDIRECTIONAL, sgt);
+put_pdev:
+	pci_dev_put(pdev);
 out:
 	fput(filep);
 	return ret < 0 ? ret : 0;
