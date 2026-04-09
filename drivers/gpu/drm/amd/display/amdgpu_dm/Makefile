@@ -40,8 +40,7 @@ AMDGPUDM = \
 	amdgpu_dm_replay.o \
 	amdgpu_dm_quirks.o \
 	amdgpu_dm_wb.o \
-	amdgpu_dm_colorop.o \
-	amdgpu_dm_ism.o
+	amdgpu_dm_colorop.o
 
 ifdef CONFIG_DRM_AMD_DC_FP
 AMDGPUDM += dc_fpu.o
