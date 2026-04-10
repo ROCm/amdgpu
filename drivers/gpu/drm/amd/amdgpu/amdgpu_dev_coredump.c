@@ -401,7 +401,6 @@ void amdgpu_coredump(struct amdgpu_device *adev, bool skip_vram_check,
 {
 	struct drm_device *dev = adev_to_drm(adev);
 	struct amdgpu_coredump_info *coredump;
-	size_t size = sizeof(*coredump);
 	struct drm_sched_job *s_job;
 	u64 total_ring_size, ring_count;
 	struct amdgpu_ring *ring;
@@ -411,16 +410,12 @@ void amdgpu_coredump(struct amdgpu_device *adev, bool skip_vram_check,
 	if (work_pending(&adev->coredump_work))
 		return;
 
-	if (job && job->pasid)
-		size += sizeof(struct amdgpu_coredump_ib_info) * job->num_ibs;
-
-	coredump = kzalloc(size, GFP_NOWAIT);
+	coredump = kzalloc(sizeof(*coredump), GFP_NOWAIT);
 	if (!coredump)
 		return;
 
 	coredump->skip_vram_check = skip_vram_check;
 	coredump->reset_vram_lost = vram_lost;
-	coredump->pasid = job->pasid;
 
 	if (job && job->pasid) {
 		struct amdgpu_task_info *ti;
@@ -429,11 +424,6 @@ void amdgpu_coredump(struct amdgpu_device *adev, bool skip_vram_check,
 		if (ti) {
 			coredump->reset_task_info = *ti;
 			amdgpu_vm_put_task_info(ti);
-		}
-		coredump->num_ibs = job->num_ibs;
-		for (i = 0; i < job->num_ibs; ++i) {
-			coredump->ibs[i].gpu_addr = job->ibs[i].gpu_addr;
-			coredump->ibs[i].ib_size_dw = job->ibs[i].length_dw;
 		}
 	}
 
