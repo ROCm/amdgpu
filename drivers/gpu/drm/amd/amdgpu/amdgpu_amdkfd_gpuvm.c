@@ -1591,10 +1591,37 @@ create_evict_fence_fail:
 int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo, u32 domain)
 {
 	int ret = 0;
+	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
+	u64 bo_size = amdgpu_bo_size(bo);
+	bool rdma_accounted = false;
+
+	/* Pin limit: reject new RDMA/P2P pins when global kill switch is on */
+	if (unlikely(amdgpu_dmabuf_reject_new_pins)) {
+		dev_info_ratelimited(adev->dev,
+			"amdgpu: KFD RDMA pin rejected (dmabuf_reject_new_pins=1)\n");
+		return -ENOSPC;
+	}
+
+	/* Pin limit: enforce per-GPU max pinned VRAM for RDMA/P2P */
+	if (dmabuf_pin_max_mb && (domain & AMDGPU_GEM_DOMAIN_VRAM)) {
+		u64 limit = (u64)dmabuf_pin_max_mb << 20;
+		u64 new_total = atomic64_add_return((s64)bo_size,
+					&adev->kfd.rdma_pinned_bytes);
+
+		if ((u64)new_total > limit) {
+			atomic64_sub((s64)bo_size, &adev->kfd.rdma_pinned_bytes);
+			dev_info_ratelimited(adev->dev,
+				"KFD RDMA pin rejected: pinned=%lluMB + new=%lluMB > max=%uMB\n",
+				(u64)(new_total - bo_size) >> 20,
+				bo_size >> 20, dmabuf_pin_max_mb);
+			return -ENOSPC;
+		}
+		rdma_accounted = true;
+	}
 
 	ret = amdgpu_bo_reserve(bo, false);
 	if (unlikely(ret))
-		return ret;
+		goto err_accounting;
 
 	if (bo->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS) {
 		/*
@@ -1620,13 +1647,30 @@ int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo, u32 domain)
 	amdgpu_bo_sync_wait(bo, AMDGPU_FENCE_OWNER_KFD, false);
 
 	if (!ret && bo->tbo.resource->mem_type == TTM_PL_VRAM)
-                atomic64_add(amdgpu_bo_size(bo),
-                        &amdgpu_ttm_adev(bo->tbo.bdev)->kfd.vram_pinned);
+		atomic64_add(amdgpu_bo_size(bo), &adev->kfd.vram_pinned);
+	else if (!ret && rdma_accounted &&
+		 bo->tbo.resource->mem_type != TTM_PL_VRAM) {
+		/*
+		 * Quota was reserved for a VRAM-domain pin; if the BO did not end
+		 * up in VRAM, roll back rdma_pinned_bytes (unpin only decrements
+		 * when mem_type == TTM_PL_VRAM).
+		 */
+		atomic64_sub((s64)bo_size, &adev->kfd.rdma_pinned_bytes);
+		rdma_accounted = false;
+	}
 
 out:
 	amdgpu_bo_unreserve(bo);
+	if (ret)
+		goto err_accounting;
+	return 0;
+
+err_accounting:
+	if (rdma_accounted)
+		atomic64_sub((s64)bo_size, &adev->kfd.rdma_pinned_bytes);
 	return ret;
 }
+
 
 /**
  * amdgpu_amdkfd_gpuvm_unpin_bo() - Unpins BO using following criteria
@@ -1639,6 +1683,7 @@ out:
 void amdgpu_amdkfd_gpuvm_unpin_bo(struct amdgpu_bo *bo)
 {
 	int ret = 0;
+	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
 
 	ret = amdgpu_bo_reserve(bo, false);
 	if (unlikely(ret))
@@ -1646,9 +1691,12 @@ void amdgpu_amdkfd_gpuvm_unpin_bo(struct amdgpu_bo *bo)
 
 	amdgpu_bo_unpin(bo);
 
-	if (bo->tbo.resource->mem_type == TTM_PL_VRAM)
-		atomic64_sub(amdgpu_bo_size(bo),
-			&amdgpu_ttm_adev(bo->tbo.bdev)->kfd.vram_pinned);
+	if (bo->tbo.resource->mem_type == TTM_PL_VRAM) {
+		atomic64_sub(amdgpu_bo_size(bo), &adev->kfd.vram_pinned);
+		if (dmabuf_pin_max_mb)
+			atomic64_sub((s64)amdgpu_bo_size(bo),
+				&adev->kfd.rdma_pinned_bytes);
+	}
 
 	amdgpu_bo_unreserve(bo);
 }

@@ -803,6 +803,28 @@ MODULE_PARM_DESC(max_num_of_queues_per_device,
 	"Maximum number of supported queues per device (1 = Minimum, 4096 = default)");
 
 /**
+ * DOC: dmabuf_pin_max_mb (uint)
+ * Maximum MB of VRAM pinned for RDMA/PeerDirect per GPU. 0 = unlimited.
+ */
+unsigned int dmabuf_pin_max_mb;
+module_param_named(dmabuf_pin_max_mb, dmabuf_pin_max_mb, uint, 0644);
+MODULE_PARM_DESC(dmabuf_pin_max_mb,
+	"Max VRAM pinned for RDMA/PeerDirect per GPU in MB (0 = unlimited (default))");
+
+/**
+ * DOC: dmabuf_reject_new_pins (int)
+ * Reject new RDMA/PeerDirect pins (global kill switch).
+ */
+int amdgpu_dmabuf_reject_new_pins;
+module_param_named(dmabuf_reject_new_pins, amdgpu_dmabuf_reject_new_pins, int, 0644);
+MODULE_PARM_DESC(dmabuf_reject_new_pins,
+	"Reject new RDMA pins (0 = allow (default), 1 = reject with -ENOSPC)");
+
+int amdgpu_rdma_pin_debug;
+module_param_named(rdma_pin_debug, amdgpu_rdma_pin_debug, int, 0644);
+MODULE_PARM_DESC(rdma_pin_debug, "Log RDMA pin/unpin events (0=off, 1=on)");
+
+/**
  * DOC: send_sigterm (int)
  * Send sigterm to HSA process on unhandled exceptions. Default is not to send sigterm
  * but just print errors on dmesg. Setting 1 enables sending sigterm.
