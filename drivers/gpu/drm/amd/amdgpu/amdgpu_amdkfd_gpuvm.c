@@ -1648,6 +1648,16 @@ int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo, u32 domain)
 
 	if (!ret && bo->tbo.resource->mem_type == TTM_PL_VRAM)
 		atomic64_add(amdgpu_bo_size(bo), &adev->kfd.vram_pinned);
+	else if (!ret && rdma_accounted &&
+		 bo->tbo.resource->mem_type != TTM_PL_VRAM) {
+		/*
+		 * Quota was reserved for a VRAM-domain pin; if the BO did not end
+		 * up in VRAM, roll back rdma_pinned_bytes (unpin only decrements
+		 * when mem_type == TTM_PL_VRAM).
+		 */
+		atomic64_sub((s64)bo_size, &adev->kfd.rdma_pinned_bytes);
+		rdma_accounted = false;
+	}
 
 out:
 	amdgpu_bo_unreserve(bo);
