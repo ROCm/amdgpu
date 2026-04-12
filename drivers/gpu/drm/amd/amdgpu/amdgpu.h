@@ -238,6 +238,9 @@ extern int amdgpu_mtype_local;
 extern int amdgpu_enforce_isolation;
 #ifdef CONFIG_HSA_AMD
 extern int sched_policy;
+extern unsigned int dmabuf_pin_max_mb;
+extern int amdgpu_dmabuf_reject_new_pins;
+extern int amdgpu_rdma_pin_debug;
 extern bool debug_evictions;
 extern bool no_system_mem_limit;
 extern int halt_if_hws_hang;

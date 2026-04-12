@@ -111,6 +111,7 @@ struct amdgpu_kfd_dev {
 	int64_t vram_used[MAX_XCP];
 	uint64_t vram_used_aligned[MAX_XCP];
 	atomic64_t vram_pinned;
+	atomic64_t rdma_pinned_bytes;
 	bool init_complete;
 	struct work_struct reset_work;
 
