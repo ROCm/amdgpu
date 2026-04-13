@@ -13112,6 +13112,7 @@ static int add_affected_mst_dsc_crtcs(struct drm_atomic_commit *state, struct dr
  * available.
  */
 
+#ifdef HAVE_DRM_DRM_COLOROP_H
 /**
  * dm_plane_color_pipeline_active() - Check if a plane's color pipeline active.
  * @state: DRM atomic state
@@ -13143,6 +13144,7 @@ static bool dm_plane_color_pipeline_active(struct drm_atomic_commit *state,
 	}
 	return false;
 }
+#endif
 
 /**
  * dm_crtc_get_cursor_mode() - Determine the required cursor mode on crtc
@@ -13221,11 +13223,13 @@ static int dm_crtc_get_cursor_mode(struct amdgpu_device *adev,
 			break;
 		}
 
+#ifdef HAVE_DRM_DRM_COLOROP_H
 		if (dm_plane_color_pipeline_active(state, plane, true) !=
 		    dm_plane_color_pipeline_active(state, plane, false)) {
 			consider_mode_change = true;
 			break;
 		}
+#endif
 	}
 
 	if (!consider_mode_change && !crtc_state->zpos_changed)
@@ -13266,11 +13270,13 @@ static int dm_crtc_get_cursor_mode(struct amdgpu_device *adev,
 			return 0;
 		}
 
+#ifdef HAVE_DRM_DRM_COLOROP_H
 		/* Underlying plane has an active color pipeline - cursor would be transformed */
 		if (dm_plane_color_pipeline_active(state, plane, false)) {
 			*cursor_mode = DM_CURSOR_OVERLAY_MODE;
 			return 0;
 		}
+#endif
 
 		dm_get_plane_scale(plane_state,
 				   &underlying_scale_w, &underlying_scale_h);
