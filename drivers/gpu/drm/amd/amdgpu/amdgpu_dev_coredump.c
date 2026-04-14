@@ -373,6 +373,9 @@ static void amdgpu_devcoredump_deferred_work(struct work_struct *work)
 	struct amdgpu_device *adev = container_of(work, typeof(*adev), coredump_work);
 	struct amdgpu_coredump_info *coredump = adev->coredump;
 
+	if (!coredump)
+		goto end;
+
 	/* Do a one-time preparation of the coredump output because
 	 * repeatingly calling drm_coredump_printer is very slow.
 	 */
@@ -407,7 +410,7 @@ void amdgpu_coredump(struct amdgpu_device *adev, bool skip_vram_check,
 	int i, off, idx;
 
 	/* No need to generate a new coredump if there's one in progress already. */
-	if (work_pending(&adev->coredump_work))
+	if (work_busy(&adev->coredump_work))
 		return;
 
 	coredump = kzalloc(sizeof(*coredump), GFP_NOWAIT);
