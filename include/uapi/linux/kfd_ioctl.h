@@ -1962,8 +1962,11 @@ struct kfd_ioctl_ais_args {
 #define AMDKFD_IOC_CREATE_PROCESS		\
 		AMDKFD_IO(0x27)
 
+#define AMDKFD_IOC_PROFILER			\
+		AMDKFD_IOWR(0x28, struct kfd_ioctl_profiler_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x28
+#define AMDKFD_COMMAND_END		0x29
 
 /* non-upstream ioctls */
 #define AMDKFD_IOC_IPC_IMPORT_HANDLE                                    \
@@ -1983,9 +1986,6 @@ struct kfd_ioctl_ais_args {
 
 #define AMDKFD_IOC_PC_SAMPLE		\
 		AMDKFD_IOWR(0x85, struct kfd_ioctl_pc_sample_args)
-
-#define AMDKFD_IOC_PROFILER			\
-		AMDKFD_IOWR(0x86, struct kfd_ioctl_profiler_args)
 
 #define AMDKFD_IOC_AIS_OP			\
 		AMDKFD_IOWR(0x87, struct kfd_ioctl_ais_args)
