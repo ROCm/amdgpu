@@ -5660,6 +5660,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		case IP_VERSION(3, 5, 0):
 		case IP_VERSION(3, 5, 1):
 		case IP_VERSION(3, 6, 0):
+		case IP_VERSION(4, 2, 0):
 			replay_feature_enabled = true;
 			break;
 
@@ -10200,7 +10201,7 @@ static void amdgpu_dm_enable_self_refresh(struct amdgpu_crtc *acrtc_attach,
 	}
 
 	/* Decrement skip count when SR is enabled and we're doing fast updates. */
-	if (acrtc_state->update_type <= UPDATE_TYPE_FAST &&
+	if (acrtc_state->update_type == UPDATE_TYPE_FAST &&
 	    (psr->psr_feature_enabled || pr->config.replay_supported)) {
 		if (aconn->sr_skip_count > 0)
 			aconn->sr_skip_count--;
@@ -10415,7 +10416,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		if ((crtc->state->pageflip_flags &
 			 DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
 #endif
-		    (acrtc_state->update_type > UPDATE_TYPE_FAST ||
+		    (acrtc_state->update_type != UPDATE_TYPE_FAST ||
 		     get_mem_type(old_plane_state->fb) != get_mem_type(fb)))
 			drm_warn_once(state->dev,
 				      "[PLANE:%d:%s] async flip with non-fast update\n",
@@ -10428,7 +10429,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			(crtc->state->pageflip_flags &
 			 DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
 #endif
-			acrtc_state->update_type <= UPDATE_TYPE_FAST &&
+			acrtc_state->update_type == UPDATE_TYPE_FAST &&
 			get_mem_type(old_plane_state->fb) == get_mem_type(fb);
 
 		timestamp_ns = ktime_get_ns();
