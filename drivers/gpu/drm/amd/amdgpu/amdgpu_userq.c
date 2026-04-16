@@ -801,6 +801,7 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
 
 	queue->doorbell_index = index;
 #ifdef HAVE_STRUCT_XARRAY
+	mutex_init(&queue->fence_drv_lock);
 	xa_init_flags(&queue->fence_drv_xa, XA_FLAGS_ALLOC);
 #else
 	idr_init(&queue->fence_drv_idr);
@@ -879,6 +880,7 @@ clean_mapping:
 	amdgpu_bo_reserve(fpriv->vm.root.bo, true);
 	amdgpu_userq_buffer_vas_list_cleanup(adev, queue);
 	amdgpu_bo_unreserve(fpriv->vm.root.bo);
+	mutex_destroy(&queue->fence_drv_lock);
 free_queue:
 	kfree(queue);
 err_pm_runtime:
