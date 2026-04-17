@@ -1887,7 +1887,8 @@ static const struct amdgpu_buffer_funcs sdma_v6_0_buffer_funcs = {
 
 static void sdma_v6_0_set_buffer_funcs(struct amdgpu_device *adev)
 {
-	amdgpu_sdma_set_buffer_funcs_scheds(adev, &sdma_v6_0_buffer_funcs);
+	adev->mman.buffer_funcs = &sdma_v6_0_buffer_funcs;
+	adev->mman.buffer_funcs_ring = &adev->sdma.instance[0].ring;
 }
 
 const struct amdgpu_ip_block_version sdma_v6_0_ip_block = {
