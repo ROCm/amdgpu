@@ -158,20 +158,6 @@ static void set_priority(struct v9_mqd *m, struct queue_properties *q)
 	m->cp_hqd_pipe_priority = pipe_priority_map[q->priority];
 }
 
-static bool mqd_on_vram(struct amdgpu_device *adev)
-{
-	if (adev->apu_prefer_gtt)
-		return false;
-
-	switch (amdgpu_ip_version(adev, GC_HWIP, 0)) {
-	case IP_VERSION(9, 4, 3):
-	case IP_VERSION(9, 5, 0):
-		return true;
-	default:
-		return false;
-	}
-}
-
 static struct kfd_mem_obj *allocate_mqd(struct mqd_manager *mm,
 		struct queue_properties *q)
 {

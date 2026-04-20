@@ -202,4 +202,6 @@ uint64_t kfd_mqd_stride(struct mqd_manager *mm,
 			struct queue_properties *q);
 bool kfd_check_hiq_mqd_doorbell_id(struct kfd_node *node, uint32_t doorbell_id,
 				   uint32_t inst);
+bool mqd_on_vram(struct amdgpu_device *adev);
+
 #endif /* KFD_MQD_MANAGER_H_ */
