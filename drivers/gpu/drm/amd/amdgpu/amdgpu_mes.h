@@ -168,6 +168,9 @@ struct amdgpu_mes {
 	int                 master_xcc_ids[AMDGPU_MAX_MES_INST_PIPES];
 	struct amdgpu_bo    *shared_cmd_buf_obj[AMDGPU_MAX_MES_INST_PIPES];
 	uint64_t            shared_cmd_buf_gpu_addr[AMDGPU_MAX_MES_INST_PIPES];
+
+	bool			compute_pipe_reset_enabled;
+	bool			gfx_pipe_reset_enabled;
 };
 
 struct amdgpu_mes_hung_queue_hqd_info {
