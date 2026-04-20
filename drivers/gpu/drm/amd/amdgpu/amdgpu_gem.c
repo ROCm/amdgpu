@@ -937,7 +937,7 @@ amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
 					.ip[AMDGPU_XCP_GFX].inst_mask;
 
 			r = amdgpu_vm_flush_compute_tlb(adev, vm,
-							TLB_FLUSH_LEGACY,
+							TLB_FLUSH_HEAVYWEIGHT,
 							xcc_mask);
 		}
 	}
