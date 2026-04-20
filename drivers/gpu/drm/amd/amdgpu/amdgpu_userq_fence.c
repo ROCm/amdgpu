@@ -160,16 +160,20 @@ amdgpu_userq_fence_put_fence_drv_array(struct amdgpu_userq_fence *userq_fence)
 	userq_fence->fence_drv_array_count = 0;
 }
 
-void amdgpu_userq_fence_driver_process(struct amdgpu_userq_fence_driver *fence_drv)
+/*
+ * Returns:
+ * -ENOENT when no fences were processes
+ * 1 when more fences are pending
+ * 0 when no fences are pending any more
+ */
+int
+amdgpu_userq_fence_driver_process(struct amdgpu_userq_fence_driver *fence_drv)
 {
 	struct amdgpu_userq_fence *userq_fence, *tmp;
 	LIST_HEAD(to_be_signaled);
 	struct dma_fence *fence;
 	unsigned long flags;
 	u64 rptr;
-
-	if (!fence_drv)
-		return;
 
 	spin_lock_irqsave(&fence_drv->fence_list_lock, flags);
 	rptr = amdgpu_userq_fence_read(fence_drv);
@@ -183,6 +187,9 @@ void amdgpu_userq_fence_driver_process(struct amdgpu_userq_fence_driver *fence_d
 				&userq_fence->link);
 	spin_unlock_irqrestore(&fence_drv->fence_list_lock, flags);
 
+	if (list_empty(&to_be_signaled))
+		return -ENOENT;
+
 	list_for_each_entry_safe(userq_fence, tmp, &to_be_signaled, link) {
 		fence = &userq_fence->base;
 		list_del_init(&userq_fence->link);
@@ -194,6 +201,8 @@ void amdgpu_userq_fence_driver_process(struct amdgpu_userq_fence_driver *fence_d
 		dma_fence_put(fence);
 	}
 
+	/* That doesn't need to be accurate so no locking */
+	return list_empty(&fence_drv->fences) ? 0 : 1;
 }
 
 void amdgpu_userq_fence_driver_destroy(struct kref *ref)

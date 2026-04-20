@@ -89,7 +89,6 @@ struct amdgpu_usermode_queue {
 	int			priority;
 	struct dentry		*debugfs_queue;
 	struct delayed_work hang_detect_work;
-	struct dma_fence *hang_detect_fence;
 	struct kref		refcount;
 
 	struct list_head	userq_va_list;
