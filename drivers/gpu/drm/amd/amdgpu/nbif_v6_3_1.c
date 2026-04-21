@@ -189,6 +189,51 @@ static void nbif_v6_3_1_vcn_doorbell_range(struct amdgpu_device *adev,
 	}
 }
 
+static void nbif_v6_3_1_vpe_doorbell_range(struct amdgpu_device *adev,
+							int instance, bool use_doorbell,
+							int doorbell_index,
+							int doorbell_size)
+{
+	if (instance)
+		return;
+
+	u32 doorbell_range = RREG32_SOC15(NBIO, 0, regGDC_S2A0_S2A_DOORBELL_ENTRY_5_CTRL);
+
+	if (use_doorbell) {
+		doorbell_range = REG_SET_FIELD(doorbell_range,
+					       GDC_S2A0_S2A_DOORBELL_ENTRY_5_CTRL,
+					       S2A_DOORBELL_PORT5_ENABLE,
+					       0x1);
+		doorbell_range = REG_SET_FIELD(doorbell_range,
+					       GDC_S2A0_S2A_DOORBELL_ENTRY_5_CTRL,
+					       S2A_DOORBELL_PORT5_AWID,
+					       0xf);
+		doorbell_range = REG_SET_FIELD(doorbell_range,
+					       GDC_S2A0_S2A_DOORBELL_ENTRY_5_CTRL,
+					       S2A_DOORBELL_PORT5_RANGE_OFFSET,
+					       doorbell_index);
+		doorbell_range = REG_SET_FIELD(doorbell_range,
+					       GDC_S2A0_S2A_DOORBELL_ENTRY_5_CTRL,
+					       S2A_DOORBELL_PORT5_RANGE_SIZE,
+					       doorbell_size);
+		doorbell_range = REG_SET_FIELD(doorbell_range,
+					       GDC_S2A0_S2A_DOORBELL_ENTRY_5_CTRL,
+					       S2A_DOORBELL_PORT5_AWADDR_31_28_VALUE,
+					       0xf);
+	} else {
+		doorbell_range = REG_SET_FIELD(doorbell_range,
+					       GDC_S2A0_S2A_DOORBELL_ENTRY_5_CTRL,
+					       S2A_DOORBELL_PORT5_RANGE_SIZE,
+					       0);
+	}
+
+	if (amdgpu_ip_version(adev, NBIO_HWIP, 0) == IP_VERSION(7, 11, 4))
+		WREG32_SOC15(NBIO, 0, regGDC_S2A0_S2A_DOORBELL_ENTRY_5_CTRL_nbif_4_10, doorbell_range);
+	else
+		WREG32_SOC15(NBIO, 0, regGDC_S2A0_S2A_DOORBELL_ENTRY_5_CTRL, doorbell_range);
+
+}
+
 static void nbif_v6_3_1_gc_doorbell_init(struct amdgpu_device *adev)
 {
 	if (amdgpu_ip_version(adev, NBIO_HWIP, 0) == IP_VERSION(7, 11, 4)) {
@@ -517,6 +562,7 @@ const struct amdgpu_nbio_funcs nbif_v6_3_1_funcs = {
 	.get_memsize = nbif_v6_3_1_get_memsize,
 	.sdma_doorbell_range = nbif_v6_3_1_sdma_doorbell_range,
 	.vcn_doorbell_range = nbif_v6_3_1_vcn_doorbell_range,
+	.vpe_doorbell_range = nbif_v6_3_1_vpe_doorbell_range,
 	.gc_doorbell_init = nbif_v6_3_1_gc_doorbell_init,
 	.enable_doorbell_aperture = nbif_v6_3_1_enable_doorbell_aperture,
 	.enable_doorbell_selfring_aperture = nbif_v6_3_1_enable_doorbell_selfring_aperture,
