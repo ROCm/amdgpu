@@ -234,7 +234,8 @@ amdgpu-y += \
 # add VPE block
 amdgpu-y += \
 	amdgpu_vpe.o \
-	vpe_v6_1.o
+	vpe_v6_1.o \
+	vpe_v2_0.o
 
 # add UMSCH block
 amdgpu-y += \

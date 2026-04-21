@@ -2755,6 +2755,9 @@ static int amdgpu_discovery_set_vpe_ip_blocks(struct amdgpu_device *adev)
 	case IP_VERSION(6, 1, 3):
 		amdgpu_device_ip_block_add(adev, &vpe_v6_1_ip_block);
 		break;
+	case IP_VERSION(2, 0, 0):
+		amdgpu_device_ip_block_add(adev, &vpe_v2_0_ip_block);
+		break;
 	default:
 		break;
 	}
