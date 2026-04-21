@@ -462,7 +462,7 @@ bool edp_receiver_ready_T9(struct dc_link *link)
 		do {
 			sinkstatus = 1;
 			result = core_link_read_dpcd(link, DP_SINK_STATUS, &sinkstatus, sizeof(sinkstatus));
-			if (sinkstatus == 0)
+			if (!(sinkstatus & DP_RECEIVE_PORT_0_STATUS))
 				break;
 			if (result != DC_OK)
 				break;
@@ -492,7 +492,7 @@ bool edp_receiver_ready_T7(struct dc_link *link)
 		do {
 			sinkstatus = 0;
 			result = core_link_read_dpcd(link, DP_SINK_STATUS, &sinkstatus, sizeof(sinkstatus));
-			if (sinkstatus == 1)
+			if (sinkstatus & DP_RECEIVE_PORT_0_STATUS)
 				break;
 			if (result != DC_OK)
 				break;
