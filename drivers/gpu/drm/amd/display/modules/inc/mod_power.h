@@ -414,27 +414,4 @@ bool mod_power_backlight_nits_to_percent(struct mod_power *mod_power,
 		unsigned int backlight_millinit,
 		unsigned int *backlight_millipercent);
 
-void initialize_backlight_caps(struct core_power *core_power, unsigned int inst);
-
-unsigned int backlight_millipercent_to_pwm(
-		struct core_power *core_power, unsigned int millipercent, unsigned int inst);
-
-unsigned int backlight_millipercent_to_millinit(
-		struct core_power *core_power, unsigned int millipercent, unsigned int inst);
-
-void fill_backlight_level_params(struct core_power *core_power,
-	struct set_backlight_level_params *backlight_level_params,
-	int panel_inst, uint8_t aux_inst, unsigned int backlight_pwm,
-	enum backlight_control_type backlight_control_type,
-	unsigned int backlight_millinit, unsigned int transition_time_millisec,
-	bool is_hdr);
-
-bool mod_power_hw_init_backlight(struct mod_power *mod_power);
-
-void mod_power_update_backlight_on_mode_change(
-    struct core_power *core_power,
-    struct dc_link *link,
-    unsigned int panel_inst,
-    uint8_t aux_inst,
-    bool is_hdr);
 #endif /* MODULES_INC_MOD_POWER_H_ */
