@@ -31,6 +31,7 @@
 #include "dm_helpers.h"
 #include <drm/display/drm_hdcp_helper.h>
 #include "hdcp_psp.h"
+#include "amdgpu_dm_kunit_helpers.h"
 
 /*
  * If the SRM version being loaded is less than or equal to the
@@ -158,7 +159,8 @@ static int psp_set_srm(struct psp_context *psp,
 	return 0;
 }
 
-static void process_output(struct hdcp_workqueue *hdcp_work)
+STATIC_IFN_KUNIT
+void process_output(struct hdcp_workqueue *hdcp_work)
 {
 	struct mod_hdcp_output output = hdcp_work->output;
 
@@ -178,6 +180,7 @@ static void process_output(struct hdcp_workqueue *hdcp_work)
 
 	schedule_delayed_work(&hdcp_work->property_validate_dwork, msecs_to_jiffies(0));
 }
+EXPORT_IF_KUNIT(process_output);
 
 static void link_lock(struct hdcp_workqueue *work, bool lock)
 {
