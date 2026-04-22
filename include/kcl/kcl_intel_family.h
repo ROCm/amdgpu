@@ -19,6 +19,11 @@
 #define IFM(_fam, _model)	VFM_MAKE(X86_VENDOR_INTEL, _fam, _model)
 #endif
 
+#ifndef INTEL_TIGERLAKE
+#define INTEL_TIGERLAKE_L		IFM(6, 0x8C) /* Willow Cove */
+#define INTEL_TIGERLAKE			IFM(6, 0x8D) /* Willow Cove */
+#endif
+
 #ifndef INTEL_ALDERLAKE
 #define INTEL_ALDERLAKE			IFM(6, 0x97) /* Golden Cove / Gracemont */
 #define INTEL_ALDERLAKE_L		IFM(6, 0x9A) /* Golden Cove / Gracemont */
