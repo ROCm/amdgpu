@@ -33,6 +33,7 @@
 #include <linux/hwmon-sysfs.h>
 #include <linux/nospec.h>
 #include <linux/pm_runtime.h>
+#include <linux/string_choices.h>
 #include <asm/processor.h>
 
 #define MAX_NUM_OF_FEATURES_PER_SUBSET		8
@@ -994,12 +995,15 @@ static ssize_t amdgpu_get_pp_dpm_clock(struct device *dev,
 		return ret;
 
 	ret = amdgpu_dpm_emit_clock_levels(adev, type, buf, &size);
-	if (ret)
-		return ret;
+	if (ret) {
+		size = ret;
+		goto out_pm_put;
+	}
 
 	if (size == 0)
 		size = sysfs_emit(buf, "\n");
 
+out_pm_put:
 	amdgpu_pm_put_access(adev);
 
 	return size;
@@ -1592,7 +1596,7 @@ static ssize_t amdgpu_get_thermal_throttling_logging(struct device *dev,
 
 	return sysfs_emit(buf, "%s: thermal throttling logging %s, with interval %d seconds\n",
 			  adev_to_drm(adev)->unique,
-			  atomic_read(&adev->throttling_logging_enabled) ? "enabled" : "disabled",
+			  str_enabled_disabled(atomic_read(&adev->throttling_logging_enabled)),
 			  adev->throttling_logging_rs.interval / HZ + 1);
 }
 
@@ -2235,7 +2239,7 @@ static ssize_t amdgpu_show_npm_status(struct device *dev,
 	if (r)
 		return r;
 
-	return sysfs_emit(buf, "%s\n", npower ? "enabled" : "disabled");
+	return sysfs_emit(buf, "%s\n", str_enabled_disabled(npower));
 }
 
 /**
@@ -3901,11 +3905,14 @@ static int amdgpu_retrieve_od_settings(struct amdgpu_device *adev,
 		return ret;
 
 	ret = amdgpu_dpm_emit_clock_levels(adev, od_type, buf, &size);
-	if (ret)
-		return ret;
+	if (ret) {
+		size = ret;
+		goto out_pm_put;
+	}
 	if (size == 0)
 		size = sysfs_emit(buf, "\n");
 
+out_pm_put:
 	amdgpu_pm_put_access(adev);
 
 	return size;

@@ -4854,17 +4854,18 @@ static int gfx_v12_0_eop_irq(struct amdgpu_device *adev,
 	DRM_DEBUG("IH: CP EOP\n");
 
 	if (adev->enable_mes && doorbell_offset) {
-		struct amdgpu_userq_fence_driver *fence_drv = NULL;
 		unsigned long flags;
 #ifdef HAVE_STRUCT_XARRAY
-		struct xarray *xa = &adev->userq_xa;
+		struct amdgpu_usermode_queue *queue;
+		struct xarray *xa = &adev->userq_doorbell_xa;
 
 		xa_lock_irqsave(xa, flags);
-		fence_drv = xa_load(xa, doorbell_offset);
-		if (fence_drv)
-			amdgpu_userq_fence_driver_process(fence_drv);
+		queue = xa_load(xa, doorbell_offset);
+		if (queue)
+			amdgpu_userq_fence_driver_process(queue->fence_drv);
 		xa_unlock_irqrestore(xa, flags);
 #else
+		struct amdgpu_userq_fence_driver *fence_drv = NULL;
 		struct idr *idr = &adev->userq_idr;
 
 		spin_lock_irqsave(&adev->userq_lock, flags);

@@ -130,6 +130,9 @@
 /* there is 'range' field within dev_pagemap structure */
 #define HAVE_DEV_PAGEMAP_RANGE 1
 
+/* disable_delayed_work_sync() is available */
+#define HAVE_DISABLE_DELAYED_WORK_SYNC 1
+
 /* dma_buf_is_dynamic() is available */
 #define HAVE_DMA_BUF_IS_DYNAMIC 1
 
@@ -353,6 +356,9 @@
 /* Define to 1 if you have the <drm/display/drm_hdmi_helper.h> header file. */
 #define HAVE_DRM_DISPLAY_DRM_HDMI_HELPER_H 1
 
+/* display_info->amd_vsdb is available */
+#define HAVE_DRM_DISPLAY_INFO_AMD_VSDB 1
+
 /* display_info->edid_hdmi_rgb444_dc_modes is available */
 #define HAVE_DRM_DISPLAY_INFO_EDID_HDMI_RGB444_DC_MODES 1
 
@@ -565,9 +571,6 @@
 /* Define to 1 if you have the <drm/drm_probe_helper.h> header file. */
 #define HAVE_DRM_DRM_PROBE_HELPER_H 1
 
-/* Define to 1 if you have the <drm/drm_suballoc.h> header file. */
-#define HAVE_DRM_DRM_SUBALLOC_H 1
-
 /* drm_driver_feature DRIVER_IRQ_SHARED is available */
 /* #undef HAVE_DRM_DRV_DRIVER_IRQ_SHARED */
 
@@ -757,9 +760,6 @@
 /* drm_simple_encoder is available */
 #define HAVE_DRM_SIMPLE_ENCODER_INIT 1
 
-/* Has function drm_suballoc_manager_init() */
-#define HAVE_DRM_SUBALLOC_MANAGER_INIT 1
-
 /* drm_syncobj_add_point() is available */
 #define HAVE_DRM_SYNCOBJ_ADD_POINT 1
 
@@ -916,6 +916,9 @@
 /* Define to 1 if you have the <linux/args.h> header file. */
 #define HAVE_LINUX_ARGS_H 1
 
+/* Define to 1 if you have the <linux/array_size.h> header file. */
+#define HAVE_LINUX_ARRAY_SIZE_H 1
+
 /* atomic_long_try_cmpxchg() is available */
 #define HAVE_LINUX_ATOMIC_LONG_TRY_CMPXCHG 1
 
@@ -996,6 +999,9 @@
 
 /* Define to 1 if you have the <linux/stdarg.h> header file. */
 #define HAVE_LINUX_STDARG_H 1
+
+/* Define to 1 if you have the <linux/string_choices.h> header file. */
+#define HAVE_LINUX_STRING_CHOICES_H 1
 
 /* Define to 1 if you have the <linux/unaligned.h> header file. */
 #define HAVE_LINUX_UNALIGNED_H 1

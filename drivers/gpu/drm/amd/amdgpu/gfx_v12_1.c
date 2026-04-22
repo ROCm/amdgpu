@@ -61,7 +61,7 @@
 #define regCP_HQD_IB_CONTROL_DEFAULT                                              0x00100000
 
 MODULE_FIRMWARE("amdgpu/gc_12_1_0_mec.bin");
-MODULE_FIRMWARE("amdgpu/gc_12_1_0_rlc.bin");
+MODULE_FIRMWARE("amdgpu/gc_12_1_0_rlc_1.bin");
 
 #define SH_MEM_ALIGNMENT_MODE_UNALIGNED_GFX12_1_0	0x00000001
 #define DEFAULT_SH_MEM_CONFIG \
@@ -409,7 +409,13 @@ static int gfx_v12_1_init_microcode(struct amdgpu_device *adev)
 	amdgpu_ucode_ip_version_decode(adev, GC_HWIP, ucode_prefix, sizeof(ucode_prefix));
 
 	if (!amdgpu_sriov_vf(adev)) {
-		err = amdgpu_ucode_request(adev, &adev->gfx.rlc_fw,
+		if (amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(12, 1, 0) &&
+		    adev->rev_id == 0)
+			err = amdgpu_ucode_request(adev, &adev->gfx.rlc_fw,
+					   AMDGPU_UCODE_REQUIRED,
+					   "amdgpu/%s_rlc_1.bin", ucode_prefix);
+		else
+			err = amdgpu_ucode_request(adev, &adev->gfx.rlc_fw,
 					   AMDGPU_UCODE_REQUIRED,
 					   "amdgpu/%s_rlc.bin", ucode_prefix);
 		if (err)
@@ -3643,14 +3649,15 @@ static int gfx_v12_1_eop_irq(struct amdgpu_device *adev,
 	DRM_DEBUG("IH: CP EOP\n");
 
 	if (adev->enable_mes && doorbell_offset) {
-		struct amdgpu_userq_fence_driver *fence_drv = NULL;
-		struct xarray *xa = &adev->userq_xa;
+		struct xarray *xa = &adev->userq_doorbell_xa;
+		struct amdgpu_usermode_queue *queue;
 		unsigned long flags;
 
 		xa_lock_irqsave(xa, flags);
-		fence_drv = xa_load(xa, doorbell_offset);
-		if (fence_drv)
-			amdgpu_userq_fence_driver_process(fence_drv);
+		queue = xa_load(xa, doorbell_offset);
+		if (queue)
+			amdgpu_userq_fence_driver_process(queue->fence_drv);
+
 		xa_unlock_irqrestore(xa, flags);
 	} else {
 		me_id = (entry->ring_id & 0x0c) >> 2;
@@ -3818,12 +3825,12 @@ static int gfx_v12_1_rlc_poison_irq(struct amdgpu_device *adev,
 static void gfx_v12_1_emit_mem_sync(struct amdgpu_ring *ring)
 {
 	const unsigned int gcr_cntl =
-			PACKET3_ACQUIRE_MEM_GCR_CNTL_GL2_INV(1) |
-			PACKET3_ACQUIRE_MEM_GCR_CNTL_GL2_WB(1) |
-			PACKET3_ACQUIRE_MEM_GCR_CNTL_GLV_INV(1) |
-			PACKET3_ACQUIRE_MEM_GCR_CNTL_GLK_INV(1) |
-			PACKET3_ACQUIRE_MEM_GCR_CNTL_GLI_INV(1) |
-			PACKET3_ACQUIRE_MEM_GCR_CNTL_GL2_SCOPE(2);
+			PACKET3_ACQUIRE_MEM__GCR_CNTL__GL2_INV(1) |
+			PACKET3_ACQUIRE_MEM__GCR_CNTL__GL2_WB(1) |
+			PACKET3_ACQUIRE_MEM__GCR_CNTL__GLV_INV(1) |
+			PACKET3_ACQUIRE_MEM__GCR_CNTL__GLK_INV(1) |
+			PACKET3_ACQUIRE_MEM__GCR_CNTL__GLI_INV(1) |
+			PACKET3_ACQUIRE_MEM__GCR_CNTL__GL2_SCOPE(2);
 
 	/* ACQUIRE_MEM - make one or more surfaces valid for use by the subsequent operations */
 	amdgpu_ring_write(ring, PACKET3(PACKET3_ACQUIRE_MEM, 6));

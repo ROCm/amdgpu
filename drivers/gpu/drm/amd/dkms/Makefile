@@ -1,7 +1,7 @@
 ifneq ($(KERNELRELEASE),)
 include $(src)/amd/dkms/Kbuild
 else
-KERNELVER := $(shell uname -r)
+KERNELVER ?= $(shell uname -r)
 kernel_build_dir := /lib/modules/$(KERNELVER)/build
 module_src_dir := $(CURDIR)
 module_build_dir := $(shell mktemp -ut amd.XXXXXXXX)
@@ -56,7 +56,7 @@ modules: sanity-check $(dkms-config)
 		SCHED_NAME=amd-sched \
 		-C $(kernel_build_dir) \
 		M=$(module_build_dir) $(module_build_flags)
-	$(Q)amd/dkms/post-build.sh $(module_build_dir)
+	$(Q)amd/dkms/post-build.sh $(module_build_dir) $(KERNELVER)
 
 sanity-check: pre-build $(config-file) $(rename_header)
 	$(if $(call KCL_MACRO_CHECK_COMMAND, HAVE_DMA_RESV_SEQ_BUG), $(error dma_resv->seq is missing. exit...))

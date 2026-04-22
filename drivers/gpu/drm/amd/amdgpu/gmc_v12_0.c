@@ -729,8 +729,10 @@ static int gmc_v12_0_mc_init(struct amdgpu_device *adev)
 	int r;
 
 	if (adev->gmc.xgmi.connected_to_cpu)
-		adev->gmc.mc_vram_size =
-			adev->gmc.xgmi.node_segment_size * adev->gmc.xgmi.num_physical_nodes;
+		/* On A+A, manage driver allocation range to the local
+		 * node segment and prevent allocations on remote HBM.
+		 */
+		adev->gmc.mc_vram_size = adev->gmc.xgmi.node_segment_size;
 	else
 		adev->gmc.mc_vram_size =
 			adev->nbio.funcs->get_memsize(adev) * 1024ULL * 1024ULL;
@@ -923,8 +925,6 @@ static int gmc_v12_0_sw_init(struct amdgpu_ip_block *ip_block)
 	r = gmc_v12_0_mc_init(adev);
 	if (r)
 		return r;
-
-	amdgpu_gmc_get_vbios_allocations(adev);
 
 #ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 	if (amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(12, 1, 0)) {

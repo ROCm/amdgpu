@@ -915,6 +915,7 @@ amdgpu_connector_vga_detect(struct drm_connector *connector, bool force)
 	if (dret) {
 		amdgpu_connector->detected_by_load = false;
 		drm_edid_free(amdgpu_connector->edid);
+		amdgpu_connector->edid = NULL;
 		amdgpu_connector_get_edid(connector);
 
 		if (!amdgpu_connector->edid) {
@@ -931,6 +932,7 @@ amdgpu_connector_vga_detect(struct drm_connector *connector, bool force)
 			 */
 			if (amdgpu_connector->use_digital && amdgpu_connector->shared_ddc) {
 				drm_edid_free(amdgpu_connector->edid);
+				amdgpu_connector->edid = NULL;
 				ret = connector_status_disconnected;
 			} else {
 				ret = connector_status_connected;
@@ -1026,6 +1028,7 @@ static void amdgpu_connector_shared_ddc(enum drm_connector_status *status,
 					if (!amdgpu_display_hpd_sense(adev,
 								      amdgpu_connector->hpd.hpd)) {
 						drm_edid_free(amdgpu_connector->edid);
+						amdgpu_connector->edid = NULL;
 						*status = connector_status_disconnected;
 					}
 				}
@@ -1095,6 +1098,7 @@ amdgpu_connector_dvi_detect(struct drm_connector *connector, bool force)
 	if (dret) {
 		amdgpu_connector->detected_by_load = false;
 		drm_edid_free(amdgpu_connector->edid);
+		amdgpu_connector->edid = NULL;
 		amdgpu_connector_get_edid(connector);
 
 		if (!amdgpu_connector->edid) {
@@ -1111,6 +1115,7 @@ amdgpu_connector_dvi_detect(struct drm_connector *connector, bool force)
 			 */
 			if ((!amdgpu_connector->use_digital) && amdgpu_connector->shared_ddc) {
 				drm_edid_free(amdgpu_connector->edid);
+				amdgpu_connector->edid = NULL;
 				ret = connector_status_disconnected;
 			} else {
 				ret = connector_status_connected;
@@ -1501,6 +1506,7 @@ amdgpu_connector_dp_detect(struct drm_connector *connector, bool force)
 	}
 
 	drm_edid_free(amdgpu_connector->edid);
+	amdgpu_connector->edid = NULL;
 
 	if ((connector->connector_type == DRM_MODE_CONNECTOR_eDP) ||
 	    (connector->connector_type == DRM_MODE_CONNECTOR_LVDS)) {

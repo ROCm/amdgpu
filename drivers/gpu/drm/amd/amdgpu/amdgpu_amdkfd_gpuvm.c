@@ -1835,7 +1835,8 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 			alloc_domain = AMDGPU_GEM_DOMAIN_GTT;
 			alloc_flags = 0;
 		} else {
-			alloc_flags = AMDGPU_GEM_CREATE_VRAM_WIPE_ON_RELEASE;
+			alloc_flags = AMDGPU_GEM_CREATE_VRAM_WIPE_ON_RELEASE |
+				AMDGPU_GEM_CREATE_VRAM_CLEARED;
 			alloc_flags |= (flags & KFD_IOC_ALLOC_MEM_FLAGS_PUBLIC) ?
 			AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED : 0;
 
@@ -2561,10 +2562,11 @@ int amdgpu_amdkfd_gpuvm_get_sg_table(struct amdgpu_device *adev,
 	unsigned int page_size;
 	unsigned int cur_page;
 	size_t max_segment = 0;
+	uint64_t end;
 	int ret;
 
 	/* Determine access does not cross memory boundary */
-	if (size + offset > amdgpu_bo_size(bo))
+	if (check_add_overflow(offset, size, &end) || end > amdgpu_bo_size(bo))
 		return -EFAULT;
 
 	/* For GPU memory use VRAM Mgr to build SG Table */

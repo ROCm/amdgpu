@@ -547,9 +547,9 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		if (aconnector->dc_sink) {
 			amdgpu_dm_update_freesync_caps(
 #ifdef HAVE_DRM_DP_MST_EDID_READ
-					connector, aconnector->drm_edid);
+					connector, aconnector->drm_edid, true);
 #else
-					connector, aconnector->edid);
+					connector, aconnector->edid, true);
 #endif
 
 #if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
@@ -984,7 +984,7 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		 aconnector, connector->base.id, aconnector->mst_root);
 
 	if (aconnector->dc_sink) {
-		amdgpu_dm_update_freesync_caps(connector, NULL);
+		amdgpu_dm_update_freesync_caps(connector, NULL, true);
 		dc_link_remove_remote_sink(aconnector->dc_link,
 		aconnector->dc_sink);
 		dc_sink_release(aconnector->dc_sink);

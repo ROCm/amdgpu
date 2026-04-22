@@ -18,6 +18,7 @@ extern struct workqueue_struct *system_highpri_wq;
 
 #ifndef HAVE_SYSTEM_PERCPU_WQ
 #define system_percpu_wq system_wq
+#define system_dfl_wq system_unbound_wq
 #endif
 
 #endif
