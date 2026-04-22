@@ -89,6 +89,24 @@ void opp2_set_disp_pattern_generator(
 	break;
 	}
 
+	if (opp->ctx->dc->debug.disable_dynamic_expansion_for_test_pattern) {
+		switch (test_pattern) {
+		case CONTROLLER_DP_TEST_PATTERN_COLORSQUARES:
+		case CONTROLLER_DP_TEST_PATTERN_COLORSQUARES_CEA:
+		case CONTROLLER_DP_TEST_PATTERN_VERTICALBARS:
+		case CONTROLLER_DP_TEST_PATTERN_HORIZONTALBARS:
+		case CONTROLLER_DP_TEST_PATTERN_COLORRAMP:
+			if (color_depth == COLOR_DEPTH_121212)
+				REG_UPDATE(FMT_DYNAMIC_EXP_CNTL, FMT_DYNAMIC_EXP_EN, 0);
+		break;
+		case CONTROLLER_DP_TEST_PATTERN_VIDEOMODE:
+			REG_UPDATE(FMT_DYNAMIC_EXP_CNTL, FMT_DYNAMIC_EXP_EN, 1);
+		break;
+		default:
+		break;
+		}
+	}
+
 	/* set DPG dimentions */
 	REG_SET_2(DPG_DIMENSIONS, 0,
 		DPG_ACTIVE_WIDTH, width,
