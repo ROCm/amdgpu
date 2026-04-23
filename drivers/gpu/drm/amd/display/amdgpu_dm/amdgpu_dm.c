@@ -10411,8 +10411,6 @@ static void amdgpu_dm_enable_self_refresh(struct amdgpu_display_manager *dm,
 			amdgpu_dm_psr_set_event(dm, acrtc_state->stream, false,
 				psr_event_hw_programming, false);
 
-			amdgpu_dm_replay_set_event(dm, acrtc_state->stream, true,
-				replay_event_general_ui, true);
 			amdgpu_dm_replay_set_event(dm, acrtc_state->stream, false,
 				replay_event_hw_programming, false);
 		}
@@ -10951,6 +10949,8 @@ static void amdgpu_dm_mod_power_update_streams(struct drm_atomic_state *state,
 					psr_event_hw_programming, true);
 				amdgpu_dm_replay_set_event(dm, dm_old_crtc_state->stream, true,
 					replay_event_hw_programming, true);
+				amdgpu_dm_replay_set_event(dm, dm_old_crtc_state->stream, false,
+					replay_event_general_ui, false);
 			}
 		}
 
@@ -11004,6 +11004,18 @@ static void amdgpu_dm_mod_power_setup_streams(struct drm_atomic_state *state,
 			mod_power_notify_mode_change(dm->power_module,
 						dm_new_crtc_state->stream,
 						false);
+
+			/*
+			 * Block PSR / Replay on the new stream until display settles post-modeset.
+			 * These events will be cleared by amdgpu_dm_enable_self_refresh() once
+			 * allow_sr_entry becomes true.
+			 */
+			amdgpu_dm_psr_set_event(dm, dm_new_crtc_state->stream, true,
+				psr_event_hw_programming, true);
+
+			amdgpu_dm_replay_set_event(dm, dm_new_crtc_state->stream, true,
+				replay_event_hw_programming | replay_event_general_ui,
+				true);
 		}
 	}
 
