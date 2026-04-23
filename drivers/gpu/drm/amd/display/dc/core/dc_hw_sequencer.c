@@ -1641,6 +1641,9 @@ void hwss_execute_sequence(struct dc *dc,
 		case STREAM_ENC_DP_SET_DSC_PPS_INFO_PACKET:
 			hwss_stream_enc_dp_set_dsc_pps_info_packet(params);
 			break;
+		case HPO_FRL_STREAM_ENC_SET_DSC_CONFIG:
+			hwss_hpo_frl_stream_enc_set_dsc_config(params);
+			break;
 		case DP_TRACE_SOURCE_SEQUENCE:
 			hwss_dp_trace_source_sequence(params);
 			break;
@@ -3731,6 +3734,16 @@ void hwss_stream_enc_dp_set_dsc_pps_info_packet(union block_sequence_params *par
 			params->stream_enc_dp_set_dsc_pps_info_packet_params.immediate_update,
 			params->stream_enc_dp_set_dsc_pps_info_packet_params.dsc_packed_pps,
 			params->stream_enc_dp_set_dsc_pps_info_packet_params.pps_sdp_stream);
+}
+
+void hwss_hpo_frl_stream_enc_set_dsc_config(union block_sequence_params *params)
+{
+	if (params->hpo_frl_stream_enc_set_dsc_config_params.hpo_frl_stream_enc &&
+	    params->hpo_frl_stream_enc_set_dsc_config_params.hpo_frl_stream_enc->funcs->hdmi_frl_set_dsc_config)
+		params->hpo_frl_stream_enc_set_dsc_config_params.hpo_frl_stream_enc->funcs->hdmi_frl_set_dsc_config(
+			params->hpo_frl_stream_enc_set_dsc_config_params.hpo_frl_stream_enc,
+			(struct dc_crtc_timing *)params->hpo_frl_stream_enc_set_dsc_config_params.timing,
+			params->hpo_frl_stream_enc_set_dsc_config_params.dsc_packed_pps);
 }
 
 void hwss_set_dmdata_attributes(union block_sequence_params *params)

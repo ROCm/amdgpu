@@ -138,6 +138,7 @@ union hdmi_scdc_status_flags_data {
 		uint8_t LANE3_LOCKED:1;
 		uint8_t RESERVED:1;
 		uint8_t FLT_READY:1;
+		uint8_t DSC_DECODEFAIL:1;
 	} fields;
 };
 
@@ -270,6 +271,7 @@ struct dc_hdmi_frl_flags {
 	int  select_ffe;
 	int  limit_ffe;
 	bool force_frl_always;
+	bool force_frl_dsc;
 	bool force_frl_max;
 	bool apply_vsdb_rcc_wa;
 };

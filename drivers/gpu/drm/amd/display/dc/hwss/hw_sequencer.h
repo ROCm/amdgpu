@@ -1710,6 +1710,8 @@ void hwss_hpo_dp_stream_enc_dp_set_dsc_pps_info_packet(union block_sequence_para
 
 void hwss_stream_enc_dp_set_dsc_pps_info_packet(union block_sequence_params *params);
 
+void hwss_hpo_frl_stream_enc_set_dsc_config(union block_sequence_params *params);
+
 void hwss_set_dmdata_attributes(union block_sequence_params *params);
 
 void hwss_dp_trace_source_sequence(union block_sequence_params *params);

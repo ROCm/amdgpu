@@ -121,6 +121,12 @@ struct frl_cap_chk_params_fixed31_32 {
 
 	bool     compressed;              /* set to true if DSC is enabled */
 	bool     bypass_hc_target_calc;   /* debug only */
+	bool     allow_all_bpp;           /* dsc_all_bpp */
+
+	/* DSC parameters */
+	int      slices;
+	int      slice_width;
+	struct fixed31_32   bpp_target;
 	int      layout;
 	int      acat;    /* not supported */
 
@@ -1153,6 +1159,7 @@ struct dc_debug_options {
 	int  select_ffe;
 	int  limit_ffe;
 	bool force_frl_always;
+	bool force_frl_dsc;
 	bool force_frl_max;
 	bool apply_vsdb_rcc_wa;
 	bool enable_hdmi_idcc;

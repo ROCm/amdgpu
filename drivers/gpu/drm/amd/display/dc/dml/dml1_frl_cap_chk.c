@@ -430,9 +430,210 @@ enum frl_cap_chk_result dml1_frl_cap_chk_uncompressed(struct frl_cap_chk_params 
 	return FRL_CAP_CHK_OK;
 }
 
+#if defined (CONFIG_DRM_AMD_DC_FP)
+enum frl_cap_chk_result dml1_frl_cap_chk_compressed(struct frl_cap_chk_params *params,
+						    struct frl_cap_chk_intermediates *inter)
+{
+	enum frl_cap_chk_result res;
+	int      c_frl_available;
+#if defined(DEBUG_FRL_CAP_CHK)
+	int      c_frl_active_available;
+	int      c_frl_blank_available;
+#endif
+	int      bytes_target = 0;
+	int      hc_active_target;
+	int      hc_blank_target_est1;
+	int      hc_blank_target_est2;
+	int      hc_blank_target = 0;
+	int      c_frl_actual_target_payload;
+	double   utilization_targeted;
+	double   margin_target;
+	double   f_tb_average;
+	double   t_active_ref;
+	double   t_blank_ref;
+	double   t_active_target;
+	double   t_blank_target;
+	double   tb_borrowed;
+#ifdef DEBUG_FRL_CAP_CHK
+	double   tb_delta;
+	double   tb_delta_limit;
+	int      tb_worst;
+#endif
+	int table_size_444 = ARRAY_SIZE(prim_format_444);
+	int table_size_422 = ARRAY_SIZE(prim_format_422);
+	int table_size_420 = ARRAY_SIZE(prim_format_420);
+	int i;
+	bool hc_active_blank_predefined = false;
+
+	dc_assert_fp_enabled();
+
+	res = dml1_frl_cap_chk_common(inter, params);
+
+	if (res != FRL_CAP_CHK_OK)
+		return res;
+
+	c_frl_available        = (int)dml_floor((1 - inter->overhead_max) * inter->c_frl_line, 1);
+#if defined(DEBUG_FRL_CAP_CHK)
+	c_frl_active_available = dml_floor(c_frl_available * ((double)params->h_active / (params->h_active + params->h_blank)), 1);
+	c_frl_blank_available  = dml_floor(c_frl_available * ((double)params->h_blank / (params->h_active + params->h_blank)), 1);
+#endif
+	bytes_target           = (int)(params->slices * dml_ceil(params->bpp_target * params->slice_width / 8.0, 1));
+
+	if (!params->bypass_hc_target_calc)
+			hc_active_target = (int)dml_ceil(bytes_target / 3.0, 1);
+	else
+		hc_active_target = params->borrow_params.hc_active_target;
+
+	if (!params->allow_all_bpp && params->vic != 0) {
+		if (params->pixel_encoding == HDMI_FRL_PIXEL_ENCODING_444) {
+			for (i = 0; i < table_size_444 ; i++) {
+				if (prim_format_444[i].vic == params->vic) {
+					params->borrow_params.hc_active_target = prim_format_444[i].hc_active;
+					params->borrow_params.hc_blank_target  = prim_format_444[i].hc_blank;
+					hc_active_blank_predefined = true;
+					break;
+				}
+			}
+		} else if (params->pixel_encoding == HDMI_FRL_PIXEL_ENCODING_422) {
+			for (i = 0; i < table_size_422 ; i++) {
+				if (prim_format_422[i].vic == params->vic) {
+					params->borrow_params.hc_active_target = prim_format_422[i].hc_active;
+					params->borrow_params.hc_blank_target  = prim_format_422[i].hc_blank;
+					hc_active_blank_predefined = true;
+					break;
+				}
+			}
+		} else if (params->pixel_encoding == HDMI_FRL_PIXEL_ENCODING_420) {
+			for (i = 0; i < table_size_420 ; i++) {
+				if (prim_format_420[i].vic == params->vic) {
+					params->borrow_params.hc_active_target = prim_format_420[i].hc_active;
+					params->borrow_params.hc_blank_target  = prim_format_420[i].hc_blank;
+					hc_active_blank_predefined = true;
+					break;
+				}
+			}
+		}
+
+		if (hc_active_blank_predefined) {
+			hc_active_target = params->borrow_params.hc_active_target;
+			hc_blank_target = params->borrow_params.hc_blank_target;
+		}
+	}
+
+	hc_blank_target_est1 = (int)dml_ceil(hc_active_target * ((double)params->h_blank / params->h_active), 1);
+	hc_blank_target_est2 = (int)dml_max(hc_blank_target_est1, inter->blank_audio_min);
+
+	if (!hc_active_blank_predefined) {
+		if (!params->bypass_hc_target_calc) {
+			hc_blank_target = (int)(4 * dml_floor(dml_min(hc_blank_target_est2, c_frl_available - 3.0 / 2.0 * hc_active_target) / 4.0, 1));
+
+			params->borrow_params.hc_active_target = hc_active_target;
+			params->borrow_params.hc_blank_target  = hc_blank_target;
+		} else {
+			hc_blank_target  = params->borrow_params.hc_blank_target;
+		}
+	}
+
+#ifdef DEBUG_FRL_CAP_CHK
+	{
+		frl_dump_var("%i", c_frl_available);
+		frl_dump_var("%i", c_frl_active_available);
+		frl_dump_var("%i", c_frl_blank_available);
+		frl_dump_var("%i", bytes_target);
+		frl_dump_var("%i", hc_active_target);
+		frl_dump_var("%i", hc_blank_target_est1);
+		frl_dump_var("%i", hc_blank_target_est2);
+		frl_dump_var("%i", hc_blank_target);
+	}
+#endif
+
+	if (!(inter->blank_audio_min <= hc_blank_target)) {
+		frl_dump_var("%i", inter->blank_audio_min);
+		frl_dump_var("%i", hc_blank_target);
+		return FRL_CAP_CHK_ERROR_AUDIO_BW;
+	}
+
+	f_tb_average    = inter->f_pixel_clock_max / (params->h_active + params->h_blank) * (hc_active_target + hc_blank_target);
+	t_active_ref    = inter->t_line * ((double)params->h_active / (params->h_active + params->h_blank));
+	t_blank_ref     = inter->t_line - t_active_ref; // * ((double) params->h_blank / (params->h_active + params->h_blank));
+	t_active_target = dml_max((hc_active_target / f_tb_average),
+				  (3.0 / 2.0 * hc_active_target) /
+				  (params->lanes * inter->r_frl_char_min * (1.0 - inter->overhead_max)));
+	t_blank_target  = inter->t_line - t_active_target;
+
+	tb_borrowed     = t_active_target * f_tb_average - hc_active_target;
+#ifdef DEBUG_FRL_CAP_CHK
+	tb_delta        = dcn_bw_fabs(t_active_target - t_active_ref) * (hc_active_target + hc_blank_target_est1) / inter->t_line;
+
+	{
+		frl_dump_var("%le", f_tb_average);
+		frl_dump_var("%le", t_active_ref);
+		frl_dump_var("%le", t_blank_ref);
+		frl_dump_var("%le", t_active_target);
+		frl_dump_var("%le", t_blank_target);
+		frl_dump_var("%le", tb_delta);
+	}
+#endif
+
+	if (t_blank_target - t_blank_ref > DBL_EPSILON) {
+#ifdef DEBUG_FRL_CAP_CHK
+		tb_delta_limit = (t_active_ref - hc_active_target / f_tb_average) * (hc_active_target + hc_blank_target_est1) / inter->t_line;
+#endif
+		params->borrow_params.borrow_mode = FRL_BORROW_MODE_FROM_ACTIVE;
+	} else if (t_active_target - t_active_ref > DBL_EPSILON) {
+#ifdef DEBUG_FRL_CAP_CHK
+		tb_delta_limit = tb_delta;
+#endif
+		params->borrow_params.borrow_mode = FRL_BORROW_MODE_FROM_BLANK;
+	} else {
+#ifdef DEBUG_FRL_CAP_CHK
+		tb_delta_limit = 0;
+#endif
+		params->borrow_params.borrow_mode = FRL_BORROW_MODE_NONE;
+	}
+
+#ifdef DEBUG_FRL_CAP_CHK
+	tb_worst = dml_ceil(dml_max(tb_borrowed, tb_delta_limit), 1);
+
+	{
+		frl_dump_var("%le", tb_delta_limit);
+		frl_dump_var("%le", tb_borrowed);
+		frl_dump_var("%i", params->borrow_params.borrow_mode);
+		frl_dump_var("%i", tb_worst);
+	}
+#endif
+
+	if (!(tb_borrowed <= TB_BORROWED_MAX))
+		return FRL_CAP_CHK_ERROR_MAX_BORROW;
+
+	c_frl_actual_target_payload = (int)(dml_ceil(3.0 / 2.0 * hc_active_target, 1) + hc_blank_target);
+	utilization_targeted        = c_frl_actual_target_payload / inter->c_frl_line;
+	margin_target               = 1.0 - (utilization_targeted + inter->overhead_max);
+
+#ifdef DEBUG_FRL_CAP_CHK
+	{
+		frl_dump_var("%i",  c_frl_actual_target_payload);
+		frl_dump_var("%le", utilization_targeted);
+		frl_dump_var("%le", margin_target);
+	}
+#endif
+
+	// oversubscribed bandwidth relative to margin
+	if (margin_target < 0 && dcn_bw_fabs(margin_target) > EPSILON)
+		return FRL_CAP_CHK_ERROR_MARGIN;
+
+	return FRL_CAP_CHK_OK;
+}
+#endif
+
 enum frl_cap_chk_result dml1_frl_cap_chk(struct frl_cap_chk_params *params)
 {
 	struct frl_cap_chk_intermediates inter;
+
+#if defined (CONFIG_DRM_AMD_DC_FP)
+	if (params->compressed)
+		return dml1_frl_cap_chk_compressed(params, &inter);
+#endif
 
 	return dml1_frl_cap_chk_inter(params, &inter);
 }

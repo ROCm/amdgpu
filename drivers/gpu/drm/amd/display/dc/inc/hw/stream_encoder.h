@@ -369,6 +369,10 @@ struct hpo_frl_stream_encoder {
  * stream interfaces for setup the FRL stream encoder.
  */
 struct hpo_frl_stream_encoder_funcs {
+	void (*hdmi_frl_set_dsc_config)(
+		struct hpo_frl_stream_encoder *enc,
+		struct dc_crtc_timing *timing,
+		uint8_t *dsc_packed_pps);
 	/**
 	 * @hdmi_frl_enable:
 	 *

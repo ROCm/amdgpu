@@ -179,6 +179,7 @@ static const struct hpo_frl_stream_encoder_funcs dcn42_str_enc_funcs = {
 	.hdmi_audio_disable		= hpo_enc42_hdmi_audio_disable,
 	.set_avmute			= enc401_stream_encoder_set_avmute,
 	.read_state			= hpo_enc401_read_state,
+	.hdmi_frl_set_dsc_config	= hpo_enc401_hdmi_set_dsc_config,
 	.set_dynamic_metadata           = hpo_enc401_set_dynamic_metadata,
 };
 

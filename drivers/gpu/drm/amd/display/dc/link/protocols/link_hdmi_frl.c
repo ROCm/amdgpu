@@ -92,6 +92,25 @@ static void hdmi_return_preeshoot_and_deemphasis(struct dc_link *link,
 	}
 }
 
+static bool hdmi_frl_test_dsc_max_rate(struct ddc_service *ddc_service)
+{
+	uint8_t slave_address = HDMI_SCDC_ADDRESS;
+	uint8_t offset = HDMI_SCDC_SOURCE_TEST_REQ;
+	union hdmi_scdc_source_test_req test_req = {0};
+
+	DC_LOGGER_INIT(ddc_service->link->ctx->logger);
+
+	link_query_ddc_data(ddc_service, slave_address,
+					&offset, sizeof(offset), &test_req.byte,
+					sizeof(test_req.byte));
+	if (test_req.fields.DSC_FRL_MAX) {
+		FRL_INFO("FRL TEST REQ:  DSC_FRL_MAX = 1");
+		return true;
+	}
+
+	return false;
+}
+
 enum clock_source_id hdmi_frl_find_matching_phypll(
 		struct dc_link *link)
 {
@@ -767,6 +786,9 @@ void hdmi_frl_verify_link_cap(struct dc_link *link,
 			link->preferred_hdmi_frl_settings.force_frl_max ||
 			link->ctx->dc->debug.force_frl_max ? true :
 			hdmi_frl_test_max_rate(link->ddc);
+	link->frl_flags.force_frl_dsc =
+			link->ctx->dc->debug.force_frl_dsc ? true :
+			hdmi_frl_test_dsc_max_rate(link->ddc);
 	link->frl_flags.apply_vsdb_rcc_wa =
 			link->ctx->dc->debug.apply_vsdb_rcc_wa;
 
@@ -778,8 +800,16 @@ void hdmi_frl_verify_link_cap(struct dc_link *link,
 			link->frl_flags.force_frl_always = true;
 
 	if (!link->frl_flags.force_frl_max &&
+			!link->frl_flags.force_frl_dsc &&
 			link->local_sink->edid_caps.panel_patch.hdmi_comp_auto) {
 		link->frl_flags.force_frl_max = true;
+		link->frl_flags.force_frl_dsc = true;
+	}
+
+	if (link->frl_flags.force_frl_max &&
+			!link->frl_flags.force_frl_dsc &&
+			link->local_sink->edid_caps.panel_patch.hdmi_comp_auto) {
+		link->frl_flags.force_frl_dsc = true;
 	}
 
 	if (link->local_sink &&
@@ -996,6 +1026,9 @@ void hdmi_frl_set_preferred_link_settings(struct dc *dc,
 			resource_build_info_frame(pipe);
 			link_stream->ctx->dc->hwss.update_info_frame(pipe);
 
+			if (link_stream->timing.flags.DSC)
+				link_set_dsc_on_stream(pipe, true);
+
 			link_stream->ctx->dc->hwss.enable_audio_stream(pipe);
 			link_stream->ctx->dc->hwss.enable_stream(pipe);
 			link_stream->ctx->dc->hwss.unblank_stream(pipe,
@@ -1017,6 +1050,27 @@ void hdmi_frl_set_preferred_link_settings(struct dc *dc,
 			break;
 		}
 	}
+}
+
+static void update_borrow_mode_from_dsc_padding(struct dsc_padding_params *dsc_padding_params,
+	struct dc_crtc_timing *timing,
+	struct dc_hdmi_frl_link_settings *frl_link_settings)
+{
+#ifdef CONFIG_DRM_AMD_DC_FP
+	uint32_t h_active = timing->h_addressable + timing->h_border_left + timing->h_border_right;
+	uint32_t h_blank = timing->h_total - h_active;
+	struct frl_borrow_params *borrow_params = &frl_link_settings->borrow_params;
+
+	borrow_params->borrow_mode = frl_modify_borrow_mode_for_dsc_padding(timing->pix_clk_100hz,
+		h_active,
+		h_active + dsc_padding_params->dsc_hactive_padding,
+		h_blank,
+		h_blank + dsc_padding_params->dsc_htotal_padding,
+		borrow_params->hc_active_target,
+		borrow_params->hc_blank_target,
+		frl_link_settings->frl_num_lanes,
+		frl_link_settings->frl_link_rate);
+#endif
 }
 
 void hdmi_frl_decide_link_settings(struct dc_stream_state *stream,
@@ -1085,6 +1139,10 @@ void hdmi_frl_decide_link_settings(struct dc_stream_state *stream,
 		*frl_link_settings = stream->link->frl_verified_link_cap;
 		return;
 	}
+	if (stream->link->frl_flags.force_frl_dsc) {
+		*frl_link_settings = stream->link->frl_verified_link_cap;
+		return;
+	}
 
 	if (stream->link->local_sink)
 		if (stream->link->local_sink->edid_caps.panel_patch.hdmi_spe_handling) {
@@ -1107,6 +1165,7 @@ void hdmi_frl_decide_link_settings(struct dc_stream_state *stream,
 	} while (!success);
 
 	*frl_link_settings = temp_settings;
+	update_borrow_mode_from_dsc_padding(dsc_padding_params, &stream->timing, frl_link_settings);
 }
 
 void hdmi_frl_write_read_request_enable(struct ddc_service *ddc_service)
