@@ -2696,6 +2696,9 @@ static int criu_restore_memory_of_gpu(struct kfd_process_device *pdd,
 	unsigned int mem_type = 0;
 	u64 offset;
 
+	if (bo_priv->idr_handle > INT_MAX)
+		return -EINVAL;
+
 	if (bo_bucket->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
 		if (bo_bucket->size !=
 				kfd_doorbell_process_slice(pdd->dev->kfd))
