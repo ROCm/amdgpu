@@ -31,6 +31,8 @@
 #include "modules/power/power_helpers.h"
 #include "dmub/inc/dmub_cmd.h"
 #include "dc/inc/link_service.h"
+#include "amdgpu_dm_kunit_helpers.h"
+
 
 /*
  * amdgpu_dm_link_supports_replay() - check if the link supports replay
@@ -68,6 +70,7 @@ bool amdgpu_dm_link_supports_replay(struct dc_link *link, struct amdgpu_dm_conne
 
 	return true;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_link_supports_replay);
 
 /*
  * amdgpu_dm_set_replay_caps() - setup Replay capabilities
