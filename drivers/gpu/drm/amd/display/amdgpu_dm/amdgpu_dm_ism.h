@@ -148,4 +148,14 @@ void amdgpu_dm_ism_commit_event(struct amdgpu_dm_ism *ism,
 void amdgpu_dm_ism_disable(struct amdgpu_display_manager *dm);
 void amdgpu_dm_ism_enable(struct amdgpu_display_manager *dm);
 
+#if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
+bool dm_ism_next_state(enum amdgpu_dm_ism_state current_state,
+		       enum amdgpu_dm_ism_event event,
+		       enum amdgpu_dm_ism_state *next_state);
+uint64_t dm_ism_get_sso_delay(const struct amdgpu_dm_ism *ism,
+			      const struct dc_stream_state *stream);
+uint64_t dm_ism_get_idle_allow_delay(const struct amdgpu_dm_ism *ism,
+				     const struct dc_stream_state *stream);
+#endif
+
 #endif
