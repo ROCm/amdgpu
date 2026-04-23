@@ -549,6 +549,8 @@ static void update_psp_stream_config(struct pipe_ctx *pipe_ctx, bool dpms_off)
 
 	/* dig front end */
 	config.dig_fe = (uint8_t) pipe_ctx->stream_res.stream_enc->stream_enc_inst;
+	if (dc_is_hdmi_frl_signal(pipe_ctx->stream->signal))
+		config.dig_fe = (uint8_t)pipe_ctx->stream_res.hpo_frl_stream_enc->stream_enc_inst;
 
 	/* stream encoder index */
 	config.stream_enc_idx = (uint8_t)(pipe_ctx->stream_res.stream_enc->id - ENGINE_ID_DIGA);
@@ -785,6 +787,22 @@ void link_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable)
 
 			/* PPS SDP is set elsewhere because it has to be done after DIG FE is connected to DIG BE */
 		}
+		else if (dc_is_hdmi_frl_signal(stream->signal)) {
+			uint8_t dsc_packed_pps[128];
+			struct dc_crtc_timing patched_crtc_timing = stream->timing;
+
+			DC_LOG_DSC("Setting stream encoder DSC config for engine %d:", (int)pipe_ctx->stream_res.hpo_frl_stream_enc->id);
+			dsc_optc_config_log(dsc, &dsc_optc_cfg);
+
+			/* if we are borrowing from hblank, h_addressable and  pic_width need to be adjusted */
+			if (dc->debug.enable_hblank_borrow) {
+				dsc_cfg.pic_width = stream->timing.h_addressable;
+			}
+
+			dsc->funcs->dsc_get_packed_pps(dsc, &dsc_cfg, &dsc_packed_pps[0]);
+			pipe_ctx->stream_res.hpo_frl_stream_enc->funcs->hdmi_frl_set_dsc_config(
+					pipe_ctx->stream_res.hpo_frl_stream_enc, &patched_crtc_timing, &dsc_packed_pps[0]);
+		}
 
 		/* Enable DSC in OPTC */
 		DC_LOG_DSC("Setting optc DSC config for tg instance %d:", pipe_ctx->stream_res.tg->inst);
@@ -816,6 +834,9 @@ void link_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable)
 							pipe_ctx->stream_res.stream_enc, false, NULL, true);
 			}
 		}
+		else if (dc_is_hdmi_frl_signal(stream->signal))
+			pipe_ctx->stream_res.hpo_frl_stream_enc->funcs->hdmi_frl_set_dsc_config(
+					pipe_ctx->stream_res.hpo_frl_stream_enc, &stream->timing, NULL);
 
 		/* disable DSC block */
 		for (odm_pipe = pipe_ctx; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe) {
@@ -903,6 +924,12 @@ bool link_set_dsc_pps_packet(struct pipe_ctx *pipe_ctx, bool enable, bool immedi
 						&dsc_packed_pps[0],
 						immediate_update);
 		}
+		else if (dc_is_hdmi_frl_signal(stream->signal)) {
+			//TODO: bring HDMI FRL in line with DP
+			DC_LOG_DSC("Setting stream encoder DSC PPS SDP for engine %d\n", (int)pipe_ctx->stream_res.hpo_frl_stream_enc->id);
+			pipe_ctx->stream_res.hpo_frl_stream_enc->funcs->hdmi_frl_set_dsc_config(
+					pipe_ctx->stream_res.hpo_frl_stream_enc, &stream->timing, &dsc_packed_pps[0]);
+		}
 	} else {
 		/* disable DSC PPS in stream encoder */
 		memset(&stream->dsc_packed_pps[0], 0, sizeof(stream->dsc_packed_pps));
@@ -917,6 +944,10 @@ bool link_set_dsc_pps_packet(struct pipe_ctx *pipe_ctx, bool enable, bool immedi
 				pipe_ctx->stream_res.stream_enc->funcs->dp_set_dsc_pps_info_packet(
 						pipe_ctx->stream_res.stream_enc, false, NULL, true);
 		}
+		else if (dc_is_hdmi_frl_signal(stream->signal))
+			//TODO: bring HDMI FRL in line with DP
+			pipe_ctx->stream_res.hpo_frl_stream_enc->funcs->hdmi_frl_set_dsc_config(
+					pipe_ctx->stream_res.hpo_frl_stream_enc, &stream->timing, NULL);
 	}
 
 	return true;
@@ -2423,6 +2454,8 @@ void link_set_dpms_off(struct pipe_ctx *pipe_ctx)
 	if (pipe_ctx->stream->timing.flags.DSC) {
 		if (dc_is_dp_signal(pipe_ctx->stream->signal))
 			link_set_dsc_enable(pipe_ctx, false);
+		else if (dc_is_hdmi_frl_signal(pipe_ctx->stream->signal))
+			link_set_dsc_on_stream(pipe_ctx, false);
 	}
 	if (dp_is_128b_132b_signal(pipe_ctx)) {
 		if (pipe_ctx->stream_res.tg->funcs->set_out_mux)
@@ -2602,6 +2635,11 @@ void link_set_dpms_on(
 			return;
 		}
 	}
+
+	if (pipe_ctx->stream->timing.flags.DSC &&
+			dc_is_hdmi_frl_signal(pipe_ctx->stream->signal))
+			//TODO: bring HDMI FRL in line with DP
+			link_set_dsc_on_stream(pipe_ctx, true);
 
 	/* turn off otg test pattern if enable */
 	if (pipe_ctx->stream_res.tg->funcs->set_test_pattern)

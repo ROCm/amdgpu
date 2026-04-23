@@ -4600,6 +4600,38 @@ fail:
 }
 
 #if defined(CONFIG_DRM_AMD_DC_FP)
+/**
+ * dc_update_modified_pix_clock_for_dsc_with_padding() - update pix_clk for dsc with padding
+ *
+ * @dc_stream_state: Pointer to the stream structure.
+ * @dc_crtc_timing: Pointer to the stream dc_crtc_timing structure.
+ * @dsc_padding_params: Pointer to the DSC padding parameters structure.
+ *
+ * This function updated the pix_clk for dsc with padding stored in pipe_ctx
+ * such that the OTG h_active time fits withing the expected compressed active
+ * time calculated according to HDMI spec. H_total is then increased to
+ * maintain the same OTG line time as before the increased pix_clk.
+ */
+static void dc_update_modified_pix_clock_for_dsc_with_padding(const struct dc_stream_state *stream,
+		const struct dc_crtc_timing *timing, struct dsc_padding_params *dsc_padding_params)
+{
+	DC_FP_START();
+	frl_modified_pix_clock_for_dsc_padding(stream->link->frl_verified_link_cap.borrow_params.hc_active_target,
+	stream->link->frl_verified_link_cap.borrow_params.hc_blank_target,
+	stream->link->frl_verified_link_cap.frl_num_lanes,
+	timing->pix_clk_100hz,
+	stream->link->frl_verified_link_cap.frl_link_rate,
+	timing->h_addressable,
+	timing->h_border_left,
+	timing->h_border_right,
+	timing->h_total,
+	(timing->h_addressable + dsc_padding_params->dsc_hactive_padding),
+	&dsc_padding_params->dsc_pix_clk_100hz,
+	&dsc_padding_params->dsc_htotal_padding);
+	DC_FP_END();
+
+	dsc_padding_params->dsc_htotal_padding = dsc_padding_params->dsc_htotal_padding - timing->h_total;
+}
 #endif /* CONFIG_DRM_AMD_DC_FP */
 
 /**
@@ -4626,6 +4658,30 @@ static void calculate_timing_params_for_dsc_with_padding(struct pipe_ctx *pipe_c
 	if (stream)
 		pipe_ctx->dsc_padding_params.dsc_pix_clk_100hz = stream->timing.pix_clk_100hz;
 
+#if defined(CONFIG_DRM_AMD_DC_FP)
+	uint32_t hactive;
+	uint32_t ceil_slice_width;
+	if (stream && stream->timing.flags.DSC) {
+		hactive = stream->timing.h_addressable + stream->timing.h_border_left + stream->timing.h_border_right;
+
+		/* Assume if determined slices does not divide Hactive evenly, Hborrow is needed for padding*/
+		if (hactive % stream->timing.dsc_cfg.num_slices_h != 0) {
+			ceil_slice_width = (hactive / stream->timing.dsc_cfg.num_slices_h) + 1;
+
+			/* If YCBCR420 slice width must be even */
+			if (stream->timing.pixel_encoding == PIXEL_ENCODING_YCBCR420 && ceil_slice_width % 2 != 0)
+				ceil_slice_width++;
+
+			pipe_ctx->dsc_padding_params.dsc_hactive_padding =
+				(uint8_t)(ceil_slice_width * stream->timing.dsc_cfg.num_slices_h - hactive);
+
+			if (stream->timing.h_total - hactive - pipe_ctx->dsc_padding_params.dsc_hactive_padding < 32)
+				pipe_ctx->dsc_padding_params.dsc_hactive_padding = 0;
+
+			dc_update_modified_pix_clock_for_dsc_with_padding(stream, &stream->timing, &pipe_ctx->dsc_padding_params);
+		}
+	}
+#endif
 }
 
 /**

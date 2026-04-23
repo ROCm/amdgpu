@@ -498,7 +498,6 @@ struct timing_generator_funcs {
 	int (*get_max_hw_supported_fva_factor)(struct timing_generator *optc,
 		struct dc_crtc_timing *timing,
 		unsigned int max_pixclk_100hz);
-	void (*set_vstartup_dsc_frl)(struct timing_generator *optc);
 	void (*set_vtotal_change_limit)(struct timing_generator *optc,
 			uint32_t limit);
 	void (*align_vblanks)(struct timing_generator *master_optc,

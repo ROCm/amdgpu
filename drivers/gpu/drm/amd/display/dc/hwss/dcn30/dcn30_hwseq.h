@@ -85,9 +85,6 @@ int dcn30_hw_get_max_fva_factor(struct dc *dc,
 		struct dc_crtc_timing *timing,
 		unsigned int max_pixel_clock);
 
-void dcn30_hw_set_vstartup_dsc_frl(struct dc *dc,
-		struct pipe_ctx *pipe_ctx);
-
 bool dcn30_does_plane_fit_in_mall(struct dc *dc,
 		unsigned int pitch,
 		unsigned int height,

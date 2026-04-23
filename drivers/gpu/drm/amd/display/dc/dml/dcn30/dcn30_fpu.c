@@ -782,6 +782,38 @@ void hpo_fpu_enc3_validate_hdmi_frl_output_link(struct hpo_frl_stream_encoder *e
 		break;
 	}
 
+	if (timing->flags.DSC &&
+			(unsigned int)frl_link_settings->frl_link_rate > dsc_max_rate) {
+		if (dsc_max_rate < HDMI_FRL_LINK_RATE_6GBPS_4LANE) {
+			frl_params->lanes = 3;
+		} else {
+			frl_params->lanes = 4;
+		}
+
+		switch (dsc_max_rate) {
+		case HDMI_FRL_LINK_RATE_3GBPS:
+			frl_params->r_bit_nominal = 3.0e9;
+			break;
+		case HDMI_FRL_LINK_RATE_6GBPS:
+		case HDMI_FRL_LINK_RATE_6GBPS_4LANE:
+			frl_params->r_bit_nominal = 6.0e9;
+			break;
+		case HDMI_FRL_LINK_RATE_8GBPS:
+			frl_params->r_bit_nominal = 8.0e9;
+			break;
+		case HDMI_FRL_LINK_RATE_10GBPS:
+		default:
+			frl_params->r_bit_nominal = 10.0e9;
+			break;
+		case HDMI_FRL_LINK_RATE_12GBPS:
+			frl_params->r_bit_nominal = 12.0e9;
+			break;
+		}
+	}
+
+	if (timing->flags.DSC && timing->rid > 0)
+		frl_params->is_ovt = true;
+
 	frl_params->f_pixel_clock_nominal = (double)timing->pix_clk_100hz * 100;
 	frl_params->h_active = timing->h_addressable + timing->h_border_left + timing->h_border_right;
 	frl_params->h_blank = timing->h_total - frl_params->h_active;
@@ -797,6 +829,12 @@ void hpo_fpu_enc3_validate_hdmi_frl_output_timing(
 
 	if (timing->flags.DSC) {
 		frl_params->compressed = true;
+		frl_params->slices = timing->dsc_cfg.num_slices_h;
+		frl_params->slice_width = (frl_params->h_active + frl_params->slices - 1) / frl_params->slices;
+		// If YCBCR420 slice width must be even
+		if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR420 && frl_params->slice_width % 2 != 0)
+			frl_params->slice_width++;
+		frl_params->bpp_target = timing->dsc_cfg.bits_per_pixel / 16.0;
 	} else {
 		frl_params->compressed = false;
 	}
@@ -828,5 +866,5 @@ enum frl_cap_chk_result frl_fpu_cap_chk_compressed(struct hpo_frl_stream_encoder
 						   struct frl_cap_chk_intermediates *inter)
 {
 	(void)enc;
-	return -5;
+	return dml1_frl_cap_chk_compressed(params, inter);
 }

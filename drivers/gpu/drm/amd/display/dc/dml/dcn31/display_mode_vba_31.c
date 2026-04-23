@@ -3665,6 +3665,9 @@ static double TruncToValidBPP(
 	hdmifrlparams.h_active = HActive;
 	hdmifrlparams.h_blank = HTotal - HActive;
 	hdmifrlparams.compressed = DSCEnable;
+	hdmifrlparams.slices = DSCSlices;
+	hdmifrlparams.slice_width = (int)dml_ceil((double) HActive / DSCSlices, 1.0);
+	hdmifrlparams.bpp_target = DesiredBPP;
 
 	if (Format == dm_420) {
 		NonDSCBPP0 = 12;

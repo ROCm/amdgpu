@@ -216,6 +216,16 @@ void hpo_enc3_set_hdmi_stream_attribute(struct hpo_frl_stream_encoder *enc,
 		break;
 	}
 
+	/* When compression active, CD/PP/Phase field shall be zero in GCP */
+	if (crtc_timing->flags.DSC) {
+		REG_UPDATE_2(HDMI_TB_ENC_PIXEL_FORMAT,
+				HDMI_DEEP_COLOR_DEPTH, 0,
+				HDMI_DEEP_COLOR_ENABLE, 0);
+	} else {
+		REG_UPDATE(HDMI_TB_ENC_PIXEL_FORMAT,
+			HDMI_DSC_MODE, 0);
+	}
+
 	/* Configure ODM combine mode */
 	switch (odm_combine_num_segments) {
 	case 1:
@@ -454,6 +464,94 @@ void hpo_enc3_update_hdmi_info_packet(struct dcn30_hpo_frl_stream_encoder *enc3,
 		/* invalid HW packet index */
 		DC_LOG_WARNING("Invalid HW packet index: %s()\n", __func__);
 		return;
+	}
+}
+
+void hpo_enc3_hdmi_set_dsc_config(
+	struct hpo_frl_stream_encoder *enc,
+	struct dc_crtc_timing *timing,
+	uint8_t *dsc_packed_pps)
+{
+	struct dcn30_hpo_frl_stream_encoder *enc3 = DCN30_HPO_FRL_STRENC_FROM_HPO_FRL_STRENC(enc);
+	enum optc_dsc_mode dsc_mode = OPTC_DSC_DISABLED;
+	uint8_t i;
+
+	if (dsc_packed_pps) {
+		if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR420 ||
+				(timing->pixel_encoding == PIXEL_ENCODING_YCBCR422
+					&& !timing->dsc_cfg.ycbcr422_simple))
+			dsc_mode = OPTC_DSC_ENABLED_NATIVE_SUBSAMPLED;
+		else
+			dsc_mode = OPTC_DSC_ENABLED_444;
+	}
+
+	REG_UPDATE(HDMI_STREAM_ENC_CLOCK_RAMP_ADJUSTER_FIFO_STATUS_CONTROL0,
+			FIFO_DSC_MODE, dsc_mode);
+
+	REG_UPDATE(HDMI_TB_ENC_PIXEL_FORMAT,
+			HDMI_DSC_MODE, dsc_mode);
+
+	/* 5 packets for hdmi 2.1, use generic packets 5-10 to transmit*/
+	/* TODO: do we change new bit to 0 after first transmission? Do we set End bit when exiting dsc? */
+	if (dsc_mode != OPTC_DSC_DISABLED) {
+		struct dc_info_packet emp_packet = {0};
+		uint32_t dsc_pic_width = timing->h_addressable + timing->h_border_left + timing->h_border_right;
+		uint32_t h_back = timing->h_total - dsc_pic_width - timing->h_sync_width - timing->h_front_porch;
+		/* HCactivebytes = Slices * ceil(SliceWidth * bpp/8)
+		 * use ... + 15) / 16 to achieve ceil since bpp is stored as 16x actual value
+		 */
+		uint32_t h_cactive_bytes = timing->dsc_cfg.num_slices_h * (
+				(dsc_pic_width / timing->dsc_cfg.num_slices_h * timing->dsc_cfg.bits_per_pixel / 8 + 15) / 16);
+
+		/* Packet 0 */
+		emp_packet.valid = true;
+		emp_packet.hb0 = 0x7F; /* Default */
+		emp_packet.hb1 = (1 << 7); /* First */
+		emp_packet.hb2 = 0; /* Sequence index */
+		emp_packet.sb[0] = (1 << 1) | (1 << 2) | (1 << 7); /* Sync[1] = 1, VFR[2] = 1, New[7] = 1*/
+		emp_packet.sb[2] = 1; /* Organization_ID = 1 (Vesa spec)*/
+		emp_packet.sb[4] = 2; /* Data_Set_Tag(LSB) = 2*/
+		emp_packet.sb[6] = 136; /* Data_Set_Length(LSB) = 136*/
+		memcpy(&emp_packet.sb[7], dsc_packed_pps, 21);
+		hpo_enc3_update_hdmi_info_packet(enc3, 5, &emp_packet);
+
+		/* Packets 1-3 */
+		emp_packet.hb1 = 0; /* Not first or last*/
+		for (i = 1; i < 4; i++) {
+			emp_packet.hb2 = i; /* Sequence index */
+			memcpy(&emp_packet.sb[0], &dsc_packed_pps[21 + 28 * (i - 1)], 28);
+			hpo_enc3_update_hdmi_info_packet(enc3, 5 + i, &emp_packet);
+		}
+
+		/* Packet 4 */
+		emp_packet.hb2 = 4; /* Sequence index */
+		memcpy(&emp_packet.sb[0], &dsc_packed_pps[105], 23);
+		emp_packet.sb[23] = (uint8_t)timing->h_front_porch; /* Hfront[7:0] */
+		emp_packet.sb[24] = (uint8_t)(timing->h_front_porch >> 8); /* Hfront[15:8] */
+		emp_packet.sb[25] = (uint8_t)timing->h_sync_width; /* Hsync[7:0] */
+		emp_packet.sb[26] = (uint8_t)(timing->h_sync_width >> 8); /* Hsync[15:8] */
+		emp_packet.sb[27] = (uint8_t)h_back; /* Hback[7:0] */
+		hpo_enc3_update_hdmi_info_packet(enc3, 9, &emp_packet);
+
+		/* Packet 5 */
+		emp_packet.hb1 = (1 << 6); /* Last */
+		emp_packet.hb2 = 5;
+		emp_packet.sb[0] = (uint8_t)(h_back >> 8); /* Hback[15:8] */
+		emp_packet.sb[1] = (uint8_t)h_cactive_bytes; /* HCactive_bytes[7:0] */
+		emp_packet.sb[2] = (uint8_t)(h_cactive_bytes >> 8); /* HCactive_bytes[15:8] */
+		hpo_enc3_update_hdmi_info_packet(enc3, 10, &emp_packet);
+
+		/* Packet 0 - Clear New[7] */
+		emp_packet.valid = true;
+		emp_packet.hb0 = 0x7F; /* Default */
+		emp_packet.hb1 = (1 << 7); /* First */
+		emp_packet.hb2 = 0; /* Sequence index */
+		emp_packet.sb[0] = (1 << 1) | (1 << 2); /* Sync[1] = 1, VFR[2] = 1*/
+		emp_packet.sb[2] = 1; /* Organization_ID = 1 (Vesa spec)*/
+		emp_packet.sb[4] = 2; /* Data_Set_Tag(LSB) = 2*/
+		emp_packet.sb[6] = 136; /* Data_Set_Length(LSB) = 136*/
+		memcpy(&emp_packet.sb[7], dsc_packed_pps, 21);
+		hpo_enc3_update_hdmi_info_packet(enc3, 5, &emp_packet);
 	}
 }
 
@@ -777,12 +875,18 @@ bool hpo_enc3_validate_hdmi_frl_output(
 	default:
 		break;
 	}
+	frl_params.allow_all_bpp = timing->dsc_cfg.is_vic_all_bpp;
 	if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR420)
 		frl_params.pixel_encoding = HDMI_FRL_PIXEL_ENCODING_420;
 	else if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR422)
 		frl_params.pixel_encoding = HDMI_FRL_PIXEL_ENCODING_422;
 	else
 		frl_params.pixel_encoding = HDMI_FRL_PIXEL_ENCODING_444;
+	/* DSC parameters */
+	frl_params.bypass_hc_target_calc = false;
+	DC_FP_START();
+	hpo_fpu_enc3_validate_hdmi_frl_output_timing(timing, audio, &frl_params);
+	DC_FP_END();
 	/* Audio parameters */
 	/* TODO: set Audio parameters */
 
@@ -910,6 +1014,7 @@ static const struct hpo_frl_stream_encoder_funcs dcn30_str_enc_funcs = {
 	.set_avmute			= enc3_stream_encoder_set_avmute,
 	.validate_hdmi_frl_output	= hpo_enc3_validate_hdmi_frl_output,
 	.read_state			= hpo_enc3_read_state,
+	.hdmi_frl_set_dsc_config	= hpo_enc3_hdmi_set_dsc_config,
 	.set_dynamic_metadata           = hpo_enc3_set_dynamic_metadata,
 	.hdmi_frl_fifo_odm_enabled = hpo_enc3_fifo_odm_enabled,
 };

@@ -7368,12 +7368,30 @@ static void update_dsc_caps(struct amdgpu_dm_connector *aconnector,
 
 	if (aconnector->dc_link && (sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT ||
 	    sink->sink_signal == SIGNAL_TYPE_EDP)) {
-		if (sink->link->dpcd_caps.dongle_type == DISPLAY_DONGLE_NONE ||
-			sink->link->dpcd_caps.dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER)
+		if (sink->link->dpcd_caps.dongle_type == DISPLAY_DONGLE_NONE)
 			dc_dsc_parse_dsc_dpcd(aconnector->dc_link->ctx->dc,
 				aconnector->dc_link->dpcd_caps.dsc_caps.dsc_basic_caps.raw,
 				aconnector->dc_link->dpcd_caps.dsc_caps.dsc_branch_decoder_caps.raw,
 				dsc_caps);
+		else if (sink->link->dpcd_caps.dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER) {
+			if (aconnector->dc_link->dpcd_caps.dsc_caps.dsc_basic_caps.fields.dsc_support.DSC_PASSTHROUGH_SUPPORT &&
+					!aconnector->dsc_settings.dsc_force_disable_passthrough &&
+					aconnector->dc_link->dpcd_caps.dongle_caps.dp_hdmi_frl_max_link_bw_in_kbps > 0 &&
+					sink->edid_caps.frl_dsc_support &&
+					sink->edid_caps.max_frl_rate > 0 &&
+					sink->edid_caps.frl_dsc_max_frl_rate > 0)
+				dc_dsc_parse_dsc_edid(aconnector->dc_link->ctx->dc, &sink->edid_caps, dsc_caps);
+			else
+				dc_dsc_parse_dsc_dpcd(aconnector->dc_link->ctx->dc,
+				      aconnector->dc_link->dpcd_caps.dsc_caps.dsc_basic_caps.raw,
+				      aconnector->dc_link->dpcd_caps.dsc_caps.dsc_branch_decoder_caps.raw,
+				      dsc_caps);
+		}
+	} else if (aconnector->dc_link && sink->sink_signal == SIGNAL_TYPE_HDMI_FRL) {
+		if (sink->edid_caps.frl_dsc_support &&
+				sink->edid_caps.max_frl_rate > 0 &&
+				sink->edid_caps.frl_dsc_max_frl_rate > 0)
+			dc_dsc_parse_dsc_edid(aconnector->dc_link->ctx->dc, &sink->edid_caps, dsc_caps);
 	}
 }
 
@@ -7447,6 +7465,10 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 	struct drm_connector *drm_connector = &aconnector->base;
 	u32 link_bandwidth_kbps;
 	struct dc *dc = sink->ctx->dc;
+	const struct dc_hdmi_frl_link_settings *frl_verified_link_cap = NULL;
+	u32 converter_bw_in_kbps;
+	u32 sink_bw_in_kbps;
+	u32 dsc_sink_bw_in_kbps;
 	u32 max_supported_bw_in_kbps, timing_bw_in_kbps;
 	u32 dsc_max_supported_bw_in_kbps;
 	u32 max_dsc_target_bpp_limit_override =
@@ -7485,8 +7507,18 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 		} else if (sink->link->dpcd_caps.dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER) {
 			timing_bw_in_kbps = dc_bandwidth_in_kbps_from_timing(&stream->timing,
 					dc_link_get_highest_encoding_format(aconnector->dc_link));
-			max_supported_bw_in_kbps = link_bandwidth_kbps;
-			dsc_max_supported_bw_in_kbps = link_bandwidth_kbps;
+			converter_bw_in_kbps = aconnector->dc_link->dpcd_caps.dongle_caps.dp_hdmi_frl_max_link_bw_in_kbps;
+			sink_bw_in_kbps = dc_link_bw_kbps_from_raw_frl_link_rate_data(dc, sink->edid_caps.max_frl_rate);
+			dsc_sink_bw_in_kbps = dc_link_bw_kbps_from_raw_frl_link_rate_data(dc, sink->edid_caps.frl_dsc_max_frl_rate);
+
+			if (dsc_caps->is_frl) {
+				max_supported_bw_in_kbps = min(link_bandwidth_kbps, converter_bw_in_kbps);
+				max_supported_bw_in_kbps = min(max_supported_bw_in_kbps, sink_bw_in_kbps);
+				dsc_max_supported_bw_in_kbps = min(max_supported_bw_in_kbps, dsc_sink_bw_in_kbps);
+			} else {
+				max_supported_bw_in_kbps = link_bandwidth_kbps;
+				dsc_max_supported_bw_in_kbps = link_bandwidth_kbps;
+			}
 
 			if (timing_bw_in_kbps > max_supported_bw_in_kbps &&
 					max_supported_bw_in_kbps > 0 &&
@@ -7499,9 +7531,39 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 						dc_link_get_highest_encoding_format(aconnector->dc_link),
 						&stream->timing.dsc_cfg)) {
 					stream->timing.flags.DSC = 1;
-					drm_dbg_driver(drm_connector->dev, "%s: SST_DSC [%s] DSC is selected from DP-HDMI PCON\n",
-									 __func__, drm_connector->name);
+					drm_dbg_driver(drm_connector->dev, "%s: SST_DSC [%s] DSC is selected from %s\n",
+							__func__, drm_connector->name,
+							(dsc_caps->is_frl == 1) ? "HDMI FRL RX" : "DP-HDMI PCON");
 				}
+		}
+	}
+	else if (aconnector->dc_link && sink->sink_signal == SIGNAL_TYPE_HDMI_FRL) {
+		struct dc_dsc_policy dsc_policy = {0};
+
+		frl_verified_link_cap = dc_link_get_frl_link_cap(stream->link);
+		if (frl_verified_link_cap->frl_link_rate != HDMI_FRL_LINK_RATE_DISABLE &&
+			aconnector->dc_link->frl_flags.force_frl_dsc) {
+			dc_dsc_policy_set_enable_dsc_when_not_needed(true);
+			dc_dsc_get_policy_for_timing(&stream->timing, 0, &dsc_policy, dc_link_get_highest_encoding_format(stream->link));
+		}
+
+		timing_bw_in_kbps = dc_bandwidth_in_kbps_from_timing(&stream->timing, DC_LINK_ENCODING_HDMI_FRL);
+		link_bandwidth_kbps = dc_link_frl_bandwidth_kbps(stream->link, frl_verified_link_cap->frl_link_rate);
+		dsc_sink_bw_in_kbps = dc_link_bw_kbps_from_raw_frl_link_rate_data(dc, sink->edid_caps.frl_dsc_max_frl_rate);
+
+		if ((timing_bw_in_kbps > link_bandwidth_kbps && dsc_sink_bw_in_kbps > 0) ||
+		    (dsc_policy.enable_dsc_when_not_needed || dsc_options.force_dsc_when_not_needed)) {
+			if (dc_dsc_compute_config(aconnector->dc_link->ctx->dc->res_pool->dscs[0],
+					dsc_caps,
+					&dsc_options,
+					dsc_sink_bw_in_kbps,
+					&stream->timing,
+					dc_link_get_highest_encoding_format(aconnector->dc_link),
+					&stream->timing.dsc_cfg)) {
+				stream->timing.flags.DSC = 1;
+				drm_dbg_driver(drm_connector->dev, "%s: HDMI_FRL_DSC [%s] DSC is selected from HDMI FRL RX\n",
+						__func__, drm_connector->name);
+			}
 		}
 	}
 

@@ -4058,6 +4058,12 @@ static void add_link_update_dsc_config_sequence(
 					pipe_ctx->stream_res.stream_enc,
 					true, dsc_packed_pps, false);
 		}
+		else if (dc_is_hdmi_frl_signal(stream->signal)) {
+			hwss_add_hpo_frl_stream_enc_set_dsc_config(seq_state,
+				pipe_ctx->stream_res.hpo_frl_stream_enc,
+				&stream->timing,
+				dsc_packed_pps);
+		}
 	}
 }
 
