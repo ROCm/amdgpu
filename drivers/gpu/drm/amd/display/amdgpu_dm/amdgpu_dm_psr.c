@@ -29,6 +29,8 @@
 #include "dc.h"
 #include "amdgpu_dm.h"
 #include "modules/power/power_helpers.h"
+#include "amdgpu_dm_kunit_helpers.h"
+
 
 static bool link_supports_psrsu(struct dc_link *link)
 {
@@ -58,7 +60,8 @@ static bool link_supports_psrsu(struct dc_link *link)
 	return false;
 }
 
-static void amdgpu_dm_psr_fill_caps(struct dc_link *link, struct psr_caps *caps)
+STATIC_IFN_KUNIT
+void amdgpu_dm_psr_fill_caps(struct dc_link *link, struct psr_caps *caps)
 {
 	struct dpcd_caps *dpcd_caps = &link->dpcd_caps;
 	unsigned int power_opts = 0;
@@ -86,6 +89,7 @@ static void amdgpu_dm_psr_fill_caps(struct dc_link *link, struct psr_caps *caps)
 	caps->rate_control_caps = 0; /* TODO: read in rc caps from aux */
 	caps->psr_power_opt_flag = power_opts;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_psr_fill_caps);
 
 /*
  * amdgpu_dm_set_psr_caps() - set link psr capabilities
