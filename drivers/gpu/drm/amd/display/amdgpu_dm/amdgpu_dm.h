@@ -704,6 +704,14 @@ struct amdgpu_display_manager {
 		struct completion replied;
 		char reply_data[0x40];  // Cannot include dmub_cmd here
 	} fused_io[8];
+	/**
+	 * @hdmi_frl_status_polling_work:
+	 *
+	 * workqueue for 200ms frl status polling
+	 */
+	struct workqueue_struct *hdmi_frl_status_polling_wq;
+	struct delayed_work hdmi_frl_status_polling_work;
+	unsigned int hdmi_frl_status_polling_delay_ms;
 
 	/**
 	 * @dm_boot_time_crc_info:
@@ -849,6 +857,8 @@ struct amdgpu_dm_connector {
 	int sr_skip_count;
 	bool disallow_edp_enter_psr;
 	bool disallow_edp_enter_replay;
+
+	union dwnstream_portxcaps mst_downstream_port_caps;
 
 	/* Record progress status of mst*/
 	uint8_t mst_status;
