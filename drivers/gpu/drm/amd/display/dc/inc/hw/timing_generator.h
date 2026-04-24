@@ -106,6 +106,7 @@ enum crc_selection {
 
 enum otg_out_mux_dest {
 	OUT_MUX_DIO = 0,
+	OUT_MUX_HPO_FRL = 1,
 	OUT_MUX_HPO_DP = 2,
 };
 
@@ -493,6 +494,11 @@ struct timing_generator_funcs {
 	void (*set_out_mux)(struct timing_generator *tg, enum otg_out_mux_dest dest);
 	void (*set_drr_trigger_window)(struct timing_generator *optc,
 			uint32_t window_start, uint32_t window_end);
+	int (*set_fva_factor)(struct timing_generator *optc, struct fva_adj *fva_adj);
+	int (*get_max_hw_supported_fva_factor)(struct timing_generator *optc,
+		struct dc_crtc_timing *timing,
+		unsigned int max_pixclk_100hz);
+	void (*set_vstartup_dsc_frl)(struct timing_generator *optc);
 	void (*set_vtotal_change_limit)(struct timing_generator *optc,
 			uint32_t limit);
 	void (*align_vblanks)(struct timing_generator *master_optc,

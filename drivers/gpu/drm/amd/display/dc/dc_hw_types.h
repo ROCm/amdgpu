@@ -888,6 +888,8 @@ struct dc_dsc_config {
 	bool ycbcr422_simple; /* Tell DSC engine to convert YCbCr 4:2:2 to 'YCbCr 4:2:2 simple'. */
 	int32_t rc_buffer_size; /* DSC RC buffer block size in bytes */
 	bool is_frl; /* indicate if DSC is applied based on HDMI FRL sink's capability */
+	bool is_vic_all_bpp; /* indicate of DSC_ALL_BPP = 1 */
+	uint32_t total_chunk_kbytes; /* total chunk kbytes in EDID */
 	bool is_dp; /* indicate if DSC is applied based on DP's capability */
 	uint32_t mst_pbn; /* pbn of display on dsc mst hub */
 	const struct dc_dsc_rc_params_override *rc_params_ovrd; /* DM owned memory. If not NULL, apply custom dsc rc params */
@@ -1162,6 +1164,12 @@ struct tg_color {
 	uint16_t color_r_cr;
 	uint16_t color_g_y;
 	uint16_t color_b_cb;
+};
+
+struct fva_adj {
+	unsigned int pixel_clock_100hz;
+	unsigned int max_pixel_clock_100hz;
+	unsigned int fva_factor;
 };
 
 enum symclk_state {

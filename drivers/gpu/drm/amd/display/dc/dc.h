@@ -46,6 +46,8 @@
 
 #include "dmub/inc/dmub_cmd.h"
 
+#include "dml/dml1_frl_cap_chk.h"
+
 #include "sspl/dc_spl_types.h"
 
 struct abm_save_restore;
@@ -83,6 +85,49 @@ struct dcn_dccg_reg_state;
 #define MAX_DPIA_NUM  (MAX_HOST_ROUTERS_NUM * MAX_DPIA_PER_HOST_ROUTER)
 
 #define NUM_FAST_FLIPS_TO_STEADY_STATE 20
+
+struct frl_cap_chk_intermediates_fixed31_32 {
+	int      c_frl_sb;
+	struct fixed31_32   overhead_sb;
+	struct fixed31_32   overhead_rs;
+	struct fixed31_32   overhead_map;
+	struct fixed31_32   overhead_min;
+	struct fixed31_32   overhead_max;
+	struct fixed31_32   f_pixel_clock_max;
+	struct fixed31_32   t_line;
+	struct fixed31_32   r_bit_min;
+	struct fixed31_32   r_frl_char_min;
+	struct fixed31_32   c_frl_line;
+	struct fixed31_32   ap;
+	struct fixed31_32   r_ap;
+	struct fixed31_32   avg_audio_packets_line;
+	struct fixed31_32   margin;
+	int      audio_packets_line;
+	int      blank_audio_min;
+};
+
+struct frl_cap_chk_params_fixed31_32 {
+	int      lanes;
+	struct fixed31_32   f_pixel_clock_nominal;   /* Pixel Clock rate (Hz)  */
+	struct fixed31_32   r_bit_nominal;           /* FRL bitrate (bps) */
+	int      audio_packet_type;
+	struct fixed31_32   f_audio;                 /* Audio rate (Hz) */
+	int      h_active;                /* Active pixels per line */
+	int      h_blank;                 /* Blanking pixels per line */
+	int      bpc;                     /* Bits per component */
+	int      vic;                     /* Video Identification Code */
+
+	enum hdmi_frl_pixel_encoding    pixel_encoding;
+
+	bool     compressed;              /* set to true if DSC is enabled */
+	bool     bypass_hc_target_calc;   /* debug only */
+	int      layout;
+	int      acat;    /* not supported */
+
+	/* outputs */
+	struct frl_dml_borrow_params borrow_params;
+	int      average_tribyte_rate;
+};
 
 /* Display Core Interfaces */
 struct dc_versions {
@@ -332,6 +377,7 @@ struct dc_caps {
 	bool ips_v2_support;
 	uint32_t num_of_internal_disp;
 	enum dp_protocol_version max_dp_protocol_version;
+	bool hdmi_hpo;
 	unsigned int mall_size_per_mem_channel;
 	unsigned int mall_size_total;
 	unsigned int cursor_cache_size;
@@ -537,6 +583,8 @@ struct dc_config {
 	int smart_mux_version;
 	bool ignore_dpref_ss;
 	bool enable_mipi_converter_optimization;
+	bool force_hdmi21_frl_enc_enable;
+	bool skip_frl_pretraining;
 	bool use_default_clock_table;
 	bool force_bios_enable_lttpr;
 	uint8_t force_bios_fixed_vs;
@@ -1097,6 +1145,18 @@ struct dc_debug_options {
 	bool validate_dml_output;
 	bool enable_dmcub_surface_flip;
 	bool usbc_combo_phy_reset_wa;
+	bool force_vrr;
+	bool force_fva;
+	int max_frl_rate;
+	int  force_frl_rate;
+	bool ignore_ffe;
+	int  select_ffe;
+	int  limit_ffe;
+	bool force_frl_always;
+	bool force_frl_max;
+	bool apply_vsdb_rcc_wa;
+	bool enable_hdmi_idcc;
+
 	bool enable_dram_clock_change_one_display_vactive;
 	/* TODO - remove once tested */
 	bool legacy_dp2_lt;
@@ -1637,6 +1697,7 @@ struct dc_scratch_space {
 	bool edp_sink_present;
 
 	struct dp_trace dp_trace;
+	volatile bool is_link_locked;
 
 	/* caps is the same as reported_link_cap. link_traing use
 	 * reported_link_cap. Will clean up.  TODO
@@ -1651,6 +1712,7 @@ struct dc_scratch_space {
 	 * management of the override pointers.
 	 */
 	struct dc_link_training_overrides preferred_training_settings;
+	struct dc_hdmi_frl_link_training_overrides preferred_hdmi_frl_settings;
 	struct dp_audio_test_data audio_test_data;
 
 	/* On ASICs with dp_connector_no_native_i2c cap set and no_ddc_pin cap
@@ -1703,6 +1765,12 @@ struct dc_scratch_space {
 
 	struct panel_cntl *panel_cntl;
 	struct link_encoder *link_enc;
+	struct hpo_frl_link_encoder *hpo_frl_link_enc;
+	struct dc_hdmi_frl_link_settings frl_reported_link_cap;
+	struct dc_hdmi_frl_link_settings frl_verified_link_cap;
+	struct dc_hdmi_frl_link_settings frl_link_settings;
+	struct dc_hdmi_frl_flags frl_flags;
+	union hdmi_idcc_cable_id hdmi_cable_id;
 	struct graphics_object_id link_id;
 
 	/* External encoder eg. NUTMEG or TRAVIS used on CIK APUs. */
@@ -2042,6 +2110,17 @@ struct dc_plane_state *dc_get_surface_for_mpcc(struct dc *dc,
 
 
 uint32_t dc_get_opp_for_plane(struct dc *dc, struct dc_plane_state *plane);
+bool dc_set_fva_vrr_adjust(struct dc *dc,
+	struct dc_stream_state *stream,
+	struct fva_adj *fva_adj,
+	struct dc_crtc_timing_adjust *vrr_adj);
+
+int dc_get_hw_max_fva_factor(struct dc *dc,
+		struct dc_stream_state *stream,
+		unsigned int max_pixel_clock);
+
+void dc_set_vstartup_start(struct dc *dc,
+		struct dc_stream_state *stream);
 
 void dc_set_disable_128b_132b_stream_overhead(bool disable);
 
@@ -2253,6 +2332,12 @@ enum dc_status dc_link_dp_read_hpd_rx_irq_data(
 	struct dc_link *link,
 	union hpd_irq_data *irq_data);
 
+bool dc_link_frl_poll_status_flag(struct dc_link *link);
+bool dc_link_frl_margin_check_uncompressed_video(
+		const struct dc_link *link,
+		struct frl_cap_chk_params_fixed31_32 *params,
+		struct frl_cap_chk_intermediates_fixed31_32 *inter);
+
 /* The function clears recorded DP RX states in the link. DM should call this
  * function when it is resuming from S3 power state to previously connected links.
  *
@@ -2276,6 +2361,12 @@ bool dc_link_reset_cur_dp_mst_topology(struct dc_link *link);
 uint32_t dc_link_bandwidth_kbps(
 	const struct dc_link *link,
 	const struct dc_link_settings *link_setting);
+
+/* The function returns effective HDMI FRL bandwidth given link rate.
+ * return - total effective link bandwidth in kbps.
+ */
+uint32_t dc_link_frl_bandwidth_kbps(const struct dc_link *link,
+		enum hdmi_frl_link_rate link_rate);
 
 struct dp_audio_bandwidth_params {
 	const struct dc_crtc_timing *crtc_timing;
@@ -2327,6 +2418,8 @@ void dc_get_cur_link_res_map(const struct dc *dc, uint32_t *map);
  *
  */
 void dc_restore_link_res_map(const struct dc *dc, uint32_t *map);
+
+void dc_link_wait_for_unlocked(struct dc_link *link);
 
 /* TODO: this is not meant to be exposed to DM. Should switch to stream update
  * interface i.e stream_update->dsc_config
@@ -2381,6 +2474,16 @@ const struct dc_link_settings *dc_link_get_link_cap(const struct dc_link *link);
  */
 enum dc_link_encoding_format dc_link_get_highest_encoding_format(const struct dc_link *link);
 
+/* get max frl link settings the link can enable with all things considered.
+ * (i.e TX/RX capabilities and link verification result.
+ *
+ * @link - a link with FRL RX connection
+ * return - max frl link settings the link can enable.
+ *
+ */
+struct dc_hdmi_frl_link_settings *dc_link_get_frl_link_cap(
+		struct dc_link *link);
+
 /* Check if a RX (ex. DP sink, MST hub, passive or active dongle) is connected
  * to a link with dp connector signal type.
  * @link - a link with dp connector signal type
@@ -2428,6 +2531,16 @@ bool dc_link_dp_set_test_pattern(
  */
 void dc_link_set_preferred_link_settings(struct dc *dc,
 		struct dc_link_settings *link_setting,
+		struct dc_link *link);
+
+/* Force FRL link settings to always use a specific value until reboot to a
+ * specific link. If link has already been enabled, the interface will also
+ * switch to desired link settings immediately. This is a debug interface to
+ * generic FRL issue trouble shooting.
+ */
+void dc_link_set_preferred_frl_link_settings(struct dc *dc,
+		struct dc_hdmi_frl_link_settings *link_setting,
+		struct dc_hdmi_frl_link_training_overrides *lt_overrides,
 		struct dc_link *link);
 
 /* Force DP link to customize a specific link training behavior by overriding to
@@ -3102,6 +3215,14 @@ struct dc_register_software_state {
 		uint32_t symclk32_le_src_sel[2];         /* SYMCLK32_LE_CNTL->SYMCLK32_LE0_SRC_SEL from dccg31_enable_symclk32_le() phyd32clk source */
 		uint32_t symclk32_le_enable[2];          /* SYMCLK32_LE_CNTL->SYMCLK32_LE0_EN from dccg31_enable_symclk32_le() enable */
 		uint32_t symclk32_le_gate_disable[2];    /* DCCG_GATE_DISABLE_CNTL3->SYMCLK32_LE0_GATE_DISABLE from debug.root_clock_optimization.bits.symclk32_le */
+
+		/* HDMI Clock Control */
+		uint32_t hdmicharclk_enable;             /* HDMICHARCLK0_CLOCK_CNTL->HDMICHARCLK0_EN from dccg31_enable_hdmicharclk() */
+		uint32_t hdmicharclk_src_sel;            /* HDMICHARCLK0_CLOCK_CNTL->HDMICHARCLK0_SRC_SEL from dccg31_enable_hdmicharclk() phypll_inst source */
+		uint32_t hdmistreamclk_src_sel;          /* HDMISTREAMCLK_CNTL->HDMISTREAMCLK0_SRC_SEL from dccg31_set_hdmistreamclk() src selection */
+		uint32_t hdmistreamclk_dto_force_dis;    /* HDMISTREAMCLK_CNTL->HDMISTREAMCLK0_DTO_FORCE_DIS from dccg31_set_hdmistreamclk() DTO force bypass */
+		uint32_t hdmistreamclk_dto_phase;        /* HDMISTREAMCLK0_DTO_PARAM->HDMISTREAMCLK0_DTO_PHASE from dccg31_disable_hdmistreamclk() */
+		uint32_t hdmistreamclk_dto_modulo;       /* HDMISTREAMCLK0_DTO_PARAM->HDMISTREAMCLK0_DTO_MODULO from dccg31_disable_hdmistreamclk() */
 
 		/* DPIA Clock Control */
 		uint32_t dpiaclk_540m_dto_modulo;        /* DPIACLK_540M_DTO_MODULO->DPIA 540MHz DTO modulo */
