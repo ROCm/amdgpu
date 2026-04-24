@@ -38,14 +38,10 @@
 	(adev->reg_offset[ip##_HWIP][inst][reg##_BASE_IDX] + (reg)+(offset))
 
 #define __WREG32_SOC15_RLC__(reg, value, flag, hwip, inst) \
-	((amdgpu_sriov_vf(adev) && adev->gfx.rlc.funcs && adev->gfx.rlc.rlcg_reg_access_supported) ? \
-	 amdgpu_sriov_wreg(adev, reg, value, flag, hwip, inst) : \
-	 WREG32(reg, value))
+	adev->gfx.rlc.reg_funcs->wreg32(adev, reg, value, flag, hwip, inst)
 
 #define __RREG32_SOC15_RLC__(reg, flag, hwip, inst) \
-	((amdgpu_sriov_vf(adev) && adev->gfx.rlc.funcs && adev->gfx.rlc.rlcg_reg_access_supported) ? \
-	 amdgpu_sriov_rreg(adev, reg, flag, hwip, inst) : \
-	 RREG32(reg))
+	adev->gfx.rlc.reg_funcs->rreg32(adev, reg, flag, hwip, inst)
 
 #define WREG32_FIELD15(ip, idx, reg, field, val)	\
 	 __WREG32_SOC15_RLC__(adev->reg_offset[ip##_HWIP][idx][mm##reg##_BASE_IDX] + mm##reg,	\

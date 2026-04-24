@@ -3982,6 +3982,8 @@ static int gfx_v12_0_early_init(struct amdgpu_ip_block *ip_block)
 
 	gfx_v12_0_init_rlcg_reg_access_ctrl(adev);
 
+	amdgpu_init_rlc_reg_funcs(adev);
+
 	return gfx_v12_0_init_microcode(adev);
 }
 
