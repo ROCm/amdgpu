@@ -1608,6 +1608,8 @@ static bool is_dtbclk_required(struct dc *dc, struct dc_state *context)
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		if (!context->res_ctx.pipe_ctx[i].stream)
 			continue;
+		if (dc_is_hdmi_frl_signal(context->res_ctx.pipe_ctx[i].stream->signal))
+			return true;
 		if (dc->link_srv->dp_is_128b_132b_signal(&context->res_ctx.pipe_ctx[i]))
 			return true;
 	}
@@ -3587,4 +3589,12 @@ void dcn32_override_min_req_memclk(struct dc *dc, struct dc_state *context)
 			context->bw_ctx.bw.dcn.clk.dramclk_khz = (int)(context->bw_ctx.dml.vba.DRAMSpeed * 1000 / 16);
 		}
 	}
+}
+
+unsigned int dcn32_get_max_dispclk_mhz(struct dc *dc, struct dc_state *context)
+{
+	(void)dc;
+	int max_level = context->bw_ctx.dml.soc.num_states;
+
+	return (unsigned int) context->bw_ctx.dml.soc.clock_limits[max_level - 1].dispclk_mhz;
 }

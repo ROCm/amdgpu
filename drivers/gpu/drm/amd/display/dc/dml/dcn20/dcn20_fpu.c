@@ -1049,6 +1049,8 @@ static bool is_dtbclk_required(struct dc *dc, struct dc_state *context)
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		if (!context->res_ctx.pipe_ctx[i].stream)
 			continue;
+		if (dc_is_hdmi_frl_signal(context->res_ctx.pipe_ctx[i].stream->signal))
+			return true;
 		if (dc->link_srv->dp_is_128b_132b_signal(&context->res_ctx.pipe_ctx[i]))
 			return true;
 	}
@@ -1466,6 +1468,9 @@ int dcn20_populate_dml_pipes_from_context(struct dc *dc,
 		case SIGNAL_TYPE_DVI_SINGLE_LINK:
 		case SIGNAL_TYPE_DVI_DUAL_LINK:
 			pipes[pipe_cnt].dout.output_type = dm_hdmi;
+			break;
+		case SIGNAL_TYPE_HDMI_FRL:
+			pipes[pipe_cnt].dout.output_type = dm_hdmifrl;
 			break;
 		default:
 			/* In case there is no signal, set dp with 4 lanes to allow max config */

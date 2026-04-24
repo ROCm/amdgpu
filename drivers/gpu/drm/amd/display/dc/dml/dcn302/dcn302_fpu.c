@@ -119,6 +119,7 @@ struct _vcs_dpi_soc_bounding_box_st dcn3_02_soc = {
 						.phyclk_mhz = 300.0,
 						.phyclk_d18_mhz = 667.0,
 						.dscclk_mhz = 405.6,
+						.dtbclk_mhz = 1217.0,
 				},
 		},
 
