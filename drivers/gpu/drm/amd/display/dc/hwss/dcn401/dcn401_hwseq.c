@@ -1496,6 +1496,57 @@ void dcn401_prepare_bandwidth(struct dc *dc,
 	}
 }
 
+void dcn401_prepare_bandwidth_sequence(struct dc *dc,
+		struct dc_state *context,
+		struct block_sequence_state *seq_state)
+{
+	struct hubbub *hubbub = dc->res_pool->hubbub;
+	bool p_state_change_support = context->bw_ctx.bw.dcn.clk.p_state_change_support;
+	unsigned int compbuf_size = 0;
+
+	/* Any transition into P-State support should disable MCLK switching first to avoid hangs */
+	if (p_state_change_support) {
+		dc->optimized_required = true;
+		context->bw_ctx.bw.dcn.clk.p_state_change_support = false;
+	}
+
+	if (dc->clk_mgr->dc_mode_softmax_enabled)
+		if (dc->clk_mgr->clks.dramclk_khz <= (int)dc->clk_mgr->bw_params->dc_mode_softmax_memclk * 1000 &&
+				context->bw_ctx.bw.dcn.clk.dramclk_khz > (int)dc->clk_mgr->bw_params->dc_mode_softmax_memclk * 1000)
+			hwss_add_clk_mgr_set_max_memclk(seq_state, dc->clk_mgr,
+					dc->clk_mgr->bw_params->clk_table.entries[dc->clk_mgr->bw_params->clk_table.num_entries - 1].memclk_mhz);
+
+	/* Build bandwidth and display clocks back-to-back (SW calc + append BLS steps) */
+	if (dc->clk_mgr->funcs->build_clock_update_for_bls)
+		dc->clk_mgr->funcs->build_clock_update_for_bls(
+				dc->clk_mgr, context, false, seq_state);
+
+	hwss_add_hubbub_program_watermarks(seq_state, dc, hubbub,
+					&context->bw_ctx.bw.dcn.watermarks,
+					dc->res_pool->ref_clocks.dchub_ref_clock_inKhz / 1000,
+					false);
+
+	if (hubbub->funcs->program_arbiter)
+		hwss_add_hubbub_program_arbiter(seq_state, dc, hubbub,
+				&context->bw_ctx.bw.dcn.arb_regs, false);
+
+	if (hubbub->funcs->program_compbuf_segments) {
+		compbuf_size = context->bw_ctx.bw.dcn.arb_regs.compbuf_size;
+		dc->optimized_required |= (compbuf_size != dc->current_state->bw_ctx.bw.dcn.arb_regs.compbuf_size);
+
+		hwss_add_hubbub_program_compbuf_segments(seq_state, hubbub, compbuf_size, false);
+	}
+
+	if (dc->debug.fams2_config.bits.enable) {
+		dcn401_dmub_hw_control_lock(dc, context, true);
+		dcn401_fams2_update_config(dc, context, false);
+		dcn401_dmub_hw_control_lock(dc, context, false);
+	}
+
+	if (p_state_change_support != context->bw_ctx.bw.dcn.clk.p_state_change_support)
+		context->bw_ctx.bw.dcn.clk.p_state_change_support = p_state_change_support;
+}
+
 void dcn401_optimize_bandwidth(
 		struct dc *dc,
 		struct dc_state *context)
@@ -1547,6 +1598,50 @@ void dcn401_optimize_bandwidth(
 						pipe_ctx->hubp_regs.dlg_regs.min_dst_y_next_start);
 		}
 	}
+}
+
+/*
+ * optimize_bandwidth_sequence is unused for now. It will be used when
+ * dc_commit_state_no_check is moved into block sequence pattern, similar
+ * to how commit_planes_do_stream_update_sequence replaces
+ * commit_planes_do_stream_update.
+ */
+void dcn401_optimize_bandwidth_sequence(struct dc *dc,
+		struct dc_state *context,
+		struct block_sequence_state *seq_state)
+{
+	struct hubbub *hubbub = dc->res_pool->hubbub;
+
+	/* enable fams2 if needed */
+	if (dc->debug.fams2_config.bits.enable) {
+		dcn401_dmub_hw_control_lock(dc, context, true);
+		dcn401_fams2_update_config(dc, context, true);
+		dcn401_dmub_hw_control_lock(dc, context, false);
+	}
+
+	hwss_add_hubbub_program_watermarks(seq_state, dc, hubbub,
+					&context->bw_ctx.bw.dcn.watermarks,
+					dc->res_pool->ref_clocks.dchub_ref_clock_inKhz / 1000,
+					true);
+
+	if (hubbub->funcs->program_arbiter)
+		hwss_add_hubbub_program_arbiter(seq_state, dc, hubbub,
+				&context->bw_ctx.bw.dcn.arb_regs, true);
+
+	if (dc->clk_mgr->dc_mode_softmax_enabled)
+		if (dc->clk_mgr->clks.dramclk_khz > (int)dc->clk_mgr->bw_params->dc_mode_softmax_memclk * 1000 &&
+				context->bw_ctx.bw.dcn.clk.dramclk_khz <= (int)dc->clk_mgr->bw_params->dc_mode_softmax_memclk * 1000)
+			hwss_add_clk_mgr_set_max_memclk(seq_state, dc->clk_mgr,
+					dc->clk_mgr->bw_params->dc_mode_softmax_memclk);
+
+	if (hubbub->funcs->program_compbuf_segments)
+		hwss_add_hubbub_program_compbuf_segments(seq_state, hubbub,
+				context->bw_ctx.bw.dcn.arb_regs.compbuf_size, true);
+
+	/* Build bandwidth and display clocks (SW calc + append BLS steps) */
+	if (dc->clk_mgr->funcs->build_clock_update_for_bls)
+		dc->clk_mgr->funcs->build_clock_update_for_bls(
+				dc->clk_mgr, context, true, seq_state);
 }
 
 void dcn401_dmub_hw_control_lock(struct dc *dc,

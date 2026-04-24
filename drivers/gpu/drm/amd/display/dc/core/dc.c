@@ -4257,8 +4257,8 @@ static void commit_planes_do_stream_update_sequence(struct dc *dc,
 					hwss_add_dc_set_optimized_required(&seq_state, dc, true);
 
 				} else {
-					if (get_seamless_boot_stream_count(context) == 0)
-						hwss_add_prepare_bandwidth(&seq_state, dc, dc->current_state);
+					if (get_seamless_boot_stream_count(context) == 0 && dc->hwss.prepare_bandwidth_sequence)
+						dc->hwss.prepare_bandwidth_sequence(dc, dc->current_state, &seq_state);
 					hwss_add_link_set_dpms_on(&seq_state, dc->current_state, dpms_pipe_ctx);
 				}
 			} else if (pipe_ctx->stream->link->wa_flags.blank_stream_on_ocs_change && stream_update->output_color_space
