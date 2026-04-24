@@ -330,7 +330,11 @@ struct bp_encoder_cap_info {
 	uint32_t DP_UHBR13_5_EN:1;
 	uint32_t DP_UHBR20_EN:1;
 	uint32_t DP_IS_USB_C:1;
-	uint32_t RESERVED:27;
+	uint32_t IS_HDMI_FRL_CAPABLE:1;
+	uint32_t FRL_8G_EN:1;
+	uint32_t FRL_10G_EN:1;
+	uint32_t FRL_12G_EN:1;
+	uint32_t RESERVED:19;
 };
 
 struct bp_soc_bb_info {
@@ -347,7 +351,13 @@ struct bp_connector_speed_cap_info {
 	uint32_t DP_UHBR13_5_EN:1;
 	uint32_t DP_UHBR20_EN:1;
 	uint32_t DP_IS_USB_C:1;
-	uint32_t RESERVED:28;
+	uint32_t FRL_8G_EN:1;
+	uint32_t FRL_10G_EN:1;
+	uint32_t FRL_12G_EN:1;
+	uint32_t FRL_16G_EN:1;
+	uint32_t FRL_20G_EN:1;
+	uint32_t FRL_24G_EN:1;
+	uint32_t RESERVED:19;
 };
 
 #endif /*__DAL_BIOS_PARSER_TYPES_H__ */

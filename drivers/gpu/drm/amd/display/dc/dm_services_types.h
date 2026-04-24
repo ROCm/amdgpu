@@ -262,6 +262,7 @@ struct dm_process_phy_transition_init_params {
 	enum dc_link_rate display_port_link_rate;
 	uint32_t transition_bitmask;
 	uint8_t hdmi_frl_num_lanes;
+	enum hdmi_frl_link_rate hdmi_frl_link_rate;
 };
 
 struct dm_process_phy_transition_input_params {
