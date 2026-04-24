@@ -2757,6 +2757,8 @@ static int gfx_v9_4_3_early_init(struct amdgpu_ip_block *ip_block)
 	/* init rlcg reg access ctrl */
 	gfx_v9_4_3_init_rlcg_reg_access_ctrl(adev);
 
+	amdgpu_init_rlc_reg_funcs(adev);
+
 	return gfx_v9_4_3_init_microcode(adev);
 }
 
