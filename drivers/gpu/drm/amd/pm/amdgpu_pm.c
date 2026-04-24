@@ -1634,6 +1634,10 @@ static ssize_t amdgpu_set_thermal_throttling_logging(struct device *dev,
 	if (ret)
 		return ret;
 
+	/* Reject negative values - only 0 (disable) or 1-3600 (seconds) are valid */
+	if (throttling_logging_interval < 0)
+		return -EINVAL;
+
 	if (throttling_logging_interval > 3600)
 		return -EINVAL;
 
