@@ -42,6 +42,7 @@
 #include "protocols/link_dp_training.h"
 #include "protocols/link_edp_panel_control.h"
 #include "protocols/link_dp_panel_replay.h"
+#include "protocols/link_hdmi_frl.h"
 #include "protocols/link_hpd.h"
 #include "gpio_service_interface.h"
 #include "atomfirmware.h"
@@ -101,6 +102,8 @@ static void construct_link_service_validation(struct link_service *link_srv)
 	link_srv->validate_mode_timing = link_validate_mode_timing;
 	link_srv->dp_link_bandwidth_kbps = dp_link_bandwidth_kbps;
 	link_srv->validate_dp_tunnel_bandwidth = link_validate_dp_tunnel_bandwidth;
+	link_srv->frl_link_bandwidth_kbps = frl_link_bandwidth_kbps;
+	link_srv->frl_margin_check_uncompressed_video = frl_capacity_computations_uncompressed_video;
 	link_srv->dp_required_hblank_size_bytes = dp_required_hblank_size_bytes;
 }
 
@@ -121,6 +124,7 @@ static void construct_link_service_dpms(struct link_service *link_srv)
 	link_srv->set_dsc_on_stream = link_set_dsc_on_stream;
 	link_srv->set_dsc_enable = link_set_dsc_enable;
 	link_srv->update_dsc_config = link_update_dsc_config;
+	link_srv->wait_for_unlocked = link_wait_for_unlocked;
 }
 
 /* link ddc implements generic display communication protocols such as i2c, aux
@@ -243,6 +247,25 @@ static void construct_link_service_dp_panel_replay(struct link_service *link_srv
 	link_srv->dp_pr_get_state = dp_pr_get_state;
 }
 
+/* link hdmi frl implements FRL link capability and link training related
+ * functions. FRL link is established by order of retrieve_link, verify_link,
+ * and poll_status. Other helper functions exist to obtain information required
+ * to maintain the correct sequence according to HDMI specification. Each
+ * sequence and state inside link training functions are timing sensitive and order sensitive.
+ * It is mandatory that these functions are debugged with FRL_LTP output message
+ * configurable in DSAT.  Any changes in the LT sequence should follow the HDMI
+ * specification as much as possible and tested through HDMI electrical and
+ * link layer compliance.
+ */
+static void construct_link_service_hdmi_frl(struct link_service *link_srv)
+{
+	link_srv->hdmi_frl_poll_status_flag = hdmi_frl_poll_status_flag;
+	link_srv->hdmi_frl_get_verified_link_cap =
+			hdmi_frl_get_verified_link_cap;
+	link_srv->hdmi_frl_set_preferred_link_settings =
+			hdmi_frl_set_preferred_link_settings;
+}
+
 /* link dp cts implements dp compliance test automation protocols and manual
  * testing interfaces for debugging and certification purpose.
  */
@@ -296,6 +319,7 @@ static void construct_link_service(struct link_service *link_srv)
 	construct_link_service_dp_irq_handler(link_srv);
 	construct_link_service_edp_panel_control(link_srv);
 	construct_link_service_dp_panel_replay(link_srv);
+	construct_link_service_hdmi_frl(link_srv);
 	construct_link_service_dp_cts(link_srv);
 	construct_link_service_dp_trace(link_srv);
 }
@@ -401,6 +425,8 @@ static void link_destruct(struct dc_link *link)
 		link->link_enc->funcs->destroy(&link->link_enc);
 	}
 
+	if (link->hpo_frl_link_enc)
+		link->hpo_frl_link_enc->funcs->destroy(&link->hpo_frl_link_enc);
 	if (link->local_sink)
 		dc_sink_release(link->local_sink);
 
@@ -630,6 +656,7 @@ static bool construct_phy(struct dc_link *link,
 
 	DC_LOG_DC("BIOS object table - DP_IS_USB_C: %d", link->link_enc->features.flags.bits.DP_IS_USB_C);
 	DC_LOG_DC("BIOS object table - IS_DP2_CAPABLE: %d", link->link_enc->features.flags.bits.IS_DP2_CAPABLE);
+	DC_LOG_DC("BIOS object table - IS_HDMI_FRL_CAPABLE: %d", link->link_enc->features.flags.bits.IS_HDMI_FRL_CAPABLE);
 
 	switch (link->link_id.id) {
 	case CONNECTOR_ID_HDMI_TYPE_A:
@@ -833,12 +860,29 @@ static bool construct_phy(struct dc_link *link,
 	 */
 	program_hpd_filter(link);
 
+	/* If the connector is HDMI FRL capable, also create an HPO link encoder */
+	if ((link->link_enc->features.flags.bits.IS_HDMI_FRL_CAPABLE) &&
+		(!link->link_enc->features.flags.bits.DP_IS_USB_C) &&
+			(link->dc->res_pool->funcs->hpo_frl_link_enc_create)) {
+		enum engine_id hpo_eng_id;
+		hpo_eng_id = ENGINE_ID_HPO_0;
+
+		link->hpo_frl_link_enc = link->dc->res_pool->funcs->hpo_frl_link_enc_create(
+				hpo_eng_id,
+				dc_ctx);
+		if (link->hpo_frl_link_enc == NULL) {
+			DC_ERROR("Failed to create HPO link encoder!\n");
+			goto hpo_enc_create_fail;
+		}
+	}
+
 	link->psr_settings.psr_vtotal_control_support = false;
 	link->psr_settings.psr_version = DC_PSR_VERSION_UNSUPPORTED;
 	link->replay_settings.config.replay_version = DC_REPLAY_VERSION_UNSUPPORTED;
 
 	DC_LOG_DC("BIOS object table - %s finished successfully.\n", __func__);
 	return true;
+hpo_enc_create_fail:
 device_tag_fail:
 link_enc_create_fail:
 panel_cntl_create_fail:

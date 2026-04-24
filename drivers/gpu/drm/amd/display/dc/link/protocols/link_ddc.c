@@ -31,6 +31,7 @@
  * link training.
  */
 #include "link_ddc.h"
+#include "link_hdmi_frl.h"
 #include "vector.h"
 #include "dce/dce_aux.h"
 #include "dal_asic_id.h"
@@ -560,6 +561,8 @@ void write_scdc_data(struct ddc_service *ddc_service,
 		(ddc_service->link->local_sink->edid_caps.panel_patch.skip_scdc_overwrite ||
 		!ddc_service->link->local_sink->edid_caps.scdc_present))
 		return;
+	hdmi_frl_LTS_clear_Link_Setting(ddc_service);
+	hdmi_frl_LTS_clear_Update_flag(ddc_service);
 
 	link_query_ddc_data(ddc_service, slave_address, &offset,
 			sizeof(offset), &sink_version, sizeof(sink_version));
@@ -609,4 +612,91 @@ void read_scdc_data(struct ddc_service *ddc_service)
 				&offset, sizeof(offset), &status_data.byte,
 				sizeof(status_data.byte));
 	}
+}
+void write_idcc_data(struct ddc_service *ddc_service, enum hdmi_idcc_scope idcc_scope,
+		uint8_t *write_buf, uint8_t offset, uint8_t write_len)
+{
+	uint8_t slave_address = HDMI_IDCC_ADDRESS;
+	uint8_t idcc_header[5] = {0};
+	uint8_t dummy_buf[1] = {0};
+	uint8_t checksum = 0;
+	int i;
+
+	idcc_header[0] = HDMI_IDCC_MARKER0;
+	idcc_header[1] = HDMI_IDCC_MARKER1;
+	idcc_header[2] = (uint8_t)(HDMI_IDCC_MARKER2 | idcc_scope);
+	idcc_header[3] = offset;
+	idcc_header[4] = write_len;
+
+	/* Write the IDCC header */
+	for (i = 0; i < sizeof(idcc_header); ++i) {
+		link_query_ddc_data(ddc_service, slave_address,
+				&idcc_header[i], 1,
+				&dummy_buf[0], 1);
+		checksum += idcc_header[i];
+	}
+
+	/* Write the payload */
+	for (i = 0; i < write_len; ++i) {
+		link_query_ddc_data(ddc_service, slave_address,
+				&write_buf[i], 1,
+				&dummy_buf[0], 1);
+		checksum += write_buf[i];
+	}
+
+	/* Write the checksum */
+	if (write_len > 0) {
+		checksum = 0xff - checksum + 1;
+		link_query_ddc_data(ddc_service, slave_address,
+			&checksum, 1,
+			&dummy_buf[0], 1);
+	}
+}
+
+int read_idcc_data(struct ddc_service *ddc_service, enum hdmi_idcc_scope idcc_scope,
+		uint8_t *read_buf, uint8_t offset, uint8_t read_len)
+{
+	uint8_t slave_address = HDMI_IDCC_ADDRESS;
+	uint8_t idcc_header[5] = {0};
+	uint8_t dummy_buf[1] = {0};
+	uint8_t read_buf_local[6] = {0};
+	uint8_t checksum = 0;
+	int i;
+
+	idcc_header[0] = HDMI_IDCC_MARKER0;
+	idcc_header[1] = HDMI_IDCC_MARKER1;
+	idcc_header[2] = (uint8_t)(HDMI_IDCC_MARKER2 | idcc_scope);
+	idcc_header[3] = offset;
+	idcc_header[4] = read_len;
+
+	/* Write the IDCC header */
+	for (i = 0; i < sizeof(idcc_header); ++i) {
+		link_query_ddc_data(ddc_service, slave_address,
+				&idcc_header[i], 1,
+				&dummy_buf[0], 1);
+		checksum += idcc_header[i];
+	}
+
+	/* Read the payload */
+	if (read_len > 0) {
+		dummy_buf[0] = 0x01;
+		if (read_len > 5)
+			read_len = 5;
+		link_query_ddc_data(ddc_service, slave_address,
+				&dummy_buf[0], 1,
+				&read_buf_local[0], read_len + 1);
+
+		memcpy(read_buf, read_buf_local, read_len);
+
+		/* Check checksum */
+		checksum = read_buf_local[read_len];
+		for (i = 0; i < 5; ++i)
+			checksum += idcc_header[i];
+		for (i = 0; i < read_len; ++i)
+			checksum += read_buf_local[i];
+		if (checksum != 0)
+			return -1;
+	}
+
+	return read_len;
 }
