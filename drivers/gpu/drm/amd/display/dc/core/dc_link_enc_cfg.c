@@ -45,6 +45,9 @@ static bool is_dig_link_enc_stream(struct dc_stream_state *stream)
 			 */
 			if (link_enc && ((uint32_t)stream->link->connector_signal & link_enc->output_signals)) {
 				is_dig_stream = true;
+				/* If stream is HDMI FRL, then it is not a DIG stream. */
+				if (dc_is_hdmi_frl_signal(stream->signal))
+					is_dig_stream = false;
 				break;
 			}
 		}
