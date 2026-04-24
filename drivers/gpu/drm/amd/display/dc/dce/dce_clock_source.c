@@ -981,7 +981,9 @@ static bool dcn31_program_pix_clk(
 		dp_dto_ref_khz = clock_source->ctx->dc->clk_mgr->dp_dto_source_clock_in_khz;
 
 	// For these signal types Driver to program DP_DTO without calling VBIOS Command table
-	if (dc_is_dp_signal(pix_clk_params->signal_type) || dc_is_virtual_signal(pix_clk_params->signal_type)) {
+	if (dc_is_hdmi_frl_signal(pix_clk_params->signal_type) ||
+			dc_is_virtual_signal(pix_clk_params->signal_type) ||
+			dc_is_dp_signal(pix_clk_params->signal_type)) {
 		if (e) {
 			/* Set DTO values: phase = target clock, modulo = reference clock*/
 			REG_WRITE(PHASE[inst], e->target_pixel_rate_khz * e->mult_factor);
@@ -996,6 +998,10 @@ static bool dcn31_program_pix_clk(
 			if (encoding == DP_128b_132b_ENCODING)
 				REG_UPDATE_2(PIXEL_RATE_CNTL[inst],
 						DP_DTO0_ENABLE, 1,
+						PIPE0_DTO_SRC_SEL, 2);
+			else if (dc_is_hdmi_frl_signal(pix_clk_params->signal_type) || encoding == DP_128b_132b_ENCODING)
+				REG_UPDATE_2(PIXEL_RATE_CNTL[inst],
+						DP_DTO0_ENABLE, 0,
 						PIPE0_DTO_SRC_SEL, 2);
 			else
 				REG_UPDATE_2(PIXEL_RATE_CNTL[inst],
@@ -1084,8 +1090,14 @@ static bool dcn401_program_pix_clk(
 	if (!dc_is_tmds_signal(pix_clk_params->signal_type)) {
 		long long dtbclk_p_src_clk_khz;
 
-		dtbclk_p_src_clk_khz = clock_source->ctx->dc->clk_mgr->dprefclk_khz;
-		dto_params.clk_src = DPREFCLK;
+		/* if signal is HDMI FRL dtbclk_p_src is DTBCLK else DPREFCLK */
+		if (dc_is_hdmi_frl_signal(pix_clk_params->signal_type)) {
+			dtbclk_p_src_clk_khz = clock_source->ctx->dc->clk_mgr->funcs->get_dtb_ref_clk_frequency(clock_source->ctx->dc->clk_mgr);
+			dto_params.clk_src = DTBCLK0;
+		} else {
+			dtbclk_p_src_clk_khz = clock_source->ctx->dc->clk_mgr->dprefclk_khz;
+			dto_params.clk_src = DPREFCLK;
+		}
 
 		if (e) {
 			dto_params.pixclk_hz = e->target_pixel_rate_khz;
@@ -1103,7 +1115,15 @@ static bool dcn401_program_pix_clk(
 		clock_source->ctx->dc->res_pool->dccg->funcs->set_dp_dto(
 				clock_source->ctx->dc->res_pool->dccg,
 				&dto_params);
-
+		if (clock_source->ctx->dc->caps.is_apu &&
+			pix_clk_params->requested_pix_clk_100hz &&
+			dc_is_hdmi_frl_signal(pix_clk_params->signal_type)) {
+			/*need hdmistreamclk before vpg block register access*/
+			clock_source->ctx->dc->res_pool->dccg->funcs->set_hdmistreamclk(
+				clock_source->ctx->dc->res_pool->dccg,
+				DTBCLK0,
+				pix_clk_params->controller_id - 1);
+		}
 	} else {
 		if (pll_settings->actual_pix_clk_100hz > 6000000UL)
 			return false;
@@ -1390,7 +1410,7 @@ static bool dcn3_program_pix_clk(
 			look_up_in_video_optimized_rate_tlb(pix_clk_params->requested_pix_clk_100hz / 10);
 
 	// For these signal types Driver to program DP_DTO without calling VBIOS Command table
-	if (dc_is_dp_signal(pix_clk_params->signal_type)) {
+	if ((pix_clk_params->signal_type == SIGNAL_TYPE_HDMI_FRL) || dc_is_dp_signal(pix_clk_params->signal_type)) {
 		if (e) {
 			/* Set DTO values: phase = target clock, modulo = reference clock*/
 			REG_WRITE(PHASE[inst], e->target_pixel_rate_khz * e->mult_factor);

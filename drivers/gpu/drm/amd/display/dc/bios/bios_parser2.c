@@ -2203,6 +2203,12 @@ static enum bp_result get_firmware_info_v3_5(
 	return BP_RESULT_OK;
 }
 
+/* TODO: Remove this temp define after atomfirmware.h is updated */
+#define ATOM_ENCODER_CAP_RECORD_HDMI_FRL_TEMP  0x200
+#define ATOM_ENCODER_CAP_RECORD_HDMI_FRL_8GbEn_TEMP 0x400        // HDMI FRL 8Gb support
+#define ATOM_ENCODER_CAP_RECORD_HDMI_FRL_10GbEn_TEMP 0x800        // HDMI FRL 10Gb support
+#define ATOM_ENCODER_CAP_RECORD_HDMI_FRL_12GbEn_TEMP 0x1000       // HDMI FRL 12Gb support
+
 static enum bp_result bios_parser_get_encoder_cap_info(
 	struct dc_bios *dcb,
 	struct graphics_object_id object_id,
@@ -2250,6 +2256,15 @@ static enum bp_result bios_parser_get_encoder_cap_info(
 	info->DP_IS_USB_C = (record->encodercaps &
 			ATOM_ENCODER_CAP_RECORD_USB_C_TYPE) ? 1 : 0;
 	DC_LOG_BIOS("\t info->DP_IS_USB_C %d", info->DP_IS_USB_C);
+	info->IS_HDMI_FRL_CAPABLE = (record->encodercaps &
+			ATOM_ENCODER_CAP_RECORD_HDMI_FRL_TEMP) ? 1 : 0;
+	info->FRL_8G_EN = (record->encodercaps &
+			ATOM_ENCODER_CAP_RECORD_HDMI_FRL_8GbEn_TEMP) ? 1 : 0;
+	info->FRL_10G_EN = (record->encodercaps &
+			ATOM_ENCODER_CAP_RECORD_HDMI_FRL_10GbEn_TEMP) ? 1 : 0;
+	info->FRL_12G_EN = (record->encodercaps &
+			ATOM_ENCODER_CAP_RECORD_HDMI_FRL_12GbEn_TEMP) ? 1 : 0;
+	DC_LOG_BIOS("\t info->IS_HDMI_FRL_CAPABLE %d\n", info->IS_HDMI_FRL_CAPABLE);
 
 	return BP_RESULT_OK;
 }
@@ -2485,6 +2500,12 @@ static enum bp_result bios_parser_get_connector_speed_cap_info(
 	info->DP_UHBR10_EN = (record->connector_max_speed >= 10000) ? 1 : 0;
 	info->DP_UHBR13_5_EN = (record->connector_max_speed >= 13500) ? 1 : 0;
 	info->DP_UHBR20_EN = (record->connector_max_speed >= 20000) ? 1 : 0;
+	info->FRL_8G_EN = (record->connector_max_speed >= 8000) ? 1 : 0;
+	info->FRL_10G_EN = (record->connector_max_speed >= 10000) ? 1 : 0;
+	info->FRL_12G_EN = (record->connector_max_speed >= 12000) ? 1 : 0;
+	info->FRL_16G_EN = (record->connector_max_speed >= 16000) ? 1 : 0;
+	info->FRL_20G_EN = (record->connector_max_speed >= 20000) ? 1 : 0;
+	info->FRL_24G_EN = (record->connector_max_speed >= 24000) ? 1 : 0;
 	return BP_RESULT_OK;
 }
 
