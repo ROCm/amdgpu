@@ -29,6 +29,8 @@
 #include "../dml_inline_defs.h"
 #include "display_mode_vba_util_32.h"
 
+#include "../dml1_frl_cap_chk.h"
+
 void dml32_recalculate(struct display_mode_lib *mode_lib);
 static void DISPCLKDPPCLKDCFCLKDeepSleepPrefetchParametersWatermarksAndPerformanceCalculation(
 		struct display_mode_lib *mode_lib);
@@ -341,6 +343,8 @@ static void DISPCLKDPPCLKDCFCLKDeepSleepPrefetchParametersWatermarksAndPerforman
 			else if (mode_lib->vba.OutputFormat[k] == dm_444)
 				mode_lib->vba.DSCFormatFactor = 1;
 			else if (mode_lib->vba.OutputFormat[k] == dm_n422)
+				mode_lib->vba.DSCFormatFactor = 2;
+			else if (mode_lib->vba.Output[k] == dm_hdmifrl)
 				mode_lib->vba.DSCFormatFactor = 2;
 			else
 				mode_lib->vba.DSCFormatFactor = 1;
@@ -2282,6 +2286,8 @@ void dml32_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 	for (k = 0; k < mode_lib->vba.NumberOfActiveSurfaces; ++k) {
 		if (mode_lib->vba.BlendingAndTiming[k] == k) {
 			v->dummy_vars.dml32_ModeSupportAndSystemConfigurationFull.TotalNumberOfActiveOTG = v->dummy_vars.dml32_ModeSupportAndSystemConfigurationFull.TotalNumberOfActiveOTG + 1;
+			if (mode_lib->vba.Output[k] == dm_hdmifrl)
+				v->dummy_vars.dml32_ModeSupportAndSystemConfigurationFull.TotalNumberOfActiveDP2p0 = v->dummy_vars.dml32_ModeSupportAndSystemConfigurationFull.TotalNumberOfActiveDP2p0 + 1;
 			if (mode_lib->vba.Output[k] == dm_dp2p0) {
 				v->dummy_vars.dml32_ModeSupportAndSystemConfigurationFull.TotalNumberOfActiveDP2p0 = v->dummy_vars.dml32_ModeSupportAndSystemConfigurationFull.TotalNumberOfActiveDP2p0 + 1;
 				if (mode_lib->vba.OutputMultistreamId[k]
@@ -2328,6 +2334,7 @@ void dml32_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 			if (mode_lib->vba.BlendingAndTiming[k] == k
 				&& (mode_lib->vba.Output[k] == dm_dp || mode_lib->vba.Output[k] == dm_dp2p0
 					|| mode_lib->vba.Output[k] == dm_edp
+					|| mode_lib->vba.Output[k] == dm_hdmifrl
 					|| mode_lib->vba.Output[k] == dm_hdmi)
 				&& mode_lib->vba.OutputBppPerState[i][k] == 0 &&
 				(mode_lib->vba.UsesMALLForPStateChange[k] != dm_use_mall_pstate_change_phantom_pipe)) {
@@ -2353,6 +2360,7 @@ void dml32_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 		if (mode_lib->vba.BlendingAndTiming[k] == k
 				&& (mode_lib->vba.Output[k] == dm_dp || mode_lib->vba.Output[k] == dm_dp2p0
 						|| mode_lib->vba.Output[k] == dm_edp
+						|| mode_lib->vba.Output[k] == dm_hdmifrl
 						|| mode_lib->vba.Output[k] == dm_hdmi)) {
 			if (mode_lib->vba.OutputFormat[k]
 					== dm_420 && mode_lib->vba.Interlace[k] == 1 &&
@@ -2388,7 +2396,9 @@ void dml32_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 				}
 			}
 
-			if ((mode_lib->vba.Output[k] == dm_edp || mode_lib->vba.Output[k] == dm_hdmi)) {
+			if ((mode_lib->vba.Output[k] == dm_edp
+					|| mode_lib->vba.Output[k] == dm_hdmifrl
+					|| mode_lib->vba.Output[k] == dm_hdmi)) {
 				if (mode_lib->vba.OutputMultistreamEn[k] == true && mode_lib->vba.OutputMultistreamId[k] == k)
 					mode_lib->vba.MultistreamWithHDMIOreDP = true;
 				for (j = 0; j < mode_lib->vba.NumberOfActiveSurfaces; ++j) {
@@ -2415,6 +2425,7 @@ void dml32_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 		mode_lib->vba.DTBCLKRequiredMoreThanSupported[i] = false;
 		for (k = 0; k < mode_lib->vba.NumberOfActiveSurfaces; ++k) {
 			if (mode_lib->vba.BlendingAndTiming[k] == k
+					&& mode_lib->vba.Output[k] == dm_hdmifrl
 					&& dml32_RequiredDTBCLK(mode_lib->vba.RequiresDSC[i][k],
 							mode_lib->vba.PixelClockBackEnd[k],
 							mode_lib->vba.OutputFormat[k],
@@ -2451,12 +2462,15 @@ void dml32_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 		for (k = 0; k <= mode_lib->vba.NumberOfActiveSurfaces - 1; k++) {
 			if (mode_lib->vba.BlendingAndTiming[k] == k) {
 				if (mode_lib->vba.Output[k] == dm_dp || mode_lib->vba.Output[k] == dm_dp2p0
+						|| mode_lib->vba.Output[k] == dm_hdmifrl
 						|| mode_lib->vba.Output[k] == dm_edp) {
 					if (mode_lib->vba.OutputFormat[k] == dm_420) {
 						mode_lib->vba.DSCFormatFactor = 2;
 					} else if (mode_lib->vba.OutputFormat[k] == dm_444) {
 						mode_lib->vba.DSCFormatFactor = 1;
 					} else if (mode_lib->vba.OutputFormat[k] == dm_n422) {
+						mode_lib->vba.DSCFormatFactor = 2;
+					} else if (mode_lib->vba.Output[k] == dm_hdmifrl) {
 						mode_lib->vba.DSCFormatFactor = 2;
 					} else {
 						mode_lib->vba.DSCFormatFactor = 1;

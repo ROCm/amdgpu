@@ -119,13 +119,6 @@ struct frl_cap_chk_params {
 
 	bool     compressed;              /* set to true if DSC is enabled */
 	bool     bypass_hc_target_calc;   /* debug only */
-	bool     allow_all_bpp;           /* dsc_all_bpp */
-
-	/* DSC parameters */
-	int      slices;
-	int      slice_width;
-	double   bpp_target;
-	bool     is_ovt;
 	int      layout;
 	int      acat;    /* not supported */
 
@@ -145,8 +138,6 @@ enum frl_cap_chk_result dml1_frl_cap_chk_common(struct frl_cap_chk_intermediates
 enum frl_cap_chk_result dml1_frl_cap_chk_uncompressed(struct frl_cap_chk_params *params,
 						      struct frl_cap_chk_intermediates *inter);
 
-enum frl_cap_chk_result dml1_frl_cap_chk_compressed(struct frl_cap_chk_params *params,
-						    struct frl_cap_chk_intermediates *inter);
 #endif
 
 void frl_modified_pix_clock_for_dsc_padding(const int hc_active_target,
