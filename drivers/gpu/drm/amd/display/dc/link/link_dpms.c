@@ -48,6 +48,7 @@
 #include "protocols/link_edp_panel_control.h"
 #include "protocols/link_dp_panel_replay.h"
 #include "protocols/link_dp_dpia_bw.h"
+#include "link/protocols/link_hdmi_frl.h"
 
 #include "dm_helpers.h"
 #include "link_enc_cfg.h"
@@ -69,6 +70,10 @@
 
 #define RETIMER_REDRIVER_INFO(...) \
 	DC_LOG_RETIMER_REDRIVER(  \
+		__VA_ARGS__)
+
+#define FRL_INFO(...) \
+	DC_LOG_HDMI_FRL_LTP(  \
 		__VA_ARGS__)
 
 #define MAX_MTP_SLOT_COUNT 64
@@ -550,14 +555,21 @@ static void update_psp_stream_config(struct pipe_ctx *pipe_ctx, bool dpms_off)
 	if (dp_is_128b_132b_signal(pipe_ctx))
 		config.stream_enc_idx =
 				(uint8_t)(pipe_ctx->stream_res.hpo_dp_stream_enc->id - ENGINE_ID_HPO_DP_0);
+	if (dc_is_hdmi_frl_signal(pipe_ctx->stream->signal))
+		config.stream_enc_idx =
+				(uint8_t)(pipe_ctx->stream_res.hpo_frl_stream_enc->id - ENGINE_ID_HPO_0);
 
 	/* dig back end */
 	config.dig_be = pipe_ctx->stream->link->link_enc_hw_inst;
+	if (dc_is_hdmi_frl_signal(pipe_ctx->stream->signal))
+		config.dig_be = (uint8_t)pipe_ctx->stream_res.hpo_frl_stream_enc->stream_enc_inst;
 
 	/* link encoder index */
 	config.link_enc_idx = (uint8_t)(link_enc->transmitter - TRANSMITTER_UNIPHY_A);
 	if (dp_is_128b_132b_signal(pipe_ctx))
 		config.link_enc_idx = (uint8_t)pipe_ctx->link_res.hpo_dp_link_enc->inst;
+	if (dc_is_hdmi_frl_signal(pipe_ctx->stream->signal))
+		config.link_enc_idx = (uint8_t)pipe_ctx->stream->link->hpo_frl_link_enc->inst;
 
 	/* dio output index is dpia index for DPIA endpoint & dcio index by default */
 	if (pipe_ctx->stream->link->ep_type == DISPLAY_ENDPOINT_USB4_DPIA)
@@ -577,6 +589,7 @@ static void update_psp_stream_config(struct pipe_ctx *pipe_ctx, bool dpms_off)
 	config.assr_enabled = (panel_mode == DP_PANEL_MODE_EDP) ? 1 : 0;
 	config.mst_enabled = (pipe_ctx->stream->signal ==
 			SIGNAL_TYPE_DISPLAY_PORT_MST) ? 1 : 0;
+	config.frl_enabled = dc_is_hdmi_frl_signal(pipe_ctx->stream->signal) ? 1 : 0;
 	config.dp2_enabled = dp_is_128b_132b_signal(pipe_ctx) ? 1 : 0;
 	config.usb4_enabled = (pipe_ctx->stream->link->ep_type == DISPLAY_ENDPOINT_USB4_DPIA) ?
 			1 : 0;
@@ -588,11 +601,46 @@ static void update_psp_stream_config(struct pipe_ctx *pipe_ctx, bool dpms_off)
 	cp_psp->funcs.update_stream_config(cp_psp->handle, &config);
 }
 
+void link_wait_for_unlocked(struct dc_link *link)
+{
+	unsigned long long enter_timestamp;
+	unsigned long long finish_timestamp;
+	unsigned long long time_taken_in_ns;
+	bool waited = false;
+
+	DC_LOGGER_INIT(link->ctx->logger);
+
+	enter_timestamp = dm_get_timestamp(link->ctx);
+
+	while (link->is_link_locked) { // busy wait
+		if (!waited) {
+			DC_LOG_DC("%s: 0x%p ...", __func__, link);
+
+			waited = true;
+		}
+
+		udelay(1);
+	}
+
+	if (!waited)
+		return;
+
+	finish_timestamp = dm_get_timestamp(link->ctx);
+	time_taken_in_ns = dm_get_elapse_time_in_ns(link->ctx,
+							finish_timestamp, enter_timestamp);
+
+	DC_LOG_DC("%s: 0x%p took %llu ms.", __func__,
+			link, div_u64(time_taken_in_ns, 1000000));
+}
+
 static void set_avmute(struct pipe_ctx *pipe_ctx, bool enable)
 {
 	struct dc  *dc = pipe_ctx->stream->ctx->dc;
 
 	if (!dc_is_hdmi_signal(pipe_ctx->stream->signal))
+		return;
+
+	if (pipe_ctx->stream->timing.flags.DSC)
 		return;
 
 	dc->hwss.set_avmute(pipe_ctx, enable);
@@ -1813,6 +1861,13 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 			stream->phy_pix_clk,
 			(stream->timing.flags.LTE_340MCSC_SCRAMBLE != 0));
 
+	if (dc->debug.enable_hdmi_idcc) {
+		union hdmi_idcc_source_id source_id;
+
+		source_id.raw = 0xff;
+		write_idcc_data(stream->link->ddc, HDMI_IDCC_SCOPE_WRITE,
+				&source_id.raw, 0, 1);
+	}
 	memset(&stream->link->cur_link_settings, 0,
 			sizeof(struct dc_link_settings));
 
@@ -1836,6 +1891,109 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 
 	if (dc_is_hdmi_signal(pipe_ctx->stream->signal))
 		read_scdc_data(link->ddc);
+}
+
+static enum dc_status enable_link_hdmi_frl(struct pipe_ctx *pipe_ctx)
+{
+	enum link_result link_stat = LINK_RESULT_UNKNOWN;
+	enum dc_status status = DC_OK;
+	struct dc_stream_state *stream = pipe_ctx->stream;
+	struct dc *core_dc = pipe_ctx->stream->ctx->dc;
+	enum clock_source_id frl_phy_clock_source_id;
+	bool frl_poll_start = true;
+
+	DC_LOGGER_INIT(stream->ctx->logger);
+
+	if ((!stream->link->link_enc) ||
+			(!stream->link->hpo_frl_link_enc) ||
+			(!core_dc->res_pool->dccg->funcs->enable_hdmicharclk) ||
+			(!(pipe_ctx->stream_res.hpo_frl_stream_enc)))
+		return DC_ERROR_UNEXPECTED;
+
+	/* get link settings for video mode timing */
+	hdmi_frl_decide_link_settings(stream, &stream->link->frl_link_settings, &pipe_ctx->dsc_padding_params);
+
+	switch (stream->link->frl_link_settings.frl_link_rate) {
+	case HDMI_FRL_LINK_RATE_3GBPS:
+		pipe_ctx->stream_res.pix_clk_params.requested_sym_clk = 166667;
+		break;
+	case HDMI_FRL_LINK_RATE_6GBPS:
+	case HDMI_FRL_LINK_RATE_6GBPS_4LANE:
+		pipe_ctx->stream_res.pix_clk_params.requested_sym_clk = 333333;
+		break;
+	case HDMI_FRL_LINK_RATE_8GBPS:
+		pipe_ctx->stream_res.pix_clk_params.requested_sym_clk = 444444;
+		break;
+	case HDMI_FRL_LINK_RATE_10GBPS:
+		pipe_ctx->stream_res.pix_clk_params.requested_sym_clk = 555555;
+		break;
+	case HDMI_FRL_LINK_RATE_12GBPS:
+		pipe_ctx->stream_res.pix_clk_params.requested_sym_clk = 666667;
+		break;
+	case HDMI_FRL_LINK_RATE_16GBPS:
+		pipe_ctx->stream_res.pix_clk_params.requested_sym_clk = 888889;
+		break;
+	case HDMI_FRL_LINK_RATE_20GBPS:
+		pipe_ctx->stream_res.pix_clk_params.requested_sym_clk = 1111111;
+		break;
+	case HDMI_FRL_LINK_RATE_24GBPS:
+		pipe_ctx->stream_res.pix_clk_params.requested_sym_clk = 1333333;
+		break;
+	default:
+		break;
+	}
+
+	stream->phy_pix_clk = pipe_ctx->stream_res.pix_clk_params.requested_sym_clk;
+
+	memset(&stream->link->cur_link_settings, 0,
+			sizeof(struct dc_link_settings));
+
+	/* Find proper clock source in HDMI FRL mode for phy used for DCCG */
+	frl_phy_clock_source_id = hdmi_frl_find_matching_phypll(stream->link);
+
+	FRL_INFO("FRL LINK TRAINING:  LTS:P Start\n");
+	/* Setup FRL PHY, enable HDMI character clock and HPO link encoder */
+	core_dc->hwss.setup_hdmi_frl_link(stream->link,
+			(pipe_ctx->stream_res.hpo_frl_stream_enc->id - ENGINE_ID_HPO_0),
+			frl_phy_clock_source_id);
+
+	link_stat = hdmi_frl_perform_link_training_with_retries(stream->link);
+
+	if (core_dc->res_pool->dccg->funcs->set_valid_pixel_rate)
+		core_dc->res_pool->dccg->funcs->set_valid_pixel_rate(
+						core_dc->res_pool->dccg,
+						core_dc->clk_mgr->funcs->get_dtb_ref_clk_frequency(core_dc->clk_mgr),
+						pipe_ctx->stream_res.tg->inst,
+						(stream->timing.pix_clk_100hz / 10));
+
+	/* Enable FRL packet transmission */
+	if (link_stat == LINK_RESULT_SUCCESS) {
+		stream->link->hpo_frl_link_enc->funcs->enable_output(
+				stream->link->hpo_frl_link_enc);
+		if (stream->link->frl_flags.apply_vsdb_rcc_wa)
+			stream->link->hpo_frl_link_enc->funcs->apply_vsdb_rcc_wa(stream->link->hpo_frl_link_enc);
+		if (frl_poll_start)
+			hdmi_frl_poll_start(stream->link->ddc);
+
+		FRL_INFO("FRL LINK TRAINING:  LTS:P Success\n");
+
+		/* Set HDMISTREAMCLK source to DTBCLK0 and bypass DTO */
+		if (core_dc->res_pool->dccg->funcs->set_hdmistreamclk) {
+			core_dc->res_pool->dccg->funcs->set_hdmistreamclk(
+					core_dc->res_pool->dccg,
+					DTBCLK0,
+					pipe_ctx->stream_res.tg->inst);
+		}
+
+		pipe_ctx->stream_res.hpo_frl_stream_enc->funcs->hdmi_frl_enable(
+			pipe_ctx->stream_res.hpo_frl_stream_enc,
+			pipe_ctx->stream_res.tg->inst);
+	} else {
+		status = DC_FAIL_HDMI_FRL_LINK_TRAINING;
+		stream->link->frl_link_settings.frl_link_rate = 0;
+	}
+
+	return status;
 }
 
 static enum dc_status enable_link_dp(struct dc_state *state,
@@ -2076,6 +2234,14 @@ static enum dc_status enable_link(
 		enable_link_hdmi(pipe_ctx);
 		status = DC_OK;
 		break;
+	case SIGNAL_TYPE_HDMI_FRL:
+		if (link->local_sink &&
+			link->local_sink->edid_caps.panel_patch.delay_hdmi_link_training &&
+			stream->timing.pix_clk_100hz == 6627500) {
+			msleep(link->local_sink->edid_caps.panel_patch.delay_hdmi_link_training);
+		}
+		status = enable_link_hdmi_frl(pipe_ctx);
+		break;
 	case SIGNAL_TYPE_LVDS:
 		enable_link_lvds(pipe_ctx);
 		status = DC_OK;
@@ -2178,6 +2344,8 @@ void link_set_dpms_off(struct pipe_ctx *pipe_ctx)
 
 	if (dp_is_128b_132b_signal(pipe_ctx))
 		vpg = pipe_ctx->stream_res.hpo_dp_stream_enc->vpg;
+	if (dc_is_hdmi_frl_signal(pipe_ctx->stream->signal))
+		vpg = pipe_ctx->stream_res.hpo_frl_stream_enc->vpg;
 	if (dc_is_virtual_signal(pipe_ctx->stream->signal))
 		return;
 
@@ -2189,6 +2357,8 @@ void link_set_dpms_off(struct pipe_ctx *pipe_ctx)
 			pipe_ctx->stream->signal, link->link_index, link->sink_count);
 		}
 	}
+
+	link_wait_for_unlocked(link);
 
 	if (!pipe_ctx->stream->sink->edid_caps.panel_patch.skip_avmute) {
 		if (dc_is_hdmi_signal(pipe_ctx->stream->signal))
@@ -2292,6 +2462,8 @@ void link_set_dpms_on(
 
 	if (dp_is_128b_132b_signal(pipe_ctx))
 		vpg = pipe_ctx->stream_res.hpo_dp_stream_enc->vpg;
+	if (dc_is_hdmi_frl_signal(pipe_ctx->stream->signal))
+		vpg = pipe_ctx->stream_res.hpo_frl_stream_enc->vpg;
 	if (dc_is_virtual_signal(pipe_ctx->stream->signal))
 		return;
 
@@ -2306,11 +2478,13 @@ void link_set_dpms_on(
 		}
 	}
 
+	link_wait_for_unlocked(stream->link);
 	if (!dc->config.unify_link_enc_assignment)
 		link_enc = link_enc_cfg_get_link_enc(link);
 	ASSERT(link_enc);
 
 	if (!dc_is_virtual_signal(pipe_ctx->stream->signal)
+			&& !dc_is_hdmi_frl_signal(pipe_ctx->stream->signal)
 			&& !dp_is_128b_132b_signal(pipe_ctx)) {
 		if (link_enc)
 			link_enc->funcs->setup(
@@ -2320,9 +2494,14 @@ void link_set_dpms_on(
 
 	pipe_ctx->stream->link->link_state_valid = true;
 
+	if (dc_is_hdmi_frl_signal(pipe_ctx->stream->signal))
+		hdmi_frl_decide_link_settings(stream, &stream->link->frl_link_settings, &pipe_ctx->dsc_padding_params);
+
 	if (pipe_ctx->stream_res.tg->funcs->set_out_mux) {
 		if (dp_is_128b_132b_signal(pipe_ctx))
 			otg_out_dest = OUT_MUX_HPO_DP;
+		else if (dc_is_hdmi_frl_signal(pipe_ctx->stream->signal))
+			otg_out_dest = OUT_MUX_HPO_FRL;
 		else
 			otg_out_dest = OUT_MUX_DIO;
 		pipe_ctx->stream_res.tg->funcs->set_out_mux(pipe_ctx->stream_res.tg, otg_out_dest);
@@ -2413,8 +2592,9 @@ void link_set_dpms_on(
 		 * show the stream anyway. But MST displays can't proceed
 		 * without link training.
 		 */
-		if (status != DC_FAIL_DP_LINK_TRAINING ||
-				pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
+			if ((status != DC_FAIL_DP_LINK_TRAINING &&
+					status != DC_FAIL_HDMI_FRL_LINK_TRAINING) ||
+					pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
 			if (false == stream->link->link_status.link_active)
 				disable_link(stream->link, &pipe_ctx->link_res,
 						pipe_ctx->stream->signal);
@@ -2434,6 +2614,7 @@ void link_set_dpms_on(
 	 * from transmitter control.
 	 */
 	if (!(dc_is_virtual_signal(pipe_ctx->stream->signal) ||
+			dc_is_hdmi_frl_signal(pipe_ctx->stream->signal) ||
 			dp_is_128b_132b_signal(pipe_ctx))) {
 
 			if (link_enc)
