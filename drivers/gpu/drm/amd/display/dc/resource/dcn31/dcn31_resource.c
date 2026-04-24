@@ -54,6 +54,8 @@
 #include "dcn30/dcn30_vpg.h"
 #include "dcn30/dcn30_afmt.h"
 #include "dcn30/dcn30_dio_stream_encoder.h"
+#include "dcn30/dcn30_hpo_frl_stream_encoder.h"
+#include "dcn30/dcn30_hpo_frl_link_encoder.h"
 #include "dcn31/dcn31_hpo_dp_stream_encoder.h"
 #include "dcn31/dcn31_hpo_dp_link_encoder.h"
 #include "dcn31/dcn31_apg.h"
@@ -429,6 +431,45 @@ static const struct dcn10_link_enc_shift le_shift = {
 static const struct dcn10_link_enc_mask le_mask = {
 	LINK_ENCODER_MASK_SH_LIST_DCN31(_MASK), \
 	DPCS_DCN31_MASK_SH_LIST(_MASK)
+};
+
+#define hpo_frl_stream_encoder_reg_list(id)\
+[id] = {\
+	DCN3_0_HPO_FRL_STREAM_ENC_REG_LIST(id)\
+}
+
+#define hpo_frl_stream_encoder_dme_reg_list(id)\
+	DCN3_0_HPO_STREAM_ENC_DME_REG_LIST(id, 6)
+
+
+static const struct dcn30_hpo_frl_stream_enc_registers hpo_frl_stream_enc_regs[] = {
+	hpo_frl_stream_encoder_reg_list(0),
+	hpo_frl_stream_encoder_dme_reg_list(6),
+};
+
+static const struct dcn30_hpo_frl_stream_encoder_shift hpo_se_shift = {
+	DCN3_0_HPO_STREAM_ENC_MASK_SH_LIST(__SHIFT)
+};
+
+static const struct dcn30_hpo_frl_stream_encoder_mask hpo_se_mask = {
+	DCN3_0_HPO_STREAM_ENC_MASK_SH_LIST(_MASK)
+};
+
+#define hpo_frl_link_encoder_reg_list(id)\
+[id] = {\
+	DCN3_0_HPO_FRL_LINK_ENC_REG_LIST(id)\
+}
+
+static const struct dcn30_hpo_frl_link_encoder_registers hpo_frl_link_enc_regs[] = {
+	hpo_frl_link_encoder_reg_list(0),
+};
+
+static const struct dcn30_hpo_frl_link_encoder_shift hpo_le_shift = {
+	DCN3_0_HPO_FRL_LINK_ENC_MASK_SH_LIST(__SHIFT)
+};
+
+static const struct dcn30_hpo_frl_link_encoder_mask hpo_le_mask = {
+	DCN3_0_HPO_FRL_LINK_ENC_MASK_SH_LIST(_MASK)
 };
 
 #define hpo_dp_stream_encoder_reg_list(id)\
@@ -833,6 +874,7 @@ static const struct resource_caps res_cap_dcn31 = {
 	.num_audio = 5,
 	.num_stream_encoder = 5,
 	.num_dig_link_enc = 5,
+	.num_hpo_frl = 1,
 	.num_hpo_dp_stream_encoder = 4,
 	.num_hpo_dp_link_encoder = 2,
 	.num_pll = 5,
@@ -904,6 +946,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 		}
 	},
 	.disable_z10 = true,
+	.max_frl_rate = HDMI_FRL_LINK_RATE_10GBPS,
 	.enable_z9_disable_interface = true, /* Allow support for the PMFW interface for disable Z9*/
 	.dml_hostvm_override = DML_HOSTVM_OVERRIDE_FALSE,
 	.using_dml2 = false,
@@ -1281,6 +1324,69 @@ static struct stream_encoder *dcn31_stream_encoder_create(
 	return &enc1->base;
 }
 
+static struct hpo_frl_stream_encoder *dcn31_hpo_frl_stream_encoder_create(enum engine_id eng_id,
+									  struct dc_context *ctx)
+{
+	struct dcn30_hpo_frl_stream_encoder *hpo_enc3;
+	struct afmt *afmt;
+	struct vpg *vpg;
+	int afmt_inst;
+	int vpg_inst;
+
+	/* Mapping of VPG, AFMT, DME register blocks to HPO block instance */
+	if (eng_id == ENGINE_ID_HPO_0) {
+		vpg_inst = 5;
+		afmt_inst = 5;
+	} else {
+		return NULL;
+	}
+
+	/* allocate HPO stream encoder and create VPG, AFMT sub-blocks */
+	hpo_enc3 = kzalloc(sizeof(struct dcn30_hpo_frl_stream_encoder), GFP_KERNEL);
+	vpg = dcn31_vpg_create(ctx, vpg_inst);
+	afmt = dcn31_afmt_create(ctx, afmt_inst);
+
+	if (!hpo_enc3 || !vpg || !afmt) {
+		kfree(hpo_enc3);
+		kfree(vpg);
+		kfree(afmt);
+		return NULL;
+	}
+
+	dcn30_hpo_frl_stream_encoder_construct(hpo_enc3,
+					       ctx,
+					       ctx->dc_bios,
+					       eng_id,
+					       vpg,
+					       afmt,
+					       &hpo_frl_stream_enc_regs[eng_id - ENGINE_ID_HPO_0],
+					       &hpo_se_shift, &hpo_se_mask);
+
+	return &hpo_enc3->base;
+}
+
+static struct hpo_frl_link_encoder *dcn31_hpo_frl_link_encoder_create(enum engine_id eng_id,
+								      struct dc_context *ctx)
+{
+	struct dcn30_hpo_frl_link_encoder *hpo_enc3;
+
+	ASSERT((eng_id == ENGINE_ID_HPO_0) || (eng_id == ENGINE_ID_HPO_1));
+
+	/* allocate HPO link encoder */
+	hpo_enc3 = kzalloc(sizeof(struct dcn30_hpo_frl_link_encoder), GFP_KERNEL);
+	if (!hpo_enc3)
+		return NULL; /* out of memory */
+
+	hpo_frl_link_encoder3_construct(hpo_enc3,
+					ctx,
+					eng_id - ENGINE_ID_HPO_0,
+					&hpo_frl_link_enc_regs[eng_id - ENGINE_ID_HPO_0],
+					&hpo_le_shift,
+					&hpo_le_mask);
+
+	return &hpo_enc3->base;
+}
+
 static struct hpo_dp_stream_encoder *dcn31_hpo_dp_stream_encoder_create(
 	enum engine_id eng_id,
 	struct dc_context *ctx)
@@ -1366,6 +1472,7 @@ static const struct resource_create_funcs res_create_funcs = {
 	.read_dce_straps = read_dce_straps,
 	.create_audio = dcn31_create_audio,
 	.create_stream_encoder = dcn31_stream_encoder_create,
+	.create_hpo_frl_stream_encoder = dcn31_hpo_frl_stream_encoder_create,
 	.create_hpo_dp_stream_encoder = dcn31_hpo_dp_stream_encoder_create,
 	.create_hpo_dp_link_encoder = dcn31_hpo_dp_link_encoder_create,
 	.create_hwseq = dcn31_hwseq_create,
@@ -1387,6 +1494,23 @@ static void dcn31_resource_destruct(struct dcn31_resource_pool *pool)
 			}
 			kfree(DCN10STRENC_FROM_STRENC(pool->base.stream_enc[i]));
 			pool->base.stream_enc[i] = NULL;
+		}
+	}
+
+	for (i = 0; i < pool->base.hpo_frl_stream_enc_count; i++) {
+		if (pool->base.hpo_frl_stream_enc[i] != NULL) {
+			if (pool->base.hpo_frl_stream_enc[i]->vpg != NULL) {
+				kfree(DCN30_VPG_FROM_VPG(pool->base.hpo_frl_stream_enc[i]->vpg));
+				pool->base.hpo_frl_stream_enc[i]->vpg = NULL;
+			}
+
+			if (pool->base.hpo_frl_stream_enc[i]->afmt != NULL) {
+				kfree(DCN30_AFMT_FROM_AFMT(pool->base.hpo_frl_stream_enc[i]->afmt));
+				pool->base.hpo_frl_stream_enc[i]->afmt = NULL;
+			}
+
+			kfree(DCN30_HPO_FRL_STRENC_FROM_HPO_FRL_STRENC(pool->base.hpo_frl_stream_enc[i]));
+			pool->base.hpo_frl_stream_enc[i] = NULL;
 		}
 	}
 
@@ -1867,6 +1991,7 @@ static struct resource_funcs dcn31_res_pool_funcs = {
 	.link_enc_create_minimal = dcn31_link_enc_create_minimal,
 	.link_encs_assign = link_enc_cfg_link_encs_assign,
 	.link_enc_unassign = link_enc_cfg_link_enc_unassign,
+	.hpo_frl_link_enc_create = dcn31_hpo_frl_link_encoder_create,
 	.panel_cntl_create = dcn31_panel_cntl_create,
 	.validate_bandwidth = dcn31_validate_bandwidth,
 	.calculate_wm_and_dlg = dcn31_calculate_wm_and_dlg,
@@ -1951,6 +2076,8 @@ static bool dcn31_resource_construct(
 	dc->caps.force_dp_tps4_for_cp2520 = true;
 	if (dc->config.forceHBR2CP2520)
 		dc->caps.force_dp_tps4_for_cp2520 = false;
+	dc->caps.hdmi_hpo = true;
+	dc->config.skip_frl_pretraining = true;
 	dc->caps.dp_hpo = true;
 	dc->caps.dp_hdmi21_pcon_support = true;
 	dc->caps.edp_dsc_support = true;

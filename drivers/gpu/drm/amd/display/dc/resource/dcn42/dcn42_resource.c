@@ -40,6 +40,9 @@
 #include "dcn31/dcn31_vpg.h"
 #include "dcn42/dcn42_dio_stream_encoder.h"
 #include "dcn42/dcn42_pg_cntl.h"
+#include "dcn401/dcn401_hpo_frl_stream_encoder.h"
+#include "dcn42/dcn42_hpo_frl_stream_encoder.h"
+#include "dcn30/dcn30_hpo_frl_link_encoder.h"
 #include "dcn31/dcn31_hpo_dp_stream_encoder.h"
 #include "dcn31/dcn31_hpo_dp_link_encoder.h"
 #include "dcn32/dcn32_hpo_dp_link_encoder.h"
@@ -140,6 +143,9 @@ enum dcn401_clk_src_array_id {
 	REG_STRUCT[id - 1].reg_name = BASE(reg##block##id##_##reg_name##_BASE_IDX) + \
 								  reg##block##id##_##reg_name
 
+#define SRI_ARR_DME(reg_name, block, id, offset)                                      \
+	REG_STRUCT[id - offset].reg_name = BASE(reg##block##id##_##reg_name##_BASE_IDX) + \
+									   reg##block##id##_##reg_name
 
 #define SRI_ARR_ALPHABET(reg_name, block, index, id)                            \
 	REG_STRUCT[index].reg_name = BASE(reg##block##id##_##reg_name##_BASE_IDX) + \
@@ -296,6 +302,34 @@ static const struct dcn10_link_enc_shift le_shift = {
 
 static const struct dcn10_link_enc_mask le_mask = {
 	LINK_ENCODER_MASK_SH_LIST_DCN42(_MASK)};
+
+#define hpo_frl_stream_encoder_reg_list(id) \
+	DCN42_HPO_FRL_STREAM_ENC_REG_LIST_RI(id)
+
+#define hpo_frl_stream_encoder_dme_reg_list(id) \
+	DCN3_0_HPO_STREAM_ENC_DME_REG_LIST_RI(id, 6)
+
+static struct dcn30_hpo_frl_stream_enc_registers hpo_frl_stream_enc_regs[2];
+
+static const struct dcn401_hpo_frl_stream_encoder_shift hpo_se_shift = {
+	DCN401_HPO_STREAM_ENC_MASK_SH_LIST(__SHIFT),
+	DCN42_HDMI_STREAM_ENC_MASK_SH_LIST(__SHIFT)
+};
+static const struct dcn401_hpo_frl_stream_encoder_mask hpo_se_mask = {
+	DCN401_HPO_STREAM_ENC_MASK_SH_LIST(_MASK),
+	DCN42_HDMI_STREAM_ENC_MASK_SH_LIST(_MASK)
+};
+
+#define hpo_frl_link_encoder_reg_list(id) \
+	DCN3_0_HPO_FRL_LINK_ENC_REG_LIST_RI(id)
+
+static struct dcn30_hpo_frl_link_encoder_registers hpo_frl_link_enc_regs[1];
+
+static const struct dcn30_hpo_frl_link_encoder_shift hpo_le_shift = {
+	DCN3_0_HPO_FRL_LINK_ENC_MASK_SH_LIST(__SHIFT)};
+
+static const struct dcn30_hpo_frl_link_encoder_mask hpo_le_mask = {
+	DCN3_0_HPO_FRL_LINK_ENC_MASK_SH_LIST(_MASK)};
 
 #define hpo_dp_stream_encoder_reg_init(id) \
 	DCN42_HPO_DP_STREAM_ENC_REG_LIST_RI(id)
@@ -658,6 +692,7 @@ static const struct resource_caps res_cap_dcn42 = {
 	.num_stream_encoder = 5,
 	.num_dig_link_enc = 5,
 	.num_usb4_dpia = 6,
+	.num_hpo_frl = 1,
 	.num_hpo_dp_stream_encoder = 4,
 	.num_hpo_dp_link_encoder = 4,
 	.num_pll = 5,
@@ -1259,6 +1294,74 @@ static struct stream_encoder *dcn42_stream_encoder_create(
 	return &enc1->base;
 }
 
+static struct hpo_frl_stream_encoder *dcn42_hpo_frl_stream_encoder_create(
+	enum engine_id eng_id,
+	struct dc_context *ctx)
+{
+	struct dcn42_hpo_frl_stream_encoder *hpo_enc42;
+	struct vpg *vpg;
+	struct apg *apg;
+
+	uint32_t vpg_inst;
+	uint32_t apg_inst;
+
+
+#undef REG_STRUCT
+#define REG_STRUCT hpo_frl_stream_enc_regs
+	hpo_frl_stream_encoder_reg_list(0),
+		hpo_frl_stream_encoder_dme_reg_list(6);
+
+	/* Mapping of VPG, DME register blocks to HPO block instance */
+	if (eng_id == ENGINE_ID_HPO_0) {
+		vpg_inst = 9; /*hw hard wired to inst 9, ref to dcn header file*/
+		apg_inst = 9;
+	} else
+		return NULL;
+
+	/* allocate HPO stream encoder and create VPG sub-block */
+	hpo_enc42 = kzalloc(sizeof(struct dcn42_hpo_frl_stream_encoder), GFP_KERNEL);
+	vpg = dcn42_vpg_create(ctx, vpg_inst);
+	apg = dcn42_apg_create(ctx, apg_inst);
+
+	if (!hpo_enc42 || !vpg || !apg) {
+		kfree(hpo_enc42);
+		kfree(vpg);
+		kfree(apg);
+		return NULL;
+	}
+
+	dcn42_hpo_frl_stream_encoder_construct(hpo_enc42, ctx, ctx->dc_bios,
+			eng_id, vpg, apg,
+			&hpo_frl_stream_enc_regs[eng_id - ENGINE_ID_HPO_0],
+			&hpo_se_shift, &hpo_se_mask);
+
+	return &hpo_enc42->base;
+}
+
+static struct hpo_frl_link_encoder *dcn42_hpo_frl_link_encoder_create(
+	enum engine_id eng_id,
+	struct dc_context *ctx)
+{
+	struct dcn30_hpo_frl_link_encoder *hpo_link_enc;
+
+	ASSERT((eng_id == ENGINE_ID_HPO_0) || (eng_id == ENGINE_ID_HPO_1));
+
+#undef REG_STRUCT
+#define REG_STRUCT hpo_frl_link_enc_regs
+	hpo_frl_link_encoder_reg_list(0);
+
+	/* allocate HPO link encoder */
+	hpo_link_enc = kzalloc(sizeof(struct dcn30_hpo_frl_link_encoder), GFP_KERNEL);
+	if (!hpo_link_enc)
+		return NULL; /* out of memory */
+
+	hpo_frl_link_encoder3_construct(hpo_link_enc, ctx, eng_id - ENGINE_ID_HPO_0,
+			&hpo_frl_link_enc_regs[eng_id - ENGINE_ID_HPO_0],
+			&hpo_le_shift, &hpo_le_mask);
+
+	return &hpo_link_enc->base;
+}
+
 static struct hpo_dp_stream_encoder *dcn42_hpo_dp_stream_encoder_create(
 	enum engine_id eng_id,
 	struct dc_context *ctx)
@@ -1364,6 +1467,7 @@ static const struct resource_create_funcs res_create_funcs = {
 	.read_dce_straps = read_dce_straps,
 	.create_audio = dcn42_create_audio,
 	.create_stream_encoder = dcn42_stream_encoder_create,
+	.create_hpo_frl_stream_encoder = dcn42_hpo_frl_stream_encoder_create,
 	.create_hpo_dp_stream_encoder = dcn42_hpo_dp_stream_encoder_create,
 	.create_hpo_dp_link_encoder = dcn42_hpo_dp_link_encoder_create,
 	.create_hwseq = dcn42_hwseq_create,
@@ -1391,6 +1495,21 @@ static void dcn42_resource_destruct(struct dcn42_resource_pool *pool)
 			}
 			kfree(DCN10STRENC_FROM_STRENC(pool->base.stream_enc[i]));
 			pool->base.stream_enc[i] = NULL;
+		}
+	}
+
+	for (i = 0; i < pool->base.hpo_frl_stream_enc_count; i++) {
+		if (pool->base.hpo_frl_stream_enc[i] != NULL) {
+			if (pool->base.hpo_frl_stream_enc[i]->vpg != NULL) {
+				kfree(DCN31_VPG_FROM_VPG(pool->base.hpo_frl_stream_enc[i]->vpg));
+				pool->base.hpo_frl_stream_enc[i]->vpg = NULL;
+			}
+			if (pool->base.hpo_frl_stream_enc[i]->apg != NULL) {
+				kfree(DCN31_APG_FROM_APG(pool->base.hpo_frl_stream_enc[i]->apg));
+				pool->base.hpo_frl_stream_enc[i]->apg = NULL;
+			}
+			kfree(DCN401_HPO_FRL_STRENC_FROM_HPO_FRL_STRENC(pool->base.hpo_frl_stream_enc[i]));
+			pool->base.hpo_frl_stream_enc[i] = NULL;
 		}
 	}
 
@@ -1796,6 +1915,7 @@ static struct resource_funcs dcn42_res_pool_funcs = {
 	.link_enc_create_minimal = dcn42_link_enc_create_minimal,
 	.link_encs_assign = link_enc_cfg_link_encs_assign,
 	.link_enc_unassign = link_enc_cfg_link_enc_unassign,
+	.hpo_frl_link_enc_create = dcn42_hpo_frl_link_encoder_create,
 	.panel_cntl_create = dcn32_panel_cntl_create,
 	.validate_bandwidth = dcn42_validate_bandwidth,
 	.calculate_wm_and_dlg = NULL,
@@ -1914,6 +2034,7 @@ static bool dcn42_resource_construct(
 	dc->caps.force_dp_tps4_for_cp2520 = true;
 	if (dc->config.forceHBR2CP2520)
 		dc->caps.force_dp_tps4_for_cp2520 = false;
+	dc->caps.hdmi_hpo = true;
 	dc->caps.dp_hdmi21_pcon_support = true;
 	dc->caps.dp_hpo = true;
 	dc->caps.edp_dsc_support = true;

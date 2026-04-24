@@ -644,6 +644,7 @@ static struct resource_caps res_cap_dcn301 = {
 	.num_video_plane = 4,
 	.num_audio = 4,
 	.num_stream_encoder = 4,
+	.num_hpo_frl = 0,
 	.num_pll = 4,
 	.num_dwb = 1,
 	.num_ddc = 4,
