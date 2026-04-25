@@ -1416,7 +1416,7 @@ static void dcn42_resource_destruct(struct dcn42_resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_dsc; i++) {
 		if (pool->base.dscs[i] != NULL)
 			dcn42_dsc_destroy(&pool->base.dscs[i]);
 	}
@@ -1445,7 +1445,7 @@ static void dcn42_resource_destruct(struct dcn42_resource_pool *pool)
 			dal_irq_service_destroy(&pool->base.irqs);
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_ddc; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_ddc; i++) {
 		if (pool->base.engines[i] != NULL)
 			dce110_engine_destroy(&pool->base.engines[i]);
 		if (pool->base.hw_i2cs[i] != NULL) {
@@ -1458,19 +1458,19 @@ static void dcn42_resource_destruct(struct dcn42_resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_opp; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_opp; i++) {
 		if (pool->base.opps[i] != NULL)
 			pool->base.opps[i]->funcs->opp_destroy(&pool->base.opps[i]);
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_timing_generator; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_timing_generator; i++) {
 		if (pool->base.timing_generators[i] != NULL) {
 			kfree(DCN10TG_FROM_TG(pool->base.timing_generators[i]));
 			pool->base.timing_generators[i] = NULL;
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_dwb; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_dwb; i++) {
 		if (pool->base.dwbc[i] != NULL) {
 			kfree(TO_DCN30_DWBC(pool->base.dwbc[i]));
 			pool->base.dwbc[i] = NULL;
@@ -1493,7 +1493,7 @@ static void dcn42_resource_destruct(struct dcn42_resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_mpc_3dlut; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_mpc_3dlut; i++) {
 		if (pool->base.mpc_lut[i] != NULL) {
 			dc_3dlut_func_release(pool->base.mpc_lut[i]);
 			pool->base.mpc_lut[i] = NULL;
@@ -1509,7 +1509,7 @@ static void dcn42_resource_destruct(struct dcn42_resource_pool *pool)
 		pool->base.dp_clock_source = NULL;
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_timing_generator; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_timing_generator; i++) {
 		if (pool->base.multiple_abms[i] != NULL)
 			dce_abm_destroy(&pool->base.multiple_abms[i]);
 	}
@@ -1580,11 +1580,11 @@ static void dcn42_build_pipe_pix_clk_params(struct pipe_ctx *pipe_ctx)
 		pixel_clk_params->dio_se_pix_per_cycle = 2;
 	} else if (dc_is_dp_signal(stream->signal)) {
 		/* round up to nearest power of 2, or max at 8 pixels per cycle */
-		if (pixel_clk_params->requested_pix_clk_100hz > 4 * stream->ctx->dc->clk_mgr->dprefclk_khz * 10) {
+		if (pixel_clk_params->requested_pix_clk_100hz > (uint32_t)(4 * stream->ctx->dc->clk_mgr->dprefclk_khz * 10)) {
 			pixel_clk_params->dio_se_pix_per_cycle = 8;
-		} else if (pixel_clk_params->requested_pix_clk_100hz > 2 * stream->ctx->dc->clk_mgr->dprefclk_khz * 10) {
+		} else if (pixel_clk_params->requested_pix_clk_100hz > (uint32_t)(2 * stream->ctx->dc->clk_mgr->dprefclk_khz * 10)) {
 			pixel_clk_params->dio_se_pix_per_cycle = 4;
-		} else if (pixel_clk_params->requested_pix_clk_100hz > stream->ctx->dc->clk_mgr->dprefclk_khz * 10) {
+		} else if (pixel_clk_params->requested_pix_clk_100hz > (uint32_t)(stream->ctx->dc->clk_mgr->dprefclk_khz * 10)) {
 			pixel_clk_params->dio_se_pix_per_cycle = 2;
 		} else {
 			pixel_clk_params->dio_se_pix_per_cycle = 1;
@@ -1594,7 +1594,7 @@ static void dcn42_build_pipe_pix_clk_params(struct pipe_ctx *pipe_ctx)
 
 static bool dcn42_dwbc_create(struct dc_context *ctx, struct resource_pool *pool)
 {
-	int i;
+	unsigned int i;
 	uint32_t dwb_count = pool->res_cap->num_dwb;
 
 	for (i = 0; i < dwb_count; i++) {
@@ -1631,7 +1631,7 @@ static void dcn42_mmhubbub_init(struct dcn30_mmhubbub *mcif_wb30,
 
 static bool dcn42_mmhubbub_create(struct dc_context *ctx, struct resource_pool *pool)
 {
-	int i;
+	unsigned int i;
 	uint32_t pipe_count = pool->res_cap->num_dwb;
 
 	for (i = 0; i < pipe_count; i++) {
@@ -1753,7 +1753,7 @@ static struct link_encoder *dcn42_link_enc_create_minimal(
 {
 	struct dcn20_link_encoder *enc20;
 
-	if ((eng_id - ENGINE_ID_DIGA) > ctx->dc->res_pool->res_cap->num_dig_link_enc)
+	if ((unsigned int)(eng_id - ENGINE_ID_DIGA) > ctx->dc->res_pool->res_cap->num_dig_link_enc)
 		return NULL;
 
 	enc20 = kzalloc(sizeof(struct dcn20_link_encoder), GFP_KERNEL);
@@ -1831,7 +1831,7 @@ static bool dcn42_resource_construct(
 	struct dc *dc,
 	struct dcn42_resource_pool *pool)
 {
-	int i, j;
+	unsigned int i, j;
 	struct dc_context *ctx = dc->ctx;
 	struct irq_service_init_data init_data;
 	uint32_t pipe_fuses;
@@ -1867,7 +1867,7 @@ static bool dcn42_resource_construct(
 	num_pipes = pool->base.res_cap->num_dpp;
 	pipe_fuses = read_pipe_fuses(ctx);
 
-	for (i = 0; i < pool->base.res_cap->num_dpp; i++)
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_dpp; i++)
 		if (pipe_fuses & 1 << i)
 			num_pipes--;
 
@@ -2121,7 +2121,7 @@ static bool dcn42_resource_construct(
 	}
 
 	/* HUBPs, DPPs, OPPs, TGs, ABMs */
-	for (i = 0, j = 0; i < pool->base.res_cap->num_timing_generator; i++) {
+	for (i = 0, j = 0; i < (unsigned int)pool->base.res_cap->num_timing_generator; i++) {
 		/* if pipe is disabled, skip instance of HW pipe,
 		 * i.e, skip ASIC register instance
 		 */
@@ -2165,7 +2165,7 @@ static bool dcn42_resource_construct(
 													  &abm_shift,
 													  &abm_mask);
 		if (pool->base.multiple_abms[j] == NULL) {
-			dm_error("DC: failed to create abm for pipe %d!\n", i);
+			dm_error("DC: failed to create abm for pipe %u!\n", i);
 			BREAK_TO_DEBUGGER();
 			goto create_fail;
 		}
@@ -2200,11 +2200,11 @@ static bool dcn42_resource_construct(
 	}
 
 	/* DSCs */
-	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_dsc; i++) {
 		pool->base.dscs[i] = dcn42_dsc_create(ctx, i);
 		if (pool->base.dscs[i] == NULL) {
 			BREAK_TO_DEBUGGER();
-			dm_error("DC: failed to create display stream compressor %d!\n", i);
+			dm_error("DC: failed to create display stream compressor %u!\n", i);
 			goto create_fail;
 		}
 	}
@@ -2224,7 +2224,7 @@ static bool dcn42_resource_construct(
 	}
 
 	/* AUX and I2C */
-	for (i = 0; i < pool->base.res_cap->num_ddc; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_ddc; i++) {
 		pool->base.engines[i] = dcn42_aux_engine_create(ctx, i);
 
 		if (pool->base.engines[i] == NULL) {

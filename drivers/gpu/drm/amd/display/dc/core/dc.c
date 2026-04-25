@@ -3846,7 +3846,7 @@ static void program_cursor_attributes_sequence(
 	struct pipe_ctx *pipe_to_program = NULL;
 	bool enable_cursor_offload = dc_dmub_srv_is_cursor_offload_enabled(dc);
 
-	for (k = 0; k < dc->res_pool->pipe_count; k++) {
+	for (k = 0; k < (int)dc->res_pool->pipe_count; k++) {
 		struct pipe_ctx *tmp_pipe = &context->res_ctx.pipe_ctx[k];
 
 		if (tmp_pipe->stream != stream)
@@ -3894,7 +3894,7 @@ static void program_cursor_position_sequence(
 	struct pipe_ctx *pipe_to_program = NULL;
 	bool enable_cursor_offload = dc_dmub_srv_is_cursor_offload_enabled(dc);
 
-	for (k = 0; k < dc->res_pool->pipe_count; k++) {
+	for (k = 0; k < (int)dc->res_pool->pipe_count; k++) {
 		struct pipe_ctx *tmp_pipe = &context->res_ctx.pipe_ctx[k];
 
 		if (tmp_pipe->stream != stream ||
@@ -4084,7 +4084,7 @@ static void commit_planes_do_stream_update_sequence(struct dc *dc,
 	*num_steps = 0; // Initialize to 0
 
 	// Stream updates
-	for (j = 0; j < dc->res_pool->pipe_count; j++) {
+	for (j = 0; j < (int)dc->res_pool->pipe_count; j++) {
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
 
 		if (resource_is_pipe_type(pipe_ctx, OTG_MASTER) && pipe_ctx->stream == stream) {

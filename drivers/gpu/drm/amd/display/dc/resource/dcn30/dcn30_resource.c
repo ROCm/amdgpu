@@ -1113,7 +1113,7 @@ static void dcn30_resource_destruct(struct dcn30_resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_dsc; i++) {
 		if (pool->base.dscs[i] != NULL)
 			dcn20_dsc_destroy(&pool->base.dscs[i]);
 	}
@@ -1149,7 +1149,7 @@ static void dcn30_resource_destruct(struct dcn30_resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_ddc; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_ddc; i++) {
 		if (pool->base.engines[i] != NULL)
 			dce110_engine_destroy(&pool->base.engines[i]);
 		if (pool->base.hw_i2cs[i] != NULL) {
@@ -1162,19 +1162,19 @@ static void dcn30_resource_destruct(struct dcn30_resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_opp; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_opp; i++) {
 		if (pool->base.opps[i] != NULL)
 			pool->base.opps[i]->funcs->opp_destroy(&pool->base.opps[i]);
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_timing_generator; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_timing_generator; i++) {
 		if (pool->base.timing_generators[i] != NULL)	{
 			kfree(DCN10TG_FROM_TG(pool->base.timing_generators[i]));
 			pool->base.timing_generators[i] = NULL;
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_dwb; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_dwb; i++) {
 		if (pool->base.dwbc[i] != NULL) {
 			kfree(TO_DCN30_DWBC(pool->base.dwbc[i]));
 			pool->base.dwbc[i] = NULL;
@@ -1197,7 +1197,7 @@ static void dcn30_resource_destruct(struct dcn30_resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_mpc_3dlut; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_mpc_3dlut; i++) {
 		if (pool->base.mpc_lut[i] != NULL) {
 			dc_3dlut_func_release(pool->base.mpc_lut[i]);
 			pool->base.mpc_lut[i] = NULL;
@@ -1252,7 +1252,7 @@ static struct hubp *dcn30_hubp_create(
 
 static bool dcn30_dwbc_create(struct dc_context *ctx, struct resource_pool *pool)
 {
-	int i;
+	unsigned int i;
 	uint32_t pipe_count = pool->res_cap->num_dwb;
 
 	for (i = 0; i < pipe_count; i++) {
@@ -1277,7 +1277,7 @@ static bool dcn30_dwbc_create(struct dc_context *ctx, struct resource_pool *pool
 
 static bool dcn30_mmhubbub_create(struct dc_context *ctx, struct resource_pool *pool)
 {
-	int i;
+	unsigned int i;
 	uint32_t pipe_count = pool->res_cap->num_dwb;
 
 	for (i = 0; i < pipe_count; i++) {
@@ -1359,7 +1359,8 @@ int dcn30_populate_dml_pipes_from_context(
 	display_e2e_pipe_params_st *pipes,
 	enum dc_validate_mode validate_mode)
 {
-	int i, pipe_cnt;
+	int pipe_cnt;
+	unsigned int i;
 	struct resource_context *res_ctx = &context->res_ctx;
 
 	DC_FP_START();
@@ -1417,7 +1418,8 @@ void dcn30_set_mcif_arb_params(
 	enum mmhubbub_wbif_mode wbif_mode;
 	struct display_mode_lib *dml = &context->bw_ctx.dml;
 	struct mcif_arb_params *wb_arb_params;
-	int i, j, dwb_pipe;
+	int j, dwb_pipe;
+	unsigned int i;
 
 	/* Writeback MCIF_WB arbitration parameters */
 	dwb_pipe = 0;
@@ -1673,7 +1675,8 @@ noinline bool dcn30_internal_validate_bw(
 	int split[MAX_PIPES] = { 0 };
 	bool merge[MAX_PIPES] = { false };
 	bool newly_split[MAX_PIPES] = { false };
-	int pipe_cnt, i, pipe_idx, vlevel = 0;
+	unsigned int i;
+	int pipe_cnt, pipe_idx, vlevel = 0;
 	struct vba_vars_st *vba = &context->bw_ctx.dml.vba;
 
 	ASSERT(pipes);
@@ -1705,7 +1708,7 @@ noinline bool dcn30_internal_validate_bw(
 			dm_allow_self_refresh_and_mclk_switch;
 		vlevel = dml_get_voltage_level(&context->bw_ctx.dml, pipes, pipe_cnt);
 		/* This may adjust vlevel and maxMpcComb */
-		if (vlevel < context->bw_ctx.dml.soc.num_states)
+		if ((unsigned int)vlevel < context->bw_ctx.dml.soc.num_states)
 			vlevel = dcn20_validate_apply_pipe_split_flags(dc, context, vlevel, split, merge);
 	}
 	if (allow_self_refresh_only &&
@@ -1723,7 +1726,7 @@ noinline bool dcn30_internal_validate_bw(
 			dm_allow_self_refresh;
 
 		vlevel = dml_get_voltage_level(&context->bw_ctx.dml, pipes, pipe_cnt);
-		if (vlevel < context->bw_ctx.dml.soc.num_states) {
+		if ((unsigned int)vlevel < context->bw_ctx.dml.soc.num_states) {
 			memset(split, 0, sizeof(split));
 			memset(merge, 0, sizeof(merge));
 			vlevel = dcn20_validate_apply_pipe_split_flags(dc, context, vlevel, split, merge);
@@ -2163,13 +2166,13 @@ void dcn30_update_bw_bounding_box(struct dc *dc, struct clk_bw_params *bw_params
 	if (bw_params->clk_table.entries[0].memclk_mhz) {
 
 		for (i = 0; i < MAX_NUM_DPM_LVL; i++) {
-			if (bw_params->clk_table.entries[i].dcfclk_mhz > dcn30_bb_max_clk.max_dcfclk_mhz)
+			if (bw_params->clk_table.entries[i].dcfclk_mhz > (unsigned int)dcn30_bb_max_clk.max_dcfclk_mhz)
 				dcn30_bb_max_clk.max_dcfclk_mhz = bw_params->clk_table.entries[i].dcfclk_mhz;
-			if (bw_params->clk_table.entries[i].dispclk_mhz > dcn30_bb_max_clk.max_dispclk_mhz)
+			if (bw_params->clk_table.entries[i].dispclk_mhz > (unsigned int)dcn30_bb_max_clk.max_dispclk_mhz)
 				dcn30_bb_max_clk.max_dispclk_mhz = bw_params->clk_table.entries[i].dispclk_mhz;
-			if (bw_params->clk_table.entries[i].dppclk_mhz > dcn30_bb_max_clk.max_dppclk_mhz)
+			if (bw_params->clk_table.entries[i].dppclk_mhz > (unsigned int)dcn30_bb_max_clk.max_dppclk_mhz)
 				dcn30_bb_max_clk.max_dppclk_mhz = bw_params->clk_table.entries[i].dppclk_mhz;
-			if (bw_params->clk_table.entries[i].phyclk_mhz > dcn30_bb_max_clk.max_phyclk_mhz)
+			if (bw_params->clk_table.entries[i].phyclk_mhz > (unsigned int)dcn30_bb_max_clk.max_phyclk_mhz)
 				dcn30_bb_max_clk.max_phyclk_mhz = bw_params->clk_table.entries[i].phyclk_mhz;
 		}
 
@@ -2177,14 +2180,14 @@ void dcn30_update_bw_bounding_box(struct dc *dc, struct clk_bw_params *bw_params
 		dcn30_fpu_update_max_clk(&dcn30_bb_max_clk);
 		DC_FP_END();
 
-		if (dcn30_bb_max_clk.max_dcfclk_mhz > dcfclk_sta_targets[num_dcfclk_sta_targets-1]) {
+		if ((unsigned int)dcn30_bb_max_clk.max_dcfclk_mhz > dcfclk_sta_targets[num_dcfclk_sta_targets-1]) {
 			// If max DCFCLK is greater than the max DCFCLK STA target, insert into the DCFCLK STA target array
 			dcfclk_sta_targets[num_dcfclk_sta_targets] = dcn30_bb_max_clk.max_dcfclk_mhz;
 			num_dcfclk_sta_targets++;
-		} else if (dcn30_bb_max_clk.max_dcfclk_mhz < dcfclk_sta_targets[num_dcfclk_sta_targets-1]) {
+		} else if ((unsigned int)dcn30_bb_max_clk.max_dcfclk_mhz < dcfclk_sta_targets[num_dcfclk_sta_targets-1]) {
 			// If max DCFCLK is less than the max DCFCLK STA target, cap values and remove duplicates
 			for (i = 0; i < num_dcfclk_sta_targets; i++) {
-				if (dcfclk_sta_targets[i] > dcn30_bb_max_clk.max_dcfclk_mhz) {
+				if (dcfclk_sta_targets[i] > (unsigned int)dcn30_bb_max_clk.max_dcfclk_mhz) {
 					dcfclk_sta_targets[i] = dcn30_bb_max_clk.max_dcfclk_mhz;
 					break;
 				}
@@ -2236,7 +2239,7 @@ void dcn30_update_bw_bounding_box(struct dc *dc, struct clk_bw_params *bw_params
 				dcfclk_mhz[num_states] = dcfclk_sta_targets[i];
 				dram_speed_mts[num_states++] = optimal_uclk_for_dcfclk_sta_targets[i++];
 			} else {
-				if (j < num_uclk_states && optimal_dcfclk_for_uclk[j] <= dcn30_bb_max_clk.max_dcfclk_mhz) {
+				if (j < num_uclk_states && optimal_dcfclk_for_uclk[j] <= (unsigned int)dcn30_bb_max_clk.max_dcfclk_mhz) {
 					dcfclk_mhz[num_states] = optimal_dcfclk_for_uclk[j];
 					dram_speed_mts[num_states++] = bw_params->clk_table.entries[j++].memclk_mhz * 16;
 				} else {
@@ -2251,7 +2254,7 @@ void dcn30_update_bw_bounding_box(struct dc *dc, struct clk_bw_params *bw_params
 		}
 
 		while (j < num_uclk_states && num_states < DC__VOLTAGE_STATES &&
-				optimal_dcfclk_for_uclk[j] <= dcn30_bb_max_clk.max_dcfclk_mhz) {
+				optimal_dcfclk_for_uclk[j] <= (unsigned int)dcn30_bb_max_clk.max_dcfclk_mhz) {
 			dcfclk_mhz[num_states] = optimal_dcfclk_for_uclk[j];
 			dram_speed_mts[num_states++] = bw_params->clk_table.entries[j++].memclk_mhz * 16;
 		}
@@ -2311,7 +2314,7 @@ static bool dcn30_resource_construct(
 	struct dc *dc,
 	struct dcn30_resource_pool *pool)
 {
-	int i;
+	unsigned int i;
 	struct dc_context *ctx = dc->ctx;
 	struct irq_service_init_data init_data;
 	struct ddc_service_init_data ddc_init_data = {0};
@@ -2533,7 +2536,7 @@ static bool dcn30_resource_construct(
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_opp; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_opp; i++) {
 		pool->base.opps[i] = dcn30_opp_create(ctx, i);
 		if (pool->base.opps[i] == NULL) {
 			BREAK_TO_DEBUGGER();
@@ -2543,7 +2546,7 @@ static bool dcn30_resource_construct(
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_timing_generator; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_timing_generator; i++) {
 		pool->base.timing_generators[i] = dcn30_timing_generator_create(
 				ctx, i);
 		if (pool->base.timing_generators[i] == NULL) {
@@ -2563,13 +2566,13 @@ static bool dcn30_resource_construct(
 	}
 
 	/* ABM */
-	for (i = 0; i < pool->base.res_cap->num_timing_generator; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_timing_generator; i++) {
 		pool->base.multiple_abms[i] = dmub_abm_create(ctx,
 				&abm_regs[i],
 				&abm_shift,
 				&abm_mask);
 		if (pool->base.multiple_abms[i] == NULL) {
-			dm_error("DC: failed to create abm for pipe %d!\n", i);
+			dm_error("DC: failed to create abm for pipe %u!\n", i);
 			BREAK_TO_DEBUGGER();
 			goto create_fail;
 		}
@@ -2582,11 +2585,11 @@ static bool dcn30_resource_construct(
 		goto create_fail;
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_dsc; i++) {
 		pool->base.dscs[i] = dcn30_dsc_create(ctx, i);
 		if (pool->base.dscs[i] == NULL) {
 			BREAK_TO_DEBUGGER();
-			dm_error("DC: failed to create display stream compressor %d!\n", i);
+			dm_error("DC: failed to create display stream compressor %u!\n", i);
 			goto create_fail;
 		}
 	}
@@ -2605,7 +2608,7 @@ static bool dcn30_resource_construct(
 	}
 
 	/* AUX and I2C */
-	for (i = 0; i < pool->base.res_cap->num_ddc; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_ddc; i++) {
 		pool->base.engines[i] = dcn30_aux_engine_create(ctx, i);
 		if (pool->base.engines[i] == NULL) {
 			BREAK_TO_DEBUGGER();

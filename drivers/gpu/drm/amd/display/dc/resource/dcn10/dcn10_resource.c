@@ -978,7 +978,7 @@ static void dcn10_resource_destruct(struct dcn10_resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_ddc; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_ddc; i++) {
 		if (pool->base.engines[i] != NULL)
 			dce110_engine_destroy(&pool->base.engines[i]);
 		kfree(pool->base.hw_i2cs[i]);
@@ -1183,7 +1183,8 @@ static enum dc_status dcn10_validate_plane(const struct dc_plane_state *plane_st
 {
 	if (plane_state->format >= SURFACE_PIXEL_FORMAT_VIDEO_BEGIN
 			&& caps->max_video_width != 0
-			&& plane_state->src_rect.width > caps->max_video_width)
+			&& plane_state->src_rect.width > 0
+			&& (unsigned int)plane_state->src_rect.width > caps->max_video_width)
 		return DC_FAIL_SURFACE_VALIDATE;
 
 	return DC_OK;
@@ -1268,7 +1269,7 @@ struct stream_encoder *dcn10_find_first_free_match_stream_enc_for_link(
 		const struct resource_pool *pool,
 		struct dc_stream_state *stream)
 {
-	int i;
+	unsigned int i;
 	int j = -1;
 	struct dc_link *link = stream->link;
 
@@ -1280,7 +1281,7 @@ struct stream_encoder *dcn10_find_first_free_match_stream_enc_for_link(
 			 */
 
 			if (pool->stream_enc[i]->id != ENGINE_ID_VIRTUAL)
-				j = i;
+				j = (int)i;
 
 			if (link->ep_type == DISPLAY_ENDPOINT_PHY && pool->stream_enc[i]->id ==
 					link->link_enc->preferred_engine)
@@ -1342,7 +1343,7 @@ static uint32_t read_pipe_fuses(struct dc_context *ctx)
 
 static bool verify_clock_values(struct dm_pp_clock_levels_with_voltage *clks)
 {
-	int i;
+	unsigned int i;
 
 	if (clks->num_levels == 0)
 		return false;
@@ -1360,7 +1361,7 @@ static bool dcn10_resource_construct(
 	struct dc *dc,
 	struct dcn10_resource_pool *pool)
 {
-	int i;
+	unsigned int i;
 	int j;
 	struct dc_context *ctx = dc->ctx;
 	uint32_t pipe_fuses = read_pipe_fuses(ctx);
@@ -1655,7 +1656,7 @@ static bool dcn10_resource_construct(
 		j++;
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_ddc; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_ddc; i++) {
 		pool->base.engines[i] = dcn10_aux_engine_create(ctx, i);
 		if (pool->base.engines[i] == NULL) {
 			BREAK_TO_DEBUGGER();

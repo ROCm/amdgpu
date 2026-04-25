@@ -262,7 +262,7 @@ static bool dcn30_set_mpc_shaper_3dlut(struct pipe_ctx *pipe_ctx,
 	struct dc *dc = pipe_ctx->stream->ctx->dc;
 	struct mpc *mpc = pipe_ctx->stream_res.opp->ctx->dc->res_pool->mpc;
 	bool result = false;
-	int acquired_rmu = 0;
+	uint32_t acquired_rmu = 0;
 	int mpcc_id_projected = 0;
 
 	const struct pwl_params *shaper_lut = NULL;
@@ -439,7 +439,7 @@ static void dcn30_set_writeback(
 	ASSERT(wb_info->dwb_pipe_inst < MAX_DWB_PIPES);
 	ASSERT(wb_info->wb_enabled);
 	ASSERT(wb_info->mpcc_inst >= 0);
-	ASSERT(wb_info->mpcc_inst < dc->res_pool->mpcc_count);
+	ASSERT(wb_info->mpcc_inst < (int)dc->res_pool->mpcc_count);
 	mcif_wb = dc->res_pool->mcif_wb[wb_info->dwb_pipe_inst];
 	mcif_buf_params = &wb_info->mcif_buf_params;
 
@@ -593,7 +593,9 @@ void dcn30_program_all_writeback_pipes_in_tree(
 	}
 	ASSERT(stream_status);
 
-	ASSERT(stream->num_wb_info <= dc->res_pool->res_cap->num_dwb);
+	// Assert non-negative signed capacity first.
+	ASSERT(dc->res_pool->res_cap->num_dwb >= 0);
+	ASSERT(stream->num_wb_info <= (unsigned int)dc->res_pool->res_cap->num_dwb);
 	/* For each writeback pipe */
 	for (i_wb = 0; i_wb < stream->num_wb_info; i_wb++) {
 

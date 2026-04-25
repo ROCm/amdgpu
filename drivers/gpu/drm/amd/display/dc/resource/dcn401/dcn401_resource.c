@@ -1427,7 +1427,7 @@ static void dcn401_resource_destruct(struct dcn401_resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_dsc; i++) {
 		if (pool->base.dscs[i] != NULL)
 			dcn401_dsc_destroy(&pool->base.dscs[i]);
 	}
@@ -1457,7 +1457,7 @@ static void dcn401_resource_destruct(struct dcn401_resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_ddc; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_ddc; i++) {
 		if (pool->base.engines[i] != NULL)
 			dce110_engine_destroy(&pool->base.engines[i]);
 		if (pool->base.hw_i2cs[i] != NULL) {
@@ -1470,19 +1470,19 @@ static void dcn401_resource_destruct(struct dcn401_resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_opp; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_opp; i++) {
 		if (pool->base.opps[i] != NULL)
 			pool->base.opps[i]->funcs->opp_destroy(&pool->base.opps[i]);
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_timing_generator; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_timing_generator; i++) {
 		if (pool->base.timing_generators[i] != NULL)	{
 			kfree(DCN10TG_FROM_TG(pool->base.timing_generators[i]));
 			pool->base.timing_generators[i] = NULL;
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_dwb; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_dwb; i++) {
 		if (pool->base.dwbc[i] != NULL) {
 			kfree(TO_DCN30_DWBC(pool->base.dwbc[i]));
 			pool->base.dwbc[i] = NULL;
@@ -1505,7 +1505,7 @@ static void dcn401_resource_destruct(struct dcn401_resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_mpc_3dlut; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_mpc_3dlut; i++) {
 		if (pool->base.mpc_lut[i] != NULL) {
 			dc_3dlut_func_release(pool->base.mpc_lut[i]);
 			pool->base.mpc_lut[i] = NULL;
@@ -1521,7 +1521,7 @@ static void dcn401_resource_destruct(struct dcn401_resource_pool *pool)
 		pool->base.dp_clock_source = NULL;
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_timing_generator; i++) {
+	for (i = 0; i < (unsigned int)pool->base.res_cap->num_timing_generator; i++) {
 		if (pool->base.multiple_abms[i] != NULL)
 			dce_abm_destroy(&pool->base.multiple_abms[i]);
 	}
@@ -1547,7 +1547,7 @@ static void dcn401_resource_destruct(struct dcn401_resource_pool *pool)
 
 static bool dcn401_dwbc_create(struct dc_context *ctx, struct resource_pool *pool)
 {
-	int i;
+	unsigned int i;
 	uint32_t dwb_count = pool->res_cap->num_dwb;
 
 	for (i = 0; i < dwb_count; i++) {
@@ -1578,7 +1578,7 @@ static bool dcn401_dwbc_create(struct dc_context *ctx, struct resource_pool *poo
 
 static bool dcn401_mmhubbub_create(struct dc_context *ctx, struct resource_pool *pool)
 {
-	int i;
+	unsigned int i;
 	uint32_t dwb_count = pool->res_cap->num_dwb;
 
 	for (i = 0; i < dwb_count; i++) {
@@ -1796,11 +1796,11 @@ static void dcn401_build_pipe_pix_clk_params(struct pipe_ctx *pipe_ctx)
 		pixel_clk_params->dio_se_pix_per_cycle = 2;
 	} else if (dc_is_dp_signal(stream->signal)) {
 		/* round up to nearest power of 2, or max at 8 pixels per cycle */
-		if (pixel_clk_params->requested_pix_clk_100hz > 4 * stream->ctx->dc->clk_mgr->dprefclk_khz * 10) {
+		if ((unsigned int)pixel_clk_params->requested_pix_clk_100hz > (unsigned int)(4 * stream->ctx->dc->clk_mgr->dprefclk_khz * 10)) {
 			pixel_clk_params->dio_se_pix_per_cycle = 8;
-		} else if (pixel_clk_params->requested_pix_clk_100hz > 2 * stream->ctx->dc->clk_mgr->dprefclk_khz * 10) {
+		} else if ((unsigned int)pixel_clk_params->requested_pix_clk_100hz > (unsigned int)(2 * stream->ctx->dc->clk_mgr->dprefclk_khz * 10)) {
 			pixel_clk_params->dio_se_pix_per_cycle = 4;
-		} else if (pixel_clk_params->requested_pix_clk_100hz > stream->ctx->dc->clk_mgr->dprefclk_khz * 10) {
+		} else if ((unsigned int)pixel_clk_params->requested_pix_clk_100hz > (unsigned int)(stream->ctx->dc->clk_mgr->dprefclk_khz * 10)) {
 			pixel_clk_params->dio_se_pix_per_cycle = 2;
 		} else {
 			pixel_clk_params->dio_se_pix_per_cycle = 1;
@@ -1810,10 +1810,10 @@ static void dcn401_build_pipe_pix_clk_params(struct pipe_ctx *pipe_ctx)
 
 int dcn401_get_power_profile(const struct dc_state *context)
 {
-	int uclk_mhz = context->bw_ctx.bw.dcn.clk.dramclk_khz / 1000;
+	unsigned int uclk_mhz = context->bw_ctx.bw.dcn.clk.dramclk_khz / 1000;
 	int dpm_level = 0;
 
-	for (int i = 0; i < context->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_memclk_levels; i++) {
+	for (unsigned int i = 0; i < context->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_memclk_levels; i++) {
 		if (context->clk_mgr->bw_params->clk_table.entries[i].memclk_mhz == 0 ||
 			uclk_mhz < context->clk_mgr->bw_params->clk_table.entries[i].memclk_mhz)
 			break;
@@ -2100,7 +2100,7 @@ static bool dcn401_resource_construct(
 				CLOCK_SOURCE_ID_DP_DTO,
 				&clk_src_regs[0], true);
 
-	for (i = 0; i < pool->base.clk_src_count; i++) {
+	for (i = 0; i < (int)pool->base.clk_src_count; i++) {
 		if (pool->base.clock_sources[i] == NULL) {
 			dm_error("DC: failed to create clock sources!\n");
 			BREAK_TO_DEBUGGER();
@@ -2262,7 +2262,7 @@ static bool dcn401_resource_construct(
 
 	dc->caps.max_planes =  pool->base.pipe_count;
 
-	for (i = 0; i < dc->caps.max_planes; ++i)
+	for (i = 0; i < (int)dc->caps.max_planes; ++i)
 		dc->caps.planes[i] = plane_cap;
 
 	dc->caps.max_odm_combine_factor = 4;

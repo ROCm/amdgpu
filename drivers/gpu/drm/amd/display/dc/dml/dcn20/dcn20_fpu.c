@@ -2217,7 +2217,7 @@ static void calculate_wm_set_for_vlevel(int vlevel,
 {
 	double dram_clock_change_latency_cached = dml->soc.dram_clock_change_latency_us;
 
-	ASSERT(vlevel < dml->soc.num_states);
+	ASSERT(vlevel < (int)dml->soc.num_states);
 	/* only pipe 0 is read for voltage and dcf/soc clocks */
 	pipes[0].clks_cfg.voltage = vlevel;
 	pipes[0].clks_cfg.dcfclk_mhz = dml->soc.clock_limits[vlevel].dcfclk_mhz;
