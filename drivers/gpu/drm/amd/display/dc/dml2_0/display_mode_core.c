@@ -2626,18 +2626,18 @@ static dml_uint_t CalculateVMAndRowBytes(
 	*PixelPTEBytesPerRow_one_row_per_frame = (dml_uint_t)((dml_float_t) *dpte_row_width_ub_one_row_per_frame / (dml_float_t) *PixelPTEReqWidth * *PTERequestSize);
 
 	if (SurfaceTiling == dml_sw_linear) {
-		*dpte_row_height = (dml_uint_t)(dml_min(128, 1 << (dml_uint_t) dml_floor(dml_log2(PTEBufferSizeInRequests * *PixelPTEReqWidth / Pitch), 1)));
+		*dpte_row_height = (dml_uint_t)(dml_min(128, (dml_uint_t)dml_pow(2.0, (int)dml_floor(dml_log2(PTEBufferSizeInRequests * *PixelPTEReqWidth / Pitch), 1))));
 		dml_print("DML::%s: dpte_row_height term 1 = %u\n", __func__, PTEBufferSizeInRequests * *PixelPTEReqWidth / Pitch);
 		dml_print("DML::%s: dpte_row_height term 2 = %f\n", __func__, dml_log2(PTEBufferSizeInRequests * *PixelPTEReqWidth / Pitch));
 		dml_print("DML::%s: dpte_row_height term 3 = %f\n", __func__, dml_floor(dml_log2(PTEBufferSizeInRequests * *PixelPTEReqWidth / Pitch), 1));
-		dml_print("DML::%s: dpte_row_height term 4 = %u\n", __func__, 1 << (dml_uint_t) dml_floor(dml_log2(PTEBufferSizeInRequests * *PixelPTEReqWidth / Pitch), 1));
+		dml_print("DML::%s: dpte_row_height term 4 = %u\n", __func__, (dml_uint_t)dml_pow(2.0, (int)dml_floor(dml_log2(PTEBufferSizeInRequests * *PixelPTEReqWidth / Pitch), 1)));
 		dml_print("DML::%s: dpte_row_height = %u\n", __func__, *dpte_row_height);
 
 		*dpte_row_width_ub = (dml_uint_t)(dml_ceil(((dml_float_t) Pitch * (dml_float_t) *dpte_row_height - 1), (dml_float_t) *PixelPTEReqWidth) + *PixelPTEReqWidth);
 		*PixelPTEBytesPerRow = (dml_uint_t)((dml_float_t) *dpte_row_width_ub / (dml_float_t) *PixelPTEReqWidth * *PTERequestSize);
 
 		// VBA_DELTA, VBA doesn't have programming value for pte row height linear.
-		*dpte_row_height_linear = 1 << (dml_uint_t) dml_floor(dml_log2(PTEBufferSizeInRequests * PixelPTEReqWidth_linear / Pitch), 1);
+		*dpte_row_height_linear = (dml_uint_t)dml_pow(2.0, (int)dml_floor(dml_log2(PTEBufferSizeInRequests * PixelPTEReqWidth_linear / Pitch), 1));
 		if (*dpte_row_height_linear > 128)
 			*dpte_row_height_linear = 128;
 
