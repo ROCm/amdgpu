@@ -1952,6 +1952,9 @@ void dcn401_perform_3dlut_wa_unlock(struct pipe_ctx *pipe_ctx)
 	 * This is meant to work around a known HW issue where VREADY will cancel the pending 3DLUT_ENABLE signal regardless
 	 * of whether OTG lock is currently being held or not.
 	 */
+	if (!pipe_ctx)
+		return;
+
 	struct pipe_ctx *wa_pipes[MAX_PIPES] = { NULL };
 	struct pipe_ctx *odm_pipe, *mpc_pipe;
 	int i, wa_pipe_ct = 0;

@@ -551,16 +551,16 @@ int dcn35_populate_dml_pipes_from_context_fpu(struct dc *dc,
 	}
 
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
-		struct pipe_ctx *pipe = &context->res_ctx.pipe_ctx[i];
+		struct pipe_ctx *cur_pipe = &context->res_ctx.pipe_ctx[i];
 
-		if (!pipe->stream)
+		if (!cur_pipe->stream)
 			continue;
 
-		if (pipe->stream->signal == SIGNAL_TYPE_EDP &&
+		if (cur_pipe->stream->signal == SIGNAL_TYPE_EDP &&
 		    dc->debug.seamless_boot_odm_combine &&
-		    pipe->stream->apply_seamless_boot_optimization) {
+		    cur_pipe->stream->apply_seamless_boot_optimization) {
 
-			if (pipe->stream->apply_boot_odm_mode ==
+			if (cur_pipe->stream->apply_boot_odm_mode ==
 			    dm_odm_combine_policy_2to1) {
 				context->bw_ctx.dml.vba.ODMCombinePolicy =
 					dm_odm_combine_policy_2to1;

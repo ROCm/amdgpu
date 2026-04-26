@@ -4977,7 +4977,7 @@ static void commit_planes_for_stream(struct dc *dc,
 		if (!pipe_ctx->top_pipe &&
 			!pipe_ctx->prev_odm_pipe &&
 			should_update_pipe_for_stream(context, pipe_ctx, stream)) {
-			struct dc_stream_status *stream_status = NULL;
+			struct dc_stream_status *pipe_stream_status = NULL;
 
 			if (!pipe_ctx->plane_state)
 				continue;
@@ -4986,12 +4986,12 @@ static void commit_planes_for_stream(struct dc *dc,
 			if (update_type == UPDATE_TYPE_FAST)
 				continue;
 
-			stream_status =
+			pipe_stream_status =
 				stream_get_status(context, pipe_ctx->stream);
 
-			if (dc->hwss.apply_ctx_for_surface && stream_status)
+			if (dc->hwss.apply_ctx_for_surface && pipe_stream_status)
 				dc->hwss.apply_ctx_for_surface(
-					dc, pipe_ctx->stream, stream_status->plane_count, context);
+					dc, pipe_ctx->stream, pipe_stream_status->plane_count, context);
 		}
 	}
 

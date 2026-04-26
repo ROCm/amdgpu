@@ -4809,14 +4809,14 @@ void dml21_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 				mode_lib->vba.MaximumReadBandwidthWithoutPrefetch = 0.0;
 				mode_lib->vba.MaximumReadBandwidthWithPrefetch = 0.0;
 				for (k = 0; k <= mode_lib->vba.NumberOfActivePlanes - 1; k++) {
-					unsigned int m;
+					unsigned int cursor_idx;
 
 					locals->cursor_bw[k] = 0;
 					locals->cursor_bw_pre[k] = 0;
-					for (m = 0; m < mode_lib->vba.NumberOfCursors[k]; m++) {
-						locals->cursor_bw[k] = mode_lib->vba.CursorWidth[k][m] * mode_lib->vba.CursorBPP[k][m]
+					for (cursor_idx = 0; cursor_idx < mode_lib->vba.NumberOfCursors[k]; cursor_idx++) {
+						locals->cursor_bw[k] = mode_lib->vba.CursorWidth[k][cursor_idx] * mode_lib->vba.CursorBPP[k][cursor_idx]
 							/ 8.0 / (mode_lib->vba.HTotal[k] / mode_lib->vba.PixelClock[k]) * mode_lib->vba.VRatio[k];
-						locals->cursor_bw_pre[k] = mode_lib->vba.CursorWidth[k][m] * mode_lib->vba.CursorBPP[k][m]
+						locals->cursor_bw_pre[k] = mode_lib->vba.CursorWidth[k][cursor_idx] * mode_lib->vba.CursorBPP[k][cursor_idx]
 							/ 8.0 / (mode_lib->vba.HTotal[k] / mode_lib->vba.PixelClock[k]) * locals->VRatioPreY[i][j][k];
 					}
 

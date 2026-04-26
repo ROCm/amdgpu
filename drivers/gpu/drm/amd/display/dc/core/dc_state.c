@@ -218,13 +218,13 @@ struct dc_state *dc_state_create(struct dc *dc, struct dc_state_create_params *p
 		}
 
 		if (dc->caps.dcmode_power_limits_present) {
-			bool status;
+			bool dc_power_status;
 
 			DC_FP_START();
-			status = dml2_create(dc, &dc->dml2_dc_power_options, &state->bw_ctx.dml2_dc_power_source);
+			dc_power_status = dml2_create(dc, &dc->dml2_dc_power_options, &state->bw_ctx.dml2_dc_power_source);
 			DC_FP_END();
 
-			if (!status) {
+			if (!dc_power_status) {
 				dc_state_release(state);
 				return NULL;
 			}
