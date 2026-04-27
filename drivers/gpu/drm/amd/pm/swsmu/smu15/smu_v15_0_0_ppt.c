@@ -248,7 +248,7 @@ static int smu_v15_0_0_update_table(struct smu_context *smu,
 	uint64_t address;
 	uint32_t table_size;
 	int ret;
-	struct smu_msg_ctl *ctl = &smu->msg_ctl;
+	uint32_t params[3];
 
 	if (!table_data || table_index >= SMU_TABLE_COUNT || table_id < 0)
 		return -EINVAL;
@@ -265,20 +265,15 @@ static int smu_v15_0_0_update_table(struct smu_context *smu,
 	}
 
 	address = table->mc_address;
+	params[0] = table_id;
+	params[1] = (uint32_t)lower_32_bits(address);
+	params[2] = (uint32_t)upper_32_bits(address);
 
-	struct smu_msg_args args = {
-		.msg = drv2smu ?
-				SMU_MSG_TransferTableDram2Smu :
-				SMU_MSG_TransferTableSmu2Dram,
-		.num_args = 3,
-		.num_out_args = 0,
-	};
-
-	args.args[0] = table_id;
-	args.args[1] = (uint32_t)lower_32_bits(address);
-	args.args[2] = (uint32_t)upper_32_bits(address);
-
-	ret = ctl->ops->send_msg(ctl, &args);
+	ret = smu_cmn_send_smc_msg_with_params(smu,
+					       drv2smu ? SMU_MSG_TransferTableDram2Smu :
+					       SMU_MSG_TransferTableSmu2Dram,
+					       params, ARRAY_SIZE(params),
+					       NULL, 0);
 
 	if (ret)
 		return ret;
@@ -535,22 +530,19 @@ static int smu_v15_0_0_read_sensor(struct smu_context *smu,
 static int smu_v15_0_0_get_enabled_mask(struct smu_context *smu,
 					struct smu_feature_bits *feature_mask)
 {
+	uint32_t out[2];
 	int ret;
-	struct smu_msg_ctl *ctl = &smu->msg_ctl;
 
 	if (!feature_mask)
 		return -EINVAL;
 
-	struct smu_msg_args args = {
-		.msg = SMU_MSG_GetEnabledSmuFeatures,
-		.num_args = 0,
-		.num_out_args = 2,
-	};
-
-	ret = ctl->ops->send_msg(ctl, &args);
+	ret = smu_cmn_send_smc_msg_with_params(smu,
+					       SMU_MSG_GetEnabledSmuFeatures,
+					       NULL, 0, out,
+					       ARRAY_SIZE(out));
 
 	if (!ret)
-		smu_feature_bits_from_arr32(feature_mask, args.out_args,
+		smu_feature_bits_from_arr32(feature_mask, out,
 					    SMU_FEATURE_NUM_DEFAULT);
 
 	return ret;
