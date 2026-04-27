@@ -54,6 +54,6 @@ int dce_set_clock(
 
 void dce_clk_mgr_destroy(struct clk_mgr **clk_mgr);
 
-int dentist_get_divider_from_did(int did);
+unsigned int dentist_get_divider_from_did(unsigned int did);
 
 #endif /* _DCE_CLK_MGR_H_ */

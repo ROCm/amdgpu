@@ -1400,7 +1400,7 @@ static void try_odm_power_optimization_and_revalidate(
 		display_e2e_pipe_params_st *pipes,
 		int *split,
 		bool *merge,
-		unsigned int *vlevel,
+		int *vlevel,
 		int pipe_cnt)
 {
 	int i;

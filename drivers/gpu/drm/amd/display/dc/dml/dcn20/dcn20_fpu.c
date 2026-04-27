@@ -1105,7 +1105,7 @@ static enum dcn_zstate_support_state  decide_zstate_support(struct dc *dc, struc
 }
 
 static void dcn20_adjust_freesync_v_startup(
-		const struct dc_crtc_timing *dc_crtc_timing, int *vstartup_start)
+		const struct dc_crtc_timing *dc_crtc_timing, unsigned int *vstartup_start)
 {
 	struct dc_crtc_timing patched_crtc_timing;
 	uint32_t asic_blank_end   = 0;
@@ -1253,7 +1253,7 @@ void dcn20_calculate_dlg_params(struct dc *dc,
 
 static void swizzle_to_dml_params(
 		enum swizzle_mode_values swizzle,
-		unsigned int *sw_mode)
+		int *sw_mode)
 {
 	switch (swizzle) {
 	case DC_SW_LINEAR:

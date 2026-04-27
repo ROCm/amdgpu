@@ -159,8 +159,8 @@ struct luminance_data {
 	int luminance_millinits[LUMINANCE_DATA_TABLE_SIZE];
 	int flicker_criteria_milli_nits_GAMING;
 	int flicker_criteria_milli_nits_STATIC;
-	int nominal_refresh_rate;
-	int dm_max_decrease_from_nominal;
+	unsigned int nominal_refresh_rate;
+	unsigned int dm_max_decrease_from_nominal;
 };
 
 enum dc_drr_trigger_mode {

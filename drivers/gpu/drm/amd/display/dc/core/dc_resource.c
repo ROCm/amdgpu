@@ -982,7 +982,7 @@ static struct rect calculate_mpc_slice_in_timing_active(
 }
 
 static void calculate_adjust_recout_for_visual_confirm(struct pipe_ctx *pipe_ctx,
-	int *base_offset, int *dpp_offset)
+	unsigned int *base_offset, unsigned int *dpp_offset)
 {
 	struct dc *dc = pipe_ctx->stream->ctx->dc;
 	*base_offset = 0;
@@ -1004,7 +1004,7 @@ static void calculate_adjust_recout_for_visual_confirm(struct pipe_ctx *pipe_ctx
 static void reverse_adjust_recout_for_visual_confirm(struct rect *recout,
 		struct pipe_ctx *pipe_ctx)
 {
-	int dpp_offset, base_offset;
+	unsigned int dpp_offset, base_offset;
 
 	calculate_adjust_recout_for_visual_confirm(pipe_ctx, &base_offset,
 		&dpp_offset);
@@ -1015,7 +1015,7 @@ static void reverse_adjust_recout_for_visual_confirm(struct rect *recout,
 static void adjust_recout_for_visual_confirm(struct rect *recout,
 		struct pipe_ctx *pipe_ctx)
 {
-	int dpp_offset, base_offset;
+	unsigned int dpp_offset, base_offset;
 
 	calculate_adjust_recout_for_visual_confirm(pipe_ctx, &base_offset,
 		&dpp_offset);
@@ -1692,7 +1692,7 @@ bool resource_can_pipe_disable_cursor(struct pipe_ctx *pipe_ctx)
 	struct pipe_ctx *test_pipe, *split_pipe;
 	struct rect r1 = pipe_ctx->plane_res.scl_data.recout;
 	int r1_right, r1_bottom;
-	int cur_layer = pipe_ctx->plane_state->layer_index;
+	unsigned int cur_layer = pipe_ctx->plane_state->layer_index;
 
 	reverse_adjust_recout_for_visual_confirm(&r1, pipe_ctx);
 	r1_right = r1.x + r1.width;
@@ -4103,9 +4103,9 @@ bool dc_resource_is_dsc_encoding_supported(const struct dc *dc)
 static bool planes_changed_for_existing_stream(struct dc_state *context,
 					       struct dc_stream_state *stream,
 					       const struct dc_validation_set set[],
-					       int set_count)
+					       unsigned int set_count)
 {
-	int i, j;
+	unsigned int i, j;
 	struct dc_stream_status *stream_status = NULL;
 
 	for (i = 0; i < context->stream_count; i++) {
@@ -4141,10 +4141,10 @@ static bool add_all_planes_for_stream(
 		const struct dc *dc,
 		struct dc_stream_state *stream,
 		const struct dc_validation_set set[],
-		int set_count,
+		unsigned int set_count,
 		struct dc_state *state)
 {
-	int i, j;
+	unsigned int i, j;
 
 	for (i = 0; i < set_count; i++)
 		if (set[i].stream == stream)
@@ -4182,7 +4182,7 @@ static bool add_all_planes_for_stream(
  */
 enum dc_status dc_validate_with_context(struct dc *dc,
 					const struct dc_validation_set set[],
-					int set_count,
+					unsigned int set_count,
 					struct dc_state *context,
 					enum dc_validate_mode validate_mode)
 {

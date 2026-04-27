@@ -47,9 +47,9 @@
 #define DP_SINK_PR_ENABLE_AND_CONFIGURATION		0x37B
 
 /* Travis */
-static const uint8_t DP_VGA_LVDS_CONVERTER_ID_2[] = "sivarT";
+static const char DP_VGA_LVDS_CONVERTER_ID_2[] = "sivarT";
 /* Nutmeg */
-static const uint8_t DP_VGA_LVDS_CONVERTER_ID_3[] = "dnomlA";
+static const char DP_VGA_LVDS_CONVERTER_ID_3[] = "dnomlA";
 
 void dp_set_panel_mode(struct dc_link *link, enum dp_panel_mode panel_mode)
 {
@@ -1210,9 +1210,9 @@ int edp_get_backlight_level(const struct dc_link *link)
 		fw_set_brightness = dmcu->funcs->is_dmcu_initialized(dmcu);
 
 	if (!fw_set_brightness && panel_cntl->funcs->get_current_backlight)
-		return panel_cntl->funcs->get_current_backlight(panel_cntl);
+		return (int)panel_cntl->funcs->get_current_backlight(panel_cntl);
 	else if (abm != NULL && abm->funcs->get_current_backlight != NULL)
-		return (int) abm->funcs->get_current_backlight(abm);
+		return (int)abm->funcs->get_current_backlight(abm);
 	else
 		return DC_ERROR_UNEXPECTED;
 }

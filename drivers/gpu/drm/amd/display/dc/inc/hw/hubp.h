@@ -305,7 +305,7 @@ struct hubp_funcs {
 			enum hubp_3dlut_fl_crossbar_bit_slice bit_slice_y_g,
 			enum hubp_3dlut_fl_crossbar_bit_slice bit_slice_cb_b,
 			enum hubp_3dlut_fl_crossbar_bit_slice bit_slice_cr_r);
-	int (*hubp_get_3dlut_fl_done)(struct hubp *hubp);
+	uint32_t (*hubp_get_3dlut_fl_done)(struct hubp *hubp);
 	void (*hubp_program_3dlut_fl_config)(struct hubp *hubp, struct hubp_fl_3dlut_config *cfg);
 	void (*hubp_clear_tiling)(struct hubp *hubp);
 	uint32_t (*hubp_get_current_read_line)(struct hubp *hubp);

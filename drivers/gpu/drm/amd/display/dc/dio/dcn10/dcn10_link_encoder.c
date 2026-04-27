@@ -450,7 +450,7 @@ static uint8_t get_frontend_source(
 unsigned int dcn10_get_dig_frontend(struct link_encoder *enc)
 {
 	struct dcn10_link_encoder *enc10 = TO_DCN10_LINK_ENC(enc);
-	int32_t value;
+	uint32_t value;
 	enum engine_id result;
 
 	REG_GET(DIG_BE_CNTL, DIG_FE_SOURCE_SELECT, &value);

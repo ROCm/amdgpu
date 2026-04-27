@@ -88,7 +88,7 @@ static const struct state_dependent_clocks dce80_max_clks_by_state[] = {
 /* ClocksStatePerformance */
 { .display_clk_khz = 625000, .pixel_clk_khz = 400000 } };
 
-int dentist_get_divider_from_did(int did)
+unsigned int dentist_get_divider_from_did(unsigned int did)
 {
 	if (did < DENTIST_BASE_DID_1)
 		did = DENTIST_BASE_DID_1;
@@ -155,8 +155,8 @@ static int dce60_get_dp_ref_freq_khz(struct clk_mgr *clk_mgr_base)
 int dce_get_dp_ref_freq_khz(struct clk_mgr *clk_mgr_base)
 {
 	struct clk_mgr_internal *clk_mgr = TO_CLK_MGR_INTERNAL(clk_mgr_base);
-	int dprefclk_wdivider;
-	int dprefclk_src_sel;
+	uint32_t dprefclk_wdivider;
+	uint32_t dprefclk_src_sel;
 	int dp_ref_clk_khz;
 	int target_div;
 

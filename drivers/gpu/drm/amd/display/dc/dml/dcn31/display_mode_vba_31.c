@@ -157,7 +157,7 @@ static bool CalculatePrefetchSchedule(
 		double *Tdmdl_vm,
 		double *Tdmdl,
 		double *TSetup,
-		int *VUpdateOffsetPix,
+		unsigned int *VUpdateOffsetPix,
 		double *VUpdateWidthPix,
 		double *VReadyOffsetPix);
 static double RoundToDFSGranularityUp(double Clock, double VCOSpeed);
@@ -218,19 +218,19 @@ static unsigned int CalculateVMAndRowBytes(
 		unsigned int *MetaRowByte,
 		unsigned int *PixelPTEBytesPerRow,
 		bool *PTEBufferSizeNotExceeded,
-		int *dpte_row_width_ub,
+		unsigned int *dpte_row_width_ub,
 		unsigned int *dpte_row_height,
 		unsigned int *MetaRequestWidth,
 		unsigned int *MetaRequestHeight,
 		unsigned int *meta_row_width,
 		unsigned int *meta_row_height,
-		int *vm_group_bytes,
+		unsigned int *vm_group_bytes,
 		unsigned int *dpte_group_bytes,
 		unsigned int *PixelPTEReqWidth,
 		unsigned int *PixelPTEReqHeight,
 		unsigned int *PTERequestSize,
-		int *DPDE0BytesFrame,
-		int *MetaPTEBytesFrame);
+		unsigned int *DPDE0BytesFrame,
+		unsigned int *MetaPTEBytesFrame);
 static double CalculateTWait(unsigned int PrefetchMode, double DRAMClockChangeLatency, double UrgentLatency, double SREnterPlusExitTime);
 static void CalculateRowBandwidth(
 		bool GPUVMEnable,
@@ -285,7 +285,7 @@ static void CalculateVupdateAndDynamicMetadataParameters(
 		double *Tdmbf,
 		double *Tdmec,
 		double *Tdmsks,
-		int *VUpdateOffsetPix,
+		unsigned int *VUpdateOffsetPix,
 		double *VUpdateWidthPix,
 		double *VReadyOffsetPix);
 
@@ -318,8 +318,8 @@ static void CalculateWatermarksAndDRAMSpeedChangeSupport(
 static void CalculateDCFCLKDeepSleep(
 		struct display_mode_lib *mode_lib,
 		unsigned int NumberOfActivePlanes,
-		int BytePerPixelY[],
-		int BytePerPixelC[],
+		unsigned int BytePerPixelY[],
+		unsigned int BytePerPixelC[],
 		double VRatio[],
 		double VRatioChroma[],
 		double SwathWidthY[],
@@ -377,7 +377,7 @@ static void CalculatePixelDeliveryTimes(
 		double PSCL_THROUGHPUT[],
 		double PSCL_THROUGHPUT_CHROMA[],
 		double DPPCLK[],
-		int BytePerPixelC[],
+		unsigned int BytePerPixelC[],
 		enum scan_direction_class SourceScan[],
 		unsigned int NumberOfCursors[],
 		unsigned int CursorWidth[][DC__NUM_CURSOR__MAX],
@@ -402,35 +402,35 @@ static void CalculateMetaAndPTETimes(
 		bool GPUVMEnable,
 		int MetaChunkSize,
 		int MinMetaChunkSizeBytes,
-		int HTotal[],
+		unsigned int HTotal[],
 		double VRatio[],
 		double VRatioChroma[],
 		double DestinationLinesToRequestRowInVBlank[],
 		double DestinationLinesToRequestRowInImmediateFlip[],
 		bool DCCEnable[],
 		double PixelClock[],
-		int BytePerPixelY[],
-		int BytePerPixelC[],
+		unsigned int BytePerPixelY[],
+		unsigned int BytePerPixelC[],
 		enum scan_direction_class SourceScan[],
-		int dpte_row_height[],
-		int dpte_row_height_chroma[],
-		int meta_row_width[],
-		int meta_row_width_chroma[],
-		int meta_row_height[],
-		int meta_row_height_chroma[],
-		int meta_req_width[],
-		int meta_req_width_chroma[],
-		int meta_req_height[],
-		int meta_req_height_chroma[],
-		int dpte_group_bytes[],
-		int PTERequestSizeY[],
-		int PTERequestSizeC[],
-		int PixelPTEReqWidthY[],
-		int PixelPTEReqHeightY[],
-		int PixelPTEReqWidthC[],
-		int PixelPTEReqHeightC[],
-		int dpte_row_width_luma_ub[],
-		int dpte_row_width_chroma_ub[],
+		unsigned int dpte_row_height[],
+		unsigned int dpte_row_height_chroma[],
+		unsigned int meta_row_width[],
+		unsigned int meta_row_width_chroma[],
+		unsigned int meta_row_height[],
+		unsigned int meta_row_height_chroma[],
+		unsigned int meta_req_width[],
+		unsigned int meta_req_width_chroma[],
+		unsigned int meta_req_height[],
+		unsigned int meta_req_height_chroma[],
+		unsigned int dpte_group_bytes[],
+		unsigned int PTERequestSizeY[],
+		unsigned int PTERequestSizeC[],
+		unsigned int PixelPTEReqWidthY[],
+		unsigned int PixelPTEReqHeightY[],
+		unsigned int PixelPTEReqWidthC[],
+		unsigned int PixelPTEReqHeightC[],
+		unsigned int dpte_row_width_luma_ub[],
+		unsigned int dpte_row_width_chroma_ub[],
 		double DST_Y_PER_PTE_ROW_NOM_L[],
 		double DST_Y_PER_PTE_ROW_NOM_C[],
 		double DST_Y_PER_META_ROW_NOM_L[],
@@ -453,18 +453,18 @@ static void CalculateVMGroupAndRequestTimes(
 		bool GPUVMEnable,
 		unsigned int GPUVMMaxPageTableLevels,
 		unsigned int HTotal[],
-		int BytePerPixelC[],
+		unsigned int BytePerPixelC[],
 		double DestinationLinesToRequestVMInVBlank[],
 		double DestinationLinesToRequestVMInImmediateFlip[],
 		bool DCCEnable[],
 		double PixelClock[],
-		int dpte_row_width_luma_ub[],
-		int dpte_row_width_chroma_ub[],
-		int vm_group_bytes[],
+		unsigned int dpte_row_width_luma_ub[],
+		unsigned int dpte_row_width_chroma_ub[],
+		unsigned int vm_group_bytes[],
 		unsigned int dpde0_bytes_per_frame_ub_l[],
 		unsigned int dpde0_bytes_per_frame_ub_c[],
-		int meta_pte_bytes_per_frame_ub_l[],
-		int meta_pte_bytes_per_frame_ub_c[],
+		unsigned int meta_pte_bytes_per_frame_ub_l[],
+		unsigned int meta_pte_bytes_per_frame_ub_c[],
 		double TimePerVMGroupVBlank[],
 		double TimePerVMGroupFlip[],
 		double TimePerVMRequestVBlank[],
@@ -492,29 +492,29 @@ static void CalculateStutterEfficiency(
 		bool ProgressiveToInterlaceUnitInOPP,
 		bool Interlace[],
 		double MinTTUVBlank[],
-		int DPPPerPlane[],
+		unsigned int DPPPerPlane[],
 		unsigned int DETBufferSizeY[],
-		int BytePerPixelY[],
+		unsigned int BytePerPixelY[],
 		double BytePerPixelDETY[],
 		double SwathWidthY[],
-		int SwathHeightY[],
-		int SwathHeightC[],
+		unsigned int SwathHeightY[],
+		unsigned int SwathHeightC[],
 		double NetDCCRateLuma[],
 		double NetDCCRateChroma[],
 		double DCCFractionOfZeroSizeRequestsLuma[],
 		double DCCFractionOfZeroSizeRequestsChroma[],
-		int HTotal[],
-		int VTotal[],
+		unsigned int HTotal[],
+		unsigned int VTotal[],
 		double PixelClock[],
 		double VRatio[],
 		enum scan_direction_class SourceScan[],
-		int BlockHeight256BytesY[],
-		int BlockWidth256BytesY[],
-		int BlockHeight256BytesC[],
-		int BlockWidth256BytesC[],
-		int DCCYMaxUncompressedBlock[],
-		int DCCCMaxUncompressedBlock[],
-		int VActive[],
+		unsigned int BlockHeight256BytesY[],
+		unsigned int BlockWidth256BytesY[],
+		unsigned int BlockHeight256BytesC[],
+		unsigned int BlockWidth256BytesC[],
+		unsigned int DCCYMaxUncompressedBlock[],
+		unsigned int DCCCMaxUncompressedBlock[],
+		unsigned int VActive[],
 		bool DCCEnable[],
 		bool WritebackEnable[],
 		double ReadBandwidthPlaneLuma[],
@@ -539,32 +539,32 @@ static void CalculateSwathAndDETConfiguration(
 		enum scan_direction_class SourceScan[],
 		enum source_format_class SourcePixelFormat[],
 		enum dm_swizzle_mode SurfaceTiling[],
-		int ViewportWidth[],
-		int ViewportHeight[],
-		int SurfaceWidthY[],
-		int SurfaceWidthC[],
-		int SurfaceHeightY[],
-		int SurfaceHeightC[],
-		int Read256BytesBlockHeightY[],
-		int Read256BytesBlockHeightC[],
-		int Read256BytesBlockWidthY[],
-		int Read256BytesBlockWidthC[],
+		unsigned int ViewportWidth[],
+		unsigned int ViewportHeight[],
+		unsigned int SurfaceWidthY[],
+		unsigned int SurfaceWidthC[],
+		unsigned int SurfaceHeightY[],
+		unsigned int SurfaceHeightC[],
+		unsigned int Read256BytesBlockHeightY[],
+		unsigned int Read256BytesBlockHeightC[],
+		unsigned int Read256BytesBlockWidthY[],
+		unsigned int Read256BytesBlockWidthC[],
 		enum odm_combine_mode ODMCombineEnabled[],
-		int BlendingAndTiming[],
-		int BytePerPixY[],
-		int BytePerPixC[],
+		unsigned int BlendingAndTiming[],
+		unsigned int BytePerPixY[],
+		unsigned int BytePerPixC[],
 		double BytePerPixDETY[],
 		double BytePerPixDETC[],
-		int HActive[],
+		unsigned int HActive[],
 		double HRatio[],
 		double HRatioChroma[],
-		int DPPPerPlane[],
-		int swath_width_luma_ub[],
-		int swath_width_chroma_ub[],
+		unsigned int DPPPerPlane[],
+		unsigned int swath_width_luma_ub[],
+		unsigned int swath_width_chroma_ub[],
 		double SwathWidth[],
 		double SwathWidthChroma[],
-		int SwathHeightY[],
-		int SwathHeightC[],
+		unsigned int SwathHeightY[],
+		unsigned int SwathHeightC[],
 		unsigned int DETBufferSizeY[],
 		unsigned int DETBufferSizeC[],
 		bool ViewportSizeSupportPerPlane[],
@@ -574,31 +574,31 @@ static void CalculateSwathWidth(
 		int NumberOfActivePlanes,
 		enum source_format_class SourcePixelFormat[],
 		enum scan_direction_class SourceScan[],
-		int ViewportWidth[],
-		int ViewportHeight[],
-		int SurfaceWidthY[],
-		int SurfaceWidthC[],
-		int SurfaceHeightY[],
-		int SurfaceHeightC[],
+		unsigned int ViewportWidth[],
+		unsigned int ViewportHeight[],
+		unsigned int SurfaceWidthY[],
+		unsigned int SurfaceWidthC[],
+		unsigned int SurfaceHeightY[],
+		unsigned int SurfaceHeightC[],
 		enum odm_combine_mode ODMCombineEnabled[],
-		int BytePerPixY[],
-		int BytePerPixC[],
-		int Read256BytesBlockHeightY[],
-		int Read256BytesBlockHeightC[],
-		int Read256BytesBlockWidthY[],
-		int Read256BytesBlockWidthC[],
-		int BlendingAndTiming[],
-		int HActive[],
+		unsigned int BytePerPixY[],
+		unsigned int BytePerPixC[],
+		unsigned int Read256BytesBlockHeightY[],
+		unsigned int Read256BytesBlockHeightC[],
+		unsigned int Read256BytesBlockWidthY[],
+		unsigned int Read256BytesBlockWidthC[],
+		unsigned int BlendingAndTiming[],
+		unsigned int HActive[],
 		double HRatio[],
-		int DPPPerPlane[],
+		unsigned int DPPPerPlane[],
 		double SwathWidthSingleDPPY[],
 		double SwathWidthSingleDPPC[],
 		double SwathWidthY[],
 		double SwathWidthC[],
-		int MaximumSwathHeightY[],
-		int MaximumSwathHeightC[],
-		int swath_width_luma_ub[],
-		int swath_width_chroma_ub[]);
+		unsigned int MaximumSwathHeightY[],
+		unsigned int MaximumSwathHeightC[],
+		unsigned int swath_width_luma_ub[],
+		unsigned int swath_width_chroma_ub[]);
 
 static double CalculateExtraLatency(
 		int RoundTripPingLatencyCycles,
@@ -612,8 +612,8 @@ static double CalculateExtraLatency(
 		bool GPUVMEnable,
 		bool HostVMEnable,
 		int NumberOfActivePlanes,
-		int NumberOfDPP[],
-		int dpte_group_bytes[],
+		unsigned int NumberOfDPP[],
+		unsigned int dpte_group_bytes[],
 		double HostVMInefficiencyFactor,
 		double HostVMMinPageSize,
 		int HostVMMaxNonCachedPageTableLevels);
@@ -627,8 +627,8 @@ static double CalculateExtraLatencyBytes(
 		bool GPUVMEnable,
 		bool HostVMEnable,
 		int NumberOfActivePlanes,
-		int NumberOfDPP[],
-		int dpte_group_bytes[],
+		unsigned int NumberOfDPP[],
+		unsigned int dpte_group_bytes[],
 		double HostVMInefficiencyFactor,
 		double HostVMMinPageSize,
 		int HostVMMaxNonCachedPageTableLevels);
@@ -652,7 +652,7 @@ static void CalculateUnboundedRequestAndCompressedBufferSize(
 		int CompressedBufferSegmentSizeInkByteFinal,
 		enum output_encoder_class *Output,
 		bool *UnboundedRequestEnabled,
-		int *CompressedBufferSizeInkByte);
+		unsigned int *CompressedBufferSizeInkByte);
 
 static bool UnboundedRequest(enum unbounded_requesting_policy UseUnboundedRequestingFinal, int TotalNumberOfActiveDPP, bool NoChroma, enum output_encoder_class Output);
 
@@ -869,7 +869,7 @@ static bool CalculatePrefetchSchedule(
 		double *Tdmdl_vm,
 		double *Tdmdl,
 		double *TSetup,
-		int *VUpdateOffsetPix,
+		unsigned int *VUpdateOffsetPix,
 		double *VUpdateWidthPix,
 		double *VReadyOffsetPix)
 {
@@ -1818,19 +1818,19 @@ static unsigned int CalculateVMAndRowBytes(
 		unsigned int *MetaRowByte,
 		unsigned int *PixelPTEBytesPerRow,
 		bool *PTEBufferSizeNotExceeded,
-		int *dpte_row_width_ub,
+		unsigned int *dpte_row_width_ub,
 		unsigned int *dpte_row_height,
 		unsigned int *MetaRequestWidth,
 		unsigned int *MetaRequestHeight,
 		unsigned int *meta_row_width,
 		unsigned int *meta_row_height,
-		int *vm_group_bytes,
+		unsigned int *vm_group_bytes,
 		unsigned int *dpte_group_bytes,
 		unsigned int *PixelPTEReqWidth,
 		unsigned int *PixelPTEReqHeight,
 		unsigned int *PTERequestSize,
-		int *DPDE0BytesFrame,
-		int *MetaPTEBytesFrame)
+		unsigned int *DPDE0BytesFrame,
+		unsigned int *MetaPTEBytesFrame)
 {
 	(void)SourcePixelFormat;
 	struct vba_vars_st *v = &mode_lib->vba;
@@ -3278,18 +3278,18 @@ static void DisplayPipeConfiguration(struct display_mode_lib *mode_lib)
 	// Display Pipe Configuration
 	double BytePerPixDETY[DC__NUM_DPP__MAX];
 	double BytePerPixDETC[DC__NUM_DPP__MAX];
-	int BytePerPixY[DC__NUM_DPP__MAX];
-	int BytePerPixC[DC__NUM_DPP__MAX];
-	int Read256BytesBlockHeightY[DC__NUM_DPP__MAX];
-	int Read256BytesBlockHeightC[DC__NUM_DPP__MAX];
-	int Read256BytesBlockWidthY[DC__NUM_DPP__MAX];
-	int Read256BytesBlockWidthC[DC__NUM_DPP__MAX];
+	unsigned int BytePerPixY[DC__NUM_DPP__MAX];
+	unsigned int BytePerPixC[DC__NUM_DPP__MAX];
+	unsigned int Read256BytesBlockHeightY[DC__NUM_DPP__MAX];
+	unsigned int Read256BytesBlockHeightC[DC__NUM_DPP__MAX];
+	unsigned int Read256BytesBlockWidthY[DC__NUM_DPP__MAX];
+	unsigned int Read256BytesBlockWidthC[DC__NUM_DPP__MAX];
 	double dummy1[DC__NUM_DPP__MAX];
 	double dummy2[DC__NUM_DPP__MAX];
 	double dummy3[DC__NUM_DPP__MAX];
 	double dummy4[DC__NUM_DPP__MAX];
-	int dummy5[DC__NUM_DPP__MAX];
-	int dummy6[DC__NUM_DPP__MAX];
+	unsigned int dummy5[DC__NUM_DPP__MAX];
+	unsigned int dummy6[DC__NUM_DPP__MAX];
 	bool dummy7[DC__NUM_DPP__MAX];
 	bool dummysinglestring;
 
@@ -3429,7 +3429,7 @@ static void CalculateVupdateAndDynamicMetadataParameters(
 		double *Tdmbf,
 		double *Tdmec,
 		double *Tdmsks,
-		int *VUpdateOffsetPix,
+		unsigned int *VUpdateOffsetPix,
 		double *VUpdateWidthPix,
 		double *VReadyOffsetPix)
 {
@@ -3783,7 +3783,7 @@ static noinline void CalculatePrefetchSchedulePerPlane(
 		&v->VReadyOffsetPix[k]);
 }
 
-static void PatchDETBufferSizeInKByte(unsigned int NumberOfActivePlanes, int NoOfDPPThisState[], unsigned int config_return_buffer_size_in_kbytes, unsigned int DETBufferSizeInKByte[])
+static void PatchDETBufferSizeInKByte(unsigned int NumberOfActivePlanes, unsigned int NoOfDPPThisState[], unsigned int config_return_buffer_size_in_kbytes, unsigned int DETBufferSizeInKByte[])
 {
 	int total_pipes = 0;
 	unsigned int i;
@@ -3804,7 +3804,7 @@ void dml31_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 	int idx;
 	unsigned int i, j, k, m;
 	int ReorderingBytes;
-	int MinPrefetchMode = 0, MaxPrefetchMode = 2;
+	unsigned int MinPrefetchMode = 0, MaxPrefetchMode = 2;
 	bool NoChroma = true;
 	bool EnoughWritebackUnits = true;
 	bool P2IWith420 = false;
@@ -5119,7 +5119,7 @@ void dml31_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 			double HostVMInefficiencyFactor = 1;
 			int NextPrefetchModeState = MinPrefetchMode;
 			bool UnboundedRequestEnabledThisState = false;
-			int CompressedBufferSizeInkByteThisState = 0;
+			unsigned int CompressedBufferSizeInkByteThisState = 0;
 			double dummy;
 
 			v->TimeCalc = 24 / v->ProjectedDCFCLKDeepSleep[i][j];
@@ -5774,8 +5774,8 @@ static void CalculateWatermarksAndDRAMSpeedChangeSupport(
 static void CalculateDCFCLKDeepSleep(
 		struct display_mode_lib *mode_lib,
 		unsigned int NumberOfActivePlanes,
-		int BytePerPixelY[],
-		int BytePerPixelC[],
+		unsigned int BytePerPixelY[],
+		unsigned int BytePerPixelC[],
 		double VRatio[],
 		double VRatioChroma[],
 		double SwathWidthY[],
@@ -5926,7 +5926,7 @@ static void CalculatePixelDeliveryTimes(
 		double PSCL_THROUGHPUT[],
 		double PSCL_THROUGHPUT_CHROMA[],
 		double DPPCLK[],
-		int BytePerPixelC[],
+		unsigned int BytePerPixelC[],
 		enum scan_direction_class SourceScan[],
 		unsigned int NumberOfCursors[],
 		unsigned int CursorWidth[][DC__NUM_CURSOR__MAX],
@@ -6050,35 +6050,35 @@ static void CalculateMetaAndPTETimes(
 		bool GPUVMEnable,
 		int MetaChunkSize,
 		int MinMetaChunkSizeBytes,
-		int HTotal[],
+		unsigned int HTotal[],
 		double VRatio[],
 		double VRatioChroma[],
 		double DestinationLinesToRequestRowInVBlank[],
 		double DestinationLinesToRequestRowInImmediateFlip[],
 		bool DCCEnable[],
 		double PixelClock[],
-		int BytePerPixelY[],
-		int BytePerPixelC[],
+		unsigned int BytePerPixelY[],
+		unsigned int BytePerPixelC[],
 		enum scan_direction_class SourceScan[],
-		int dpte_row_height[],
-		int dpte_row_height_chroma[],
-		int meta_row_width[],
-		int meta_row_width_chroma[],
-		int meta_row_height[],
-		int meta_row_height_chroma[],
-		int meta_req_width[],
-		int meta_req_width_chroma[],
-		int meta_req_height[],
-		int meta_req_height_chroma[],
-		int dpte_group_bytes[],
-		int PTERequestSizeY[],
-		int PTERequestSizeC[],
-		int PixelPTEReqWidthY[],
-		int PixelPTEReqHeightY[],
-		int PixelPTEReqWidthC[],
-		int PixelPTEReqHeightC[],
-		int dpte_row_width_luma_ub[],
-		int dpte_row_width_chroma_ub[],
+		unsigned int dpte_row_height[],
+		unsigned int dpte_row_height_chroma[],
+		unsigned int meta_row_width[],
+		unsigned int meta_row_width_chroma[],
+		unsigned int meta_row_height[],
+		unsigned int meta_row_height_chroma[],
+		unsigned int meta_req_width[],
+		unsigned int meta_req_width_chroma[],
+		unsigned int meta_req_height[],
+		unsigned int meta_req_height_chroma[],
+		unsigned int dpte_group_bytes[],
+		unsigned int PTERequestSizeY[],
+		unsigned int PTERequestSizeC[],
+		unsigned int PixelPTEReqWidthY[],
+		unsigned int PixelPTEReqHeightY[],
+		unsigned int PixelPTEReqWidthC[],
+		unsigned int PixelPTEReqHeightC[],
+		unsigned int dpte_row_width_luma_ub[],
+		unsigned int dpte_row_width_chroma_ub[],
 		double DST_Y_PER_PTE_ROW_NOM_L[],
 		double DST_Y_PER_PTE_ROW_NOM_C[],
 		double DST_Y_PER_META_ROW_NOM_L[],
@@ -6223,18 +6223,18 @@ static void CalculateVMGroupAndRequestTimes(
 		bool GPUVMEnable,
 		unsigned int GPUVMMaxPageTableLevels,
 		unsigned int HTotal[],
-		int BytePerPixelC[],
+		unsigned int BytePerPixelC[],
 		double DestinationLinesToRequestVMInVBlank[],
 		double DestinationLinesToRequestVMInImmediateFlip[],
 		bool DCCEnable[],
 		double PixelClock[],
-		int dpte_row_width_luma_ub[],
-		int dpte_row_width_chroma_ub[],
-		int vm_group_bytes[],
+		unsigned int dpte_row_width_luma_ub[],
+		unsigned int dpte_row_width_chroma_ub[],
+		unsigned int vm_group_bytes[],
 		unsigned int dpde0_bytes_per_frame_ub_l[],
 		unsigned int dpde0_bytes_per_frame_ub_c[],
-		int meta_pte_bytes_per_frame_ub_l[],
-		int meta_pte_bytes_per_frame_ub_c[],
+		unsigned int meta_pte_bytes_per_frame_ub_l[],
+		unsigned int meta_pte_bytes_per_frame_ub_c[],
 		double TimePerVMGroupVBlank[],
 		double TimePerVMGroupFlip[],
 		double TimePerVMRequestVBlank[],
@@ -6342,29 +6342,29 @@ static void CalculateStutterEfficiency(
 		bool ProgressiveToInterlaceUnitInOPP,
 		bool Interlace[],
 		double MinTTUVBlank[],
-		int DPPPerPlane[],
+		unsigned int DPPPerPlane[],
 		unsigned int DETBufferSizeY[],
-		int BytePerPixelY[],
+		unsigned int BytePerPixelY[],
 		double BytePerPixelDETY[],
 		double SwathWidthY[],
-		int SwathHeightY[],
-		int SwathHeightC[],
+		unsigned int SwathHeightY[],
+		unsigned int SwathHeightC[],
 		double NetDCCRateLuma[],
 		double NetDCCRateChroma[],
 		double DCCFractionOfZeroSizeRequestsLuma[],
 		double DCCFractionOfZeroSizeRequestsChroma[],
-		int HTotal[],
-		int VTotal[],
+		unsigned int HTotal[],
+		unsigned int VTotal[],
 		double PixelClock[],
 		double VRatio[],
 		enum scan_direction_class SourceScan[],
-		int BlockHeight256BytesY[],
-		int BlockWidth256BytesY[],
-		int BlockHeight256BytesC[],
-		int BlockWidth256BytesC[],
-		int DCCYMaxUncompressedBlock[],
-		int DCCCMaxUncompressedBlock[],
-		int VActive[],
+		unsigned int BlockHeight256BytesY[],
+		unsigned int BlockWidth256BytesY[],
+		unsigned int BlockHeight256BytesC[],
+		unsigned int BlockWidth256BytesC[],
+		unsigned int DCCYMaxUncompressedBlock[],
+		unsigned int DCCCMaxUncompressedBlock[],
+		unsigned int VActive[],
 		bool DCCEnable[],
 		bool WritebackEnable[],
 		double ReadBandwidthPlaneLuma[],
@@ -6649,42 +6649,42 @@ static void CalculateSwathAndDETConfiguration(
 		enum scan_direction_class SourceScan[],
 		enum source_format_class SourcePixelFormat[],
 		enum dm_swizzle_mode SurfaceTiling[],
-		int ViewportWidth[],
-		int ViewportHeight[],
-		int SurfaceWidthY[],
-		int SurfaceWidthC[],
-		int SurfaceHeightY[],
-		int SurfaceHeightC[],
-		int Read256BytesBlockHeightY[],
-		int Read256BytesBlockHeightC[],
-		int Read256BytesBlockWidthY[],
-		int Read256BytesBlockWidthC[],
+		unsigned int ViewportWidth[],
+		unsigned int ViewportHeight[],
+		unsigned int SurfaceWidthY[],
+		unsigned int SurfaceWidthC[],
+		unsigned int SurfaceHeightY[],
+		unsigned int SurfaceHeightC[],
+		unsigned int Read256BytesBlockHeightY[],
+		unsigned int Read256BytesBlockHeightC[],
+		unsigned int Read256BytesBlockWidthY[],
+		unsigned int Read256BytesBlockWidthC[],
 		enum odm_combine_mode ODMCombineEnabled[],
-		int BlendingAndTiming[],
-		int BytePerPixY[],
-		int BytePerPixC[],
+		unsigned int BlendingAndTiming[],
+		unsigned int BytePerPixY[],
+		unsigned int BytePerPixC[],
 		double BytePerPixDETY[],
 		double BytePerPixDETC[],
-		int HActive[],
+		unsigned int HActive[],
 		double HRatio[],
 		double HRatioChroma[],
-		int DPPPerPlane[],
-		int swath_width_luma_ub[],
-		int swath_width_chroma_ub[],
+		unsigned int DPPPerPlane[],
+		unsigned int swath_width_luma_ub[],
+		unsigned int swath_width_chroma_ub[],
 		double SwathWidth[],
 		double SwathWidthChroma[],
-		int SwathHeightY[],
-		int SwathHeightC[],
+		unsigned int SwathHeightY[],
+		unsigned int SwathHeightC[],
 		unsigned int DETBufferSizeY[],
 		unsigned int DETBufferSizeC[],
 		bool ViewportSizeSupportPerPlane[],
 		bool *ViewportSizeSupport)
 {
 	(void)HRatioChroma;
-	int MaximumSwathHeightY[DC__NUM_DPP__MAX];
-	int MaximumSwathHeightC[DC__NUM_DPP__MAX];
-	int MinimumSwathHeightY;
-	int MinimumSwathHeightC;
+	unsigned int MaximumSwathHeightY[DC__NUM_DPP__MAX];
+	unsigned int MaximumSwathHeightC[DC__NUM_DPP__MAX];
+	unsigned int MinimumSwathHeightY;
+	unsigned int MinimumSwathHeightC;
 	unsigned int RoundedUpMaxSwathSizeBytesY;
 	unsigned int RoundedUpMaxSwathSizeBytesC;
 	unsigned int RoundedUpMinSwathSizeBytesY;
@@ -6829,31 +6829,31 @@ static void CalculateSwathWidth(
 		int NumberOfActivePlanes,
 		enum source_format_class SourcePixelFormat[],
 		enum scan_direction_class SourceScan[],
-		int ViewportWidth[],
-		int ViewportHeight[],
-		int SurfaceWidthY[],
-		int SurfaceWidthC[],
-		int SurfaceHeightY[],
-		int SurfaceHeightC[],
+		unsigned int ViewportWidth[],
+		unsigned int ViewportHeight[],
+		unsigned int SurfaceWidthY[],
+		unsigned int SurfaceWidthC[],
+		unsigned int SurfaceHeightY[],
+		unsigned int SurfaceHeightC[],
 		enum odm_combine_mode ODMCombineEnabled[],
-		int BytePerPixY[],
-		int BytePerPixC[],
-		int Read256BytesBlockHeightY[],
-		int Read256BytesBlockHeightC[],
-		int Read256BytesBlockWidthY[],
-		int Read256BytesBlockWidthC[],
-		int BlendingAndTiming[],
-		int HActive[],
+		unsigned int BytePerPixY[],
+		unsigned int BytePerPixC[],
+		unsigned int Read256BytesBlockHeightY[],
+		unsigned int Read256BytesBlockHeightC[],
+		unsigned int Read256BytesBlockWidthY[],
+		unsigned int Read256BytesBlockWidthC[],
+		unsigned int BlendingAndTiming[],
+		unsigned int HActive[],
 		double HRatio[],
-		int DPPPerPlane[],
+		unsigned int DPPPerPlane[],
 		double SwathWidthSingleDPPY[],
 		double SwathWidthSingleDPPC[],
 		double SwathWidthY[],
 		double SwathWidthC[],
-		int MaximumSwathHeightY[],
-		int MaximumSwathHeightC[],
-		int swath_width_luma_ub[],
-		int swath_width_chroma_ub[])
+		unsigned int MaximumSwathHeightY[],
+		unsigned int MaximumSwathHeightC[],
+		unsigned int swath_width_luma_ub[],
+		unsigned int swath_width_chroma_ub[])
 {
 	(void)BytePerPixY;
 	enum odm_combine_mode MainPlaneODMCombine;
@@ -6960,8 +6960,8 @@ static double CalculateExtraLatency(
 		bool GPUVMEnable,
 		bool HostVMEnable,
 		int NumberOfActivePlanes,
-		int NumberOfDPP[],
-		int dpte_group_bytes[],
+		unsigned int NumberOfDPP[],
+		unsigned int dpte_group_bytes[],
 		double HostVMInefficiencyFactor,
 		double HostVMMinPageSize,
 		int HostVMMaxNonCachedPageTableLevels)
@@ -7006,8 +7006,8 @@ static double CalculateExtraLatencyBytes(
 		bool GPUVMEnable,
 		bool HostVMEnable,
 		int NumberOfActivePlanes,
-		int NumberOfDPP[],
-		int dpte_group_bytes[],
+		unsigned int NumberOfDPP[],
+		unsigned int dpte_group_bytes[],
 		double HostVMInefficiencyFactor,
 		double HostVMMinPageSize,
 		int HostVMMaxNonCachedPageTableLevels)
@@ -7061,7 +7061,7 @@ static noinline_for_stack void UseMinimumDCFCLK(
 		int ReorderingBytes)
 {
 	struct vba_vars_st *v = &mode_lib->vba;
-	int dummy1;
+	unsigned int dummy1;
 	unsigned int j, k;
 	unsigned int i;
 	double NormalEfficiency,  dummy2, dummy3;
@@ -7081,7 +7081,7 @@ static noinline_for_stack void UseMinimumDCFCLK(
 			double ExtraLatencyBytes;
 			double ExtraLatencyCycles;
 			double DCFCLKRequiredForPeakBandwidth;
-			int NoOfDPPState[DC__NUM_DPP__MAX];
+			unsigned int NoOfDPPState[DC__NUM_DPP__MAX];
 			double MinimumTvmPlus2Tr0;
 
 			TotalMaxPrefetchFlipDPTERowBandwidth[i][j] = 0;
@@ -7226,7 +7226,7 @@ static void CalculateUnboundedRequestAndCompressedBufferSize(
 		int CompressedBufferSegmentSizeInkByteFinal,
 		enum output_encoder_class *Output,
 		bool *UnboundedRequestEnabled,
-		int *CompressedBufferSizeInkByte)
+		unsigned int *CompressedBufferSizeInkByte)
 {
 	double actDETBufferSizeInKByte = dml_ceil(DETBufferSizeInKByte, 64);
 
@@ -7244,7 +7244,7 @@ static void CalculateUnboundedRequestAndCompressedBufferSize(
 	dml_print("DML::%s: UseUnboundedRequestingFinal = %d\n", __func__, UseUnboundedRequestingFinal);
 	dml_print("DML::%s: actDETBufferSizeInKByte = %f\n", __func__, actDETBufferSizeInKByte);
 	dml_print("DML::%s: UnboundedRequestEnabled = %d\n", __func__, *UnboundedRequestEnabled);
-	dml_print("DML::%s: CompressedBufferSizeInkByte = %d\n", __func__, *CompressedBufferSizeInkByte);
+	dml_print("DML::%s: CompressedBufferSizeInkByte = %u\n", __func__, *CompressedBufferSizeInkByte);
 #endif
 }
 

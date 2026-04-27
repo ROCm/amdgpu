@@ -2485,7 +2485,8 @@ void dcn10_enable_vblanks_synchronization(
 	(void)group_index;
 	struct output_pixel_processor *opp;
 	struct timing_generator *tg;
-	int i, width = 0, height = 0, master;
+	int i, master;
+	uint32_t width = 0, height = 0;
 
 	DC_LOGGER_INIT(dc->ctx);
 
@@ -2551,7 +2552,8 @@ void dcn10_enable_timing_synchronization(
 	(void)group_index;
 	struct output_pixel_processor *opp;
 	struct timing_generator *tg;
-	int i, width = 0, height = 0;
+	int i;
+	uint32_t width = 0, height = 0;
 
 	DC_LOGGER_INIT(dc->ctx);
 

@@ -7007,7 +7007,7 @@ bool dc_can_clear_cursor_limit(const struct dc *dc)
 	return false;
 }
 
-void dc_get_underflow_debug_data_for_otg(struct dc *dc, int primary_otg_inst,
+void dc_get_underflow_debug_data_for_otg(struct dc *dc, unsigned int primary_otg_inst,
 				struct dc_underflow_debug_data *out_data)
 {
 	struct timing_generator *tg = NULL;
@@ -7025,7 +7025,7 @@ void dc_get_underflow_debug_data_for_otg(struct dc *dc, int primary_otg_inst,
 		dc->hwss.get_underflow_debug_data(dc, tg, out_data);
 }
 
-void dc_get_power_feature_status(struct dc *dc, int primary_otg_inst,
+void dc_get_power_feature_status(struct dc *dc, unsigned int primary_otg_inst,
 				struct power_features *out_data)
 {
 	(void)primary_otg_inst;
