@@ -22,8 +22,8 @@
  *
  */
 
-#include <generated/utsrelease.h>
 #include <linux/devcoredump.h>
+#include <linux/utsname.h>
 #include "amdgpu_dev_coredump.h"
 #include "atom.h"
 
@@ -237,7 +237,7 @@ amdgpu_devcoredump_format(char *buffer, size_t count, struct amdgpu_coredump_inf
 
 	drm_printf(&p, "**** AMDGPU Device Coredump ****\n");
 	drm_printf(&p, "version: " AMDGPU_COREDUMP_VERSION "\n");
-	drm_printf(&p, "kernel: " UTS_RELEASE "\n");
+	drm_printf(&p, "kernel: %s\n", init_utsname()->release);
 	drm_printf(&p, "module: " KBUILD_MODNAME "\n");
 	drm_printf(&p, "time: %ptSp\n", &coredump->reset_time);
 
