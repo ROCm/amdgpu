@@ -38,6 +38,9 @@
 #include <drm/drm_probe_helper.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
+#ifndef DRM_CRTC_HELPER_VBLANK_FUNCS
+#include <linux/hrtimer.h>
+#endif
 #include "amdgpu_irq.h"
 
 #include <drm/display/drm_dp_mst_helper.h>
@@ -504,6 +507,12 @@ struct amdgpu_crtc {
 	u32 line_time;
 	u32 lb_vblank_lead_lines;
 	struct drm_display_mode hw_mode;
+
+#ifndef DRM_CRTC_VBLANK_TIMER_FUNCS
+	/* for virtual dce */
+	struct hrtimer vblank_timer;
+	enum amdgpu_interrupt_state vsync_timer_enabled;
+#endif
 
 	int otg_inst;
 	struct drm_pending_vblank_event *event;
