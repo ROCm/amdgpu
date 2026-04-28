@@ -63,7 +63,7 @@ struct amdgpu_dm_connector;
 struct dc_state;
 struct dc_stream_state;
 struct dm_atomic_state;
-struct drm_atomic_state;
+struct drm_atomic_commit;
 struct drm_dp_mst_topology_mgr;
 
 uint32_t dm_mst_get_pbn_divider(struct dc_link *link);
