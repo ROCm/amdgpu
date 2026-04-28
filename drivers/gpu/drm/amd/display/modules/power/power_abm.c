@@ -245,8 +245,6 @@ struct iram_table_v_2_2 {
 #define MOD_POWER_TO_CORE(mod_power)\
 		container_of(mod_power, struct core_power, mod_public)
 
-
-
 static uint16_t backlight_8_to_16(unsigned int backlight_8bit)
 {
 	return (uint16_t)(backlight_8bit * 0x101);

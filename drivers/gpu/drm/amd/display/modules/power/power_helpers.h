@@ -203,4 +203,9 @@ bool mod_power_psr_notify_mode_change(struct mod_power *mod_power,
 	const struct dc_stream_state *stream,
 	struct dc_link *link,
 	unsigned int stream_index);
+void mod_power_replay_notify_mode_change(struct mod_power *mod_power,
+	struct dc *dc,
+	struct dc_link *link,
+	const struct dc_stream_state *stream,
+	unsigned int stream_index);
 #endif /* MODULES_POWER_POWER_HELPERS_H_ */
