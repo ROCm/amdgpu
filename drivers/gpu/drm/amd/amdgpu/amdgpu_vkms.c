@@ -5,7 +5,9 @@
 #include <drm/drm_simple_kms_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_vblank.h>
+#ifdef DRM_CRTC_VBLANK_TIMER_FUNCS
 #include <drm/drm_vblank_helper.h>
+#endif
 
 #include "amdgpu.h"
 #ifdef CONFIG_DRM_AMDGPU_SI
@@ -127,8 +129,8 @@ static const struct drm_crtc_funcs amdgpu_vkms_crtc_funcs = {
 	.atomic_destroy_state   = drm_atomic_helper_crtc_destroy_state,
 #ifndef DRM_CRTC_VBLANK_TIMER_FUNCS
 #ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
-	.enable_vblank		= amdgpu_vkms_enable_vblank,
-	.disable_vblank		= amdgpu_vkms_disable_vblank,
+	.enable_vblank		    = amdgpu_vkms_enable_vblank,
+	.disable_vblank		    = amdgpu_vkms_disable_vblank,
 	.get_vblank_timestamp	= amdgpu_vkms_get_vblank_timestamp,
 #endif
 #else
