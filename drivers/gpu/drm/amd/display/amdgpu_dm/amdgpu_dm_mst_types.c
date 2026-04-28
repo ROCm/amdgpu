@@ -2073,7 +2073,7 @@ int pre_validate_dsc(struct drm_atomic_commit *state,
 			dm_old_crtc_state = to_dm_crtc_state(state->crtcs[ind].old_state);
 
 			local_dc_state->streams[i] =
-				create_validate_stream_for_sink(connector,
+				amdgpu_dm_create_validate_stream_for_sink(connector,
 								&state->crtcs[ind].new_state->mode,
 								dm_new_conn_state,
 								dm_old_crtc_state->stream);

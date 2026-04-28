@@ -2983,7 +2983,7 @@ static ssize_t hdmi_cec_state_write(struct file *f, const char __user *buf,
 		ret = amdgpu_dm_initialize_hdmi_connector(aconnector);
 		if (ret)
 			return ret;
-		hdmi_cec_set_edid(aconnector);
+		amdgpu_dm_hdmi_cec_set_edid(aconnector);
 	} else {
 		if (!aconnector->notifier)
 			return -EINVAL;

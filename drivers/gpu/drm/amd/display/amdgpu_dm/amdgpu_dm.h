@@ -1091,43 +1091,7 @@ struct dm_connector_state {
 #define to_dm_connector_state(x)\
 	container_of((x), struct dm_connector_state, base)
 
-void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector);
-struct drm_connector_state *
-amdgpu_dm_connector_atomic_duplicate_state(struct drm_connector *connector);
-int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
-					    struct drm_connector_state *state,
-					    struct drm_property *property,
-					    uint64_t val);
-
-int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
-					    const struct drm_connector_state *state,
-					    struct drm_property *property,
-					    uint64_t *val);
-
-int amdgpu_dm_get_encoder_crtc_mask(struct amdgpu_device *adev);
-
-void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
-				     struct amdgpu_dm_connector *aconnector,
-				     int connector_type,
-				     struct dc_link *link,
-				     int link_index);
-
-enum drm_mode_status amdgpu_dm_connector_mode_valid(struct drm_connector *connector,
-#ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_MODE_VALID_CONST_ARGUMENT
-				   const struct drm_display_mode *mode);
-#else
-				   struct drm_display_mode *mode);
-#endif
-
-void dm_restore_drm_connector_state(struct drm_device *dev,
-				    struct drm_connector *connector);
-
-void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
-#ifdef HAVE_DRM_DP_MST_EDID_READ
-				    const struct drm_edid *drm_edid, bool do_mccs);
-#else
-					struct edid *edid, bool do_mccs);
-#endif
+#include "amdgpu_dm_connector.h"
 
 void amdgpu_dm_trigger_timing_sync(struct drm_device *dev);
 
@@ -1151,13 +1115,8 @@ int amdgpu_dm_update_plane_color_mgmt(struct dm_crtc_state *crtc,
 				      struct drm_plane_state *plane_state,
 				      struct dc_plane_state *dc_plane_state);
 
-void amdgpu_dm_update_connector_after_detect(
-		struct amdgpu_dm_connector *aconnector);
-
 void populate_hdmi_info_from_connector(bool enable_frl, struct drm_hdmi_info *info,
 				      struct dc_edid_caps *edid_caps);
-
-extern const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs;
 
 int amdgpu_dm_process_dmub_aux_transfer_sync(struct dc_context *ctx, unsigned int link_index,
 					struct aux_payload *payload, enum aux_return_code_type *operation_result);
@@ -1173,20 +1132,9 @@ bool amdgpu_dm_execute_fused_io(
 int amdgpu_dm_process_dmub_set_config_sync(struct dc_context *ctx, unsigned int link_index,
 					struct set_config_cmd_payload *payload, enum set_config_status *operation_result);
 
-struct dc_stream_state *
-	create_validate_stream_for_sink(struct drm_connector *connector,
-					const struct drm_display_mode *drm_mode,
-					const struct dm_connector_state *dm_state,
-					const struct dc_stream_state *old_stream);
-
 int dm_atomic_get_state(struct drm_atomic_commit *state,
 			struct dm_atomic_state **dm_state);
 
-struct drm_connector *
-amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_commit *state,
-					     struct drm_crtc *crtc);
-
-int convert_dc_color_depth_into_bpc(enum dc_color_depth display_color_depth);
 struct idle_workqueue *idle_create_workqueue(struct amdgpu_device *adev);
 
 void *dm_allocate_gpu_mem(struct amdgpu_device *adev,
@@ -1198,10 +1146,6 @@ void dm_free_gpu_mem(struct amdgpu_device *adev,
 						  void *addr);
 
 bool amdgpu_dm_is_headless(struct amdgpu_device *adev);
-
-void hdmi_cec_set_edid(struct amdgpu_dm_connector *aconnector);
-void hdmi_cec_unset_edid(struct amdgpu_dm_connector *aconnector);
-int amdgpu_dm_initialize_hdmi_connector(struct amdgpu_dm_connector *aconnector);
 
 void retrieve_dmi_info(struct amdgpu_display_manager *dm);
 
