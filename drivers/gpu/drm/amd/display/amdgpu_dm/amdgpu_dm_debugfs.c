@@ -3177,9 +3177,24 @@ static int replay_get_state(void *data, u64 *val)
 {
 	struct amdgpu_dm_connector *connector = data;
 	struct dc_link *link = connector->dc_link;
+	struct amdgpu_device *adev = drm_to_adev(connector->base.dev);
+	struct dc *dc = adev->dm.dc;
 	uint64_t state = REPLAY_STATE_INVALID;
+	bool reallow_idle = false;
+
+	mutex_lock(&adev->dm.dc_lock);
+
+	if (dc->idle_optimizations_allowed) {
+		dc_allow_idle_optimizations(dc, false);
+		reallow_idle = true;
+	}
 
 	dc_link_get_replay_state(link, &state);
+
+	if (reallow_idle)
+		dc_allow_idle_optimizations(dc, true);
+
+	mutex_unlock(&adev->dm.dc_lock);
 
 	*val = state;
 
@@ -3193,10 +3208,26 @@ static int replay_set_residency(void *data, u64 val)
 {
 	struct amdgpu_dm_connector *connector = data;
 	struct dc_link *link = connector->dc_link;
+	struct amdgpu_device *adev = drm_to_adev(connector->base.dev);
+	struct dc *dc = adev->dm.dc;
 	bool is_start = (val != 0);
 	u32 residency = 0;
+	bool reallow_idle = false;
+
+	mutex_lock(&adev->dm.dc_lock);
+
+	if (dc->idle_optimizations_allowed) {
+		dc_allow_idle_optimizations(dc, false);
+		reallow_idle = true;
+	}
 
 	link->dc->link_srv->edp_replay_residency(link, &residency, is_start, PR_RESIDENCY_MODE_PHY);
+
+	if (reallow_idle)
+		dc_allow_idle_optimizations(dc, true);
+
+	mutex_unlock(&adev->dm.dc_lock);
+
 	return 0;
 }
 
@@ -3207,9 +3238,25 @@ static int replay_get_residency(void *data, u64 *val)
 {
 	struct amdgpu_dm_connector *connector = data;
 	struct dc_link *link = connector->dc_link;
+	struct amdgpu_device *adev = drm_to_adev(connector->base.dev);
+	struct dc *dc = adev->dm.dc;
 	u32 residency = 0;
+	bool reallow_idle = false;
+
+	mutex_lock(&adev->dm.dc_lock);
+
+	if (dc->idle_optimizations_allowed) {
+		dc_allow_idle_optimizations(dc, false);
+		reallow_idle = true;
+	}
 
 	link->dc->link_srv->edp_replay_residency(link, &residency, false, PR_RESIDENCY_MODE_PHY);
+
+	if (reallow_idle)
+		dc_allow_idle_optimizations(dc, true);
+
+	mutex_unlock(&adev->dm.dc_lock);
+
 	*val = (u64)residency;
 
 	return 0;
@@ -3222,9 +3269,24 @@ static int psr_get(void *data, u64 *val)
 {
 	struct amdgpu_dm_connector *connector = data;
 	struct dc_link *link = connector->dc_link;
+	struct amdgpu_device *adev = drm_to_adev(connector->base.dev);
+	struct dc *dc = adev->dm.dc;
 	enum dc_psr_state state = PSR_STATE0;
+	bool reallow_idle = false;
+
+	mutex_lock(&adev->dm.dc_lock);
+
+	if (dc->idle_optimizations_allowed) {
+		dc_allow_idle_optimizations(dc, false);
+		reallow_idle = true;
+	}
 
 	dc_link_get_psr_state(link, &state);
+
+	if (reallow_idle)
+		dc_allow_idle_optimizations(dc, true);
+
+	mutex_unlock(&adev->dm.dc_lock);
 
 	*val = state;
 
@@ -3238,9 +3300,24 @@ static int psr_read_residency(void *data, u64 *val)
 {
 	struct amdgpu_dm_connector *connector = data;
 	struct dc_link *link = connector->dc_link;
+	struct amdgpu_device *adev = drm_to_adev(connector->base.dev);
+	struct dc *dc = adev->dm.dc;
 	u32 residency = 0;
+	bool reallow_idle = false;
+
+	mutex_lock(&adev->dm.dc_lock);
+
+	if (dc->idle_optimizations_allowed) {
+		dc_allow_idle_optimizations(dc, false);
+		reallow_idle = true;
+	}
 
 	link->dc->link_srv->edp_get_psr_residency(link, &residency, PSR_RESIDENCY_MODE_PHY);
+
+	if (reallow_idle)
+		dc_allow_idle_optimizations(dc, true);
+
+	mutex_unlock(&adev->dm.dc_lock);
 
 	*val = (u64)residency;
 
