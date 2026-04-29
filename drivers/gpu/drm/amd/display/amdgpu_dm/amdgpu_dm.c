@@ -1883,7 +1883,7 @@ static enum dmub_ips_disable_type dm_get_default_ips_mode(
 		ret =  DMUB_IPS_RCG_IN_ACTIVE_IPS2_IN_OFF;
 		break;
 	case IP_VERSION(4, 2, 0):
-		ret =  DMUB_IPS_DISABLE_ALL;
+		ret =  DMUB_IPS_ENABLE;
 		break;
 	default:
 		/* ASICs older than DCN35 do not have IPSs */
