@@ -1730,6 +1730,13 @@ static struct dc_cap_funcs cap_funcs = {
 	.get_dcc_compression_cap = dcn20_get_dcc_compression_cap
 };
 
+static void dcn316_update_bw_bounding_box(struct dc *dc, struct clk_bw_params *bw_params)
+{
+	DC_FP_START();
+	dcn316_update_bw_bounding_box_fpu(dc, bw_params);
+	DC_FP_END();
+}
+
 static struct resource_funcs dcn316_res_pool_funcs = {
 	.destroy = dcn316_destroy_resource_pool,
 	.link_enc_create = dcn31_link_encoder_create,
@@ -1831,7 +1838,7 @@ static bool dcn316_resource_construct(
 	dc->caps.color.dpp.ocsc = 0;
 
 	dc->caps.color.mpc.gamut_remap = 1;
-	dc->caps.color.mpc.num_3dluts = pool->base.res_cap->num_mpc_3dlut; //2
+	dc->caps.color.mpc.num_3dluts = (uint16_t)pool->base.res_cap->num_mpc_3dlut; //2
 	dc->caps.color.mpc.ogam_ram = 1;
 	dc->caps.color.mpc.ogam_rom_caps.srgb = 0;
 	dc->caps.color.mpc.ogam_rom_caps.bt2020 = 0;
@@ -2084,7 +2091,7 @@ struct resource_pool *dcn316_create_resource_pool(
 	if (!pool)
 		return NULL;
 
-	if (dcn316_resource_construct(init_data->num_virtual_links, dc, pool))
+	if (dcn316_resource_construct((uint8_t)init_data->num_virtual_links, dc, pool))
 		return &pool->base;
 
 	BREAK_TO_DEBUGGER();

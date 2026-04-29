@@ -64,6 +64,7 @@
 #include "nbio_v7_2.h"
 #include "nbio_v7_7.h"
 #include "nbif_v6_3_1.h"
+#include "nbio_v6_3_2.h"
 #include "hdp_v5_0.h"
 #include "hdp_v5_2.h"
 #include "hdp_v6_0.h"
@@ -535,10 +536,11 @@ static int amdgpu_discovery_get_table_info(struct amdgpu_device *adev,
 		*info = &bhdrv2->table_list[table_id];
 		break;
 	case 1:
+	case 0:
 		*info = &bhdr->table_list[table_id];
 		break;
 	default:
-		dev_err(adev->dev, "Invalid ip discovery table version\n");
+		dev_err(adev->dev, "Invalid ip discovery table version %d\n",bhdr->version_major);
 		return -EINVAL;
 	}
 
@@ -3211,6 +3213,9 @@ int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev)
 		adev->nbio.funcs = &nbif_v6_3_1_funcs;
 		adev->nbio.hdp_flush_reg = &nbif_v6_3_1_hdp_flush_reg;
 		break;
+	case IP_VERSION(6, 3, 2):
+		adev->nbio.funcs = &nbio_v6_3_2_funcs;
+		break;
 	default:
 		break;
 	}
@@ -3434,3 +3439,28 @@ int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev)
 	return 0;
 }
 
+int amdgpu_discovery_get_gc_major_minor_version(struct amdgpu_device *adev,
+						uint16_t *major, uint16_t *minor)
+{
+	uint8_t *discovery_bin = adev->discovery.bin;
+	struct table_info *info;
+	union gc_info *gc_info;
+	u16 offset;
+
+	if (!discovery_bin)
+		return -EINVAL;
+	if (amdgpu_discovery_get_table_info(adev, &info, GC))
+		return -EINVAL;
+
+	offset = le16_to_cpu(info->offset);
+	if (!offset)
+		return -EINVAL;
+
+	gc_info = (union gc_info *)(discovery_bin + offset);
+
+	if (major)
+		*major = le16_to_cpu(gc_info->v1.header.version_major);
+	if (minor)
+		*minor = le16_to_cpu(gc_info->v1.header.version_minor);
+	return 0;
+}

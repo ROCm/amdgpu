@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Advanced Micro Devices, Inc.
+ * Copyright 2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -21,36 +21,11 @@
  *
  */
 
-#ifndef __AMDGPU_DISCOVERY__
-#define __AMDGPU_DISCOVERY__
+#ifndef __NBIO_V6_3_2_H__
+#define __NBIO_V6_3_2_H__
 
-#include <linux/debugfs.h>
+#include "soc15_common.h"
 
-#define DISCOVERY_TMR_SIZE      (10 << 10)
-#define DISCOVERY_TMR_OFFSET    (64 << 10)
+extern const struct amdgpu_nbio_funcs nbio_v6_3_2_funcs;
 
-struct ip_discovery_top;
-struct drm_printer;
-
-struct amdgpu_discovery_info {
-	struct debugfs_blob_wrapper debugfs_blob;
-	struct ip_discovery_top *ip_top;
-	uint64_t offset;
-	uint32_t size;
-	uint8_t *bin;
-	bool reserve_tmr;
-};
-
-void amdgpu_discovery_fini(struct amdgpu_device *adev);
-int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev);
-
-int amdgpu_discovery_get_nps_info(struct amdgpu_device *adev,
-				  uint32_t *nps_type,
-				  struct amdgpu_gmc_memrange *ranges,
-				  int *range_cnt, bool refresh);
-int amdgpu_discovery_get_gc_major_minor_version(struct amdgpu_device *adev,
-						uint16_t *major, uint16_t *minor);
-
-void amdgpu_discovery_dump(struct amdgpu_device *adev, struct drm_printer *p);
-
-#endif /* __AMDGPU_DISCOVERY__ */
+#endif

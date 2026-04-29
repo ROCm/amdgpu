@@ -36,9 +36,21 @@ USER_INCLUDE := $(filter-out $(LINUX_SRCTREE_INCLUDE), $(_KCL_LINUXINCLUDE))
 # If so, we need to include the path for the function pointers, as well as the include path for
 # rdma/peer_mem.h, since the ofa_kernel isn't integrated into the base kernel in that configuration
 _is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n")
+
+OFA_DIR := $(shell \
+	if [ -d /usr/src/ofa_kernel/x86_64/$(KERNELRELEASE) ]; then \
+		echo /usr/src/ofa_kernel; \
+	elif [ -d /usr/src/ofa_kernel-dkms/x86_64/$(KERNELRELEASE) ]; then \
+		echo /usr/src/ofa_kernel-dkms; \
+	fi)
+
 ifeq ($(call _is_kcl_macro_defined,HAVE_KFD_PEERDIRECT_SUPPORT_NEED_OFAPATH),y)
-KBUILD_EXTRA_SYMBOLS += /usr/src/ofa_kernel/x86_64/$(KERNELRELEASE)/Module.symvers
-USER_INCLUDE += -I/usr/src/ofa_kernel/x86_64/$(KERNELRELEASE)/include
+ifneq ($(OFA_DIR),)
+KBUILD_EXTRA_SYMBOLS += $(OFA_DIR)/x86_64/$(KERNELRELEASE)/Module.symvers
+USER_INCLUDE += -I$(OFA_DIR)/x86_64/$(KERNELRELEASE)/include
+else
+$(warning "Could not find ofa_kernel, but PEERDIRECT isn't natively installed")
+endif
 endif
 
 LINUXINCLUDE := \

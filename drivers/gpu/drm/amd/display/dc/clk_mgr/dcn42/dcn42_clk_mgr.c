@@ -634,7 +634,7 @@ static void dcn42_read_ss_info_from_lut(struct clk_mgr_internal *clk_mgr)
 
 void dcn42_build_watermark_ranges(struct clk_bw_params *bw_params, struct dcn42_watermarks *table)
 {
-	int i, num_valid_sets;
+	uint8_t i, num_valid_sets;
 
 	num_valid_sets = 0;
 
@@ -643,8 +643,10 @@ void dcn42_build_watermark_ranges(struct clk_bw_params *bw_params, struct dcn42_
 		if (!bw_params->wm_table.entries[i].valid)
 			continue;
 
-		table->WatermarkRow[WM_DCFCLK][num_valid_sets].WmSetting = bw_params->wm_table.entries[i].wm_inst;
-		table->WatermarkRow[WM_DCFCLK][num_valid_sets].WmType = bw_params->wm_table.entries[i].wm_type;
+		table->WatermarkRow[WM_DCFCLK][num_valid_sets].WmSetting =
+			(uint8_t)bw_params->wm_table.entries[i].wm_inst;
+		table->WatermarkRow[WM_DCFCLK][num_valid_sets].WmType =
+			(uint8_t)bw_params->wm_table.entries[i].wm_type;
 		/* We will not select WM based on fclk, so leave it as unconstrained */
 		table->WatermarkRow[WM_DCFCLK][num_valid_sets].MinClock = 0;
 		table->WatermarkRow[WM_DCFCLK][num_valid_sets].MaxClock = 0xFFFF;
@@ -655,10 +657,10 @@ void dcn42_build_watermark_ranges(struct clk_bw_params *bw_params, struct dcn42_
 			else {
 				/* add 1 to make it non-overlapping with next lvl */
 				table->WatermarkRow[WM_DCFCLK][num_valid_sets].MinMclk =
-						bw_params->clk_table.entries[i - 1].dcfclk_mhz + 1;
+						(uint16_t)(bw_params->clk_table.entries[i - 1].dcfclk_mhz + 1);
 			}
 			table->WatermarkRow[WM_DCFCLK][num_valid_sets].MaxMclk =
-					bw_params->clk_table.entries[i].dcfclk_mhz;
+					(uint16_t)bw_params->clk_table.entries[i].dcfclk_mhz;
 
 		} else {
 			/* unconstrained for memory retraining */
@@ -734,9 +736,12 @@ void dcn42_notify_wm_ranges(struct clk_mgr *clk_mgr_base)
 			clk_mgr_dcn42->smu_wm_set.mc_address.low_part);
 	dcn42_smu_transfer_wm_table_dram_2_smu(clk_mgr);
 
-	if (clk_mgr_dcn42->smu_wm_set.wm_set && clk_mgr_dcn42->smu_wm_set.mc_address.quad_part != 0)
+	if (clk_mgr_dcn42->smu_wm_set.wm_set && clk_mgr_dcn42->smu_wm_set.mc_address.quad_part != 0) {
 		dm_helpers_free_gpu_mem(clk_mgr->base.ctx, DC_MEM_ALLOC_TYPE_GART,
 				clk_mgr_dcn42->smu_wm_set.wm_set);
+		clk_mgr_dcn42->smu_wm_set.wm_set = NULL;
+		clk_mgr_dcn42->smu_wm_set.mc_address.quad_part = 0;
+	}
 
 }
 
@@ -1099,7 +1104,10 @@ void dcn42_clk_mgr_destroy(struct clk_mgr_internal *clk_mgr_int)
 {
 	struct clk_mgr_dcn42 *clk_mgr = TO_CLK_MGR_DCN42(clk_mgr_int);
 
-	if (clk_mgr->smu_wm_set.wm_set && clk_mgr->smu_wm_set.mc_address.quad_part != 0)
+	if (clk_mgr->smu_wm_set.wm_set && clk_mgr->smu_wm_set.mc_address.quad_part != 0) {
 		dm_helpers_free_gpu_mem(clk_mgr_int->base.ctx, DC_MEM_ALLOC_TYPE_GART,
 				clk_mgr->smu_wm_set.wm_set);
+		clk_mgr->smu_wm_set.wm_set = NULL;
+		clk_mgr->smu_wm_set.mc_address.quad_part = 0;
+	}
 }
