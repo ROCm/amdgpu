@@ -1156,4 +1156,25 @@ void amdgpu_dm_emulated_link_detect(struct dc_link *link);
 void amdgpu_dm_apply_delay_after_dpcd_poweroff(struct amdgpu_device *adev,
 											   struct dc_sink *sink);
 
+#if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
+int dm_plane_layer_index_cmp(const void *a, const void *b);
+int fill_plane_color_attributes(const struct drm_plane_state *plane_state,
+				const enum surface_pixel_format format,
+				enum dc_color_space *color_space);
+bool modereset_required(struct drm_crtc_state *crtc_state);
+void dm_get_oriented_plane_size(struct drm_plane_state *plane_state,
+				int *src_w, int *src_h);
+void dm_get_plane_scale(struct drm_plane_state *plane_state,
+			int *out_plane_scale_w, int *out_plane_scale_h);
+bool is_scaling_state_different(const struct dm_connector_state *dm_state,
+				const struct dm_connector_state *old_dm_state);
+bool is_timing_unchanged_for_freesync(struct drm_crtc_state *old_crtc_state,
+				      struct drm_crtc_state *new_crtc_state);
+void set_freesync_fixed_config(struct dm_crtc_state *dm_new_crtc_state);
+bool is_dc_timing_adjust_needed(struct dm_crtc_state *old_state,
+				struct dm_crtc_state *new_state);
+void set_multisync_trigger_params(struct dc_stream_state *stream);
+void set_master_stream(struct dc_stream_state *stream_set[], int stream_count);
+#endif
+
 #endif /* __AMDGPU_DM_H__ */

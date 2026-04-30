@@ -70,6 +70,7 @@
 #include "amdgpu_dm_audio.h"
 #include "amdgpu_dm_dmub.h"
 #include "amdgpu_dm_connector.h"
+#include "amdgpu_dm_kunit_helpers.h"
 
 #include "ivsrcid/ivsrcid_vislands30.h"
 
@@ -149,7 +150,8 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 				  struct drm_atomic_commit *state);
 
 static void prepare_flip_isr(struct amdgpu_crtc *acrtc);
-static bool
+
+STATIC_IFN_KUNIT bool
 is_timing_unchanged_for_freesync(struct drm_crtc_state *old_crtc_state,
 				 struct drm_crtc_state *new_crtc_state);
 
@@ -245,8 +247,8 @@ static int dm_soft_reset(struct amdgpu_ip_block *ip_block)
 	return 0;
 }
 
-static inline bool is_dc_timing_adjust_needed(struct dm_crtc_state *old_state,
-					      struct dm_crtc_state *new_state)
+STATIC_IFN_KUNIT bool is_dc_timing_adjust_needed(struct dm_crtc_state *old_state,
+						 struct dm_crtc_state *new_state)
 {
 	if (new_state->stream->adjust.timing_adjust_pending)
 		return true;
@@ -257,13 +259,14 @@ static inline bool is_dc_timing_adjust_needed(struct dm_crtc_state *old_state,
 	else
 		return false;
 }
+EXPORT_IF_KUNIT(is_dc_timing_adjust_needed);
 
 /*
  * DC will program planes with their z-order determined by their ordering
  * in the dc_surface_updates array. This comparator is used to sort them
  * by descending zpos.
  */
-static int dm_plane_layer_index_cmp(const void *a, const void *b)
+STATIC_IFN_KUNIT int dm_plane_layer_index_cmp(const void *a, const void *b)
 {
 	const struct dc_surface_update *sa = (struct dc_surface_update *)a;
 	const struct dc_surface_update *sb = (struct dc_surface_update *)b;
@@ -271,6 +274,7 @@ static int dm_plane_layer_index_cmp(const void *a, const void *b)
 	/* Sort by descending dc_plane layer_index (i.e. normalized_zpos) */
 	return sb->surface->layer_index - sa->surface->layer_index;
 }
+EXPORT_IF_KUNIT(dm_plane_layer_index_cmp);
 
 /**
  * update_planes_and_stream_adapter() - Send planes to be updated in DC
@@ -3044,12 +3048,13 @@ static int dm_early_init(struct amdgpu_ip_block *ip_block)
 	return dm_init_microcode(adev);
 }
 
-static bool modereset_required(struct drm_crtc_state *crtc_state)
+STATIC_IFN_KUNIT bool modereset_required(struct drm_crtc_state *crtc_state)
 {
 	return !crtc_state->active && drm_atomic_crtc_needs_modeset(crtc_state);
 }
+EXPORT_IF_KUNIT(modereset_required);
 
-static int
+STATIC_IFN_KUNIT int
 fill_plane_color_attributes(const struct drm_plane_state *plane_state,
 			    const enum surface_pixel_format format,
 			    enum dc_color_space *color_space)
@@ -3098,6 +3103,7 @@ fill_plane_color_attributes(const struct drm_plane_state *plane_state,
 
 	return 0;
 }
+EXPORT_IF_KUNIT(fill_plane_color_attributes);
 
 static int
 fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
@@ -3686,7 +3692,7 @@ static void dm_update_pflip_irq_state(struct amdgpu_device *adev,
 	amdgpu_irq_update(adev, &adev->pageflip_irq, irq_type);
 }
 
-static bool
+STATIC_IFN_KUNIT bool
 is_scaling_state_different(const struct dm_connector_state *dm_state,
 			   const struct dm_connector_state *old_dm_state)
 {
@@ -3703,6 +3709,7 @@ is_scaling_state_different(const struct dm_connector_state *dm_state,
 		return true;
 	return false;
 }
+EXPORT_IF_KUNIT(is_scaling_state_different);
 
 static bool is_content_protection_different(struct drm_crtc_state *new_crtc_state,
 					    struct drm_crtc_state *old_crtc_state,
@@ -5190,7 +5197,7 @@ static int amdgpu_dm_atomic_setup_commit(struct drm_atomic_commit *state)
 }
 #endif
 
-static void set_multisync_trigger_params(
+STATIC_IFN_KUNIT void set_multisync_trigger_params(
 		struct dc_stream_state *stream)
 {
 	struct dc_stream_state *master = NULL;
@@ -5203,9 +5210,10 @@ static void set_multisync_trigger_params(
 		stream->triggered_crtc_reset.delay = TRIGGER_DELAY_NEXT_PIXEL;
 	}
 }
+EXPORT_IF_KUNIT(set_multisync_trigger_params);
 
-static void set_master_stream(struct dc_stream_state *stream_set[],
-			      int stream_count)
+STATIC_IFN_KUNIT void set_master_stream(struct dc_stream_state *stream_set[],
+					int stream_count)
 {
 	int j, highest_rfr = 0, master_stream = 0;
 
@@ -5226,6 +5234,7 @@ static void set_master_stream(struct dc_stream_state *stream_set[],
 			stream_set[j]->triggered_crtc_reset.event_source = stream_set[master_stream];
 	}
 }
+EXPORT_IF_KUNIT(set_master_stream);
 
 static void dm_enable_per_frame_crtc_master_sync(struct dc_state *context)
 {
@@ -5691,7 +5700,7 @@ static void reset_freesync_config_for_crtc(
 	       sizeof(new_crtc_state->vrr_infopacket));
 }
 
-static bool
+STATIC_IFN_KUNIT bool
 is_timing_unchanged_for_freesync(struct drm_crtc_state *old_crtc_state,
 				 struct drm_crtc_state *new_crtc_state)
 {
@@ -5720,8 +5729,9 @@ is_timing_unchanged_for_freesync(struct drm_crtc_state *old_crtc_state,
 
 	return false;
 }
+EXPORT_IF_KUNIT(is_timing_unchanged_for_freesync);
 
-static void set_freesync_fixed_config(struct dm_crtc_state *dm_new_crtc_state)
+STATIC_IFN_KUNIT void set_freesync_fixed_config(struct dm_crtc_state *dm_new_crtc_state)
 {
 	u64 num, den, res;
 	struct drm_crtc_state *new_crtc_state = &dm_new_crtc_state->base;
@@ -5735,6 +5745,7 @@ static void set_freesync_fixed_config(struct dm_crtc_state *dm_new_crtc_state)
 	res = div_u64(num, den);
 	dm_new_crtc_state->freesync_config.fixed_refresh_in_uhz = res;
 }
+EXPORT_IF_KUNIT(set_freesync_fixed_config);
 
 static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 			 struct drm_atomic_commit *state,
@@ -6478,8 +6489,8 @@ out:
 	return ret;
 }
 
-static void dm_get_oriented_plane_size(struct drm_plane_state *plane_state,
-				       int *src_w, int *src_h)
+STATIC_IFN_KUNIT void dm_get_oriented_plane_size(struct drm_plane_state *plane_state,
+					 int *src_w, int *src_h)
 {
 	switch (plane_state->rotation & DRM_MODE_ROTATE_MASK) {
 	case DRM_MODE_ROTATE_90:
@@ -6495,8 +6506,9 @@ static void dm_get_oriented_plane_size(struct drm_plane_state *plane_state,
 		break;
 	}
 }
+EXPORT_IF_KUNIT(dm_get_oriented_plane_size);
 
-static void
+STATIC_IFN_KUNIT void
 dm_get_plane_scale(struct drm_plane_state *plane_state,
 		   int *out_plane_scale_w, int *out_plane_scale_h)
 {
@@ -6506,6 +6518,7 @@ dm_get_plane_scale(struct drm_plane_state *plane_state,
 	*out_plane_scale_w = plane_src_w ? plane_state->crtc_w * 1000 / plane_src_w : 0;
 	*out_plane_scale_h = plane_src_h ? plane_state->crtc_h * 1000 / plane_src_h : 0;
 }
+EXPORT_IF_KUNIT(dm_get_plane_scale);
 
 /*
  * The normalized_zpos value cannot be used by this iterator directly. It's only
