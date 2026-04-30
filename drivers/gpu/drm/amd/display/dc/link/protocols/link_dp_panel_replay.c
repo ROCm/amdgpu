@@ -321,6 +321,19 @@ bool dp_pr_copy_settings(struct dc_link *link, struct replay_context *replay_con
 	cmd.pr_copy_settings.data.flags.bitfields.dsc_enable_status = (pipe_ctx->stream->timing.flags.DSC == 1);
 	cmd.pr_copy_settings.data.debug.u32All = link->replay_settings.config.debug_flags;
 
+	// ALPM settings
+	cmd.pr_copy_settings.data.flags.bitfields.alpm_mode = (enum dmub_alpm_mode)link->replay_settings.config.alpm_mode;
+	if (link->replay_settings.config.alpm_mode == DC_ALPM_AUXLESS) {
+		cmd.pr_copy_settings.data.auxless_alpm_data.lfps_setup_ns = (uint16_t)dc->debug.auxless_alpm_lfps_setup_ns;
+		cmd.pr_copy_settings.data.auxless_alpm_data.lfps_period_ns = (uint16_t)dc->debug.auxless_alpm_lfps_period_ns;
+		cmd.pr_copy_settings.data.auxless_alpm_data.lfps_silence_ns = (uint16_t)dc->debug.auxless_alpm_lfps_silence_ns;
+		cmd.pr_copy_settings.data.auxless_alpm_data.lfps_t1_t2_override_us =
+			(uint16_t)dc->debug.auxless_alpm_lfps_t1t2_us;
+		cmd.pr_copy_settings.data.auxless_alpm_data.lfps_t1_t2_offset_us =
+			(uint16_t)dc->debug.auxless_alpm_lfps_t1t2_offset_us;
+		cmd.pr_copy_settings.data.auxless_alpm_data.lttpr_count = link->dc->link_srv->dp_get_lttpr_count(link);
+	}
+
 	cmd.pr_copy_settings.data.su_granularity_needed = link->dpcd_caps.vesa_replay_caps.bits.PR_SU_GRANULARITY_NEEDED;
 	cmd.pr_copy_settings.data.su_x_granularity = link->dpcd_caps.vesa_replay_su_info.pr_su_x_granularity;
 	cmd.pr_copy_settings.data.su_y_granularity = link->dpcd_caps.vesa_replay_su_info.pr_su_y_granularity;
