@@ -1205,4 +1205,8 @@ int amdgpu_dm_initialize_hdmi_connector(struct amdgpu_dm_connector *aconnector);
 
 void retrieve_dmi_info(struct amdgpu_display_manager *dm);
 
+void amdgpu_dm_emulated_link_detect(struct dc_link *link);
+void amdgpu_dm_apply_delay_after_dpcd_poweroff(struct amdgpu_device *adev,
+											   struct dc_sink *sink);
+
 #endif /* __AMDGPU_DM_H__ */

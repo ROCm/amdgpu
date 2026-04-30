@@ -27,6 +27,12 @@
 
 #include "irq_types.h" /* DAL irq definitions */
 
+struct amdgpu_device;
+struct amdgpu_crtc;
+struct amdgpu_display_manager;
+struct hpd_rx_irq_offload_work_queue;
+struct work_struct;
+
 /*
  * Display Manager IRQ-related interfaces (for use by DAL).
  */
@@ -100,5 +106,18 @@ void amdgpu_dm_irq_suspend(struct amdgpu_device *adev);
  */
 void amdgpu_dm_irq_resume_early(struct amdgpu_device *adev);
 void amdgpu_dm_irq_resume_late(struct amdgpu_device *adev);
+
+/* HPD handling */
+struct hpd_rx_irq_offload_work_queue *amdgpu_dm_hpd_rx_irq_create_workqueue(struct amdgpu_device *adev);
+void amdgpu_dm_hpd_rx_irq_work_suspend(struct amdgpu_display_manager *dm);
+int amdgpu_dm_register_hpd_handlers(struct amdgpu_device *adev);
+void amdgpu_dm_hdmi_hpd_debounce_work(struct work_struct *work);
+
+/* IRQ handlers */
+struct amdgpu_crtc *amdgpu_dm_get_crtc_by_otg_inst(struct amdgpu_device *adev,
+						    int otg_inst);
+int amdgpu_dm_dce110_register_irq_handlers(struct amdgpu_device *adev);
+int amdgpu_dm_dcn10_register_irq_handlers(struct amdgpu_device *adev);
+int amdgpu_dm_register_outbox_irq_handlers(struct amdgpu_device *adev);
 
 #endif /* __AMDGPU_DM_IRQ_H__ */
