@@ -34,6 +34,7 @@ struct amdgpu_encoder;
 struct amdgpu_i2c_adapter;
 struct dc_crtc_timing;
 struct dc_link;
+enum signal_type;
 struct dc_state;
 struct dc_stream_state;
 struct ddc_service;
@@ -152,4 +153,18 @@ int amdgpu_dm_encoder_init(struct drm_device *dev,
 			   struct amdgpu_encoder *aencoder,
 			   uint32_t link_index);
 
+#if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
+enum drm_mode_subconnector get_subconnector_type(struct dc_link *link);
+enum display_content_type
+get_output_content_type(const struct drm_connector_state *connector_state);
+bool adjust_colour_depth_from_display_info(struct dc_crtc_timing *timing_out,
+					   const struct drm_display_info *info);
+
+int to_drm_connector_type(enum signal_type st, uint32_t connector_id);
+bool is_duplicate_mode(struct amdgpu_dm_connector *aconnector, struct drm_display_mode *mode);
+enum dc_aspect_ratio get_aspect_ratio(const struct drm_display_mode *mode_in);
+void decide_crtc_timing_for_drm_display_mode(struct drm_display_mode *drm_mode,
+					     const struct drm_display_mode *native_mode,
+					     bool scale_enabled);
+#endif
 #endif /* __AMDGPU_DM_CONNECTOR_H__ */
