@@ -225,58 +225,6 @@ static int mes_userq_create_ctx_space(struct amdgpu_userq_mgr *uq_mgr,
 	return 0;
 }
 
-static int mes_userq_detect_and_reset(struct amdgpu_device *adev,
-				      int queue_type)
-{
-	int db_array_size = amdgpu_mes_get_hung_queue_db_array_size(adev);
-	struct mes_detect_and_reset_queue_input input;
-	struct amdgpu_usermode_queue *queue;
-	unsigned int hung_db_num = 0;
-	unsigned long queue_id;
-	u32 db_array[8];
-	bool found_hung_queue = false;
-	int r, i;
-
-	if (db_array_size > 8) {
-		dev_err(adev->dev, "DB array size (%d vs 8) too small\n",
-			db_array_size);
-		return -EINVAL;
-	}
-
-	memset(&input, 0x0, sizeof(struct mes_detect_and_reset_queue_input));
-
-	input.queue_type = queue_type;
-
-	amdgpu_mes_lock(&adev->mes);
-	r = amdgpu_mes_detect_and_reset_hung_queues(adev, queue_type, false,
-						    &hung_db_num, db_array, 0);
-	amdgpu_mes_unlock(&adev->mes);
-	if (r) {
-		dev_err(adev->dev, "Failed to detect and reset queues, err (%d)\n", r);
-	} else if (hung_db_num) {
-		xa_for_each(&adev->userq_doorbell_xa, queue_id, queue) {
-			if (queue->queue_type == queue_type) {
-				for (i = 0; i < hung_db_num; i++) {
-					if (queue->doorbell_index == db_array[i]) {
-						queue->state = AMDGPU_USERQ_STATE_HUNG;
-						found_hung_queue = true;
-						atomic_inc(&adev->gpu_reset_counter);
-						amdgpu_userq_fence_driver_force_completion(queue);
-						drm_dev_wedged_event(adev_to_drm(adev), DRM_WEDGE_RECOVERY_NONE, NULL);
-					}
-				}
-			}
-		}
-	}
-
-	if (found_hung_queue) {
-		/* Resume scheduling after hang recovery */
-		r = amdgpu_mes_resume(adev, input.xcc_id);
-	}
-
-	return r;
-}
-
 static int mes_userq_mqd_create(struct amdgpu_usermode_queue *queue,
 				struct drm_amdgpu_userq_in *args_in)
 {
@@ -569,7 +517,6 @@ const struct amdgpu_userq_funcs userq_mes_funcs = {
 	.mqd_destroy = mes_userq_mqd_destroy,
 	.unmap = mes_userq_unmap,
 	.map = mes_userq_map,
-	.detect_and_reset = mes_userq_detect_and_reset,
 	.preempt = mes_userq_preempt,
 	.restore = mes_userq_restore,
 	.reset = mes_userq_reset,
