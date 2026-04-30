@@ -765,6 +765,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.min_deep_sleep_dcfclk_khz = 8000,
 	.replay_skip_crtc_disabled = true,
 	.psr_skip_crtc_disable = true,
+	.force_odm2to1_for_edp_pixclk_mhz = 550, // Force ODM 2to1 for eDP when pixel clock is above 550MHz
 };
 
 static const struct dc_check_config config_defaults = {
@@ -1721,8 +1722,11 @@ enum dc_status dcn42_validate_bandwidth(struct dc *dc,
 
 	DC_FP_START();
 
+	dcn42_decide_odm_override(dc, context);
+
 	out = dml2_validate(dc, context, context->bw_ctx.dml2,
 						validate_mode);
+
 
 	if (validate_mode == DC_VALIDATE_MODE_AND_PROGRAMMING) {
 		/*not required for mode enumeration*/

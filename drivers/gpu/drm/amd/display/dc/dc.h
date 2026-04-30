@@ -1222,6 +1222,7 @@ struct dc_debug_options {
 	unsigned int force_vmin_threshold;
 	bool enable_otg_frame_sync_pwa;
 	unsigned int min_deep_sleep_dcfclk_khz;
+	unsigned int force_odm2to1_for_edp_pixclk_mhz;
 };
 
 
