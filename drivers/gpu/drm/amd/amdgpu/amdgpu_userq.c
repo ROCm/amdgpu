@@ -88,6 +88,38 @@ static void amdgpu_userq_mgr_reset_work(struct work_struct *work)
 		container_of(work, struct amdgpu_userq_mgr,
 			     reset_work);
 	struct amdgpu_device *adev = uq_mgr->adev;
+	struct amdgpu_reset_context reset_context;
+
+	if (unlikely(adev->debug_disable_gpu_ring_reset)) {
+		dev_err(adev->dev, "userq reset disabled by debug mask\n");
+		return;
+	}
+
+	/*
+	 * If GPU recovery feature is disabled system-wide,
+	 * skip all reset detection logic
+	 */
+	if (!amdgpu_gpu_recovery)
+		return;
+
+	memset(&reset_context, 0, sizeof(reset_context));
+
+	reset_context.method = AMD_RESET_METHOD_NONE;
+	reset_context.reset_req_dev = adev;
+	reset_context.src = AMDGPU_RESET_SRC_USERQ;
+	set_bit(AMDGPU_NEED_FULL_RESET, &reset_context.flags);
+	/*set_bit(AMDGPU_SKIP_COREDUMP, &reset_context.flags);*/
+
+	amdgpu_device_gpu_recover(adev, NULL, &reset_context);
+}
+
+static void amdgpu_userq_hang_detect_work(struct work_struct *work)
+{
+	struct amdgpu_usermode_queue *queue =
+		container_of(work, struct amdgpu_usermode_queue,
+			     hang_detect_work.work);
+	struct amdgpu_userq_mgr *uq_mgr = queue->userq_mgr;
+	struct amdgpu_device *adev = uq_mgr->adev;
 	const int queue_types[] = {
 		AMDGPU_RING_TYPE_COMPUTE,
 		AMDGPU_RING_TYPE_GFX,
@@ -131,33 +163,12 @@ static void amdgpu_userq_mgr_reset_work(struct work_struct *work)
 			}
 		}
 	}
-
-	if (gpu_reset) {
-		struct amdgpu_reset_context reset_context;
-
-		memset(&reset_context, 0, sizeof(reset_context));
-
-		reset_context.method = AMD_RESET_METHOD_NONE;
-		reset_context.reset_req_dev = adev;
-		reset_context.src = AMDGPU_RESET_SRC_USERQ;
-		set_bit(AMDGPU_NEED_FULL_RESET, &reset_context.flags);
-		/*set_bit(AMDGPU_SKIP_COREDUMP, &reset_context.flags);*/
-
-		amdgpu_device_gpu_recover(adev, NULL, &reset_context);
-	}
-}
-
-static void amdgpu_userq_hang_detect_work(struct work_struct *work)
-{
-	struct amdgpu_usermode_queue *queue =
-		container_of(work, struct amdgpu_usermode_queue,
-			     hang_detect_work.work);
-
 	/*
 	 * Don't schedule the work here! Scheduling or queue work from one reset
 	 * handler to another is illegal if you don't take extra precautions!
 	 */
-	amdgpu_userq_mgr_reset_work(&queue->userq_mgr->reset_work);
+	if (gpu_reset)
+		amdgpu_userq_mgr_reset_work(&queue->userq_mgr->reset_work);
 }
 
 /*
