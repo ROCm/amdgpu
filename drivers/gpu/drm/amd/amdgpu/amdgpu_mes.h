@@ -458,6 +458,10 @@ int amdgpu_mes_reset_legacy_queue(struct amdgpu_device *adev,
 				  unsigned int vmid,
 				  bool use_mmio,
 				  uint32_t xcc_id);
+int amdgpu_mes_reset_user_queue(struct amdgpu_device *adev,
+				int queue_type,
+				unsigned int doorbell_index,
+				unsigned int xcc_id);
 
 int amdgpu_mes_get_hung_queue_db_array_size(struct amdgpu_device *adev);
 int amdgpu_mes_detect_and_reset_hung_queues(struct amdgpu_device *adev,
