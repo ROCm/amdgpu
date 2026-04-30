@@ -33,6 +33,7 @@
 #include "amdgpu_display.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_irq.h"
+#include "amdgpu_dm_kunit_helpers.h"
 #include "amdgpu_dm_crtc.h"
 #include "amdgpu_dm_hdcp.h"
 #include "amdgpu_dm_mst_types.h"
@@ -372,6 +373,7 @@ void *amdgpu_dm_irq_register_interrupt(struct amdgpu_device *adev,
 
 	return handler_data;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_register_interrupt);
 
 /**
  * amdgpu_dm_irq_unregister_interrupt() - Remove a handler from the DM IRQ table
@@ -416,6 +418,7 @@ void amdgpu_dm_irq_unregister_interrupt(struct amdgpu_device *adev,
 			ih, irq_source);
 	}
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_unregister_interrupt);
 
 /**
  * amdgpu_dm_irq_init() - Initialize DM IRQ management
@@ -450,6 +453,7 @@ int amdgpu_dm_irq_init(struct amdgpu_device *adev)
 
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_init);
 
 /**
  * amdgpu_dm_irq_fini() - Tear down DM IRQ management
@@ -488,6 +492,7 @@ void amdgpu_dm_irq_fini(struct amdgpu_device *adev)
 	/* Deallocate handlers from the table. */
 	unregister_all_irq_handlers(adev);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_fini);
 
 void amdgpu_dm_irq_suspend(struct amdgpu_device *adev)
 {
@@ -690,7 +695,7 @@ static int amdgpu_dm_irq_handler(struct amdgpu_device *adev,
 	return 0;
 }
 
-static enum dc_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned int type)
+STATIC_IFN_KUNIT enum dc_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned int type)
 {
 	switch (type) {
 	case AMDGPU_HPD_1:
@@ -709,6 +714,7 @@ static enum dc_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned int type)
 		return DC_IRQ_SOURCE_INVALID;
 	}
 }
+EXPORT_IF_KUNIT(amdgpu_dm_hpd_to_dal_irq_source);
 
 static int amdgpu_dm_set_hpd_irq_state(struct amdgpu_device *adev,
 				       struct amdgpu_irq_src *source,
@@ -1192,7 +1198,7 @@ void amdgpu_dm_hpd_rx_irq_work_suspend(struct amdgpu_display_manager *dm)
 	}
 }
 
-static bool are_sinks_equal(const struct dc_sink *sink1, const struct dc_sink *sink2)
+STATIC_IFN_KUNIT bool are_sinks_equal(const struct dc_sink *sink1, const struct dc_sink *sink2)
 {
 	if (!sink1 || !sink2)
 		return false;
@@ -1207,6 +1213,7 @@ static bool are_sinks_equal(const struct dc_sink *sink1, const struct dc_sink *s
 		return false;
 	return true;
 }
+EXPORT_IF_KUNIT(are_sinks_equal);
 
 
 /**
@@ -1693,6 +1700,7 @@ amdgpu_dm_get_crtc_by_otg_inst(struct amdgpu_device *adev,
 
 	return NULL;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_get_crtc_by_otg_inst);
 
 /**
  * dm_pflip_high_irq() - Handle pageflip interrupt
@@ -2067,7 +2075,7 @@ static void dm_handle_hpd_work(struct work_struct *work)
 
 }
 
-static const char *dmub_notification_type_str(enum dmub_notification_type e)
+STATIC_IFN_KUNIT const char *dmub_notification_type_str(enum dmub_notification_type e)
 {
 	switch (e) {
 	case DMUB_NOTIFICATION_NO_DATA:
@@ -2090,6 +2098,7 @@ static const char *dmub_notification_type_str(enum dmub_notification_type e)
 		return "<unknown>";
 	}
 }
+EXPORT_IF_KUNIT(dmub_notification_type_str);
 
 #define DMUB_TRACE_MAX_READ 64
 /**
