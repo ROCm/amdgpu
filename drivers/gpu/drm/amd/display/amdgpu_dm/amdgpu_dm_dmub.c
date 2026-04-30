@@ -38,6 +38,7 @@
 #include "amdgpu_ucode.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_dmub.h"
+#include "amdgpu_dm_kunit_helpers.h"
 #include <linux/component.h>
 #include <linux/firmware.h>
 
@@ -80,6 +81,7 @@ void dm_dmub_aux_setconfig_callback(struct amdgpu_device *adev,
 	if (notify->type == DMUB_NOTIFICATION_AUX_REPLY)
 		complete(&adev->dm.dmub_aux_transfer_done);
 }
+EXPORT_IF_KUNIT(dm_dmub_aux_setconfig_callback);
 
 void dm_dmub_aux_fused_io_callback(struct amdgpu_device *adev,
 				   struct dmub_notification *notify)
@@ -103,6 +105,7 @@ void dm_dmub_aux_fused_io_callback(struct amdgpu_device *adev,
 	memcpy(sync->reply_data, req, sizeof(*req));
 	complete(&sync->replied);
 }
+EXPORT_IF_KUNIT(dm_dmub_aux_fused_io_callback);
 
 /**
  * dm_register_dmub_notify_callback - Sets callback for DMUB notify
@@ -129,6 +132,7 @@ bool dm_register_dmub_notify_callback(struct amdgpu_device *adev,
 
 	return true;
 }
+EXPORT_IF_KUNIT(dm_register_dmub_notify_callback);
 
 int dm_dmub_hw_init(struct amdgpu_device *adev)
 {
@@ -318,6 +322,7 @@ int dm_dmub_hw_init(struct amdgpu_device *adev)
 
 	return 0;
 }
+EXPORT_IF_KUNIT(dm_dmub_hw_init);
 
 void dm_dmub_hw_resume(struct amdgpu_device *adev)
 {
@@ -347,6 +352,7 @@ void dm_dmub_hw_resume(struct amdgpu_device *adev)
 			drm_err(adev_to_drm(adev), "DMUB interface failed to initialize: status=%d\n", r);
 	}
 }
+EXPORT_IF_KUNIT(dm_dmub_hw_resume);
 
 static enum dmub_status
 dm_dmub_send_vbios_gpint_command(struct amdgpu_device *adev,
@@ -460,6 +466,7 @@ enum dmub_ips_disable_type dm_get_default_ips_mode(
 
 	return ret;
 }
+EXPORT_IF_KUNIT(dm_get_default_ips_mode);
 
 static uint32_t amdgpu_dm_dmub_reg_read(void *ctx, uint32_t address)
 {
@@ -678,6 +685,7 @@ int dm_dmub_sw_init(struct amdgpu_device *adev)
 
 	return 0;
 }
+EXPORT_IF_KUNIT(dm_dmub_sw_init);
 
 int dm_init_microcode(struct amdgpu_device *adev)
 {
@@ -750,6 +758,7 @@ int dm_init_microcode(struct amdgpu_device *adev)
 				 "%s", fw_name_dmub);
 	return r;
 }
+EXPORT_IF_KUNIT(dm_init_microcode);
 
 int amdgpu_dm_process_dmub_aux_transfer_sync(
 		struct dc_context *ctx,
