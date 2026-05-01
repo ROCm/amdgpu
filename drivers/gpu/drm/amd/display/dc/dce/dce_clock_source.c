@@ -1188,15 +1188,16 @@ static bool dce110_clock_source_power_down(
 	return bp_result == BP_RESULT_OK;
 }
 
-static bool get_pixel_clk_frequency_100hz(
+static bool get_dp_dto_frequency_100hz(
 		const struct clock_source *clock_source,
 		unsigned int inst,
-		unsigned int *pixel_clk_khz)
+		unsigned int *pixel_clk_100hz)
 {
 	struct dce110_clk_src *clk_src = TO_DCE110_CLK_SRC(clock_source);
 	unsigned int clock_hz = 0;
 	unsigned int modulo_hz = 0;
 	unsigned int dp_dto_ref_khz = clock_source->ctx->dc->clk_mgr->dprefclk_khz;
+	unsigned long long temp = 0;
 
 	if (clock_source->id == CLOCK_SOURCE_ID_DP_DTO) {
 		clock_hz = REG_READ(PHASE[inst]);
@@ -1207,18 +1208,74 @@ static bool get_pixel_clk_frequency_100hz(
 			 * not be programmed equal to DPREFCLK
 			 */
 			modulo_hz = REG_READ(MODULO[inst]);
-			if (modulo_hz)
-				*pixel_clk_khz = (unsigned int)div_u64((uint64_t)clock_hz *
-					dp_dto_ref_khz * 10, modulo_hz);
-			else
-				*pixel_clk_khz = 0;
+			if (modulo_hz) {
+				temp = div_u64((uint64_t)clock_hz * dp_dto_ref_khz * 10, modulo_hz);
+				ASSERT(temp / 100 <= 0xFFFFFFFFUL);
+				*pixel_clk_100hz = (unsigned int)(temp / 100);
+			} else
+				*pixel_clk_100hz = 0;
 		} else {
 			/* NOTE: There is agreement with VBIOS here that MODULO is
 			 * programmed equal to DPREFCLK, in which case PHASE will be
 			 * equivalent to pixel clock.
 			 */
-			*pixel_clk_khz = clock_hz / 100;
+			*pixel_clk_100hz = clock_hz / 100;
 		}
+		return true;
+	}
+
+	return false;
+}
+
+static bool dcn401_get_dp_dto_frequency_100hz(const struct clock_source *clock_source, unsigned int inst,
+					      unsigned int *pixel_clk_100hz)
+{
+	struct dce110_clk_src *clk_src = TO_DCE110_CLK_SRC(clock_source);
+	unsigned int phase_hz = 0;
+	unsigned int modulo_hz = 0;
+	unsigned int dp_dto_integer = 0;
+	unsigned long long temp = 0;
+
+	if (clock_source->id == CLOCK_SOURCE_ID_DP_DTO) {
+		phase_hz = REG_READ(PHASE[inst]);
+		modulo_hz = REG_READ(MODULO[inst]);
+
+		switch (inst) {
+		case 0:
+			REG_GET(OTG_PIXEL_RATE_DIV, DPDTO0_INT, &dp_dto_integer);
+			break;
+		case 1:
+			REG_GET(OTG_PIXEL_RATE_DIV, DPDTO1_INT, &dp_dto_integer);
+			break;
+		case 2:
+			REG_GET(OTG_PIXEL_RATE_DIV, DPDTO2_INT, &dp_dto_integer);
+			break;
+		case 3:
+			REG_GET(OTG_PIXEL_RATE_DIV, DPDTO3_INT, &dp_dto_integer);
+			break;
+		default:
+			BREAK_TO_DEBUGGER();
+			break;
+		}
+
+		/* On DCN4x, the DCCG DPDTO is directly programmed with the required pixel clock as per the following formula:
+		 *     - DPDTO INTEGER = INT(4:4:4 pixel rate / DTBCLK_P rate)
+		 *     - DPDTO PHASE = 4:4:4 pixel rate – DPDTO INTEGER * DTBCLK_P rate
+		 *     - DPDTO MODULO = DTBCLK_P rate
+		 *     - target pix_clk_hz = (DPDTO INTEGER * DPDTO MODULO + DPDTO PHASE)
+		 */
+
+		dp_dto_integer += 1; // integer=0 represents 1x multiplier, etc.
+		temp = (unsigned long long)dp_dto_integer * modulo_hz + phase_hz;
+
+		if (temp / 100 > 0xFFFFFFFFUL) {
+			/* pixel rate 100hz should never be this high, if it is, throw an assert and return 0  */
+			BREAK_TO_DEBUGGER();
+			*pixel_clk_100hz = 0;
+		} else {
+			*pixel_clk_100hz = (unsigned int)(temp / 100);
+		}
+
 		return true;
 	}
 
@@ -1318,7 +1375,7 @@ static const struct clock_source_funcs dcn20_clk_src_funcs = {
 	.cs_power_down = dce110_clock_source_power_down,
 	.program_pix_clk = dcn20_program_pix_clk,
 	.get_pix_clk_dividers = dce112_get_pix_clk_dividers,
-	.get_pixel_clk_frequency_100hz = get_pixel_clk_frequency_100hz,
+	.get_dp_dto_frequency_100hz = get_dp_dto_frequency_100hz,
 	.override_dp_pix_clk = dcn20_override_dp_pix_clk
 };
 
@@ -1405,21 +1462,21 @@ static const struct clock_source_funcs dcn3_clk_src_funcs = {
 	.cs_power_down = dce110_clock_source_power_down,
 	.program_pix_clk = dcn3_program_pix_clk,
 	.get_pix_clk_dividers = dcn3_get_pix_clk_dividers,
-	.get_pixel_clk_frequency_100hz = get_pixel_clk_frequency_100hz
+	.get_dp_dto_frequency_100hz = get_dp_dto_frequency_100hz
 };
 
 static const struct clock_source_funcs dcn31_clk_src_funcs = {
 	.cs_power_down = dce110_clock_source_power_down,
 	.program_pix_clk = dcn31_program_pix_clk,
 	.get_pix_clk_dividers = dcn3_get_pix_clk_dividers,
-	.get_pixel_clk_frequency_100hz = get_pixel_clk_frequency_100hz
+	.get_dp_dto_frequency_100hz = get_dp_dto_frequency_100hz
 };
 
 static const struct clock_source_funcs dcn401_clk_src_funcs = {
 	.cs_power_down = dce110_clock_source_power_down,
 	.program_pix_clk = dcn401_program_pix_clk,
 	.get_pix_clk_dividers = dcn3_get_pix_clk_dividers,
-	.get_pixel_clk_frequency_100hz = get_pixel_clk_frequency_100hz
+	.get_dp_dto_frequency_100hz = dcn401_get_dp_dto_frequency_100hz
 };
 
 /*****************************************/
@@ -1430,13 +1487,13 @@ static const struct clock_source_funcs dce112_clk_src_funcs = {
 	.cs_power_down = dce110_clock_source_power_down,
 	.program_pix_clk = dce112_program_pix_clk,
 	.get_pix_clk_dividers = dce112_get_pix_clk_dividers,
-	.get_pixel_clk_frequency_100hz = get_pixel_clk_frequency_100hz
+	.get_dp_dto_frequency_100hz = get_dp_dto_frequency_100hz
 };
 static const struct clock_source_funcs dce110_clk_src_funcs = {
 	.cs_power_down = dce110_clock_source_power_down,
 	.program_pix_clk = dce110_program_pix_clk,
 	.get_pix_clk_dividers = dce110_get_pix_clk_dividers,
-	.get_pixel_clk_frequency_100hz = get_pixel_clk_frequency_100hz
+	.get_dp_dto_frequency_100hz = get_dp_dto_frequency_100hz
 };
 
 

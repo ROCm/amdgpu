@@ -1487,7 +1487,7 @@ static void disable_vbios_mode_if_required(
 					}
 				}
 
-				dc->res_pool->dp_clock_source->funcs->get_pixel_clk_frequency_100hz(
+				dc->res_pool->dp_clock_source->funcs->get_dp_dto_frequency_100hz(
 					dc->res_pool->dp_clock_source,
 					tg_inst, &pix_clk_100hz);
 
@@ -2004,7 +2004,7 @@ bool dc_validate_boot_timing(const struct dc *dc,
 		uint32_t numOdmPipes = 1;
 		uint32_t id_src[4] = {0};
 
-		dc->res_pool->dp_clock_source->funcs->get_pixel_clk_frequency_100hz(
+		dc->res_pool->dp_clock_source->funcs->get_dp_dto_frequency_100hz(
 			dc->res_pool->dp_clock_source,
 			tg_inst, &pix_clk_100hz);
 

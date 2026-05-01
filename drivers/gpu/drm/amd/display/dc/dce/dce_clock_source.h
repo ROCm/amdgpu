@@ -202,7 +202,11 @@
 	type PLL_REF_DIV; \
 	type DP_DTO0_PHASE; \
 	type DP_DTO0_MODULO; \
-	type DP_DTO0_ENABLE;
+	type DP_DTO0_ENABLE; \
+	type DPDTO0_INT; \
+	type DPDTO1_INT; \
+	type DPDTO2_INT; \
+	type DPDTO3_INT;
 
 #define CS_REG_FIELD_LIST_DCN32(type) \
 	type PIPE0_DTO_SRC_SEL;
@@ -221,6 +225,7 @@ struct dce110_clk_src_regs {
 	uint32_t RESYNC_CNTL;
 	uint32_t PIXCLK_RESYNC_CNTL;
 	uint32_t PLL_CNTL;
+	uint32_t OTG_PIXEL_RATE_DIV;
 
 	/* below are for DTO.
 	 * todo: should probably use different struct to not waste space
