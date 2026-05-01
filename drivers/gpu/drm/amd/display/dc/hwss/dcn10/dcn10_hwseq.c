@@ -2423,7 +2423,7 @@ static int dcn10_align_pixel_clocks(struct dc *dc, int group_size,
 			grouped_pipes[i]->stream_res.tg->funcs->get_hw_timing(
 					grouped_pipes[i]->stream_res.tg,
 					&hw_crtc_timing[i]);
-			dc->res_pool->dp_clock_source->funcs->get_pixel_clk_frequency_100hz(
+			dc->res_pool->dp_clock_source->funcs->get_dp_dto_frequency_100hz(
 				dc->res_pool->dp_clock_source,
 				grouped_pipes[i]->stream_res.tg->inst,
 				&pclk);
@@ -2462,7 +2462,7 @@ static int dcn10_align_pixel_clocks(struct dc *dc, int group_size,
 					dc->res_pool->dp_clock_source,
 					grouped_pipes[i]->stream_res.tg->inst,
 					(unsigned int)phase[i], (unsigned int)modulo[i]);
-				dc->res_pool->dp_clock_source->funcs->get_pixel_clk_frequency_100hz(
+				dc->res_pool->dp_clock_source->funcs->get_dp_dto_frequency_100hz(
 					dc->res_pool->dp_clock_source,
 					grouped_pipes[i]->stream_res.tg->inst, &pclk);
 				grouped_pipes[i]->stream->timing.pix_clk_100hz =
