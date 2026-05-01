@@ -2378,24 +2378,24 @@ struct dmub_cmd_lsdma_data {
 			uint32_t dst_mip_max      : 5;
 			uint32_t dst_swizzle_mode : 5;
 			uint32_t dst_mip_id       : 5;
-			uint32_t tmz              : 1;
 			uint32_t dcc              : 1;
+			uint32_t padding1         : 1;
 
 			uint32_t data_format      : 6;
-			uint32_t padding1         : 4;
+			uint32_t tmz              : 4;
 			uint32_t dst_element_size : 3;
 			uint32_t num_type         : 3;
 			uint32_t src_element_size : 3;
 			uint32_t write_compress   : 2;
-			uint32_t cache_policy_dst : 2;
-			uint32_t cache_policy_src : 2;
+			uint32_t cache_policy_dst : 3;
+			uint32_t cache_policy_src : 3;
 			uint32_t read_compress    : 2;
-			uint32_t src_dim          : 2;
-			uint32_t dst_dim          : 2;
+			uint32_t max_com          : 2;
 			uint32_t max_uncom        : 1;
 
-			uint32_t max_com          : 2;
-			uint32_t padding          : 30;
+			uint32_t dst_dim          : 2;
+			uint32_t src_dim          : 2;
+			uint32_t padding          : 28;
 		} tiled_copy_data;
 		struct lsdma_linear_copy_data {
 			uint32_t src_lo;
@@ -2405,11 +2405,13 @@ struct dmub_cmd_lsdma_data {
 			uint32_t dst_hi;
 
 			uint32_t count            : 30;
-			uint32_t cache_policy_dst : 2;
+			uint32_t pad0             : 2;
 
-			uint32_t tmz              : 1;
-			uint32_t cache_policy_src : 2;
-			uint32_t padding          : 29;
+			uint32_t tmz              : 4;
+			uint32_t cache_policy_src : 3;
+			uint32_t cache_policy_dst : 3;
+			uint32_t pad1             : 22;
+			// DCC fields not included because linear mode on display does not support DCC
 		} linear_copy_data;
 		struct lsdma_linear_sub_window_copy_data {
 			uint32_t src_lo;
@@ -2433,11 +2435,13 @@ struct dmub_cmd_lsdma_data {
 			uint32_t src_slice_pitch;
 			uint32_t dst_slice_pitch;
 
-			uint32_t tmz              : 1;
+			uint32_t tmz              : 4;
 			uint32_t element_size     : 3;
 			uint32_t src_cache_policy : 3;
 			uint32_t dst_cache_policy : 3;
-			uint32_t reserved0        : 22;
+			uint32_t reserved0        : 19;
+			// Linear mode on display does not support compression so DCC related fields are not included.
+			// The DCC fields in the command packet will be zero'd at the time of constructing the packet.
 		} linear_sub_window_copy_data;
 		struct lsdma_reg_write_data {
 			uint32_t reg_addr;
