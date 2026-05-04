@@ -158,6 +158,9 @@ MODULE_FIRMWARE(FIRMWARE_DCN_401_DMUB);
 #define FIRMWARE_DCN_42_DMUB "amdgpu/dcn_4_2_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_DCN_42_DMUB);
 
+#define FIRMWARE_DCN_42B_DMUB "amdgpu/dcn_4_2_1_dmcub.bin"
+MODULE_FIRMWARE(FIRMWARE_DCN_42B_DMUB);
+
 /**
  * DOC: overview
  *
@@ -1389,6 +1392,7 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 	case IP_VERSION(3, 5, 1):
 	case IP_VERSION(3, 6, 0):
 	case IP_VERSION(4, 2, 0):
+	case IP_VERSION(4, 2, 1):
 		hw_params.ips_sequential_ono = adev->external_rev_id > 0x10;
 		hw_params.lower_hbr3_phy_ssc = true;
 		break;
@@ -1837,6 +1841,7 @@ static void *dm_dmub_get_vbios_bounding_box(struct amdgpu_device *adev)
 		bb_size = sizeof(struct dml2_soc_bb);
 		break;
 	case IP_VERSION(4, 2, 0):
+	case IP_VERSION(4, 2, 1):
 		bb_size = sizeof(struct dml2_soc_bb);
 		break;
 	default:
@@ -1884,6 +1889,7 @@ static enum dmub_ips_disable_type dm_get_default_ips_mode(
 		ret =  DMUB_IPS_RCG_IN_ACTIVE_IPS2_IN_OFF;
 		break;
 	case IP_VERSION(4, 2, 0):
+	case IP_VERSION(4, 2, 1):
 		ret =  DMUB_IPS_ENABLE;
 		break;
 	default:
@@ -2517,6 +2523,7 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 		case IP_VERSION(3, 6, 0):
 		case IP_VERSION(4, 0, 1):
 		case IP_VERSION(4, 2, 0):
+		case IP_VERSION(4, 2, 1):
 			return 0;
 		default:
 			break;
@@ -2654,6 +2661,9 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 		break;
 	case IP_VERSION(4, 2, 0):
 		dmub_asic = DMUB_ASIC_DCN42;
+		break;
+	case IP_VERSION(4, 2, 1):
+		dmub_asic = DMUB_ASIC_DCN42B;
 		break;
 	default:
 		/* ASIC doesn't support DMUB. */
@@ -5830,6 +5840,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	case IP_VERSION(3, 6, 0):
 	case IP_VERSION(4, 0, 1):
 	case IP_VERSION(4, 2, 0):
+	case IP_VERSION(4, 2, 1):
 		if (register_outbox_irq_handlers(dm->adev)) {
 			drm_err(adev_to_drm(adev), "DM: Failed to initialize IRQ\n");
 			goto fail;
@@ -5855,6 +5866,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		case IP_VERSION(3, 6, 0):
 		case IP_VERSION(4, 0, 1):
 		case IP_VERSION(4, 2, 0):
+		case IP_VERSION(4, 2, 1):
 			psr_feature_enabled = true;
 			break;
 		default:
@@ -5873,6 +5885,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		case IP_VERSION(3, 5, 1):
 		case IP_VERSION(3, 6, 0):
 		case IP_VERSION(4, 2, 0):
+		case IP_VERSION(4, 2, 1):
 			replay_feature_enabled = true;
 			break;
 
@@ -6034,6 +6047,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		case IP_VERSION(3, 6, 0):
 		case IP_VERSION(4, 0, 1):
 		case IP_VERSION(4, 2, 0):
+		case IP_VERSION(4, 2, 1):
 			if (dcn10_register_irq_handlers(dm->adev)) {
 				drm_err(adev_to_drm(adev), "DM: Failed to initialize IRQ\n");
 				goto fail;
@@ -6185,6 +6199,9 @@ static int dm_init_microcode(struct amdgpu_device *adev)
 	case IP_VERSION(4, 2, 0):
 		fw_name_dmub = FIRMWARE_DCN_42_DMUB;
 		break;
+	case IP_VERSION(4, 2, 1):
+		fw_name_dmub = FIRMWARE_DCN_42B_DMUB;
+		break;
 	default:
 		/* ASIC doesn't support DMUB. */
 		return 0;
@@ -6313,6 +6330,7 @@ static int dm_early_init(struct amdgpu_ip_block *ip_block)
 		case IP_VERSION(3, 6, 0):
 		case IP_VERSION(4, 0, 1):
 		case IP_VERSION(4, 2, 0):
+		case IP_VERSION(4, 2, 1):
 			adev->mode_info.num_crtc = 4;
 			adev->mode_info.num_hpd = 4;
 			adev->mode_info.num_dig = 4;
@@ -13021,7 +13039,8 @@ static int dm_crtc_get_cursor_mode(struct amdgpu_device *adev,
 	 * as previous DCN generations, so enable native mode on DCN401/420
 	 */
 	if (amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 0, 1) ||
-	    amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 2, 0)) {
+	    amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 2, 0) ||
+	    amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 2, 1)) {
 		*cursor_mode = DM_CURSOR_NATIVE_MODE;
 		return 0;
 	}
@@ -13464,9 +13483,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			continue;
 
 		/* Check if rotation or scaling is enabled on DCN401 */
-		if ((drm_plane_mask(crtc->cursor) & new_crtc_state->plane_mask) &&
-		    (amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 2, 0) ||
-		    amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 0, 1))) {
+		if ((drm_plane_mask(crtc->cursor) &
+		     new_crtc_state->plane_mask) &&
+		    (amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 2, 1) ||
+		     amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 2, 0) ||
+		     amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 0, 1))) {
 			new_cursor_state = drm_atomic_get_new_plane_state(state, crtc->cursor);
 
 			is_rotated = new_cursor_state &&
