@@ -459,8 +459,8 @@ void amdgpu_dm_ism_commit_event(struct amdgpu_dm_ism *ism,
 	struct amdgpu_display_manager *dm = &adev->dm;
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(acrtc->base.state);
 
-	/* ISM transitions must be called with mutex acquired */
-	ASSERT(mutex_is_locked(&dm->dc_lock));
+	/* ISM transitions must be called with dc_lock held */
+	lockdep_assert_held(&dm->dc_lock);
 
 	/* ISM should not run after dc is destroyed */
 	ASSERT(dm->dc);
