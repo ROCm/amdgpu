@@ -2290,6 +2290,8 @@ static bool dcn42_resource_construct(
 	dc->dml2_options.gpuvm_enable = true;
 	dc->dml2_options.hostvm_enable = true;
 
+	dc->dml2_options.pmo.force_mandatory_uclk_pstate_support = true;
+
 	/* SPL */
 	dc->caps.scl_caps.sharpener_support = true;
 
