@@ -161,6 +161,7 @@ static void dpp401_power_on_dscl(
 				REG_WAIT(DSCL_MEM_PWR_STATUS, LUT_MEM_PWR_STATE, 0, 1, 100);
 			} else
 				REG_WAIT(DSCL_MEM_PWR_STATUS, LUT_MEM_PWR_STATE, 0, 1, 5);
+			dpp->base.deferred_reg_writes.bits.disable_dscl = false;
 		} else {
 			if (dpp->base.ctx->dc->debug.enable_mem_low_power.bits.dscl) {
 				dpp->base.ctx->dc->optimized_required = true;

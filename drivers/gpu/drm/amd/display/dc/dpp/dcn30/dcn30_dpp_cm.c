@@ -136,6 +136,7 @@ static void dpp3_power_on_gamcor_lut(
 			if (dpp_base->ctx->dc->caps.ips_v2_support)
 				REG_UPDATE(CM_MEM_PWR_CTRL, GAMCOR_MEM_PWR_DIS, 1);
 			REG_WAIT(CM_MEM_PWR_STATUS, GAMCOR_MEM_PWR_STATE, 0, 1, 5);
+			dpp_base->deferred_reg_writes.bits.disable_gamcor = false;
 		} else {
 			dpp_base->ctx->dc->optimized_required = true;
 			dpp_base->deferred_reg_writes.bits.disable_gamcor = true;
