@@ -603,6 +603,7 @@ static void dpp3_power_on_blnd_lut(
 		if (power_on) {
 			REG_UPDATE(CM_MEM_PWR_CTRL, BLNDGAM_MEM_PWR_FORCE, 0);
 			REG_WAIT(CM_MEM_PWR_STATUS, BLNDGAM_MEM_PWR_STATE, 0, 1, 5);
+			dpp_base->deferred_reg_writes.bits.disable_blnd_lut = false;
 		} else {
 			dpp_base->ctx->dc->optimized_required = true;
 			dpp_base->deferred_reg_writes.bits.disable_blnd_lut = true;
@@ -620,6 +621,7 @@ static void dpp3_power_on_hdr3dlut(
 		if (power_on) {
 			REG_UPDATE(CM_MEM_PWR_CTRL2, HDR3DLUT_MEM_PWR_FORCE, 0);
 			REG_WAIT(CM_MEM_PWR_STATUS2, HDR3DLUT_MEM_PWR_STATE, 0, 1, 5);
+			dpp_base->deferred_reg_writes.bits.disable_3dlut = false;
 		} else {
 			dpp_base->ctx->dc->optimized_required = true;
 			dpp_base->deferred_reg_writes.bits.disable_3dlut = true;
@@ -637,6 +639,7 @@ static void dpp3_power_on_shaper(
 		if (power_on) {
 			REG_UPDATE(CM_MEM_PWR_CTRL2, SHAPER_MEM_PWR_FORCE, 0);
 			REG_WAIT(CM_MEM_PWR_STATUS2, SHAPER_MEM_PWR_STATE, 0, 1, 5);
+			dpp_base->deferred_reg_writes.bits.disable_shaper = false;
 		} else {
 			dpp_base->ctx->dc->optimized_required = true;
 			dpp_base->deferred_reg_writes.bits.disable_shaper = true;
