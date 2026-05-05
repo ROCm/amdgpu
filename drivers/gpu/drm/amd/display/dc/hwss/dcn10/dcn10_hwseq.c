@@ -181,6 +181,7 @@ void dcn10_set_wait_for_update_needed_for_pipe(struct dc *dc, struct pipe_ctx *p
 	uint32_t vupdate_start, vupdate_end;
 	struct crtc_position position;
 	unsigned int vpos, cur_frame;
+	uint32_t max_frame_count;
 
 	if (!pipe_ctx->stream ||
 		!pipe_ctx->stream_res.tg ||
@@ -197,7 +198,8 @@ void dcn10_set_wait_for_update_needed_for_pipe(struct dc *dc, struct pipe_ctx *p
 
 	struct optc *optc1 = DCN10TG_FROM_TG(tg);
 
-	ASSERT(optc1->max_frame_count != 0);
+	max_frame_count = optc1->tg_mask->OTG_FRAME_COUNT >> optc1->tg_shift->OTG_FRAME_COUNT;
+	ASSERT(max_frame_count != 0);
 
 	if (tg->funcs->is_tg_enabled && !tg->funcs->is_tg_enabled(tg))
 		return;
@@ -209,8 +211,8 @@ void dcn10_set_wait_for_update_needed_for_pipe(struct dc *dc, struct pipe_ctx *p
 	if (vpos < vupdate_start) {
 		pipe_ctx->wait_frame_count = cur_frame;
 	} else {
-		if (cur_frame + 1 > optc1->max_frame_count)
-			pipe_ctx->wait_frame_count = cur_frame + 1 - optc1->max_frame_count;
+		if (cur_frame + 1 > max_frame_count)
+			pipe_ctx->wait_frame_count = cur_frame + 1 - max_frame_count;
 		else
 			pipe_ctx->wait_frame_count = cur_frame + 1;
 	}

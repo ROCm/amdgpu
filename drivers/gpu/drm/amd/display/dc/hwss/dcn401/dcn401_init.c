@@ -167,6 +167,8 @@ static const struct hwseq_private_funcs dcn401_private_funcs = {
 	.perform_3dlut_wa_unlock = dcn401_perform_3dlut_wa_unlock,
 	.program_pipe_sequence = dcn401_program_pipe_sequence,
 	.dc_ip_request_cntl = dcn401_dc_ip_request_cntl,
+	.wait_for_pipe_update_if_needed = dcn10_wait_for_pipe_update_if_needed,
+	.set_wait_for_update_needed_for_pipe = dcn10_set_wait_for_update_needed_for_pipe,
 };
 
 void dcn401_hw_sequencer_init_functions(struct dc *dc)
