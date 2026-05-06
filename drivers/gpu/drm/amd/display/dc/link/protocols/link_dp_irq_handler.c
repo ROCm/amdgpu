@@ -312,12 +312,14 @@ static void handle_hpd_irq_replay_sink(struct dc_link *link, bool *need_re_enabl
 		}
 	}
 
-	if (!link->replay_settings.replay_allow_active &&
-	    replay_sink_status.bits.SINK_DEVICE_REPLAY_STATUS == 0x7) {
-	    /* If sink device replay status is 0x7 and replay is disabled,
-	     * it means sink is in a bad state and link retraining is needed to recover
-	     */
-	    *replay_esd_detection_needed = true;
+	if (link->ctx->dc->debug.enable_replay_esd_recovery) {
+		if (!link->replay_settings.replay_allow_active &&
+		    replay_sink_status.bits.SINK_DEVICE_REPLAY_STATUS == 0x7) {
+		    /* If sink device replay status is 0x7 and replay is disabled,
+		     * it means sink is in a bad state and link retraining is needed to recover
+		     */
+		    *replay_esd_detection_needed = true;
+		}
 	}
 }
 
