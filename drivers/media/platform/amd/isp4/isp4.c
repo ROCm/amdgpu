@@ -9,6 +9,7 @@
 #include <media/v4l2-ioctl.h>
 
 #include "isp4.h"
+#include "isp4_debug.h"
 #include "isp4_hw_reg.h"
 
 #define ISP4_DRV_NAME "amd_isp_capture"
@@ -191,6 +192,7 @@ static int isp4_capture_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, isp_dev);
+	isp_debugfs_create(isp_dev);
 
 	return 0;
 
@@ -209,6 +211,8 @@ static void isp4_capture_remove(struct platform_device *pdev)
 {
 	struct isp4_device *isp_dev = platform_get_drvdata(pdev);
 	struct device *dev = &pdev->dev;
+
+	isp_debugfs_remove(isp_dev);
 
 	media_device_unregister(&isp_dev->mdev);
 	isp4sd_deinit(&isp_dev->isp_subdev);

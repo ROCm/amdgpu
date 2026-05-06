@@ -5,6 +5,7 @@
 
 #include <linux/iopoll.h>
 
+#include "isp4_debug.h"
 #include "isp4_fw_cmd_resp.h"
 #include "isp4_hw_reg.h"
 #include "isp4_interface.h"
@@ -302,8 +303,9 @@ static int isp4if_insert_isp_fw_cmd(struct isp4_interface *ispif,
 	wr_ptr = isp4hw_rreg(ispif->mmio, wreg);
 	if (rd_ptr >= len || wr_ptr >= len) {
 		dev_err(dev,
-			"rb invalid: stream=%u, rd=%u, wr=%u, len=%u, cmd_sz=%u\n",
-			stream, rd_ptr, wr_ptr, len, cmd_sz);
+			"rb invalid: stream=%u(%s), rd=%u, wr=%u, len=%u, cmd_sz=%u\n",
+			stream, isp4dbg_get_if_stream_str(stream), rd_ptr,
+			wr_ptr, len, cmd_sz);
 		return -EINVAL;
 	}
 
@@ -394,8 +396,9 @@ static int isp4if_send_fw_cmd(struct isp4_interface *ispif, u32 cmd_id,
 						 rb_config->reg_wptr);
 
 			dev_err(dev,
-				"fail to get free cmdq slot, stream (%d),rd %u, wr %u\n",
-				stream, rd_ptr, wr_ptr);
+				"failed to get free cmdq slot, stream %s(%d),rd %u, wr %u\n",
+				isp4dbg_get_if_stream_str(stream), stream,
+				rd_ptr, wr_ptr);
 			ret = -ETIMEDOUT;
 			goto free_ele;
 		}
@@ -421,8 +424,8 @@ static int isp4if_send_fw_cmd(struct isp4_interface *ispif, u32 cmd_id,
 		ret = isp4if_insert_isp_fw_cmd(ispif, stream, &cmd);
 		if (ret) {
 			dev_err(dev,
-				"fail for insert_isp_fw_cmd cmd_id (0x%08x)\n",
-				cmd_id);
+				"fail for insert_isp_fw_cmd cmd_id %s(0x%08x)\n",
+				isp4dbg_get_cmd_str(cmd_id), cmd_id);
 			goto err_dequeue_ele;
 		}
 	}
@@ -692,8 +695,9 @@ int isp4if_f2h_resp(struct isp4_interface *ispif, enum isp4if_stream_id stream,
 	if (checksum != resp->resp_check_sum) {
 		dev_err(dev, "resp checksum 0x%x,should 0x%x,rptr %u,wptr %u\n",
 			checksum, resp->resp_check_sum, rd_ptr, wr_ptr);
-		dev_err(dev, "(%u), seqNo %u, resp_id (0x%x)\n",
-			stream, resp->resp_seq_num,
+		dev_err(dev, "%s(%u), seqNo %u, resp_id %s(0x%x)\n",
+			isp4dbg_get_if_stream_str(stream), stream,
+			resp->resp_seq_num, isp4dbg_get_resp_str(resp->resp_id),
 			resp->resp_id);
 		return -EINVAL;
 	}
@@ -702,8 +706,9 @@ int isp4if_f2h_resp(struct isp4_interface *ispif, enum isp4if_stream_id stream,
 
 err_rb_invalid:
 	dev_err(dev,
-		"rb invalid: stream=%u, rd=%u, wr=%u, len=%u, resp_sz=%u\n",
-		stream, rd_ptr, wr_ptr, len, resp_sz);
+		"rb invalid: stream=%u(%s), rd=%u, wr=%u, len=%u, resp_sz=%u\n",
+		stream, isp4dbg_get_if_stream_str(stream), rd_ptr, wr_ptr, len,
+		resp_sz);
 	return -EINVAL;
 }
 
