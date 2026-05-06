@@ -2179,10 +2179,10 @@ static enum dc_status enable_link(
 	return status;
 }
 
-static bool allocate_usb4_bandwidth_for_stream(struct dc_stream_state *stream, int bw)
+static bool allocate_usb4_bandwidth_for_stream(struct dc_stream_state *stream, int stream_bw)
 {
 	struct dc_link *link = stream->sink->link;
-	int req_bw = bw;
+	int req_bw = stream_bw;
 
 	DC_LOGGER_INIT(link->ctx->logger);
 
@@ -2190,38 +2190,37 @@ static bool allocate_usb4_bandwidth_for_stream(struct dc_stream_state *stream, i
 		return false;
 
 	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
-		int sink_index = 0;
+		int sink_index = -1;
 		unsigned int i = 0;
 
 		for (i = 0; i < link->sink_count; i++) {
 			if (link->remote_sinks[i] == NULL)
 				continue;
 
-			if (stream->sink->sink_id != link->remote_sinks[i]->sink_id)
+			if (stream->sink->sink_id != link->remote_sinks[i]->sink_id) {
+				DC_LOG_DEBUG("%s: add remote_sink=%s, request_bw=%d\n", __func__,
+					(const char *)(&link->remote_sinks[i]->edid_caps.display_name[0]),
+					link->dpia_bw_alloc_config.remote_sink_req_bw[i]);
+
 				req_bw += link->dpia_bw_alloc_config.remote_sink_req_bw[i];
-			else
+			} else
 				sink_index = i;
 		}
 
-		link->dpia_bw_alloc_config.remote_sink_req_bw[sink_index] = bw;
-	}
+		if (sink_index >= 0)
+			link->dpia_bw_alloc_config.remote_sink_req_bw[sink_index] = stream_bw;
+		else
+			DC_LOG_WARNING("%s: stream sink_id=%u not found in remote_sinks[]\n",
+				__func__, stream->sink->sink_id);
 
-	link->dpia_bw_alloc_config.dp_overhead = link_dpia_get_dp_overhead(link);
-	req_bw += link->dpia_bw_alloc_config.dp_overhead;
+		if (req_bw) {
+			link->dpia_bw_alloc_config.dp_overhead = link_dpia_get_dp_overhead(link);
+			req_bw += link->dpia_bw_alloc_config.dp_overhead;
+		} else
+			link->dpia_bw_alloc_config.dp_overhead = 0;
+	}
 
 	link_dp_dpia_allocate_usb4_bandwidth_for_stream(link, req_bw);
-
-	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
-		unsigned int i = 0;
-
-		for (i = 0; i < link->sink_count; i++) {
-			if (link->remote_sinks[i] == NULL)
-				continue;
-			DC_LOG_DEBUG("%s, remote_sink=%s, request_bw=%d\n", __func__,
-					(const char *)(&link->remote_sinks[i]->edid_caps.display_name[0]),
-					link->dpia_bw_alloc_config.remote_sink_req_bw[i]);
-		}
-	}
 
 	return true;
 }
