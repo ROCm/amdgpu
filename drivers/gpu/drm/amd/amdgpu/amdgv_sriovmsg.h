@@ -295,7 +295,7 @@ struct amd_sriov_msg_pf2vf_info {
 	uint32_t vf2pf_update_interval_ms;
 	/* identification in ROCm SMI */
 	uint64_t uuid;
-	uint32_t fcn_idx;
+	uint32_t pad;
 	/* flags to indicate which register access method VF should use */
 	union amd_sriov_reg_access_flags reg_access_flags;
 	/* MM BW management */

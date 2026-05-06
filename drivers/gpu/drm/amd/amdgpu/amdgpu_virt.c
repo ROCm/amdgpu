@@ -463,6 +463,9 @@ static void amdgpu_virt_add_bad_page(struct amdgpu_device *adev,
 static int amdgpu_virt_read_pf2vf_data(struct amdgpu_device *adev)
 {
 	struct amd_sriov_msg_pf2vf_info_header *pf2vf_info = adev->virt.fw_reserve.p_pf2vf;
+	struct amdgim_pf2vf_info_v1 *pf2vf_v1;
+	struct amd_sriov_msg_pf2vf_info *pf2vf;
+
 	uint32_t checksum;
 	uint32_t checkval;
 
@@ -479,7 +482,8 @@ static int amdgpu_virt_read_pf2vf_data(struct amdgpu_device *adev)
 
 	switch (pf2vf_info->version) {
 	case 1:
-		checksum = ((struct amdgim_pf2vf_info_v1 *)pf2vf_info)->checksum;
+		pf2vf_v1 = (struct amdgim_pf2vf_info_v1 *)pf2vf_info;
+		checksum = pf2vf_v1->checksum;
 		checkval = amd_sriov_msg_checksum(
 			adev->virt.fw_reserve.p_pf2vf, pf2vf_info->size,
 			adev->virt.fw_reserve.checksum_key, checksum);
@@ -490,12 +494,12 @@ static int amdgpu_virt_read_pf2vf_data(struct amdgpu_device *adev)
 			return -EINVAL;
 		}
 
-		adev->virt.gim_feature =
-			((struct amdgim_pf2vf_info_v1 *)pf2vf_info)->feature_flags;
+		adev->virt.gim_feature = pf2vf_v1->feature_flags;
 		break;
 	case 2:
 		/* TODO: missing key, need to add it later */
-		checksum = ((struct amd_sriov_msg_pf2vf_info *)pf2vf_info)->checksum;
+		pf2vf = (struct amd_sriov_msg_pf2vf_info *)pf2vf_info;
+		checksum = pf2vf->checksum;
 		checkval = amd_sriov_msg_checksum(
 			adev->virt.fw_reserve.p_pf2vf, pf2vf_info->size,
 			0, checksum);
@@ -507,11 +511,9 @@ static int amdgpu_virt_read_pf2vf_data(struct amdgpu_device *adev)
 		}
 
 		adev->virt.vf2pf_update_interval_ms =
-			((struct amd_sriov_msg_pf2vf_info *)pf2vf_info)->vf2pf_update_interval_ms;
-		adev->virt.gim_feature =
-			((struct amd_sriov_msg_pf2vf_info *)pf2vf_info)->feature_flags.all;
-		adev->virt.reg_access =
-			((struct amd_sriov_msg_pf2vf_info *)pf2vf_info)->reg_access_flags.all;
+			pf2vf->vf2pf_update_interval_ms;
+		adev->virt.gim_feature = pf2vf->feature_flags.all;
+		adev->virt.reg_access = pf2vf->reg_access_flags.all;
 
 		adev->virt.decode_max_dimension_pixels = 0;
 		adev->virt.decode_max_frame_pixels = 0;
@@ -519,26 +521,30 @@ static int amdgpu_virt_read_pf2vf_data(struct amdgpu_device *adev)
 		adev->virt.encode_max_frame_pixels = 0;
 		adev->virt.is_mm_bw_enabled = false;
 		for (i = 0; i < AMD_SRIOV_MSG_RESERVE_VCN_INST; i++) {
-			tmp = ((struct amd_sriov_msg_pf2vf_info *)pf2vf_info)->mm_bw_management[i].decode_max_dimension_pixels;
+			tmp = pf2vf->mm_bw_management[i].decode_max_dimension_pixels;
 			adev->virt.decode_max_dimension_pixels = max(tmp, adev->virt.decode_max_dimension_pixels);
 
-			tmp = ((struct amd_sriov_msg_pf2vf_info *)pf2vf_info)->mm_bw_management[i].decode_max_frame_pixels;
+			tmp = pf2vf->mm_bw_management[i].decode_max_frame_pixels;
 			adev->virt.decode_max_frame_pixels = max(tmp, adev->virt.decode_max_frame_pixels);
 
-			tmp = ((struct amd_sriov_msg_pf2vf_info *)pf2vf_info)->mm_bw_management[i].encode_max_dimension_pixels;
+			tmp = pf2vf->mm_bw_management[i].encode_max_dimension_pixels;
 			adev->virt.encode_max_dimension_pixels = max(tmp, adev->virt.encode_max_dimension_pixels);
 
-			tmp = ((struct amd_sriov_msg_pf2vf_info *)pf2vf_info)->mm_bw_management[i].encode_max_frame_pixels;
+			tmp = pf2vf->mm_bw_management[i].encode_max_frame_pixels;
 			adev->virt.encode_max_frame_pixels = max(tmp, adev->virt.encode_max_frame_pixels);
 		}
 		if ((adev->virt.decode_max_dimension_pixels > 0) || (adev->virt.encode_max_dimension_pixels > 0))
 			adev->virt.is_mm_bw_enabled = true;
 
-		adev->unique_id =
-			((struct amd_sriov_msg_pf2vf_info *)pf2vf_info)->uuid;
-		adev->virt.ras_en_caps.all = ((struct amd_sriov_msg_pf2vf_info *)pf2vf_info)->ras_en_caps.all;
+		adev->unique_id = pf2vf->uuid;
+
+		adev->unitid = 0;
+		if (amdgpu_sriov_is_unitid_support(adev))
+			adev->unitid = pf2vf->unitid;
+
+		adev->virt.ras_en_caps.all = pf2vf->ras_en_caps.all;
 		adev->virt.ras_telemetry_en_caps.all =
-			((struct amd_sriov_msg_pf2vf_info *)pf2vf_info)->ras_telemetry_en_caps.all;
+			pf2vf->ras_telemetry_en_caps.all;
 		break;
 	default:
 		dev_err(adev->dev, "invalid pf2vf version: 0x%x\n", pf2vf_info->version);
