@@ -2638,8 +2638,7 @@ static void gfx_v9_4_3_spm_start(struct amdgpu_device *adev, int xcc_id)
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[xcc_id].ring;
 	uint32_t data = 0;
 
-	data = RREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_PERFMON_CNTL);
-	data |= RLC_SPM_PERFMON_CNTL__PERFMON_RING_MODE_MASK;
+	data = RLC_SPM_PERFMON_CNTL__PERFMON_RING_MODE_MASK;
 	gfx_v9_4_3_write_data_to_reg(kiq_ring, 0, false,
 			SOC15_REG_OFFSET(GC, GET_INST(GC, xcc_id), regRLC_SPM_PERFMON_CNTL), data);
 
