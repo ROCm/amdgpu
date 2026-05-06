@@ -48,6 +48,8 @@
 #include "dm_helpers.h"
 #include "ddc_service_types.h"
 #include "clk_mgr.h"
+#include "amdgpu_dm_kunit_helpers.h"
+#include "amdgpu_dm_helpers.h"
 
 #define MCCS_DEST_ADDR (0x6E >> 1)
 #define MCCS_SRC_ADDR	0x51
@@ -123,12 +125,13 @@ static int amdgpu_dm_patch_edid_caps(struct dc_edid_caps *edid_caps)
 }
 #endif
 
-static u32 edid_extract_panel_id(struct edid *edid)
+STATIC_IFN_KUNIT u32 edid_extract_panel_id(struct edid *edid)
 {
 	return (u32)edid->mfg_id[0] << 24   |
 	       (u32)edid->mfg_id[1] << 16   |
 	       (u32)EDID_PRODUCT_ID(edid);
 }
+EXPORT_IF_KUNIT(edid_extract_panel_id);
 
 static void apply_edid_quirks(struct dc_link *link, struct edid *edid,
 			      struct dc_edid_caps *edid_caps)
@@ -708,6 +711,7 @@ void dm_dtn_log_begin(struct dc_context *ctx,
 
 	dm_dtn_log_append_v(ctx, log_ctx, "%s", msg);
 }
+EXPORT_IF_KUNIT(dm_dtn_log_begin);
 
 __printf(3, 4)
 void dm_dtn_log_append_v(struct dc_context *ctx,
@@ -770,6 +774,7 @@ void dm_dtn_log_append_v(struct dc_context *ctx,
 	if (n > 0)
 		log_ctx->pos += n;
 }
+EXPORT_IF_KUNIT(dm_dtn_log_append_v);
 
 void dm_dtn_log_end(struct dc_context *ctx,
 	struct dc_log_buffer_ctx *log_ctx)
@@ -783,6 +788,7 @@ void dm_dtn_log_end(struct dc_context *ctx,
 
 	dm_dtn_log_append_v(ctx, log_ctx, "%s", msg);
 }
+EXPORT_IF_KUNIT(dm_dtn_log_end);
 
 bool dm_helpers_dp_mst_start_top_mgr(
 		struct dc_context *ctx,
@@ -817,6 +823,7 @@ bool dm_helpers_dp_mst_start_top_mgr(
 
 	return true;
 }
+EXPORT_IF_KUNIT(dm_helpers_dp_mst_start_top_mgr);
 
 bool dm_helpers_dp_mst_stop_top_mgr(
 		struct dc_context *ctx,
@@ -839,6 +846,7 @@ bool dm_helpers_dp_mst_stop_top_mgr(
 
 	return false;
 }
+EXPORT_IF_KUNIT(dm_helpers_dp_mst_stop_top_mgr);
 
 bool dm_helpers_dp_read_dpcd(
 		struct dc_context *ctx,
@@ -856,6 +864,7 @@ bool dm_helpers_dp_read_dpcd(
 	return drm_dp_dpcd_read(&aconnector->dm_dp_aux.aux, address, data,
 				size) == size;
 }
+EXPORT_IF_KUNIT(dm_helpers_dp_read_dpcd);
 
 bool dm_helpers_dp_write_dpcd(
 		struct dc_context *ctx,
@@ -872,6 +881,7 @@ bool dm_helpers_dp_write_dpcd(
 	return drm_dp_dpcd_write(&aconnector->dm_dp_aux.aux,
 			address, (uint8_t *)data, size) > 0;
 }
+EXPORT_IF_KUNIT(dm_helpers_dp_write_dpcd);
 
 bool dm_helpers_submit_i2c(
 		struct dc_context *ctx,
@@ -1208,6 +1218,7 @@ bool dm_helpers_dp_write_hblank_reduction(struct dc_context *ctx, const struct d
 	// TODO
 	return false;
 }
+EXPORT_IF_KUNIT(dm_helpers_dp_write_hblank_reduction);
 
 bool dm_helpers_is_dp_sink_present(struct dc_link *link)
 {
@@ -1327,7 +1338,7 @@ dm_helpers_read_vbios_hardcoded_edid(struct dc_link *link, struct amdgpu_dm_conn
 	return edid;
 }
 
-static uint8_t get_max_frl_rate(uint8_t max_lanes, uint8_t max_rate_per_lane)
+STATIC_IFN_KUNIT uint8_t get_max_frl_rate(uint8_t max_lanes, uint8_t max_rate_per_lane)
 {
 	uint8_t max_frl_rate;
 
@@ -1348,6 +1359,7 @@ static uint8_t get_max_frl_rate(uint8_t max_lanes, uint8_t max_rate_per_lane)
 
 	return max_frl_rate;
 }
+EXPORT_IF_KUNIT(get_max_frl_rate);
 
 static uint8_t get_dsc_max_slices(uint8_t max_slices, int clk_per_slice)
 {
@@ -1394,6 +1406,7 @@ void populate_hdmi_info_from_connector(bool enable_frl, struct drm_hdmi_info *hd
 	}
 #endif /* HAVE_DRM_HDMI_INFO_MAX_LANES */
 }
+EXPORT_IF_KUNIT(populate_hdmi_info_from_connector);
 
 enum dc_edid_status dm_helpers_read_local_edid(
 		struct dc_context *ctx,
@@ -1817,24 +1830,32 @@ void dm_helpers_dp_mst_update_branch_bandwidth(
 	// TODO
 }
 
-static bool dm_is_freesync_pcon_whitelist(const uint32_t branch_dev_id)
+STATIC_IFN_KUNIT const uint32_t dm_freesync_pcon_whitelist[] = {
+	DP_BRANCH_DEVICE_ID_0060AD,
+	DP_BRANCH_DEVICE_ID_00E04C,
+	DP_BRANCH_DEVICE_ID_90CC24,
+	DP_BRANCH_DEVICE_ID_001CF8,
+	DP_BRANCH_DEVICE_ID_001FF2,
+};
+EXPORT_IF_KUNIT(dm_freesync_pcon_whitelist);
+
+STATIC_IFN_KUNIT uint32_t dm_freesync_pcon_whitelist_count(void)
 {
-	bool ret_val = false;
-
-	switch (branch_dev_id) {
-	case DP_BRANCH_DEVICE_ID_0060AD:
-	case DP_BRANCH_DEVICE_ID_00E04C:
-	case DP_BRANCH_DEVICE_ID_90CC24:
-	case DP_BRANCH_DEVICE_ID_001CF8:
-	case DP_BRANCH_DEVICE_ID_001FF2:
-		ret_val = true;
-		break;
-	default:
-		break;
-	}
-
-	return ret_val;
+	return ARRAY_SIZE(dm_freesync_pcon_whitelist);
 }
+EXPORT_IF_KUNIT(dm_freesync_pcon_whitelist_count);
+
+STATIC_IFN_KUNIT bool dm_is_freesync_pcon_whitelist(const uint32_t branch_dev_id)
+{
+	u32 i;
+
+	for (i = 0; i < dm_freesync_pcon_whitelist_count(); i++)
+		if (dm_freesync_pcon_whitelist[i] == branch_dev_id)
+			return true;
+
+	return false;
+}
+EXPORT_IF_KUNIT(dm_is_freesync_pcon_whitelist);
 
 enum adaptive_sync_type dm_get_adaptive_sync_support_type(struct dc_link *link)
 {
@@ -1854,18 +1875,21 @@ enum adaptive_sync_type dm_get_adaptive_sync_support_type(struct dc_link *link)
 
 	return as_type;
 }
+EXPORT_IF_KUNIT(dm_get_adaptive_sync_support_type);
 
 bool dm_helpers_is_fullscreen(struct dc_context *ctx, struct dc_stream_state *stream)
 {
 	// TODO
 	return false;
 }
+EXPORT_IF_KUNIT(dm_helpers_is_fullscreen);
 
 bool dm_helpers_is_hdr_on(struct dc_context *ctx, struct dc_stream_state *stream)
 {
 	// TODO
 	return false;
 }
+EXPORT_IF_KUNIT(dm_helpers_is_hdr_on);
 
 static int mccs_operation_vcp_request(unsigned int vcp_code, struct dc_link *link,
 				union vcp_reply *reply)
