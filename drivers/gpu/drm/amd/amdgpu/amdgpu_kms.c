@@ -1424,6 +1424,33 @@ int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 }
 
 /**
+ * amdgpu_proc_options_ioctl - set per-fd user options
+ *
+ * @dev: drm dev pointer
+ * @data: pointer to struct drm_amdgpu_proc_options
+ * @filp: drm file
+ *
+ * Sets options stored on the per-file amdgpu_fpriv. Currently the only
+ * supported option is %AMDGPU_PROC_OPTIONS_OP_KFD_SIGBUS_DELAY which
+ * controls how KFD delivers SIGBUS for poison/RAS events to the calling
+ * process (immediate, suppressed, or delayed by N milliseconds).
+ */
+int amdgpu_proc_options_ioctl(struct drm_device *dev, void *data,
+			      struct drm_file *filp)
+{
+	struct drm_amdgpu_proc_options *args = data;
+
+	switch (args->op) {
+	case AMDGPU_PROC_OPTIONS_OP_KFD_SIGBUS_DELAY:
+		return amdgpu_amdkfd_set_sigbus_delay(current,
+						      args->kfd_sigbus_delay.value);
+	default:
+		DRM_DEBUG_KMS("Invalid user option op %u\n", args->op);
+		return -EINVAL;
+	}
+}
+
+/**
  * amdgpu_driver_open_kms - drm callback for open
  *
  * @dev: drm dev pointer
