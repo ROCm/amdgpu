@@ -173,6 +173,17 @@ static int isp4_capture_probe(struct platform_device *pdev)
 		goto err_pm_disable;
 	}
 
+	ret = media_create_pad_link(&isp_dev->isp_subdev.sdev.entity,
+				    0,
+				    &isp_dev->isp_subdev.isp_vdev.vdev.entity,
+				    0,
+				    MEDIA_LNK_FL_ENABLED |
+				    MEDIA_LNK_FL_IMMUTABLE);
+	if (ret) {
+		dev_err_probe(dev, ret, "fail to create pad link\n");
+		goto err_isp4_deinit;
+	}
+
 	ret = media_device_register(&isp_dev->mdev);
 	if (ret) {
 		dev_err_probe(dev, ret, "fail to register media device\n");
