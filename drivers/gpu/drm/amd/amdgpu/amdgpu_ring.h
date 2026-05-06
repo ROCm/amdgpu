@@ -68,8 +68,6 @@ enum amdgpu_ring_priority_level {
 
 #define to_amdgpu_ring(s) container_of((s), struct amdgpu_ring, sched)
 
-#define AMDGPU_IB_POOL_SIZE	(1024 * 1024)
-
 enum amdgpu_ring_type {
 	AMDGPU_RING_TYPE_GFX		= AMDGPU_HW_IP_GFX,
 	AMDGPU_RING_TYPE_COMPUTE	= AMDGPU_HW_IP_COMPUTE,

@@ -358,6 +358,11 @@ free_fence:
  */
 int amdgpu_ib_pool_init(struct amdgpu_device *adev)
 {
+	const int sizes[AMDGPU_IB_POOL_MAX] = {
+		[AMDGPU_IB_POOL_DELAYED] = SZ_1M,
+		[AMDGPU_IB_POOL_IMMEDIATE] = SZ_128K,
+		[AMDGPU_IB_POOL_DIRECT] = SZ_512K
+	};
 	int r, i;
 
 	if (adev->ib_pool_ready)
@@ -365,7 +370,7 @@ int amdgpu_ib_pool_init(struct amdgpu_device *adev)
 
 	for (i = 0; i < AMDGPU_IB_POOL_MAX; i++) {
 		r = amdgpu_sa_bo_manager_init(adev, &adev->ib_pools[i],
-					      AMDGPU_IB_POOL_SIZE, 256,
+					      sizes[i], 256,
 					      AMDGPU_GEM_DOMAIN_GTT);
 		if (r)
 			goto error;
