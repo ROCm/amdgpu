@@ -109,6 +109,11 @@ struct isp4_subdev {
 	bool irq_enabled;
 	/* spin lock to access ISP_SYS_INT0_EN exclusively */
 	spinlock_t irq_lock;
+#ifdef CONFIG_DEBUG_FS
+	bool enable_fw_log;
+	struct dentry *debugfs_dir;
+	char *fw_log_output;
+#endif
 };
 
 int isp4sd_init(struct isp4_subdev *isp_subdev, struct v4l2_device *v4l2_dev,
