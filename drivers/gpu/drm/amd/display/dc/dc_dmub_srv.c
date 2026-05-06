@@ -2125,9 +2125,7 @@ bool dmub_lsdma_init(struct dc_dmub_srv *dc_dmub_srv)
 
 bool dmub_lsdma_send_linear_copy_command(
 	struct dc_dmub_srv *dc_dmub_srv,
-	uint64_t src_addr,
-	uint64_t dst_addr,
-	uint32_t count
+	struct lsdma_linear_copy_params copy_data
 )
 {
 	struct dc_context *dc_ctx = dc_dmub_srv->ctx;
@@ -2142,11 +2140,20 @@ bool dmub_lsdma_send_linear_copy_command(
 	cmd.cmd_common.header.sub_type = DMUB_CMD__LSDMA_LINEAR_COPY;
 	wait_type                      = DM_DMUB_WAIT_TYPE_NO_WAIT;
 
-	lsdma_data->u.linear_copy_data.count   = count - 1; // LSDMA controller expects bytes to copy -1
-	lsdma_data->u.linear_copy_data.src_lo  = src_addr & 0xFFFFFFFF;
-	lsdma_data->u.linear_copy_data.src_hi  = (src_addr >> 32) & 0xFFFFFFFF;
-	lsdma_data->u.linear_copy_data.dst_lo  = dst_addr & 0xFFFFFFFF;
-	lsdma_data->u.linear_copy_data.dst_hi  = (dst_addr >> 32) & 0xFFFFFFFF;
+	lsdma_data->u.linear_copy_data.count   = copy_data.count;
+	lsdma_data->u.linear_copy_data.src_lo  = copy_data.src_lo;
+	lsdma_data->u.linear_copy_data.src_hi  = copy_data.src_hi;
+	lsdma_data->u.linear_copy_data.dst_lo  = copy_data.dst_lo;
+	lsdma_data->u.linear_copy_data.dst_hi  = copy_data.dst_hi;
+	lsdma_data->u.linear_copy_data.tmz     = copy_data.tmz;
+	lsdma_data->u.linear_copy_data.data_format = copy_data.data_format;
+	lsdma_data->u.linear_copy_data.num_type = copy_data.num_type;
+	lsdma_data->u.linear_copy_data.read_compress = copy_data.read_compress;
+	lsdma_data->u.linear_copy_data.write_compress = copy_data.write_compress;
+	lsdma_data->u.linear_copy_data.max_com = copy_data.max_com;
+	lsdma_data->u.linear_copy_data.max_uncom = copy_data.max_uncom;
+	lsdma_data->u.linear_copy_data.cache_policy_src = copy_data.cache_policy_src;
+	lsdma_data->u.linear_copy_data.cache_policy_dst = copy_data.cache_policy_dst;
 
 	result = dc_wake_and_execute_dmub_cmd(dc_ctx, &cmd, wait_type);
 
@@ -2191,6 +2198,12 @@ bool dmub_lsdma_send_linear_sub_window_copy_command(
 	lsdma_data->u.linear_sub_window_copy_data.rect_y           = copy_data.rect_y;
 	lsdma_data->u.linear_sub_window_copy_data.src_cache_policy = copy_data.src_cache_policy;
 	lsdma_data->u.linear_sub_window_copy_data.dst_cache_policy = copy_data.dst_cache_policy;
+	lsdma_data->u.linear_sub_window_copy_data.data_format      = copy_data.data_format;
+	lsdma_data->u.linear_sub_window_copy_data.num_type         = copy_data.num_type;
+	lsdma_data->u.linear_sub_window_copy_data.read_compress    = copy_data.read_compress;
+	lsdma_data->u.linear_sub_window_copy_data.write_compress   = copy_data.write_compress;
+	lsdma_data->u.linear_sub_window_copy_data.max_com          = copy_data.max_com;
+	lsdma_data->u.linear_sub_window_copy_data.max_uncom        = copy_data.max_uncom;
 
 	result = dc_wake_and_execute_dmub_cmd(dc_ctx, &cmd, wait_type);
 
