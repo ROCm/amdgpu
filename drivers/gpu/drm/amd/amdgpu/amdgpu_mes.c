@@ -217,7 +217,7 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 	if (r)
 		goto error_doorbell;
 
-	if (amdgpu_ip_version(adev, GC_HWIP, 0) >= IP_VERSION(12, 1, 0)) {
+	if (amdgpu_ip_version(adev, GC_HWIP, 0) >= IP_VERSION(11, 0, 0)) {
 		/* When queue/pipe reset is done in MES instead of in the
 		 * driver, MES passes hung queues information to the driver in
 		 * hung_queue_hqd_info. Calculate required space to store this
