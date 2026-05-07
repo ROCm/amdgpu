@@ -33,6 +33,9 @@
 #define ACP7X_PGFSM_CNTL_POWER_ON_MASK		7
 #define ACP7X_PGFSM_STATUS_MASK			0x3F
 
+/* time in ms for runtime suspend delay */
+#define ACP_SUSPEND_DELAY_MS			2000
+
 struct acp_hw_ops {
 	int (*acp_init)(void __iomem *acp_base, struct device *dev);
 	int (*acp_deinit)(void __iomem *acp_base, struct device *dev);
