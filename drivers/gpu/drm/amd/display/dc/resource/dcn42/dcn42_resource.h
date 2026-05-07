@@ -456,6 +456,8 @@
 		SRI_ARR(OTG_V_SYNC_A, OTG, inst), \
 		SRI_ARR(OTG_V_SYNC_A_CNTL, OTG, inst), \
 		SRI_ARR(OTG_CONTROL, OTG, inst), \
+		SRI_ARR(OTG_MASTER_EN, OTG, inst), \
+		SRI_ARR(OTG_LONG_VBLANK_STATUS, OTG, inst), \
 		SRI_ARR(OTG_STEREO_CONTROL, OTG, inst), \
 		SRI_ARR(OTG_3D_STRUCTURE_CONTROL, OTG, inst),                            \
 		SRI_ARR(OTG_STEREO_STATUS, OTG, inst),                                   \
@@ -472,6 +474,11 @@
 		SRI_ARR(OTG_M_CONST_DTO0, OTG, inst),                                    \
 		SRI_ARR(OTG_M_CONST_DTO1, OTG, inst),                                    \
 		SRI_ARR(OTG_CLOCK_CONTROL, OTG, inst),                                   \
+		SRI_ARR(OTG_COUNT_CONTROL, OTG, inst),                                   \
+		SRI_ARR(OTG_COUNT_RESET, OTG, inst),                                   \
+		SRI_ARR(OTG_CRC_SIG_BLUE_CONTROL_MASK, OTG, inst),                      \
+		SRI_ARR(OTG_CRC_SIG_RED_GREEN_MASK, OTG, inst),                      \
+		SRI_ARR(OTG_DRR_TIMING_INT_STATUS, OTG, inst),                      \
 		SRI_ARR(OTG_VERTICAL_INTERRUPT0_CONTROL, OTG, inst),                     \
 		SRI_ARR(OTG_VERTICAL_INTERRUPT0_POSITION, OTG, inst),                    \
 		SRI_ARR(OTG_VERTICAL_INTERRUPT1_CONTROL, OTG, inst),                     \
