@@ -8,6 +8,7 @@ config SND_SOC_AMD_ACP
 
 config SND_SOC_AMD_CZ_DA7219MX98357_MACH
 	tristate "AMD CZ support for DA7219, RT5682 and MAX9835"
+	select CLK_FIXED_FCH
 	select SND_SOC_DA7219
 	select SND_SOC_RT5682_I2C
 	select SND_SOC_MAX98357A
@@ -44,6 +45,7 @@ config SND_SOC_AMD_ACP3x
 
 config SND_SOC_AMD_RV_RT5682_MACH
 	tristate "AMD RV support for RT5682"
+	select CLK_FIXED_FCH
 	select SND_SOC_RT5682_I2C
 	select SND_SOC_MAX98357A
 	select SND_SOC_CROS_EC_CODEC
@@ -122,6 +124,16 @@ config SND_AMD_ACP_CONFIG
 
 source "sound/soc/amd/acp/Kconfig"
 
+config SND_SOC_AMD_RPL_ACP6x
+        tristate "AMD Audio Coprocessor-v6.2 RPL support"
+        depends on X86 && PCI
+        help
+          This option enables Audio Coprocessor i.e. ACP v6.2 support on
+          AMD RPL platform. By enabling this flag build will be
+          triggered for ACP PCI driver.
+          Say m if you have such a device.
+          If unsure select "N".
+
 config SND_SOC_AMD_ACP63_TOPLEVEL
 	tristate "support for AMD platforms with ACP version >= 6.3"
 	default SND_AMD_ACP_CONFIG
@@ -173,16 +185,6 @@ config SND_SOC_AMD_PS_MACH
           DMIC can be connected directly to ACP IP.
           Say m if you have such a device.
           If unsure select "N".
-
-config SND_SOC_AMD_ACP7X
-        tristate "AMD Audio Coprocessor-v7.x support"
-        depends on X86 && PCI && ACPI
-        help
-	  This option enables Audio Coprocessor i.e ACP7.x
-	  variants support(ACP7.D/7.E/7.F). By enabling this flag build
-	  will be triggered for ACP PCI driver.
-	  Say m if you have such a device.
-	  If unsure select "N".
 
 endif
 endmenu
