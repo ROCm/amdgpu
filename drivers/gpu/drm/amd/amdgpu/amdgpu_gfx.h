@@ -36,6 +36,8 @@
 #include "amdgpu_ring_mux.h"
 #include "amdgpu_xcp.h"
 
+struct amdgpu_usermode_queue;
+
 /* GFX current status */
 #define AMDGPU_GFX_NORMAL_MODE			0x00000000L
 #define AMDGPU_GFX_SAFE_MODE			0x00000001L
@@ -117,6 +119,8 @@ struct amdgpu_mec {
 	u32 num_queue_per_pipe;
 	void			*mqd_backup[AMDGPU_MAX_COMPUTE_RINGS * AMDGPU_MAX_GC_INSTANCES];
 	bool use_mmio_for_reset;
+	u32 *mes_hung_db_array;
+	struct mutex		reset_mutex;
 };
 
 struct amdgpu_mec_bitmap {
@@ -643,6 +647,11 @@ int amdgpu_gfx_poison_consumption_handler(struct amdgpu_device *adev,
 bool amdgpu_gfx_is_master_xcc(struct amdgpu_device *adev, int xcc_id);
 int amdgpu_gfx_sysfs_init(struct amdgpu_device *adev);
 void amdgpu_gfx_sysfs_fini(struct amdgpu_device *adev);
+int amdgpu_gfx_reset_mes_compute(struct amdgpu_device *adev,
+				 struct amdgpu_ring *ring,
+				 struct amdgpu_fence *guilty_fence,
+				 struct amdgpu_usermode_queue *uq,
+				 unsigned int *hung_queue_count);
 void amdgpu_gfx_ras_error_func(struct amdgpu_device *adev,
 		void *ras_error_status,
 		void (*func)(struct amdgpu_device *adev, void *ras_error_status,

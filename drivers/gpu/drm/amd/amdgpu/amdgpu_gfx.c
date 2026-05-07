@@ -34,6 +34,7 @@
 #include "amdgpu_xcp.h"
 #include "amdgpu_xgmi.h"
 #include "amdgpu_mes.h"
+#include "mes_userqueue.h"
 #include "nvd.h"
 
 /* delay 0.1 second to enable gfx off feature */
@@ -1994,7 +1995,17 @@ int amdgpu_gfx_mes_reset_queue(struct amdgpu_ring *ring,
 			       bool use_mmio)
 {
 	struct amdgpu_device *adev = ring->adev;
+	bool reinit_queue;
 	int r;
+
+	if ((ring->funcs->type == AMDGPU_RING_TYPE_COMPUTE) &&
+	    adev->mes.compute_pipe_reset_enabled)
+		reinit_queue = true;
+	else if ((ring->funcs->type == AMDGPU_RING_TYPE_GFX) &&
+		 adev->mes.gfx_pipe_reset_enabled)
+		reinit_queue = true;
+	else
+		reinit_queue = use_mmio;
 
 	amdgpu_ring_reset_helper_begin(ring, timedout_fence);
 
@@ -2002,7 +2013,7 @@ int amdgpu_gfx_mes_reset_queue(struct amdgpu_ring *ring,
 	if (r)
 		return r;
 
-	if (use_mmio) {
+	if (reinit_queue) {
 		r = amdgpu_mes_unmap_legacy_queue(adev, ring,
 						  RESET_QUEUES, 0, 0, 0);
 		if (r)
@@ -2175,6 +2186,133 @@ void amdgpu_gfx_sysfs_fini(struct amdgpu_device *adev)
 		amdgpu_gfx_sysfs_isolation_shader_fini(adev);
 		amdgpu_gfx_sysfs_reset_mask_fini(adev);
 	}
+}
+
+static void amdgpu_gfx_reset_start_compute_scheds(struct amdgpu_device *adev,
+						  struct amdgpu_ring *guilty_ring)
+{
+	struct amdgpu_ring *ring;
+	int i;
+
+	for (i = 0; i < adev->gfx.num_compute_rings; i++) {
+		ring = &adev->gfx.compute_ring[i];
+		if (ring == guilty_ring)
+			continue;
+		drm_sched_wqueue_start(&ring->sched);
+	}
+}
+
+static void amdgpu_gfx_reset_stop_compute_scheds(struct amdgpu_device *adev,
+						 struct amdgpu_ring *guilty_ring)
+{
+	struct amdgpu_ring *ring;
+	int i;
+
+	for (i = 0; i < adev->gfx.num_compute_rings; i++) {
+		ring = &adev->gfx.compute_ring[i];
+		if (ring == guilty_ring)
+			continue;
+		drm_sched_wqueue_stop(&ring->sched);
+	}
+}
+
+static int amdgpu_gfx_reset_mes_kcq(struct amdgpu_device *adev,
+				    struct amdgpu_ring *guilty_ring,
+				    unsigned int db)
+{
+	bool use_mmio = adev->gfx.mec.use_mmio_for_reset;
+	struct amdgpu_fence *fence;
+	struct amdgpu_ring *ring;
+	int i, r;
+
+	for (i = 0; i < adev->gfx.num_compute_rings; i++) {
+		ring = &adev->gfx.compute_ring[i];
+		if (ring == guilty_ring)
+			continue;
+		if (ring->doorbell_index == db) {
+			fence = amdgpu_ring_find_guilty_fence(ring);
+			r = amdgpu_gfx_mes_reset_queue(ring, 0, fence, use_mmio);
+			if (r)
+				return r;
+			break;
+		}
+	}
+	return 0;
+}
+
+int amdgpu_gfx_reset_mes_compute(struct amdgpu_device *adev,
+				 struct amdgpu_ring *ring,
+				 struct amdgpu_fence *guilty_fence,
+				 struct amdgpu_usermode_queue *uq,
+				 unsigned int *hung_queue_count)
+{
+	struct amdgpu_mes_hung_queue_hqd_info *hqd_info =
+		(struct amdgpu_mes_hung_queue_hqd_info *)
+		&adev->gfx.mec.mes_hung_db_array[adev->mes.hung_queue_hqd_info_offset];
+	int i, r, pipe, queue, queue_type;
+	unsigned int num_hung = 0;
+	bool use_mmio = adev->gfx.mec.use_mmio_for_reset;
+
+	guard(mutex)(&adev->gfx.mec.reset_mutex);
+	/* stop the drm schedulers for all compute queues */
+	amdgpu_gfx_reset_stop_compute_scheds(adev, ring);
+	/* suspend all will determine which queues are hung.
+	 * reset detect will return the array of bad queue doorbells
+	 */
+	r = amdgpu_mes_suspend(adev, 0);
+	/* if suspend all success, it should no hang queue */
+	if (!r)
+		/* always reset the KCQ/userq since we need to signal the fence
+		 * and we could be stuck in a loop which is preemptable.
+		 */
+		goto fence_reset;
+	r = amdgpu_mes_detect_and_reset_hung_queues(adev, AMDGPU_RING_TYPE_COMPUTE,
+						    true, &num_hung, adev->gfx.mec.mes_hung_db_array, 0);
+	if (r)
+		goto out;
+	if (hung_queue_count)
+		*hung_queue_count = num_hung;
+
+fence_reset:
+	/* reset the queue this came from if specified */
+	if (ring) {
+		r = amdgpu_gfx_mes_reset_queue(ring, 0, guilty_fence, use_mmio);
+		if (r)
+			goto out;
+	}
+	if (uq) {
+		r = mes_userq_reset(uq);
+		if (r)
+			goto out;
+	}
+	for (i = 0; i < num_hung; i++) {
+		pipe = hqd_info[i].pipe_index;
+		queue = hqd_info[i].queue_index;
+		queue_type = hqd_info[i].queue_type;
+
+		/* reset any KCQs */
+		r = amdgpu_gfx_reset_mes_kcq(adev, ring,
+					     adev->gfx.mec.mes_hung_db_array[i]);
+		if (r)
+			goto out;
+		/* reset any KFD queues */
+		r = amdgpu_amdkfd_reset_mes_queue(adev, 0, queue_type, pipe, queue,
+						  adev->gfx.mec.mes_hung_db_array[i]);
+		if (r)
+			goto out;
+		/* reset KGD user queues */
+		r = mes_userq_reset_queue(adev, uq, queue_type, pipe, queue,
+					  adev->gfx.mec.mes_hung_db_array[i]);
+		if (r)
+			goto out;
+	}
+out:
+	/* resume all will enable the non-hung queues */
+	amdgpu_mes_resume(adev, 0);
+	if (!r)
+		amdgpu_gfx_reset_start_compute_scheds(adev, ring);
+
+	return r;
 }
 
 int amdgpu_gfx_cleaner_shader_sw_init(struct amdgpu_device *adev,
