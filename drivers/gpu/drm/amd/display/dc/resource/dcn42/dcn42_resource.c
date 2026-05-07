@@ -1520,6 +1520,10 @@ static void dcn42_resource_destruct(struct dcn42_resource_pool *pool)
 
 	if (pool->base.pg_cntl != NULL)
 		dcn_pg_cntl_destroy(&pool->base.pg_cntl);
+
+	if (pool->base.replay != NULL)
+		dmub_replay_destroy(&pool->base.replay);
+
 	if (pool->base.dccg != NULL)
 		dcn_dccg_destroy(&pool->base.dccg);
 
@@ -1915,12 +1919,6 @@ static bool dcn42_resource_construct(
 	dc->caps.extended_aux_timeout_support = true;
 	dc->caps.dmcub_support = true;
 	dc->caps.is_apu = true;
-	dc->caps.seamless_odm = true;
-	dc->caps.zstate_support = true;
-	dc->caps.ips_support = true;
-	dc->caps.max_v_total = (1 << 15) - 1;
-	dc->caps.vtotal_limited_by_fp2 = true;
-
 	dc->caps.seamless_odm = true;
 	dc->caps.zstate_support = true;
 	dc->caps.ips_support = true;

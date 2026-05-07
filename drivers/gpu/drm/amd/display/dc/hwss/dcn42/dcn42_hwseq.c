@@ -470,9 +470,9 @@ static bool is_rmcm_3dlut_fl_supported(struct dc *dc, enum dc_cm2_gpu_mem_size s
 	if (!dc->caps.color.mpc.rmcm_3d_lut_caps.dma_3d_lut)
 		return false;
 	if (size == DC_CM2_GPU_MEM_SIZE_171717)
-		return (dc->caps.color.mpc.rmcm_3d_lut_caps.lut_dim_caps.dim_17);
+		return dc->caps.color.mpc.rmcm_3d_lut_caps.lut_dim_caps.dim_17 != 0u;
 	else if (size == DC_CM2_GPU_MEM_SIZE_333333)
-		return (dc->caps.color.mpc.rmcm_3d_lut_caps.lut_dim_caps.dim_33);
+		return dc->caps.color.mpc.rmcm_3d_lut_caps.lut_dim_caps.dim_33 != 0u;
 	return false;
 }
 
@@ -945,6 +945,7 @@ bool dcn42_set_mcm_luts(struct pipe_ctx *pipe_ctx,
 void dcn42_hardware_release(struct dc *dc)
 {
 	dcn35_hardware_release(dc);
+	dc_dmub_srv_release_hw(dc);
 
 }
 static int count_active_streams(const struct dc *dc)
