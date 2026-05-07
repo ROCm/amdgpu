@@ -445,7 +445,7 @@ static int reset_queues_mes(struct device_queue_manager *dqm)
 	 * Passed parameter is for targeting queues not scheduled by MES add_queue.
 	 */
 	r =  amdgpu_mes_detect_and_reset_hung_queues(adev, AMDGPU_RING_TYPE_COMPUTE,
-		false, &num_hung, hung_array, ffs(dqm->dev->xcc_mask) - 1);
+		true, &num_hung, hung_array, ffs(dqm->dev->xcc_mask) - 1);
 
 	if (!num_hung || r) {
 		r = -ENOTRECOVERABLE;
@@ -467,10 +467,9 @@ static int reset_queues_mes(struct device_queue_manager *dqm)
 		}
 
 		q = find_queue_by_doorbell_offset(dqm, hung_array[i]);
-		if (!q) {
-			r = -ENOTRECOVERABLE;
-			goto fail;
-		}
+		/* skip queues not owned by KFD */
+		if (!q)
+			continue;
 
 		pdd = kfd_get_process_device_data(q->device, q->process);
 		if (!pdd) {
@@ -480,6 +479,10 @@ static int reset_queues_mes(struct device_queue_manager *dqm)
 
 		pr_warn("Hang detected doorbell %x pipe %d queue %d type %d\n",
 				hung_array[i], pipe, queue, queue_type);
+		r = amdgpu_mes_reset_user_queue(adev, queue_type, hung_array[i],
+						ffs(dqm->dev->xcc_mask) - 1);
+		if (r)
+			goto fail;
 		/* Proceed remove_queue with reset=true */
 		remove_queue_mes_on_reset_option(dqm, q, &pdd->qpd, true, false);
 		set_queue_as_reset(dqm, q, &pdd->qpd);
@@ -505,13 +508,17 @@ static int suspend_all_queues_mes(struct device_queue_manager *dqm)
 	up_read(&adev->reset_domain->sem);
 
 	if (r) {
-		if (!reset_queues_mes(dqm))
-			return 0;
+		if (!reset_queues_mes(dqm)) {
+			r = 0;
+			goto out;
+		}
 
 		dev_err(adev->dev, "failed to suspend gangs from MES\n");
 		dev_err(adev->dev, "MES might be in unrecoverable state, issue a GPU reset\n");
 		kfd_hws_hang(dqm);
 	}
+out:
+	resume_all_queues_mes(dqm);
 
 	return r;
 }
