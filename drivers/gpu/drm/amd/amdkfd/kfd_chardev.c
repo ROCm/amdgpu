@@ -2631,6 +2631,12 @@ static int criu_restore_memory_of_gpu_ipc(struct kfd_process_device *pdd,
 			return ret;
 		}
 
+		if (bo_bucket->alloc_flags & (KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
+					      KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP)) {
+			pr_err("IPC sharing of Doorbell and MMIO_remap memory is not supported.\n");
+			return -EINVAL;
+		}
+
 		/* kfd_ipc_import_handle returns -EINVAL if the ipc share_handle does not exist.
 		 * In that case create a new BO and create a new ipc share_handle by calling
 		 * amdgpu_amdkfd_gpuvm_export_ipc_obj.
