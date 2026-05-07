@@ -1021,6 +1021,9 @@
 /* local_try_cmpchg() is available */
 #define HAVE_LINUX_LOCAL_TRY_CMPXCHG 1
 
+/* Define to 1 if you have the <linux/math.h> header file. */
+#define HAVE_LINUX_MATH_H 1
+
 /* Define to 1 if you have the <linux/minmax.h> header file. */
 #define HAVE_LINUX_MINMAX_H 1
 
