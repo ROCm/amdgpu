@@ -265,6 +265,8 @@ struct amdgpu_virt_ras_err_handler_data {
 	struct eeprom_table_record *bps;
 	/* point to reserved bo array */
 	struct amdgpu_bo **bps_bo;
+	/* number of slots in bps[] / bps_bo[] (always >= count) */
+	int capacity;
 	/* the count of entries */
 	int count;
 	/* last reserved entry's index + 1 */
