@@ -252,6 +252,10 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 		}
 	}
 
+	adev->gfx.mec.mes_hung_db_array =
+		kcalloc(amdgpu_mes_get_hung_queue_db_array_size(adev),
+			sizeof(u32), GFP_KERNEL);
+
 	return 0;
 
 error_doorbell:
@@ -278,6 +282,8 @@ void amdgpu_mes_fini(struct amdgpu_device *adev)
 {
 	int i;
 	int num_xcc = adev->gfx.xcc_mask ? NUM_XCC(adev->gfx.xcc_mask) : 1;
+
+	kfree(adev->gfx.mec.mes_hung_db_array);
 
 	amdgpu_bo_free_kernel(&adev->mes.event_log_gpu_obj,
 			      &adev->mes.event_log_gpu_addr,

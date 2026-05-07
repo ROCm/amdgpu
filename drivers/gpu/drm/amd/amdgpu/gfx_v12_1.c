@@ -1287,6 +1287,8 @@ static int gfx_v12_1_sw_init(struct amdgpu_ip_block *ip_block)
 	if (r)
 		return r;
 
+	mutex_init(&adev->gfx.mec.reset_mutex);
+
 	return 0;
 }
 
