@@ -188,4 +188,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #kernel.h: Move ARRAY_SIZE() to a separate header
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/array_size.h])
+
+	dnl #v5.10-7858-gaa6159ab99a9
+	dnl #kernel.h: split out mathematical helpers
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/math.h])
 ])
