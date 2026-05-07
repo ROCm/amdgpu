@@ -11,6 +11,7 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/pm_runtime.h>
 #include <linux/slab.h>
 #include <linux/types.h>
 
@@ -92,6 +93,11 @@ static int snd_acp7x_probe(struct pci_dev *pci,
 	ret = acp_hw_init(adata, &pci->dev);
 	if (ret)
 		goto release_regions;
+
+	pm_runtime_set_autosuspend_delay(&pci->dev, ACP_SUSPEND_DELAY_MS);
+	pm_runtime_use_autosuspend(&pci->dev);
+	pm_runtime_put_noidle(&pci->dev);
+	pm_runtime_allow(&pci->dev);
 	return 0;
 
 release_regions:
@@ -102,6 +108,26 @@ disable_pci:
 	return ret;
 }
 
+static int __maybe_unused snd_acp_suspend(struct device *dev)
+{
+	return acp_hw_suspend(dev);
+}
+
+static int __maybe_unused snd_acp_runtime_resume(struct device *dev)
+{
+	return acp_hw_runtime_resume(dev);
+}
+
+static int __maybe_unused snd_acp_resume(struct device *dev)
+{
+	return acp_hw_resume(dev);
+}
+
+static const struct dev_pm_ops acp7x_pm_ops = {
+	SET_RUNTIME_PM_OPS(snd_acp_suspend, snd_acp_runtime_resume, NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(snd_acp_suspend, snd_acp_resume)
+};
+
 static void snd_acp7x_remove(struct pci_dev *pci)
 {
 	struct acp7x_dev_data *adata;
@@ -111,6 +137,8 @@ static void snd_acp7x_remove(struct pci_dev *pci)
 	ret = acp_hw_deinit(adata, &pci->dev);
 	if (ret)
 		dev_err(&pci->dev, "ACP de-init failed\n");
+	pm_runtime_forbid(&pci->dev);
+	pm_runtime_get_noresume(&pci->dev);
 	pci_release_regions(pci);
 	pci_disable_device(pci);
 }
@@ -128,6 +156,9 @@ static struct pci_driver acp7x_pci_driver  = {
 	.id_table = snd_acp7x_ids,
 	.probe = snd_acp7x_probe,
 	.remove = snd_acp7x_remove,
+	.driver = {
+		.pm = &acp7x_pm_ops,
+	}
 };
 
 module_pci_driver(acp7x_pci_driver);

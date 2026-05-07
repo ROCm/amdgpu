@@ -75,8 +75,51 @@ static int acp7x_deinit(void __iomem *acp_base, struct device *dev)
 	return 0;
 }
 
+static int __maybe_unused snd_acp7x_suspend(struct device *dev)
+{
+	struct acp7x_dev_data *adata;
+	int ret;
+
+	adata = dev_get_drvdata(dev);
+	ret = acp_hw_deinit(adata, dev);
+	if (ret)
+		dev_err(dev, "ACP de-init failed\n");
+	return ret;
+}
+
+static int __maybe_unused snd_acp7x_runtime_resume(struct device *dev)
+{
+	struct acp7x_dev_data *adata;
+	int ret;
+
+	adata = dev_get_drvdata(dev);
+	ret = acp_hw_init(adata, dev);
+	if (ret) {
+		dev_err(dev, "ACP init failed\n");
+		return ret;
+	}
+	return 0;
+}
+
+static int __maybe_unused snd_acp7x_resume(struct device *dev)
+{
+	struct acp7x_dev_data *adata;
+	int ret;
+
+	adata = dev_get_drvdata(dev);
+	ret = acp_hw_init(adata, dev);
+	if (ret)
+		dev_err(dev, "ACP init failed\n");
+
+	return ret;
+}
+
 void acp7x_hw_init_ops(struct acp_hw_ops *hw_ops)
 {
 	hw_ops->acp_init = acp7x_init;
 	hw_ops->acp_deinit = acp7x_deinit;
+	hw_ops->acp_suspend = snd_acp7x_suspend;
+	hw_ops->acp_resume = snd_acp7x_resume;
+	hw_ops->acp_suspend_runtime = snd_acp7x_suspend;
+	hw_ops->acp_resume_runtime = snd_acp7x_runtime_resume;
 }
