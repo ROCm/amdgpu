@@ -215,6 +215,9 @@ static void populate_dml21_output_config_from_stream_state(struct dml2_link_outp
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
 		output->output_encoder = dml2_hdmi;
 		break;
+	case SIGNAL_TYPE_HDMI_FRL:
+		output->output_encoder = dml2_hdmifrl;
+		break;
 	default:
 			output->output_encoder = dml2_dp;
 	}
@@ -249,6 +252,7 @@ static void populate_dml21_output_config_from_stream_state(struct dml2_link_outp
 	case SIGNAL_TYPE_DISPLAY_PORT_MST:
 	case SIGNAL_TYPE_EDP:
 	case SIGNAL_TYPE_VIRTUAL:
+	case SIGNAL_TYPE_HDMI_FRL:
 	default:
 		output->output_dp_link_rate = dml2_dp_rate_na;
 		break;
