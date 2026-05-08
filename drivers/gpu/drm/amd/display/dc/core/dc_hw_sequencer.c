@@ -1059,6 +1059,18 @@ void hwss_build_fast_sequence(struct dc *dc,
 					(*num_steps)++;
 				}
 
+				if (current_mpc_pipe->plane_state->update_flags.bits.lut_3d &&
+						current_mpc_pipe->plane_state->mcm_luts.lut3d_data.lut3d_src ==
+								DC_CM2_TRANSFER_FUNC_SOURCE_VIDMEM &&
+						current_mpc_pipe->plane_state->mcm_shaper_3dlut_setting ==
+								DC_CM2_SHAPER_3DLUT_SETTING_ENABLE_SHAPER_3DLUT &&
+						current_mpc_pipe->plane_res.hubp->funcs->hubp_enable_3dlut_fl) {
+					block_sequence[*num_steps].params.hubp_enable_3dlut_fl_params.hubp =
+						current_mpc_pipe->plane_res.hubp;
+					block_sequence[*num_steps].func = HUBP_ENABLE_3DLUT_FL;
+					(*num_steps)++;
+				}
+
 				if (hws->funcs.set_input_transfer_func && current_mpc_pipe->plane_state->update_flags.bits.gamma_change) {
 					block_sequence[*num_steps].params.set_input_transfer_func_params.dc = dc;
 					block_sequence[*num_steps].params.set_input_transfer_func_params.pipe_ctx = current_mpc_pipe;
@@ -3531,7 +3543,7 @@ void hwss_send_cursor_info_to_dmu(union block_sequence_params *params)
 	struct pipe_ctx *pipe_ctx = params->send_cursor_info_to_dmu_params.pipe_ctx;
 	int pipe_idx = params->send_cursor_info_to_dmu_params.pipe_idx;
 
-	dc_send_update_cursor_info_to_dmu(pipe_ctx, pipe_idx);
+	dc_send_update_cursor_info_to_dmu(pipe_ctx, (uint8_t)pipe_idx);
 }
 
 void hwss_set_cursor_attribute(union block_sequence_params *params)

@@ -1361,18 +1361,15 @@ static bool amdgpu_device_aspm_support_quirk(struct amdgpu_device *adev)
 #if IS_ENABLED(CONFIG_X86)
 	struct cpuinfo_x86 *c = &cpu_data(0);
 
-	if (!(amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(12, 0, 0) ||
-		  amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(12, 0, 1)))
-		return false;
-
-	if (c->x86 == 6 &&
-		adev->pm.pcie_gen_mask & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN5) {
+	if (c->x86_vendor == X86_VENDOR_INTEL) {
 		switch (c->x86_model) {
 		case VFM_MODEL(INTEL_ALDERLAKE):
 		case VFM_MODEL(INTEL_ALDERLAKE_L):
 		case VFM_MODEL(INTEL_RAPTORLAKE):
 		case VFM_MODEL(INTEL_RAPTORLAKE_P):
 		case VFM_MODEL(INTEL_RAPTORLAKE_S):
+		case VFM_MODEL(INTEL_TIGERLAKE):
+		case VFM_MODEL(INTEL_TIGERLAKE_L):
 			return true;
 		default:
 			return false;
@@ -3914,6 +3911,9 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	 * completed before the need for a different level is detected.
 	 */
 	amdgpu_set_init_level(adev, AMDGPU_INIT_LEVEL_DEFAULT);
+
+	amdgpu_device_check_iommu_direct_map(adev);
+
 	/* early init functions */
 	r = amdgpu_device_ip_early_init(adev);
 	if (r)
@@ -4180,8 +4180,6 @@ fence_driver_init:
 
 	if (px)
 		vga_switcheroo_init_domain_pm_ops(adev->dev, &adev->vga_pm_domain);
-
-	amdgpu_device_check_iommu_direct_map(adev);
 
 	adev->pm_nb.notifier_call = amdgpu_device_pm_notifier;
 	r = register_pm_notifier(&adev->pm_nb);

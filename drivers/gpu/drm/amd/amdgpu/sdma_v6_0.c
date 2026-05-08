@@ -1662,32 +1662,8 @@ static int sdma_v6_0_process_fence_irq(struct amdgpu_device *adev,
 	u32 doorbell_offset = entry->src_data[0];
 
 	if (adev->enable_mes && doorbell_offset) {
-#ifdef HAVE_STRUCT_XARRAY
-		struct xarray *xa = &adev->userq_doorbell_xa;
-		struct amdgpu_usermode_queue *queue;
-#else
-		struct amdgpu_userq_fence_driver *fence_drv = NULL;
-		struct idr *idr = &adev->userq_idr;
-		struct spinlock_t *idr_lock = &adev->userq_lock;
-#endif
-		unsigned long flags;
-
 		doorbell_offset >>= SDMA0_QUEUE0_DOORBELL_OFFSET__OFFSET__SHIFT;
-
-#ifdef HAVE_STRUCT_XARRAY
-		xa_lock_irqsave(xa, flags);
-		queue = xa_load(xa, doorbell_offset);
-		if (queue)
-			amdgpu_userq_fence_driver_process(queue->fence_drv);
-		
-		xa_unlock_irqrestore(xa, flags);
-#else
-		spin_lock_irqsave(idr_lock, flags);
-		fence_drv = idr_find(idr, doorbell_offset);
-		if (fence_drv)
-			amdgpu_userq_fence_driver_process(fence_drv);
-		spin_unlock_irqrestore(idr_lock, flags);
-#endif
+		amdgpu_userq_process_fence_irq(adev, doorbell_offset);
 	}
 
 	return 0;
