@@ -198,8 +198,8 @@ exit:
 
 int amdgpu_job_alloc(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		     struct drm_sched_entity *entity, void *owner,
-		     unsigned int num_ibs, struct amdgpu_job **job,
-		     u64 drm_client_id)
+		     unsigned int num_ibs, u64 drm_client_id,
+		     struct amdgpu_job **job)
 {
 	struct amdgpu_fence *af;
 	int r;
@@ -252,12 +252,12 @@ err_job:
 int amdgpu_job_alloc_with_ib(struct amdgpu_device *adev,
 			     struct drm_sched_entity *entity, void *owner,
 			     size_t size, enum amdgpu_ib_pool_type pool_type,
-			     struct amdgpu_job **job, u64 k_job_id)
+			     u64 k_job_id, struct amdgpu_job **job)
 {
 	int r;
 
-	r = amdgpu_job_alloc(adev, NULL, entity, owner, 1, job,
-			     k_job_id);
+	r = amdgpu_job_alloc(adev, NULL, entity, owner, 1, k_job_id,
+			     job);
 	if (r)
 		return r;
 
