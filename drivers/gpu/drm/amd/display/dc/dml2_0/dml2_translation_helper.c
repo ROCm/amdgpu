@@ -808,6 +808,9 @@ static void populate_dml_output_cfg_from_stream_state(struct dml_output_cfg_st *
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
 		out->OutputEncoder[location] = dml_hdmi;
 		break;
+	case SIGNAL_TYPE_HDMI_FRL:
+		out->OutputEncoder[location] = dml_hdmifrl;
+		break;
 	default:
 		out->OutputEncoder[location] = dml_dp;
 	}
@@ -883,6 +886,7 @@ static void populate_dml_output_cfg_from_stream_state(struct dml_output_cfg_st *
 	case SIGNAL_TYPE_DISPLAY_PORT_MST:
 	case SIGNAL_TYPE_EDP:
 	case SIGNAL_TYPE_VIRTUAL:
+	case SIGNAL_TYPE_HDMI_FRL:
 	default:
 		out->OutputLinkDPRate[location] = dml_dp_rate_na;
 		break;
