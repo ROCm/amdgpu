@@ -617,7 +617,9 @@ bool hubbub401_dcc_support_swizzle(
 			swizzle_supported = true;
 		break;
 	case DC_ADDR3_SW_64KB_2D:
+	case DC_ADDR3_SW_64KB_2D_Z:
 	case DC_ADDR3_SW_256KB_2D:
+	case DC_ADDR3_SW_256KB_2D_Z:
 		swizzle_supported = true;
 		break;
 	default:
