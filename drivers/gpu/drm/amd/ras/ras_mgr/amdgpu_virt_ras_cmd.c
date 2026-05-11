@@ -108,15 +108,19 @@ static int amdgpu_virt_ras_remote_ioctl_cmd(struct ras_core_context *ras_core,
 	ret = amdgpu_virt_send_remote_ras_cmd(ras_core->dev,
 				shared_mem.gpa, mem_len);
 	if (!ret) {
-		if (rcmd->cmd_res) {
-			ret = rcmd->cmd_res;
+		uint32_t cmd_res = READ_ONCE(rcmd->cmd_res);
+		uint32_t osz;
+
+		if (cmd_res) {
+			ret = cmd_res;
 			goto out;
 		}
 
-		cmd->cmd_res = rcmd->cmd_res;
-		cmd->output_size = rcmd->output_size;
-		if (rcmd->output_size && (rcmd->output_size <= output_size) && output_data)
-			memcpy(output_data, rcmd->output_buff_raw, rcmd->output_size);
+		osz = READ_ONCE(rcmd->output_size);
+		cmd->cmd_res = cmd_res;
+		cmd->output_size = osz;
+		if (osz && osz <= output_size && output_data)
+			memcpy(output_data, rcmd->output_buff_raw, osz);
 	}
 
 out:
