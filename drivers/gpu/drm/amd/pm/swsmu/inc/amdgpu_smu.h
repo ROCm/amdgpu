@@ -1657,9 +1657,15 @@ struct pptable_funcs {
 	 * &param: Message parameter.
 	 * &read_arg: SMU response (optional).
 	 */
-	int (*ras_send_msg)(struct smu_context *smu,
-			    enum smu_message_type msg, uint32_t param, uint32_t *read_arg);
+	int (*ras_send_msg)(struct smu_context *smu, enum smu_message_type msg,
+				const uint32_t *params, size_t num_params,
+				uint32_t *read_args, size_t num_read_args);
 
+	/**
+	 * @get_ras_smu_drv: Get RAS smu driver interface
+	 * Return: ras_smu_drv *
+	 */
+	int (*get_ras_smu_drv)(struct smu_context *smu, const struct ras_smu_drv **ras_smu_drv);
 	/**
 	 * @set_power_dep: Create or destroy a power dependency link
 	 * from an integrated xHCI controller to the GPU so that the GPU is
@@ -2023,7 +2029,10 @@ int smu_phase_det_enable(struct smu_context *smu, bool enable);
 void amdgpu_smu_phase_det_debugfs_init(struct amdgpu_device *adev);
 
 int amdgpu_smu_ras_send_msg(struct amdgpu_device *adev, enum smu_message_type msg,
-			    uint32_t param, uint32_t *readarg);
+			const uint32_t *params, size_t num_params,
+			uint32_t *read_args, size_t num_read_args);
+int amdgpu_smu_ras_send_msg_legacy(struct amdgpu_device *adev,
+		enum smu_message_type msg, uint32_t param, uint32_t *read_arg);
 int amdgpu_smu_ras_feature_is_enabled(struct amdgpu_device *adev,
 						enum smu_feature_mask mask);
 #endif
