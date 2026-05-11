@@ -424,6 +424,17 @@ void amdgpu_ib_pool_fini(struct amdgpu_device *adev)
 }
 
 /**
+ * amdgpu_ib_pool_gfp_flags - Returns the gfp flags to use for each pool
+ * @adev: amdgpu device pointer
+ * @type: the IB pool type
+ */
+gfp_t amdgpu_ib_pool_gfp_flags(struct amdgpu_device *adev,
+			       enum amdgpu_ib_pool_type type)
+{
+	return adev->ib_pools[type].gfp_flags;
+}
+
+/**
  * amdgpu_ib_ring_tests - test IBs on the rings
  *
  * @adev: amdgpu_device pointer

@@ -199,7 +199,7 @@ exit:
 int amdgpu_job_alloc(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		     struct drm_sched_entity *entity, void *owner,
 		     unsigned int num_ibs, u64 drm_client_id,
-		     struct amdgpu_job **job)
+		     gfp_t gfp_flags, struct amdgpu_job **job)
 {
 	struct amdgpu_fence *af;
 	int r;
@@ -207,18 +207,18 @@ int amdgpu_job_alloc(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	if (num_ibs == 0)
 		return -EINVAL;
 
-	*job = kzalloc_flex(**job, ibs, num_ibs);
+	*job = kzalloc_flex(**job, ibs, num_ibs, gfp_flags);
 	if (!*job)
 		return -ENOMEM;
 
-	af = kzalloc_obj(struct amdgpu_fence);
+	af = kzalloc_obj(struct amdgpu_fence, gfp_flags);
 	if (!af) {
 		r = -ENOMEM;
 		goto err_job;
 	}
 	(*job)->hw_fence = af;
 
-	af = kzalloc_obj(struct amdgpu_fence);
+	af = kzalloc_obj(struct amdgpu_fence, gfp_flags);
 	if (!af) {
 		r = -ENOMEM;
 		goto err_fence;
@@ -257,6 +257,7 @@ int amdgpu_job_alloc_with_ib(struct amdgpu_device *adev,
 	int r;
 
 	r = amdgpu_job_alloc(adev, NULL, entity, owner, 1, k_job_id,
+			     amdgpu_ib_pool_gfp_flags(adev, pool_type),
 			     job);
 	if (r)
 		return r;
