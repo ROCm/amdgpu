@@ -87,25 +87,31 @@ static int ras_cmd_get_group_bad_pages(struct ras_core_context *ras_core,
 	struct eeprom_umc_record record;
 	struct ras_cmd_bad_page_record *ras_cmd_record;
 	uint32_t i = 0, bp_cnt = 0, group_cnt = 0;
+	int ret = RAS_CMD__SUCCESS;
 
 	output_data->bp_in_group = 0;
 	output_data->group_index = 0;
 
+	mutex_lock(&ras_core->ras_umc.umc_lock);
 	bp_cnt = ras_umc_get_badpage_count(ras_core);
 	if (bp_cnt) {
 		output_data->group_index = group_index;
 		group_cnt = bp_cnt / RAS_CMD_MAX_BAD_PAGES_PER_GROUP
 			+ ((bp_cnt % RAS_CMD_MAX_BAD_PAGES_PER_GROUP) ? 1 : 0);
 
-		if (group_index >= group_cnt)
-			return RAS_CMD__ERROR_INVALID_INPUT_DATA;
+		if (group_index >= group_cnt) {
+			ret = RAS_CMD__ERROR_INVALID_INPUT_DATA;
+			goto out;
+		}
 
 		i = group_index * RAS_CMD_MAX_BAD_PAGES_PER_GROUP;
 		for (;
 		   i < bp_cnt && output_data->bp_in_group < RAS_CMD_MAX_BAD_PAGES_PER_GROUP;
 		   i++) {
-			if (ras_umc_get_badpage_record(ras_core, i, &record))
-				return RAS_CMD__ERROR_GENERIC;
+			if (ras_umc_get_badpage_record(ras_core, i, &record)) {
+				ret = RAS_CMD__ERROR_GENERIC;
+				goto out;
+			}
 
 			ras_cmd_record = &output_data->records[i % RAS_CMD_MAX_BAD_PAGES_PER_GROUP];
 
@@ -115,7 +121,10 @@ static int ras_cmd_get_group_bad_pages(struct ras_core_context *ras_core,
 		}
 	}
 	output_data->bp_total_cnt = bp_cnt;
-	return RAS_CMD__SUCCESS;
+
+out:
+	mutex_unlock(&ras_core->ras_umc.umc_lock);
+	return ret;
 }
 
 static int ras_cmd_get_bad_pages(struct ras_core_context *ras_core,
