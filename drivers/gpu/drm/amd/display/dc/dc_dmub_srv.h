@@ -37,17 +37,8 @@ struct dc_crtc_timing;
 struct dc_state;
 struct dc_surface_update;
 
-struct dc_reg_helper_state {
-	bool gather_in_progress;
-	uint32_t same_addr_count;
-	bool should_burst_write;
-	union dmub_rb_cmd cmd_data;
-	unsigned int reg_seq_count;
-};
-
 struct dc_dmub_srv {
 	struct dmub_srv *dmub;
-	struct dc_reg_helper_state reg_helper_offload;
 
 	struct dc_context *ctx;
 	void *dm;

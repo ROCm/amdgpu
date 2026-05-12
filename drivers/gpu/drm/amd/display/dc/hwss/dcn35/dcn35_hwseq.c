@@ -581,9 +581,6 @@ void dcn35_power_down_on_boot(struct dc *dc)
 
 bool dcn35_apply_idle_power_optimizations(struct dc *dc, bool enable)
 {
-	if (dc->debug.dmcub_emulation)
-		return true;
-
 	if (enable) {
 		uint32_t num_active_edp = 0;
 		int i;

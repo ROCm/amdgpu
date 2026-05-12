@@ -819,7 +819,6 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.enable_hpo_pg_support = false,
 	.enable_single_display_2to1_odm_policy = true,
 	.disable_idle_power_optimizations = false,
-	.dmcub_emulation = false,
 	.disable_boot_optimizations = false,
 	.disable_unbounded_requesting = false,
 	.disable_mem_low_power = false,

@@ -518,9 +518,6 @@ void dc_dmub_srv_query_caps_cmd(struct dc_dmub_srv *dc_dmub_srv)
 {
 	union dmub_rb_cmd cmd = { 0 };
 
-	if (dc_dmub_srv->ctx->dc->debug.dmcub_emulation)
-		return;
-
 	memset(&cmd, 0, sizeof(cmd));
 
 	/* Prepare fw command */
@@ -1302,9 +1299,6 @@ bool dc_dmub_srv_is_hw_pwr_up(struct dc_dmub_srv *dc_dmub_srv, bool wait)
 	if (!dc_dmub_srv || !dc_dmub_srv->dmub)
 		return true;
 
-	if (dc_dmub_srv->ctx->dc->debug.dmcub_emulation)
-		return true;
-
 	dc_ctx = dc_dmub_srv->ctx;
 
 	if (wait) {
@@ -1344,9 +1338,6 @@ static void dc_dmub_srv_notify_idle(const struct dc *dc, bool allow_idle)
 	volatile const struct dmub_shared_state_ips_fw *ips_fw;
 	struct dc_dmub_srv *dc_dmub_srv;
 	union dmub_rb_cmd cmd = {0};
-
-	if (dc->debug.dmcub_emulation)
-		return;
 
 	if (!dc->ctx->dmub_srv || !dc->ctx->dmub_srv->dmub)
 		return;
@@ -1465,9 +1456,6 @@ static void dc_dmub_srv_exit_low_power_state(const struct dc *dc)
 {
 	struct dc_dmub_srv *dc_dmub_srv;
 	uint32_t rcg_exit_count = 0, ips1_exit_count = 0, ips2_exit_count = 0, ips1z8_exit_count = 0;
-
-	if (dc->debug.dmcub_emulation)
-		return;
 
 	if (!dc->ctx->dmub_srv || !dc->ctx->dmub_srv->dmub)
 		return;

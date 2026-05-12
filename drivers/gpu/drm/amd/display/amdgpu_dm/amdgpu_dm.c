@@ -14483,13 +14483,6 @@ uint32_t dm_read_reg_func(const struct dc_context *ctx, uint32_t address,
 	}
 #endif
 
-	if (ctx->dmub_srv &&
-	    ctx->dmub_srv->reg_helper_offload.gather_in_progress &&
-	    !ctx->dmub_srv->reg_helper_offload.should_burst_write) {
-		ASSERT(false);
-		return 0;
-	}
-
 	amdgpu_dm_exit_ips_for_hw_access(ctx->dc);
 
 	value = cgs_read_register(ctx->cgs_device, address);
