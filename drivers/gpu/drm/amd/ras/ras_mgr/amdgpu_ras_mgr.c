@@ -498,8 +498,10 @@ uint64_t amdgpu_ras_mgr_gen_ras_event_seqno(struct amdgpu_device *adev,
 	if ((seqno_type == RAS_SEQNO_TYPE_DE) ||
 	    (seqno_type == RAS_SEQNO_TYPE_POISON_CONSUMPTION)) {
 		ret = ras_core_put_seqno(ras_mgr->ras_core, seqno_type, seq_no);
-		if (ret)
+		if (ret) {
 			RAS_DEV_WARN(adev, "There are too many ras interrupts!");
+			return 0;
+		}
 	}
 
 	return seq_no;
