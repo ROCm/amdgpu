@@ -309,13 +309,17 @@ static int amdgpu_ras_mgr_sw_init(struct amdgpu_ip_block *ip_block)
 	if (!ras_mgr->ras_core) {
 		RAS_DEV_ERR(adev, "Failed to create ras core!\n");
 		ret = -EINVAL;
-		goto err;
+		goto err1;
 	}
 
 	ras_mgr->ras_core->dev = adev;
 
 	amdgpu_ras_process_init(adev);
-	ras_core_sw_init(ras_mgr->ras_core);
+	ret = ras_core_sw_init(ras_mgr->ras_core);
+	if (ret) {
+		RAS_DEV_ERR(adev, "ras_core_sw_init failed! ret:%d\n", ret);
+		goto err2;
+	}
 	amdgpu_ras_mgr_init_event_mgr(ras_mgr->ras_core);
 
 	if (amdgpu_sriov_vf(adev)) {
@@ -323,14 +327,22 @@ static int amdgpu_ras_mgr_sw_init(struct amdgpu_ip_block *ip_block)
 		if (ret) {
 			RAS_DEV_ERR(adev,
 				"Virt ras sw_init failed! ret:%d\n", ret);
-			goto err;
+			goto err3;
 		}
 	}
 
 	return 0;
 
-err:
+err3:
+	if (ras_mgr->ras_core)
+		ras_core_sw_fini(ras_mgr->ras_core);
+err2:
+	amdgpu_ras_process_fini(adev);
+	if (ras_mgr->ras_core)
+		ras_core_destroy(ras_mgr->ras_core);
+err1:
 	kfree(ras_mgr);
+	con->ras_mgr = NULL;
 	return ret;
 }
 
