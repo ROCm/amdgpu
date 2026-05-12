@@ -477,6 +477,17 @@ struct clk_mgr_internal {
 	void *wm_range_table;
 	long long wm_range_table_addr;
 
+	/**
+	 * @dal_init_table:
+	 *
+	 * GPU-accessible DRAM buffer for the DAL init table transferred
+	 * from PMFW via DALSMC_MSG_TransferTableSmu2Dram(TABLE_DAL_INIT).
+	 * Contains all static PMFW data needed at init: DPM clock tables,
+	 * UTM QoS parameters, and memory configuration.
+	 */
+	const void *dal_init_table;
+	long long dal_init_table_addr;
+
 	bool dpm_present;
 	bool pme_trigger_pending;
 };
