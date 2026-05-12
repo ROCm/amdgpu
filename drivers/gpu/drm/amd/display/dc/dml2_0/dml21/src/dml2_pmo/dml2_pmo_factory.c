@@ -67,7 +67,7 @@ bool dml2_pmo_create(enum dml2_project_id project_id, struct dml2_pmo_instance *
 		out->test_for_vmin = pmo_dcn4_fams2_test_for_vmin;
 		out->optimize_for_vmin = pmo_dcn4_fams2_optimize_for_vmin;
 
-		out->init_for_uclk_pstate = pmo_dcn4_fams2_init_for_pstate_support;
+		out->init_for_uclk_pstate = pmo_dcn42_init_for_pstate_support;
 		out->test_for_uclk_pstate = pmo_dcn42_test_for_pstate_support;
 		out->optimize_for_uclk_pstate = pmo_dcn42_fams2_optimize_for_pstate_support;
 
