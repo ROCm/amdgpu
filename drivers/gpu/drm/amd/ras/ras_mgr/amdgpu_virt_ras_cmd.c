@@ -92,6 +92,7 @@ static int amdgpu_virt_ras_remote_ioctl_cmd(struct ras_core_context *ras_core,
 	struct amdgpu_virt_ras_cmd *virt_ras = ras_mgr->virt_ras_cmd;
 	uint32_t mem_len = ALIGN(sizeof(*cmd) + output_size, AMDGPU_GPU_PAGE_SIZE);
 	struct ras_cmd_ctx *rcmd;
+	struct ras_cmd_ctx hdr_snap;
 	struct amdgpu_virt_shared_mem shared_mem = {0};
 	int ret = 0;
 
@@ -108,19 +109,31 @@ static int amdgpu_virt_ras_remote_ioctl_cmd(struct ras_core_context *ras_core,
 	ret = amdgpu_virt_send_remote_ras_cmd(ras_core->dev,
 				shared_mem.gpa, mem_len);
 	if (!ret) {
-		uint32_t cmd_res = READ_ONCE(rcmd->cmd_res);
-		uint32_t osz;
+		/*
+		 * rcmd lives in shared memory the PF can mutate at any time.
+		 * Snapshot the entire fixed-size response header into a local
+		 * struct in one shot so every subsequent decision (cmd_res,
+		 * output_size, version, etc.) operates on a stable copy. This
+		 * defeats double-fetch / TOCTOU attacks where a malicious or
+		 * buggy PF could flip cmd_res from SUCCESS to an error after
+		 * our success branch, or enlarge output_size between the
+		 * bounds check and the memcpy below to corrupt the caller's
+		 * local output buffer.
+		 */
+		memcpy(&hdr_snap, rcmd, sizeof(hdr_snap));
+		barrier();
 
-		if (cmd_res) {
-			ret = cmd_res;
+		if (hdr_snap.cmd_res) {
+			ret = hdr_snap.cmd_res;
 			goto out;
 		}
 
-		osz = READ_ONCE(rcmd->output_size);
-		cmd->cmd_res = cmd_res;
-		cmd->output_size = osz;
-		if (osz && osz <= output_size && output_data)
-			memcpy(output_data, rcmd->output_buff_raw, osz);
+		cmd->cmd_res = hdr_snap.cmd_res;
+		cmd->output_size = hdr_snap.output_size;
+
+		if (hdr_snap.output_size && output_data &&
+		    hdr_snap.output_size <= output_size)
+			memcpy(output_data, rcmd->output_buff_raw, hdr_snap.output_size);
 	}
 
 out:
