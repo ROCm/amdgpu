@@ -28,20 +28,6 @@
 #define RAS_CMD_MINOR_VERSION 0
 #define RAS_CMD_VERSION  (((RAS_CMD_MAJOR_VERSION) << 10) | (RAS_CMD_MINOR_VERSION))
 
-static int ras_cmd_add_device(struct ras_core_context *ras_core)
-{
-	INIT_LIST_HEAD(&ras_core->ras_cmd.head);
-	ras_core->ras_cmd.ras_core = ras_core;
-	ras_core->ras_cmd.dev_handle = (uintptr_t)ras_core ^ RAS_CMD_DEV_HANDLE_MAGIC;
-	return 0;
-}
-
-static int ras_cmd_remove_device(struct ras_core_context *ras_core)
-{
-	memset(&ras_core->ras_cmd, 0, sizeof(ras_core->ras_cmd));
-	return 0;
-}
-
 static int ras_get_block_ecc_info(struct ras_core_context *ras_core,
 				struct ras_cmd_ctx *cmd, void *data)
 {
@@ -476,12 +462,11 @@ int rascore_handle_cmd(struct ras_core_context *ras_core,
 
 int ras_cmd_init(struct ras_core_context *ras_core)
 {
-	return ras_cmd_add_device(ras_core);
+	return 0;
 }
 
 int ras_cmd_fini(struct ras_core_context *ras_core)
 {
-	ras_cmd_remove_device(ras_core);
 	return 0;
 }
 
@@ -529,9 +514,4 @@ int ras_cmd_translate_bank_to_soc_pa(struct ras_core_context *ras_core,
 	umc_bank.subchannel = bank_addr.subchannel;
 
 	return ras_umc_translate_soc_pa_and_bank(ras_core, soc_pa, &umc_bank, true);
-}
-
-uint64_t ras_cmd_get_dev_handle(struct ras_core_context *ras_core)
-{
-	return ras_core->ras_cmd.dev_handle;
 }

@@ -29,8 +29,6 @@
 #include "ras_log_ring.h"
 #include "ras_cper.h"
 
-#define RAS_CMD_DEV_HANDLE_MAGIC 0xFEEDAD00UL
-
 #define RAS_CMD_MAX_IN_SIZE 256
 #define RAS_CMD_MAX_GPU_NUM 32
 #define RAS_CMD_MAX_BAD_PAGES_PER_GROUP 32
@@ -106,12 +104,6 @@ enum ras_error_type {
 
 struct ras_core_context;
 struct ras_cmd_ctx;
-
-struct ras_cmd_mgr {
-	struct list_head head;
-	struct ras_core_context *ras_core;
-	uint64_t dev_handle;
-};
 
 struct ras_cmd_func_map {
 	uint32_t cmd_id;
@@ -481,7 +473,6 @@ struct ras_cmd_blocks_ecc_rsp {
 int ras_cmd_init(struct ras_core_context *ras_core);
 int ras_cmd_fini(struct ras_core_context *ras_core);
 int rascore_handle_cmd(struct ras_core_context *ras_core, struct ras_cmd_ctx *cmd, void *data);
-uint64_t ras_cmd_get_dev_handle(struct ras_core_context *ras_core);
 int ras_cmd_query_interface_info(struct ras_core_context *ras_core,
 	struct ras_query_interface_info_rsp *rsp);
 int ras_cmd_translate_soc_pa_to_bank(struct ras_core_context *ras_core,
