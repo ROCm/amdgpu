@@ -4733,7 +4733,7 @@ static const struct bin_attribute psp_vbflash_bin_attr = {
 static struct bin_attribute psp_vbflash_bin_attr = {
 #endif
 	.attr = {.name = "psp_vbflash", .mode = 0660},
-	.size = 0,
+	.size = AMD_VBIOS_FILE_MAX_SIZE_B,
 	.write = amdgpu_psp_vbflash_write,
 	.read = amdgpu_psp_vbflash_read,
 };
