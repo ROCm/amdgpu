@@ -610,19 +610,25 @@
 /* drm_edid_connector_update is available */
 #define HAVE_DRM_EDID_CONNECTOR_UPDATE 1
 
+/* drm_edid_dup() is available and exported */
+#define HAVE_DRM_EDID_DUP 1
+
 /* drm_edid_is_digital is available */
 #define HAVE_DRM_EDID_IS_DIGITAL 1
 
-/* drm_edid_alloc() is available */
+/* drm_edid_alloc() is available and exported */
 #define HAVE_DRM_EDID_MALLOC 1
 
 /* drm_edid_override_connector_update() is available */
 #define HAVE_DRM_EDID_OVERRIDE_CONNECTOR_UPDATE 1
 
-/* drm_edid_raw() is available */
+/* drm_edid_raw() is available and exported */
 #define HAVE_DRM_EDID_RAW 1
 
-/* drm_edid_valid() is available */
+/* drm_edid_read_ddc() is available and exported */
+#define HAVE_DRM_EDID_READ_DDC 1
+
+/* drm_edid_valid() is available and exported */
 #define HAVE_DRM_EDID_VALID 1
 
 /* fb_create has const struct drm_format_info * parameter */
