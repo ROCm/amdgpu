@@ -12,6 +12,7 @@
 #include <kcl/kcl_list.h>
 #include <kcl/kcl_fence.h>
 #include <kcl/kcl_slab.h>
+#include <kcl/kcl_overflow.h>
 #include <kcl/backport/kcl_mm_backport.h>
 #include <kcl/backport/kcl_drm_vma_manager_backport.h>
 #include <kcl/backport/kcl_drm_print.h>
