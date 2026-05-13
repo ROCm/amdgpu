@@ -589,6 +589,7 @@ struct dc_config {
 	int smart_mux_version;
 	bool ignore_dpref_ss;
 	bool enable_mipi_converter_optimization;
+	bool enable_frl;
 	bool force_hdmi21_frl_enc_enable;
 	bool skip_frl_pretraining;
 	bool use_default_clock_table;

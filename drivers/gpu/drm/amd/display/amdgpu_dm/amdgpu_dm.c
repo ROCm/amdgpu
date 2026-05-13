@@ -2090,6 +2090,9 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	if (amdgpu_dc_feature_mask & DC_DISABLE_LTTPR_DP2_0)
 		init_data.flags.allow_lttpr_non_transparent_mode.bits.DP2_0 = true;
 
+	if (amdgpu_dc_feature_mask & DC_FRL_MASK)
+		init_data.flags.enable_frl = true;
+
 	init_data.flags.seamless_boot_edp_requested = false;
 
 	if (amdgpu_device_seamless_boot_supported(adev)) {
