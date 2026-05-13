@@ -3,5 +3,6 @@
 #define _KCL_BACKPORT_DRM_SUBALLOC_H
 
 #include <linux/module.h>
+#include <kcl/kcl_slab.h>
 
 #endif

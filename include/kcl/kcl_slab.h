@@ -43,4 +43,57 @@ size_t kmalloc_size_roundup(size_t size);
 DEFINE_FREE(kfree, void *, if (_T) kfree(_T))
 #endif
 
+#ifndef HAVE_KMALLOC_OBJ
+/*
+ * Backport typed allocation macros for old kernels.
+ * These macros infer the type and size from the variable/type passed in.
+ */
+
+/* default_gfp: if no GFP flags provided, default to GFP_KERNEL */
+#ifndef default_gfp
+#define __kcl_default_gfp(a, b, ...) b
+#define default_gfp(...) __kcl_default_gfp(,##__VA_ARGS__, GFP_KERNEL)
+#endif
+
+#define kmalloc_obj(VAR_OR_TYPE, ...) \
+	((typeof(VAR_OR_TYPE) *)kmalloc(sizeof(typeof(VAR_OR_TYPE)), \
+					default_gfp(__VA_ARGS__)))
+
+#define kmalloc_objs(VAR_OR_TYPE, COUNT, ...) \
+	((typeof(VAR_OR_TYPE) *)kmalloc(sizeof(typeof(VAR_OR_TYPE)) * (COUNT), \
+					default_gfp(__VA_ARGS__)))
+
+#define kzalloc_obj(P, ...) \
+	((typeof(P) *)kzalloc(sizeof(typeof(P)), default_gfp(__VA_ARGS__)))
+
+#define kzalloc_objs(P, COUNT, ...) \
+	((typeof(P) *)kzalloc(sizeof(typeof(P)) * (COUNT), \
+			      default_gfp(__VA_ARGS__)))
+
+#define kzalloc_flex(P, FAM, COUNT, ...) \
+	((typeof(P) *)kzalloc(offsetof(typeof(P), FAM) + \
+			      sizeof(((typeof(P) *)0)->FAM[0]) * (COUNT), \
+			      default_gfp(__VA_ARGS__)))
+
+#define kvmalloc_obj(P, ...) \
+	((typeof(P) *)kvmalloc(sizeof(typeof(P)), default_gfp(__VA_ARGS__)))
+
+#define kvmalloc_objs(P, COUNT, ...) \
+	((typeof(P) *)kvmalloc(sizeof(typeof(P)) * (COUNT), \
+			       default_gfp(__VA_ARGS__)))
+
+#define kvzalloc_obj(P, ...) \
+	((typeof(P) *)kvzalloc(sizeof(typeof(P)), default_gfp(__VA_ARGS__)))
+
+#define kvzalloc_objs(P, COUNT, ...) \
+	((typeof(P) *)kvzalloc(sizeof(typeof(P)) * (COUNT), \
+			       default_gfp(__VA_ARGS__)))
+
+#define kvzalloc_flex(P, FAM, COUNT, ...) \
+	((typeof(P) *)kvzalloc(offsetof(typeof(P), FAM) + \
+			       sizeof(((typeof(P) *)0)->FAM[0]) * (COUNT), \
+			       default_gfp(__VA_ARGS__)))
+
+#endif /* HAVE_KMALLOC_OBJ */
+
 #endif
