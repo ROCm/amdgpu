@@ -14,6 +14,15 @@
 #include <kcl/kcl_mmap_lock.h>
 #include <kcl/kcl_memory.h>
 
+/*
+ * On old kernels, shmem_file_setup() takes unsigned long flags,
+ * and 0 was used. On new kernels, it takes vma_flags_t.
+ * Provide EMPTY_VMA_FLAGS as 0 for old kernels.
+ */
+#ifndef HAVE_EMPTY_VMA_FLAGS
+#define EMPTY_VMA_FLAGS 0
+#endif
+
 #ifndef untagged_addr
 /* Copied from include/linux/mm.h */
 #define untagged_addr(addr) (addr)
