@@ -2323,11 +2323,13 @@ static const struct file_operations amdgpu_mqd_info_fops = {
 
 void amdgpu_debugfs_userq_init(struct drm_file *file, struct amdgpu_usermode_queue *queue, int qid)
 {
+#ifdef STRUCT_DRM_FILE_DEBUGFS_CLIENT
 	char queue_name[32];
 
 	scnprintf(queue_name, sizeof(queue_name), "queue_%d", qid);
 	queue->debugfs_queue = debugfs_create_dir(queue_name, file->debugfs_client);
 	debugfs_create_file("mqd_info", 0444, queue->debugfs_queue, queue, &amdgpu_mqd_info_fops);
+#endif
 }
 
 void amdgpu_debugfs_vm_init(struct drm_file *file)
