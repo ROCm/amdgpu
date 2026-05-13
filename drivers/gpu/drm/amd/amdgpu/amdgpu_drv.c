@@ -3158,6 +3158,9 @@ static int __init amdgpu_init(void)
 {
 	int r;
 
+	/* Train lockdep on correct lock ordering */
+	amdgpu_lockdep_init();
+
 	r = amdgpu_sync_init();
 	if (r)
 		return r;
