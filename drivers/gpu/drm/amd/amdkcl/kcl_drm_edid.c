@@ -124,28 +124,46 @@ const struct edid *_kcl_drm_edid_raw(const struct drm_edid *drm_edid)
 EXPORT_SYMBOL(_kcl_drm_edid_raw);
 #endif
 
-#ifndef HAVE_DRM_EDID_CONNECTOR_UPDATE
-int kcl_drm_edid_connector_update(struct drm_connector *connector,
-      const struct drm_edid *drm_edid)
+#ifndef HAVE_DRM_EDID_READ_DDC
+const struct drm_edid *_kcl_drm_edid_read_ddc(struct drm_connector *connector,
+					       struct i2c_adapter *adapter)
 {
-	const struct edid *edid = _kcl_drm_edid_raw(drm_edid);
-	return drm_connector_update_edid_property(connector, edid);
+	struct edid *edid;
+	const struct drm_edid *drm_edid;
+
+	edid = drm_get_edid(connector, adapter);
+	if (!edid)
+		return NULL;
+
+	drm_edid = drm_edid_alloc(edid, (edid->extensions + 1) * EDID_LENGTH);
+	kfree(edid);
+	return drm_edid;
 }
-EXPORT_SYMBOL(kcl_drm_edid_connector_update);
+EXPORT_SYMBOL(_kcl_drm_edid_read_ddc);
+#endif
+
+#ifndef HAVE_DRM_EDID_CONNECTOR_UPDATE
+int _kcl_drm_edid_connector_update(struct drm_connector *connector,
+				    const struct drm_edid *drm_edid)
+{
+	return drm_connector_update_edid_property(connector,
+		drm_edid ? (struct edid *)drm_edid_raw(drm_edid) : NULL);
+}
+EXPORT_SYMBOL(_kcl_drm_edid_connector_update);
 #endif
 
 #ifndef HAVE_DRM_EDID_CONNECTOR_ADD_MODES
-int kcl_drm_edid_connector_add_modes(struct drm_connector *connector)
+int _kcl_drm_edid_connector_add_modes(struct drm_connector *connector)
 {
 	struct edid *edid = NULL;
 
 	if (connector->edid_blob_ptr)
 		edid = (struct edid *)connector->edid_blob_ptr->data;
 
-	if (edid)
-		return drm_add_edid_modes(connector, edid);
+	if (!edid)
+		return 0;
 
-	return 0;
+	return drm_add_edid_modes(connector, edid);
 }
-EXPORT_SYMBOL(kcl_drm_edid_connector_add_modes);
+EXPORT_SYMBOL(_kcl_drm_edid_connector_add_modes);
 #endif

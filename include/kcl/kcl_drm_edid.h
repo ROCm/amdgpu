@@ -36,13 +36,8 @@ struct drm_edid {
 
 #ifndef HAVE_DRM_EDID_MALLOC
 const struct drm_edid *_kcl_drm_edid_alloc(const void *edid, size_t size);
-const struct drm_edid *kcl_drm_edid_dup(const struct drm_edid *drm_edid);
-const struct drm_edid *kcl_drm_edid_read_ddc(struct drm_connector *connector,
- struct i2c_adapter *adapter);
 void _kcl_drm_edid_free(const struct drm_edid *drm_edid);
 #define  drm_edid_alloc _kcl_drm_edid_alloc
-#define  drm_edid_dup kcl_drm_edid_dup
-#define  drm_edid_read_ddc kcl_drm_edid_read_ddc
 #define  drm_edid_free _kcl_drm_edid_free
 #endif
 
@@ -62,26 +57,58 @@ static inline bool _kcl_drm_edid_valid(const struct drm_edid *drm_edid)
 #define  drm_edid_valid _kcl_drm_edid_valid
 #endif
 
-#ifndef HAVE_DRM_EDID_IS_DIGITAL
-static inline bool kcl_drm_edid_is_digital(const struct drm_edid *drm_edid)
+/*	commit v6.3-rc2-329-gf1e4c916f97f
+	drm/edid: add drm_edid_dup()	*/
+#ifndef HAVE_DRM_EDID_DUP
+static inline const struct drm_edid *_kcl_drm_edid_dup(const struct drm_edid *drm_edid)
 {
-	if (!drm_edid || !drm_edid->edid)
-		return false;
-
-	return drm_edid->edid->input & DRM_EDID_INPUT_DIGITAL;
+	if (!drm_edid)
+		return NULL;
+	return drm_edid_alloc(drm_edid_raw(drm_edid), drm_edid->size);
 }
-#define drm_edid_is_digital kcl_drm_edid_is_digital
+#define drm_edid_dup _kcl_drm_edid_dup
 #endif
 
-#ifndef HAVE_DRM_EDID_CONNECTOR_ADD_MODES
-int kcl_drm_edid_connector_add_modes(struct drm_connector *connector);
-#define drm_edid_connector_add_modes kcl_drm_edid_connector_add_modes
+/*	commit v6.3-rc2-336-gce6526ab2364
+	drm/edid: add drm_edid_read_ddc()	*/
+#ifndef HAVE_DRM_EDID_READ_DDC
+struct drm_connector;
+struct i2c_adapter;
+const struct drm_edid *_kcl_drm_edid_read_ddc(struct drm_connector *connector,
+					       struct i2c_adapter *adapter);
+#define drm_edid_read_ddc _kcl_drm_edid_read_ddc
 #endif
 
+/*	commit v5.20-rc1-474-g5ceb7058b5fe
+	drm/edid: add drm_edid_connector_update()	*/
 #ifndef HAVE_DRM_EDID_CONNECTOR_UPDATE
-int kcl_drm_edid_connector_update(struct drm_connector *connector,
-      const struct drm_edid *drm_edid);
-#define drm_edid_connector_update kcl_drm_edid_connector_update
+struct drm_connector;
+int _kcl_drm_edid_connector_update(struct drm_connector *connector,
+				    const struct drm_edid *drm_edid);
+#define drm_edid_connector_update _kcl_drm_edid_connector_update
+#endif
+
+/*	commit v5.20-rc1-479-gedd1f90a8403
+	drm/edid: add drm_edid_connector_add_modes()	*/
+#ifndef HAVE_DRM_EDID_CONNECTOR_ADD_MODES
+struct drm_connector;
+int _kcl_drm_edid_connector_add_modes(struct drm_connector *connector);
+#define drm_edid_connector_add_modes _kcl_drm_edid_connector_add_modes
+#endif
+
+/*	commit v6.3-rc2-327-g02364dd57e33
+	drm/edid: add drm_edid_is_digital()	*/
+#ifndef HAVE_DRM_EDID_IS_DIGITAL
+static inline bool _kcl_drm_edid_is_digital(const struct drm_edid *drm_edid)
+{
+	const struct edid *edid;
+
+	if (!drm_edid)
+		return false;
+	edid = drm_edid_raw(drm_edid);
+	return edid && (edid->input & DRM_EDID_INPUT_DIGITAL);
+}
+#define drm_edid_is_digital _kcl_drm_edid_is_digital
 #endif
 
 #endif

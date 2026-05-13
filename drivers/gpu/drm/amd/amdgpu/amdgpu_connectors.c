@@ -112,7 +112,7 @@ int amdgpu_connector_get_monitor_bpc(struct drm_connector *connector)
 #if defined(HAVE_DRM_DISPLAY_INFO_IS_HDMI)
 			if (connector->display_info.is_hdmi) {
 #else
-			if (drm_detect_hdmi_monitor(drm_edid_raw(amdgpu_connector->edid))) {
+			if (drm_detect_hdmi_monitor((struct edid *)drm_edid_raw(amdgpu_connector->edid))) {
 #endif
 				if (connector->display_info.bpc)
 					bpc = connector->display_info.bpc;
@@ -124,7 +124,7 @@ int amdgpu_connector_get_monitor_bpc(struct drm_connector *connector)
 #if defined(HAVE_DRM_DISPLAY_INFO_IS_HDMI)
 		if (connector->display_info.is_hdmi) {
 #else
-		if (drm_detect_hdmi_monitor(drm_edid_raw(amdgpu_connector->edid))) {
+		if (drm_detect_hdmi_monitor((struct edid *)drm_edid_raw(amdgpu_connector->edid))) {
 #endif
 			if (connector->display_info.bpc)
 				bpc = connector->display_info.bpc;
@@ -137,7 +137,7 @@ int amdgpu_connector_get_monitor_bpc(struct drm_connector *connector)
 #if defined(HAVE_DRM_DISPLAY_INFO_IS_HDMI)
 		    connector->display_info.is_hdmi) {
 #else
-		    drm_detect_hdmi_monitor(drm_edid_raw(amdgpu_connector->edid))) {
+		    drm_detect_hdmi_monitor((struct edid *)drm_edid_raw(amdgpu_connector->edid))) {
 #endif
 			if (connector->display_info.bpc)
 				bpc = connector->display_info.bpc;
@@ -165,7 +165,7 @@ int amdgpu_connector_get_monitor_bpc(struct drm_connector *connector)
 #if defined(HAVE_DRM_DISPLAY_INFO_IS_HDMI)
 	if (connector->display_info.is_hdmi) {
 #else
-	if (drm_detect_hdmi_monitor(drm_edid_raw(amdgpu_connector->edid))) {
+	if (drm_detect_hdmi_monitor((struct edid *)drm_edid_raw(amdgpu_connector->edid))) {
 #endif
 		/*
 		 * Pre DCE-8 hw can't handle > 12 bpc, and more than 12 bpc doesn't make
