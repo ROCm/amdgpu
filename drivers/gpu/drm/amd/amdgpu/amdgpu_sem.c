@@ -330,16 +330,16 @@ err_put_sem:
 
 void amdgpu_sem_destroy(struct amdgpu_fpriv *fpriv, u32 handle)
 {
-	struct amdgpu_sem *sem = amdgpu_sem_lookup(fpriv, handle);
+	struct amdgpu_sem *sem;
+
+	spin_lock(&fpriv->sem_handles_lock);
+	sem = idr_remove(&fpriv->sem_handles, handle);
+	spin_unlock(&fpriv->sem_handles_lock);
+
 	if (!sem)
 		return;
 
-	spin_lock(&fpriv->sem_handles_lock);
-	idr_remove(&fpriv->sem_handles, handle);
-	spin_unlock(&fpriv->sem_handles_lock);
-
-	kref_put(&sem->kref, amdgpu_sem_free);
-	kref_put(&sem->kref, amdgpu_sem_free);
+	amdgpu_sem_put(sem);
 }
 
 static struct dma_fence *amdgpu_sem_get_fence(struct amdgpu_fpriv *fpriv,
