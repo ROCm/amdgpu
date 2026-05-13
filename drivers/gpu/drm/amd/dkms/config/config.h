@@ -1078,6 +1078,9 @@
 /* kvrealloc() isn't available */
 /* #undef HAVE_NO_KVREALLOC */
 
+/* NR_GPU_ACTIVE is available */
+#define HAVE_NR_GPU_ACTIVE 1
+
 /* class_create has one argument */
 #define HAVE_ONE_ARGUMENT_OF_CLASS_CREATE 1
 
