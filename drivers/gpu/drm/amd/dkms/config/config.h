@@ -865,6 +865,9 @@
 /* kfifo_out_linear() available */
 #define HAVE_KFIFO_OUT_LINEAR 1
 
+/* kmalloc_obj() and related typed allocation macros are available */
+#define HAVE_KMALLOC_OBJ 1
+
 /* kmalloc_size_roundup is available */
 #define HAVE_KMALLOC_SIZE_ROUNDUP 1
 
