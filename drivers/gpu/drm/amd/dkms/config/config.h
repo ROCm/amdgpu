@@ -778,6 +778,9 @@
 /* drm_writeback_connector_init() has 7 args */
 #define HAVE_DRM_WRITEBACK_CONNECTOR_INIT_7_ARGS 1
 
+/* EMPTY_VMA_FLAGS is available */
+#define HAVE_EMPTY_VMA_FLAGS 1
+
 /* fault_flag_allow_retry_first() is available */
 #define HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST 1
 
