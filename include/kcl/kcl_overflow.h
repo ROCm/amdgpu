@@ -3,6 +3,17 @@
 
 #include <linux/overflow.h>
 
+/*
+ * Old kernels' check_sub_overflow uses (void)(&__a == &__b) for type
+ * checking, which causes "comparison of distinct pointer types" warnings
+ * when mixing u32 and int (e.g., from atomic_read). The new version uses
+ * __builtin_sub_overflow which handles type promotion correctly.
+ */
+#ifndef HAVE_CHECK_SUB_OVERFLOW_BUILTIN
+#undef check_sub_overflow
+#define check_sub_overflow(a, b, d) __builtin_sub_overflow(a, b, d)
+#endif
+
 #ifndef HAVE_SIZE_MUL
 #define size_mul array_size
 #endif

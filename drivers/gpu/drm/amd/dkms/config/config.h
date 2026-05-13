@@ -91,6 +91,9 @@
 /* cec_notifier_conn_register() is available */
 #define HAVE_CEC_NOTIFIER_CONN_REGISTER 1
 
+/* check_sub_overflow uses __builtin_sub_overflow */
+#define HAVE_CHECK_SUB_OVERFLOW_BUILTIN 1
+
 /* whether CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL is defined */
 #define HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL 1
 
