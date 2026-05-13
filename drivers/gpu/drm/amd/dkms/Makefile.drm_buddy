@@ -3,5 +3,7 @@ export CONFIG_DRM_BUDDY=m
 subdir-ccflags-y += -DCONFIG_DRM_BUDDY
 CFLAGS_drm_buddy.o += -include $(src)/amd/dkms/backport_drm_buddy.h \
 			-DHAVE_CONFIG_H
-amddrm_buddy-y := drm_buddy.o
+CFLAGS_buddy.o += -include $(src)/amd/dkms/backport_drm_buddy.h \
+			-DHAVE_CONFIG_H
+amddrm_buddy-y := buddy.o drm_buddy.o
 obj-$(CONFIG_DRM_BUDDY) += amddrm_buddy.o
