@@ -82,7 +82,7 @@ static int kfd_spm_monitor_thread(void *param)
 
 	allow_signal(SIGKILL);
 	while (!kthread_should_stop() &&
-			!signal_pending(node->spm_monitor_thread) && pdd->spm_cntr) {
+			!signal_pending(current) && pdd->spm_cntr) {
 		bool need_schedule = false;
 		u32 inst;
 
