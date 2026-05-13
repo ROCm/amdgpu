@@ -97,4 +97,24 @@ static inline void kcl_dma_fence_end_signalling(bool cookie)
 #define dma_fence_end_signalling kcl_dma_fence_end_signalling
 #endif
 
+#ifndef HAVE_DMA_FENCE_SPINLOCK
+/**
+ * dma_fence_spinlock - return pointer to the spinlock protecting the fence
+ * @fence: the fence to get the lock from
+ *
+ * On older kernels struct dma_fence only has spinlock_t *lock,
+ * so just return that directly.
+ */
+static inline spinlock_t *dma_fence_spinlock(struct dma_fence *fence)
+{
+	return fence->lock;
+}
+
+#define dma_fence_lock_irqsave(fence, flags)	\
+	spin_lock_irqsave(dma_fence_spinlock(fence), flags)
+
+#define dma_fence_unlock_irqrestore(fence, flags)	\
+	spin_unlock_irqrestore(dma_fence_spinlock(fence), flags)
+#endif /* HAVE_DMA_FENCE_SPINLOCK */
+
 #endif

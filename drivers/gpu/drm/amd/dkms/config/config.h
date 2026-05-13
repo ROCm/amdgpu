@@ -181,6 +181,9 @@
 /* test whether dma_fence_begin_signalling are available */
 #define HAVE_DMA_FENCE_SIGNALLING 1
 
+/* dma_fence_spinlock() is available */
+#define HAVE_DMA_FENCE_SPINLOCK 1
+
 /* dma_fence_TIMESTAMP() is available */
 #define HAVE_DMA_FENCE_TIMESTAMP 1
 
