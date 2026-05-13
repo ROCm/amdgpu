@@ -405,6 +405,9 @@ struct batch_ras_trace_info {
 
 #define RAS_CMD_MAX_BATCH_NUM  300
 #define RAS_CMD_MAX_TRACE_NUM  300
+
+/* Upper bounds for RAS_CMD__GET_CPER_RECORD to limit kernel allocations and work. */
+#define RAS_CMD_MAX_CPER_BUF_SZ	(2 * 1024U * 1024U) /* 2 MiB */
 struct ras_cmd_batch_trace_record_rsp {
 	uint32_t version;
 	uint16_t real_batch_num;
