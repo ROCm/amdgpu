@@ -177,7 +177,9 @@ static struct page *ttm_pool_alloc_page(struct ttm_pool *pool, gfp_t gfp_flags,
 		p = alloc_pages_node(pool->nid, gfp_flags, order);
 		if (p) {
 			p->private = order;
+#ifdef HAVE_NR_GPU_ACTIVE
 			mod_lruvec_page_state(p, NR_GPU_ACTIVE, 1 << order);
+#endif
 		}
 		return p;
 	}
@@ -214,8 +216,10 @@ error_free:
 static void __free_pages_gpu_account(struct page *p, unsigned int order,
 				     bool reclaim)
 {
+#ifdef HAVE_NR_GPU_ACTIVE
 	mod_lruvec_page_state(p, reclaim ? NR_GPU_RECLAIM : NR_GPU_ACTIVE,
 			      -(1 << order));
+#endif
 	__free_pages(p, order);
 }
 
@@ -326,8 +330,10 @@ static void ttm_pool_type_give(struct ttm_pool_type *pt, struct page *p)
 	rcu_read_unlock();
 
 	atomic_long_add(num_pages, &allocated_pages[nid]);
+#ifdef HAVE_NR_GPU_ACTIVE
 	mod_lruvec_page_state(p, NR_GPU_ACTIVE, -num_pages);
 	mod_lruvec_page_state(p, NR_GPU_RECLAIM, num_pages);
+#endif
 }
 
 static enum lru_status take_one_from_lru(struct list_head *item,
@@ -352,8 +358,10 @@ static struct page *ttm_pool_type_take(struct ttm_pool_type *pt, int nid)
 	ret = list_lru_walk_node(&pt->pages, nid, take_one_from_lru, (void *)&p, &nr_to_walk);
 	if (ret == 1 && p) {
 		atomic_long_sub(1 << pt->order, &allocated_pages[nid]);
+#ifdef HAVE_NR_GPU_ACTIVE
 		mod_lruvec_page_state(p, NR_GPU_ACTIVE, (1 << pt->order));
 		mod_lruvec_page_state(p, NR_GPU_RECLAIM, -(1 << pt->order));
+#endif
 	}
 	return p;
 }
