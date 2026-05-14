@@ -36,11 +36,14 @@ struct drm_color_lut;
 struct drm_color_lut32;
 struct drm_color_ctm;
 struct drm_color_ctm_3x4;
+struct drm_colorop_state;
 struct drm_property_blob;
 struct dc_gamma;
 struct dc_rgb;
+struct dc_plane_state;
 struct fixed31_32;
 struct tetrahedral_params;
+struct dc_transfer_func;
 
 #if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 /*
@@ -91,6 +94,25 @@ void amdgpu_dm_atomic_lut3d(const struct drm_color_lut *drm_lut3d,
 int __set_colorop_3dlut(const struct drm_color_lut32 *drm_lut3d,
 			uint32_t drm_lut3d_size,
 			struct dc_3dlut *lut);
+void __set_tf_bypass(struct dc_transfer_func *tf);
+void __set_tf_distributed_points(struct dc_transfer_func *tf,
+				 enum dc_transfer_func_predefined predefined_tf);
+int amdgpu_dm_set_atomic_regamma(struct dc_transfer_func *out_tf,
+				 const struct drm_color_lut *regamma_lut,
+				 uint32_t regamma_size, bool has_rom,
+				 enum dc_transfer_func_predefined tf);
+int amdgpu_dm_atomic_shaper_lut(const struct drm_color_lut *shaper_lut,
+				bool has_rom,
+				enum dc_transfer_func_predefined tf,
+				uint32_t shaper_size,
+				struct dc_transfer_func *func_shaper);
+int amdgpu_dm_atomic_blend_lut(const struct drm_color_lut *blend_lut,
+			       bool has_rom,
+			       enum dc_transfer_func_predefined tf,
+			       uint32_t blend_size,
+			       struct dc_transfer_func *func_blend);
+int __set_colorop_in_tf_1d_curve(struct dc_plane_state *dc_plane_state,
+				 struct drm_colorop_state *colorop_state);
 #endif
 
 #endif /* __AMDGPU_DM_COLOR_H__ */
