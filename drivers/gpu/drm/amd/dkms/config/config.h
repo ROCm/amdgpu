@@ -196,6 +196,9 @@
 /* dma_fence_unwrap_merge() is available */
 #define HAVE_DMA_FENCE_UNWRAP_MERGE 1
 
+/* dma_fence_was_initialized() is available */
+#define HAVE_DMA_FENCE_WAS_INITIALIZED 1
+
 /* dma_map_sgtable() is enabled */
 #define HAVE_DMA_MAP_SGTABLE 1
 

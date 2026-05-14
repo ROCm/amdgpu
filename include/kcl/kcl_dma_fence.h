@@ -117,4 +117,20 @@ static inline spinlock_t *dma_fence_spinlock(struct dma_fence *fence)
 	spin_unlock_irqrestore(dma_fence_spinlock(fence), flags)
 #endif /* HAVE_DMA_FENCE_SPINLOCK */
 
+#ifndef HAVE_DMA_FENCE_WAS_INITIALIZED
+/**
+ * dma_fence_was_initialized - test if fence was initialized
+ * @fence: fence to test
+ *
+ * Return: True if fence was ever initialized, false otherwise.
+ *
+ * On older kernels DMA_FENCE_FLAG_INITIALIZED_BIT does not exist.
+ * Fall back to checking if the fence ops pointer is non-NULL.
+ */
+static inline bool dma_fence_was_initialized(struct dma_fence *fence)
+{
+	return fence && fence->ops;
+}
+#endif /* HAVE_DMA_FENCE_WAS_INITIALIZED */
+
 #endif
