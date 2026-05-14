@@ -136,6 +136,15 @@ int _kcl_drm_mode_create_dp_colorspace_property(struct drm_connector *connector,
 #define DRM_COLOR_FORMAT_YCBCR420      (1<<3)
 #endif
 
+#ifndef HAVE_DRM_OUTPUT_COLOR_FORMAT
+enum drm_output_color_format {
+	DRM_OUTPUT_COLOR_FORMAT_RGB444 = 0,
+	DRM_OUTPUT_COLOR_FORMAT_YCBCR444,
+	DRM_OUTPUT_COLOR_FORMAT_YCBCR422,
+	DRM_OUTPUT_COLOR_FORMAT_YCBCR420,
+};
+#endif
+
 /* For Default case, driver will set the colorspace */
 #ifndef DRM_MODE_COLORIMETRY_DEFAULT
 /* For Default case, driver will set the colorspace */
