@@ -1264,8 +1264,6 @@ static bool dcn401_get_dp_dto_frequency_100hz(const struct clock_source *clock_s
 		 *     - DPDTO MODULO = DTBCLK_P rate
 		 *     - target pix_clk_hz = (DPDTO INTEGER * DPDTO MODULO + DPDTO PHASE)
 		 */
-
-		dp_dto_integer += 1; // integer=0 represents 1x multiplier, etc.
 		temp = (unsigned long long)dp_dto_integer * modulo_hz + phase_hz;
 
 		if (temp / 100 > 0xFFFFFFFFUL) {
