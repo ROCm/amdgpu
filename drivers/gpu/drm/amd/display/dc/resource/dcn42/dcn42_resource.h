@@ -550,7 +550,8 @@
 		SRII_ARR_2(PIXEL_RATE_CNTL, OTG, 0, index),             \
 		SRII_ARR_2(PIXEL_RATE_CNTL, OTG, 1, index),             \
 		SRII_ARR_2(PIXEL_RATE_CNTL, OTG, 2, index),             \
-		SRII_ARR_2(PIXEL_RATE_CNTL, OTG, 3, index)
+		SRII_ARR_2(PIXEL_RATE_CNTL, OTG, 3, index),             \
+		SR_ARR(OTG_PIXEL_RATE_DIV, index)
 
 /* ABM */
 #define ABM_DCN42_REG_LIST_RI(id)                               \

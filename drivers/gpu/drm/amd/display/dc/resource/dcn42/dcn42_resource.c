@@ -214,10 +214,10 @@ static struct bios_registers bios_regs;
 static struct dce110_clk_src_regs clk_src_regs[5];
 
 static const struct dce110_clk_src_shift cs_shift = {
-	CS_COMMON_MASK_SH_LIST_DCN3_1_4(__SHIFT)
+	CS_COMMON_MASK_SH_LIST_DCN4_0_1(__SHIFT)
 };
 static const struct dce110_clk_src_mask cs_mask = {
-	CS_COMMON_MASK_SH_LIST_DCN3_1_4(_MASK)
+	CS_COMMON_MASK_SH_LIST_DCN4_0_1(_MASK)
 };
 #define abm_regs_init(id) \
 	ABM_DCN42_REG_LIST_RI(id)
@@ -874,8 +874,7 @@ static struct clock_source *dcn42_clock_source_create(
 	if (!clk_src)
 		return NULL;
 
-	if (dcn401_clk_src_construct(clk_src, ctx, bios, id,
-								 regs, &cs_shift, &cs_mask)) {
+	if (dcn401_clk_src_construct(clk_src, ctx, bios, id, regs, &cs_shift, &cs_mask)) {
 		clk_src->base.dp_clk_src = dp_clk_src;
 		return &clk_src->base;
 	}
