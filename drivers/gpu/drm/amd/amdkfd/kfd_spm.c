@@ -431,6 +431,60 @@ static void _kfd_release_spm(struct kfd_process_device *pdd, int inst, struct am
 	--pdd->spm_cntr->spm_use_cnt;
 }
 
+static int _spm_start(struct kfd_process_device *pdd,
+		struct amdgpu_device *adev, int inst)
+{
+	struct kfd_spm_base *spm = &(pdd->spm_cntr->spm[inst]);
+	unsigned long flags;
+	int ret = 0;
+
+	/* Start hardware SPM first */
+	amdgpu_amdkfd_rlc_spm_cntl(adev, inst, 1);
+
+	/* amdgpu_amdkfd_rlc_spm_cntl() will reset SPM and
+	 * wptr will become 0, adjust rptr accordingly.
+	 */
+	spin_lock_irqsave(&pdd->spm_irq_lock, flags);
+	spm->ring_rptr = 0;
+	spm->warned_ring_rptr = ~0;
+	spm->is_spm_started = true;
+	spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
+
+	if (!pdd->dev->spm_monitor_thread) {
+		ret = kfd_spm_monitor_thread_start(pdd);
+		if (ret) {
+			/* Thread failed to start, revert state */
+			dev_dbg(pdd->dev->adev->dev,
+				"Failed to start SPM monitor thread, ret = %d\n", ret);
+			spin_lock_irqsave(&pdd->spm_irq_lock, flags);
+			spm->is_spm_started = false;
+			spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
+			amdgpu_amdkfd_rlc_spm_cntl(adev, inst, 0);
+		}
+	}
+	return ret;
+}
+
+static void _spm_stop(struct kfd_process_device *pdd,
+		struct amdgpu_device *adev, int inst)
+{
+	struct kfd_spm_base *spm = &(pdd->spm_cntr->spm[inst]);
+	unsigned long flags;
+
+	if (pdd->dev->spm_monitor_thread)
+		kthread_stop(pdd->dev->spm_monitor_thread);
+
+	amdgpu_amdkfd_rlc_spm_cntl(adev, inst, 0);
+	spin_lock_irqsave(&pdd->spm_irq_lock, flags);
+	spm->is_spm_started = false;
+	/* amdgpu_amdkfd_rlc_spm_cntl() will reset SPM and wptr will become 0.
+	 * Adjust rptr accordingly
+	 */
+	spm->ring_rptr = 0;
+	spm->warned_ring_rptr = ~0;
+	spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
+}
+
 static int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device *adev)
 {
 	unsigned long flags;
@@ -443,15 +497,12 @@ static int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 		goto out;
 	}
 
-	if (pdd->dev->spm_monitor_thread)
-		kthread_stop(pdd->dev->spm_monitor_thread);
 
-	for_each_inst(inst, pdd->dev->xcc_mask) {
-		spin_lock_irqsave(&pdd->spm_irq_lock, flags);
-		pdd->spm_cntr->spm[inst].is_spm_started = false;
-		spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
-		amdgpu_amdkfd_rlc_spm_cntl(adev, inst, 0);
-	}
+	/* Stop monitor thread and hardware SPM for all instances.
+	 * Monitor thread is shared across instances and stopped only once.
+	 */
+	for_each_inst(inst, pdd->dev->xcc_mask)
+		_spm_stop(pdd, adev, inst);
 	flush_work(&pdd->spm_work);
 	wake_up_all(&pdd->spm_cntr->spm_buf_wq);
 
@@ -559,7 +610,6 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 	struct kfd_ioctl_spm_args user_spm_data, *user_spm_ptr;
 	struct kfd_spm_cntr *spm_cntr;
 	bool need_schedule = false;
-	unsigned long flags;
 	u32 ubufsize;
 	int ret = 0;
 	int inst;
@@ -622,17 +672,9 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 		if (user_spm_data.dest_buf) {
 			/* Start SPM if necessary*/
 			if (spm->is_spm_started == false) {
-				amdgpu_amdkfd_rlc_spm_cntl(adev, inst, 1);
-				spin_lock_irqsave(&pdd->spm_irq_lock, flags);
-				spm->is_spm_started = true;
-				/* amdgpu_amdkfd_rlc_spm_cntl() will reset SPM and
-				 * wptr will become 0, adjust rptr accordingly.
-				 */
-				spm->ring_rptr = 0;
-				spm->warned_ring_rptr = ~0;
-				spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
-				if (!pdd->dev->spm_monitor_thread)
-					kfd_spm_monitor_thread_start(pdd);
+				ret = _spm_start(pdd, adev, inst);
+				if (ret)
+					goto out;
 			} else {
 				/* If SPM was already started, there may already
 				 * be data in the ring-buffer that needs to be read.
@@ -641,17 +683,8 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 			}
 			user_spm_data.dest_buf += ubufsize;
 		} else {
-			amdgpu_amdkfd_rlc_spm_cntl(adev, inst, 0);
-			spin_lock_irqsave(&pdd->spm_irq_lock, flags);
-			spm->is_spm_started = false;
-			/* amdgpu_amdkfd_rlc_spm_cntl() will reset SPM and wptr will become 0.
-			 * Adjust rptr accordingly
-			 */
-			spm->ring_rptr = 0;
-			spm->warned_ring_rptr = ~0;
-			spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
-			if (pdd->dev->spm_monitor_thread)
-				kthread_stop(pdd->dev->spm_monitor_thread);
+
+			_spm_stop(pdd, adev, inst);
 		}
 	}
 
