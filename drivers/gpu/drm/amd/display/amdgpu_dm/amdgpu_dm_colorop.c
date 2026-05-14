@@ -63,12 +63,11 @@ static const struct drm_colorop_funcs dm_colorop_funcs = {
 	.destroy = drm_colorop_destroy,
 };
 
-int amdgpu_dm_initialize_default_pipeline(struct drm_plane *plane, struct drm_prop_enum_list *list)
+STATIC_IFN_KUNIT int
+amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane,
+				  bool hw_3d_lut, struct drm_prop_enum_list *list)
 {
 	struct drm_colorop *ops[MAX_COLOR_PIPELINE_OPS];
-	struct drm_device *dev = plane->dev;
-	struct amdgpu_device *adev = drm_to_adev(dev);
-	bool has_3dlut = adev->dm.dc->caps.color.dpp.hw_3d_lut || adev->dm.dc->caps.color.mpc.preblend;
 	int ret;
 	int i = 0;
 
@@ -124,7 +123,7 @@ int amdgpu_dm_initialize_default_pipeline(struct drm_plane *plane, struct drm_pr
 
 	i++;
 
-	if (has_3dlut) {
+	if (hw_3d_lut) {
 		/* 1D curve - SHAPER TF */
 		ops[i] = kzalloc_obj(*ops[0]);
 		if (!ops[i]) {
@@ -219,9 +218,20 @@ int amdgpu_dm_initialize_default_pipeline(struct drm_plane *plane, struct drm_pr
 
 cleanup:
 	if (ret == -ENOMEM)
-		drm_err(plane->dev, "KMS: Failed to allocate colorop\n");
+		drm_err(dev, "KMS: Failed to allocate colorop\n");
 
 	drm_colorop_pipeline_destroy(dev);
 
 	return ret;
+}
+EXPORT_IF_KUNIT(amdgpu_dm_build_default_pipeline);
+
+int amdgpu_dm_initialize_default_pipeline(struct drm_plane *plane, struct drm_prop_enum_list *list)
+{
+	struct drm_device *dev = plane->dev;
+	struct amdgpu_device *adev = drm_to_adev(dev);
+	bool hw_3d_lut = adev->dm.dc->caps.color.dpp.hw_3d_lut ||
+			 adev->dm.dc->caps.color.mpc.preblend;
+
+	return amdgpu_dm_build_default_pipeline(dev, plane, hw_3d_lut, list);
 }
