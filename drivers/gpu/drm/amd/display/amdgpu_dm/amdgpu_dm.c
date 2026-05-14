@@ -5218,6 +5218,7 @@ static void dm_atomic_destroy_state(struct drm_private_obj *obj,
 	kfree(dm_state);
 }
 
+#ifdef HAVE_DRM_PRIVATE_STATE_FUNCS_ATOMIC_CREATE_STATE
 static struct drm_private_state *
 dm_atomic_create_state(struct drm_private_obj *obj)
 {
@@ -5240,15 +5241,21 @@ dm_atomic_create_state(struct drm_private_obj *obj)
 
 	return &dm_state->base;
 }
+#endif
 
 static struct drm_private_state_funcs dm_atomic_state_funcs = {
+#ifdef HAVE_DRM_PRIVATE_STATE_FUNCS_ATOMIC_CREATE_STATE
 	.atomic_create_state = dm_atomic_create_state,
+#endif
 	.atomic_duplicate_state = dm_atomic_duplicate_state,
 	.atomic_destroy_state = dm_atomic_destroy_state,
 };
 
 static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 {
+#ifndef HAVE_DRM_PRIVATE_STATE_FUNCS_ATOMIC_CREATE_STATE
+	struct dm_atomic_state *state;
+#endif
 	int r;
 
 	adev->mode_info.mode_config_initialized = true;
@@ -5268,22 +5275,54 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 	/* indicates support for immediate flip */
 	adev_to_drm(adev)->mode_config.async_page_flip = true;
 
+#ifndef HAVE_DRM_PRIVATE_STATE_FUNCS_ATOMIC_CREATE_STATE
+	state = kzalloc_obj(*state);
+	if (!state)
+		return -ENOMEM;
+
+	state->context = dc_state_create_current_copy(adev->dm.dc);
+	if (!state->context) {
+		kfree(state);
+		return -ENOMEM;
+	}
+
+	drm_atomic_private_obj_init(adev_to_drm(adev),
+				    &adev->dm.atomic_obj,
+				    &state->base,
+				    &dm_atomic_state_funcs);
+#else
 	drm_atomic_private_obj_init(adev_to_drm(adev),
 				    &adev->dm.atomic_obj,
 				    &dm_atomic_state_funcs);
+#endif
 
 	r = amdgpu_display_modeset_create_props(adev);
-	if (r)
+	if (r) {
+#ifndef HAVE_DRM_PRIVATE_STATE_FUNCS_ATOMIC_CREATE_STATE
+		dc_state_release(state->context);
+		kfree(state);
+#endif
 		return r;
+	}
 
 #ifdef AMD_PRIVATE_COLOR
-	if (amdgpu_dm_create_color_properties(adev))
+	if (amdgpu_dm_create_color_properties(adev)) {
+#ifndef HAVE_DRM_PRIVATE_STATE_FUNCS_ATOMIC_CREATE_STATE
+		dc_state_release(state->context);
+		kfree(state);
+#endif
 		return -ENOMEM;
+	}
 #endif
 
 	r = amdgpu_dm_audio_init(adev);
-	if (r)
+	if (r) {
+#ifndef HAVE_DRM_PRIVATE_STATE_FUNCS_ATOMIC_CREATE_STATE
+		dc_state_release(state->context);
+		kfree(state);
+#endif
 		return r;
+	}
 
 	return 0;
 }

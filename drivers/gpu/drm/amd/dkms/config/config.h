@@ -775,6 +775,9 @@
 /* struct drm_private_obj.lock is available */
 #define HAVE_DRM_PRIVATE_OBJ_LOCK 1
 
+/* struct drm_private_state_funcs has atomic_create_state */
+#define HAVE_DRM_PRIVATE_STATE_FUNCS_ATOMIC_CREATE_STATE 1
+
 /* drm_show_fdinfo() is available */
 #define HAVE_DRM_SHOW_FDINFO 1
 
