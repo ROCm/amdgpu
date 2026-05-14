@@ -765,7 +765,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.min_deep_sleep_dcfclk_khz = 8000,
 	.replay_skip_crtc_disabled = true,
 	.psr_skip_crtc_disable = true,
-	.force_odm2to1_for_edp_pixclk_mhz = 550, // Force ODM 2to1 for eDP when pixel clock is above 550MHz
+	.force_odm2to1_for_edp_pixclk_mhz = 0, // disable the policy for now
 };
 
 static const struct dc_check_config config_defaults = {
