@@ -142,6 +142,9 @@
 /* disable_delayed_work_sync() is available */
 #define HAVE_DISABLE_DELAYED_WORK_SYNC 1
 
+/* dma_buf_attach_ops.invalidate_mappings is available */
+#define HAVE_DMA_BUF_ATTACH_OPS_INVALIDATE_MAPPINGS 1
+
 /* dma_buf_is_dynamic() is available */
 #define HAVE_DMA_BUF_IS_DYNAMIC 1
 
