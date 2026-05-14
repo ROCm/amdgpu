@@ -1315,7 +1315,7 @@ void amdgpu_bo_move_notify(struct ttm_buffer_object *bo,
 
 	amdgpu_bo_kunmap(abo);
 
-#ifdef HAVE_STRUCT_DMA_BUF_OPS_PIN
+#ifdef HAVE_DMA_BUF_ATTACH_OPS_INVALIDATE_MAPPINGS
 	if (abo->tbo.base.dma_buf && !drm_gem_is_imported(&abo->tbo.base) &&
 	    old_mem && old_mem->mem_type != TTM_PL_SYSTEM)
 		dma_buf_invalidate_mappings(abo->tbo.base.dma_buf);

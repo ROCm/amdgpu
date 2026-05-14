@@ -869,7 +869,11 @@ static const struct dma_buf_attach_ops amdgpu_dma_buf_attach_ops = {
 #ifdef HAVE_STRUCT_DMA_BUF_ATTACH_OPS_ALLOW_PEER2PEER
 	.allow_peer2peer = true,
 #endif
+#ifdef HAVE_DMA_BUF_ATTACH_OPS_INVALIDATE_MAPPINGS
 	.invalidate_mappings = amdgpu_dma_buf_move_notify
+#else
+	.move_notify = amdgpu_dma_buf_move_notify
+#endif
 };
 #endif
 /**
