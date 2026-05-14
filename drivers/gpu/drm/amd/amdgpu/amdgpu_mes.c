@@ -439,6 +439,36 @@ int amdgpu_mes_reset_legacy_queue(struct amdgpu_device *adev,
 	return r;
 }
 
+int amdgpu_mes_reset_queue_mmio(struct amdgpu_device *adev,
+				int queue_type,
+				unsigned int vmid,
+				unsigned int me,
+				unsigned int pipe,
+				unsigned int queue,
+				uint32_t xcc_id)
+{
+	struct mes_reset_queue_input queue_input;
+	int r;
+
+	memset(&queue_input, 0, sizeof(queue_input));
+
+	queue_input.xcc_id = xcc_id;
+	queue_input.me_id = me;
+	queue_input.pipe_id = pipe;
+	queue_input.queue_id = queue;
+	queue_input.vmid = vmid;
+	queue_input.queue_type = queue_type;
+	queue_input.use_mmio = true;
+
+	amdgpu_mes_lock(&adev->mes);
+	r = adev->mes.funcs->reset_hw_queue(&adev->mes, &queue_input);
+	amdgpu_mes_unlock(&adev->mes);
+	if (r)
+		dev_err(adev->dev, "failed to reset legacy queue\n");
+
+	return r;
+}
+
 int amdgpu_mes_reset_user_queue(struct amdgpu_device *adev,
 				int queue_type,
 				unsigned int doorbell_index,
