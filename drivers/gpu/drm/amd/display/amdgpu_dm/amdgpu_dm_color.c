@@ -1044,9 +1044,9 @@ EXPORT_IF_KUNIT(__drm_3dlut32_to_dc_3dlut);
  * Map user 3D LUT data to DC 3D LUT and all necessary bits to program it
  * on DCN accordingly.
  */
-static void amdgpu_dm_atomic_lut3d(const struct drm_color_lut *drm_lut3d,
-				   uint32_t drm_lut3d_size,
-				   struct dc_3dlut *lut)
+STATIC_IFN_KUNIT void amdgpu_dm_atomic_lut3d(const struct drm_color_lut *drm_lut3d,
+				     uint32_t drm_lut3d_size,
+				     struct dc_3dlut *lut)
 {
 	if (!drm_lut3d_size) {
 		lut->state.bits.initialized = 0;
@@ -1062,6 +1062,7 @@ static void amdgpu_dm_atomic_lut3d(const struct drm_color_lut *drm_lut3d,
 					MAX_COLOR_3DLUT_BITDEPTH);
 	}
 }
+EXPORT_IF_KUNIT(amdgpu_dm_atomic_lut3d);
 
 static int amdgpu_dm_atomic_shaper_lut(const struct drm_color_lut *shaper_lut,
 				       bool has_rom,
@@ -1198,6 +1199,7 @@ int amdgpu_dm_verify_lut_sizes(const struct drm_crtc_state *crtc_state)
 
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_verify_lut_sizes);
 
 /**
  * amdgpu_dm_check_crtc_color_mgmt: Check if DRM color props are programmable by DC.
@@ -1705,9 +1707,9 @@ __set_dm_plane_colorop_shaper(struct drm_plane_state *plane_state,
  * Returns:
  * 0 on success. -EINVAL if drm_lut3d_size is zero.
  */
-static int __set_colorop_3dlut(const struct drm_color_lut32 *drm_lut3d,
-				uint32_t drm_lut3d_size,
-				struct dc_3dlut *lut)
+STATIC_IFN_KUNIT int __set_colorop_3dlut(const struct drm_color_lut32 *drm_lut3d,
+					 uint32_t drm_lut3d_size,
+					 struct dc_3dlut *lut)
 {
 	if (!drm_lut3d_size) {
 		lut->state.bits.initialized = 0;
@@ -1724,6 +1726,7 @@ static int __set_colorop_3dlut(const struct drm_color_lut32 *drm_lut3d,
 
 	return 0;
 }
+EXPORT_IF_KUNIT(__set_colorop_3dlut);
 
 static int
 __set_dm_plane_colorop_3dlut(struct drm_plane_state *plane_state,
