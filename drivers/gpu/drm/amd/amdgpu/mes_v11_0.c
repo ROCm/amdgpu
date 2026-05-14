@@ -478,9 +478,6 @@ static int mes_v11_0_reset_compute_pipe_mmio(struct amdgpu_device *adev,
 	uint32_t reset_val, clean_val;
 	int r;
 
-	if (!mes_v11_0_pipe_reset_support(adev))
-		return -EOPNOTSUPP;
-
 	amdgpu_gfx_rlc_enter_safe_mode(adev, 0);
 	mutex_lock(&adev->srbm_mutex);
 	soc21_grbm_select(adev, me, pipe, queue, 0);
