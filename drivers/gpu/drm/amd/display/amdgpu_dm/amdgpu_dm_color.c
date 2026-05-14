@@ -759,6 +759,19 @@ static int __set_output_tf_32(struct dc_transfer_func *func,
 	return res ? 0 : -ENOMEM;
 }
 
+static void __set_tf_bypass(struct dc_transfer_func *tf)
+{
+	tf->type = TF_TYPE_BYPASS;
+	tf->tf = TRANSFER_FUNCTION_LINEAR;
+}
+
+static void __set_tf_distributed_points(struct dc_transfer_func *tf,
+					enum dc_transfer_func_predefined predefined_tf)
+{
+	tf->type = TF_TYPE_DISTRIBUTED_POINTS;
+	tf->tf = predefined_tf;
+	tf->sdr_ref_white_level = SDR_WHITE_LEVEL_INIT_VALUE;
+}
 
 static int amdgpu_dm_set_atomic_regamma(struct dc_transfer_func *out_tf,
 					const struct drm_color_lut *regamma_lut,
@@ -779,18 +792,14 @@ static int amdgpu_dm_set_atomic_regamma(struct dc_transfer_func *out_tf,
 		 * pre-defined TF and the custom LUT values into the LUT that's
 		 * actually programmed.
 		 */
-		out_tf->type = TF_TYPE_DISTRIBUTED_POINTS;
-		out_tf->tf = tf;
-		out_tf->sdr_ref_white_level = SDR_WHITE_LEVEL_INIT_VALUE;
-
+		__set_tf_distributed_points(out_tf, tf);
 		ret = __set_output_tf(out_tf, regamma_lut, regamma_size, has_rom);
 	} else {
 		/*
 		 * No CRTC RGM means we can just put the block into bypass
 		 * since we don't have any plane level adjustments using it.
 		 */
-		out_tf->type = TF_TYPE_BYPASS;
-		out_tf->tf = TRANSFER_FUNCTION_LINEAR;
+		__set_tf_bypass(out_tf);
 	}
 
 	return ret;
@@ -1077,14 +1086,10 @@ static int amdgpu_dm_atomic_shaper_lut(const struct drm_color_lut *shaper_lut,
 		 * If user shaper LUT is set, we assume a linear color space
 		 * (linearized by degamma 1D LUT or not).
 		 */
-		func_shaper->type = TF_TYPE_DISTRIBUTED_POINTS;
-		func_shaper->tf = tf;
-		func_shaper->sdr_ref_white_level = SDR_WHITE_LEVEL_INIT_VALUE;
-
+		__set_tf_distributed_points(func_shaper, tf);
 		ret = __set_output_tf(func_shaper, shaper_lut, shaper_size, has_rom);
 	} else {
-		func_shaper->type = TF_TYPE_BYPASS;
-		func_shaper->tf = TRANSFER_FUNCTION_LINEAR;
+		__set_tf_bypass(func_shaper);
 	}
 
 	return ret;
@@ -1106,14 +1111,10 @@ static int amdgpu_dm_atomic_blend_lut(const struct drm_color_lut *blend_lut,
 		 * module to fill the parameters that will be translated to HW
 		 * points.
 		 */
-		func_blend->type = TF_TYPE_DISTRIBUTED_POINTS;
-		func_blend->tf = tf;
-		func_blend->sdr_ref_white_level = SDR_WHITE_LEVEL_INIT_VALUE;
-
+		__set_tf_distributed_points(func_blend, tf);
 		ret = __set_input_tf(NULL, func_blend, blend_lut, blend_size);
 	} else {
-		func_blend->type = TF_TYPE_BYPASS;
-		func_blend->tf = TRANSFER_FUNCTION_LINEAR;
+		__set_tf_bypass(func_blend);
 	}
 
 	return ret;
@@ -1510,8 +1511,7 @@ __set_colorop_in_tf_1d_curve(struct dc_plane_state *dc_plane_state,
 		return -EINVAL;
 
 	if (colorop_state->bypass) {
-		tf->type = TF_TYPE_BYPASS;
-		tf->tf = TRANSFER_FUNCTION_LINEAR;
+		__set_tf_bypass(tf);
 		return 0;
 	}
 
