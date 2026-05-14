@@ -5,6 +5,7 @@
 #include <linux/version.h>
 #include <kcl/kcl_compiler_attributes.h>
 #include <kcl/kcl_fence.h>
+#include <kcl/kcl_dma_fence.h>
 #include <kcl/kcl_slab.h>
 #include <kcl/kcl_overflow.h>
 #include <kcl/backport/kcl_drm_print.h>
