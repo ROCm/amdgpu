@@ -1725,8 +1725,10 @@ enum dc_status dcn42_validate_bandwidth(struct dc *dc,
 	bool out = false;
 
 	DC_FP_START();
-
-	dcn42_decide_odm_override(dc, context);
+	if (validate_mode == DC_VALIDATE_MODE_AND_PROGRAMMING) {
+		/*only do this when programing HW*/
+		dcn42_decide_odm_override(dc, context);
+	}
 
 	out = dml2_validate(dc, context, context->bw_ctx.dml2,
 						validate_mode);
