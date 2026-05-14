@@ -3309,11 +3309,7 @@ static int __init amdgpu_init(void)
 
 	r = amdgpu_sync_init();
 	if (r)
-		goto error_sync;
-
-	r = amdgpu_userq_fence_slab_init();
-	if (r)
-		goto error_fence;
+		return r;
 
 	DRM_INFO("amdgpu version: %s\n", AMDGPU_VERSION);
 	DRM_INFO("OS DRM version: %d.%d.%d\n", DRM_VER, DRM_PATCH, DRM_SUB);
@@ -3324,7 +3320,7 @@ static int __init amdgpu_init(void)
 	/* Ignore KFD init failures when CONFIG_HSA_AMD is not set. */
 	r = amdgpu_amdkfd_init();
 	if (r && r != -ENOENT)
-		goto error_fence;
+		goto error_fini_sync;
 
 	if (amdgpu_pp_feature_mask & PP_OVERDRIVE_MASK) {
 		add_taint(TAINT_CPU_OUT_OF_SPEC, LOCKDEP_STILL_OK);
@@ -3335,10 +3331,8 @@ static int __init amdgpu_init(void)
 	/* let modprobe override vga console setting */
 	return pci_register_driver(&amdgpu_kms_pci_driver);
 
-error_fence:
+error_fini_sync:
 	amdgpu_sync_fini();
-
-error_sync:
 	return r;
 }
 
@@ -3349,7 +3343,6 @@ static void __exit amdgpu_exit(void)
 	amdgpu_unregister_atpx_handler();
 	amdgpu_acpi_release();
 	amdgpu_sync_fini();
-	amdgpu_userq_fence_slab_fini();
 #ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
 	mmu_notifier_synchronize();
 #endif

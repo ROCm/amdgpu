@@ -5,6 +5,9 @@
 #include <drm/drm_simple_kms_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_vblank.h>
+#ifdef DRM_CRTC_VBLANK_TIMER_FUNCS
+#include <drm/drm_vblank_helper.h>
+#endif
 
 #include "amdgpu.h"
 #ifdef CONFIG_DRM_AMDGPU_SI
@@ -41,29 +44,6 @@
 static const u32 amdgpu_vkms_formats[] = {
 	DRM_FORMAT_XRGB8888,
 };
-
-static enum hrtimer_restart amdgpu_vkms_vblank_simulate(struct hrtimer *timer)
-{
-	struct amdgpu_crtc *amdgpu_crtc = container_of(timer, struct amdgpu_crtc, vblank_timer);
-	struct drm_crtc *crtc = &amdgpu_crtc->base;
-	struct amdgpu_vkms_output *output = drm_crtc_to_amdgpu_vkms_output(crtc);
-	u64 ret_overrun;
-	bool ret;
-
-	ret_overrun = hrtimer_forward_now(&amdgpu_crtc->vblank_timer,
-					  output->period_ns);
-	if (ret_overrun != 1)
-		drm_warn(amdgpu_crtc->base.dev,
-			 "%s: vblank timer overrun count: %llu\n",
-			 __func__, ret_overrun);
-
-	ret = drm_crtc_handle_vblank(crtc);
-	/* Don't queue timer again when vblank is disabled. */
-	if (!ret)
-		return HRTIMER_NORESTART;
-
-	return HRTIMER_RESTART;
-}
 
 static int amdgpu_vkms_enable_vblank(struct drm_crtc *crtc)
 {
@@ -122,10 +102,14 @@ static const struct drm_crtc_funcs amdgpu_vkms_crtc_funcs = {
 	.reset                  = drm_atomic_helper_crtc_reset,
 	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
 	.atomic_destroy_state   = drm_atomic_helper_crtc_destroy_state,
+#ifndef DRM_CRTC_VBLANK_TIMER_FUNCS
 #ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
-	.enable_vblank		= amdgpu_vkms_enable_vblank,
-	.disable_vblank		= amdgpu_vkms_disable_vblank,
+	.enable_vblank		    = amdgpu_vkms_enable_vblank,
+	.disable_vblank		    = amdgpu_vkms_disable_vblank,
 	.get_vblank_timestamp	= amdgpu_vkms_get_vblank_timestamp,
+#endif
+#else
+	DRM_CRTC_VBLANK_TIMER_FUNCS,
 #endif
 };
 
@@ -171,11 +155,14 @@ static void amdgpu_vkms_crtc_atomic_flush(struct drm_crtc *crtc,
 	}
 }
 
-
 static const struct drm_crtc_helper_funcs amdgpu_vkms_crtc_helper_funcs = {
+#ifndef DRM_CRTC_VBLANK_TIMER_FUNCS
 	.atomic_flush	= amdgpu_vkms_crtc_atomic_flush,
 	.atomic_enable	= amdgpu_vkms_crtc_atomic_enable,
 	.atomic_disable	= amdgpu_vkms_crtc_atomic_disable,
+#else
+	DRM_CRTC_HELPER_VBLANK_FUNCS,
+#endif
 };
 
 static int amdgpu_vkms_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
@@ -200,15 +187,6 @@ static int amdgpu_vkms_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
 	amdgpu_crtc->pll_id = ATOM_PPLL_INVALID;
 	amdgpu_crtc->encoder = NULL;
 	amdgpu_crtc->connector = NULL;
-	amdgpu_crtc->vsync_timer_enabled = AMDGPU_IRQ_STATE_DISABLE;
-
-#ifdef HAVE_HRTIMER_SETUP
-	hrtimer_setup(&amdgpu_crtc->vblank_timer, &amdgpu_vkms_vblank_simulate, CLOCK_MONOTONIC,
-		      HRTIMER_MODE_REL);
-#else
-	hrtimer_init(&amdgpu_crtc->vblank_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	amdgpu_crtc->vblank_timer.function = &amdgpu_vkms_vblank_simulate;
-#endif
 
 	return ret;
 }
@@ -668,11 +646,6 @@ static int amdgpu_vkms_sw_init(struct amdgpu_ip_block *ip_block)
 static int amdgpu_vkms_sw_fini(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
-	int i = 0;
-
-	for (i = 0; i < adev->mode_info.num_crtc; i++)
-		if (adev->mode_info.crtcs[i])
-			hrtimer_cancel(&adev->mode_info.crtcs[i]->vblank_timer);
 
 	drm_kms_helper_poll_fini(adev_to_drm(adev));
 	drm_mode_config_cleanup(adev_to_drm(adev));

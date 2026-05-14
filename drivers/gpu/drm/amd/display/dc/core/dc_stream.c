@@ -508,7 +508,7 @@ bool dc_stream_program_cursor_position(
 		/* apply/update visual confirm */
 		if (dc->debug.visual_confirm == VISUAL_CONFIRM_HW_CURSOR) {
 			/* update software state */
-			int i;
+			unsigned int i;
 
 			for (i = 0; i < dc->res_pool->pipe_count; i++) {
 				struct pipe_ctx *pipe_ctx = &dc->current_state->res_ctx.pipe_ctx[i];
@@ -527,7 +527,7 @@ bool dc_stream_program_cursor_position(
 
 		if (stream->drr_trigger_mode == DRR_TRIGGER_ON_FLIP_AND_CURSOR) {
 			/* apply manual trigger */
-			int i;
+			unsigned int i;
 
 			for (i = 0; i < dc->res_pool->pipe_count; i++) {
 				struct pipe_ctx *pipe_ctx = &dc->current_state->res_ctx.pipe_ctx[i];
@@ -553,7 +553,7 @@ bool dc_stream_add_writeback(struct dc *dc,
 		struct dc_writeback_info *wb_info)
 {
 	bool isDrc = false;
-	int i = 0;
+	unsigned int i = 0;
 	struct dwbc *dwb;
 
 	if (stream == NULL) {
@@ -962,7 +962,7 @@ struct dc_rmcm_3dlut *dc_stream_get_3dlut_for_stream(
 	unsigned int num_rmcm = dc->caps.color.mpc.num_rmcm_3dluts;
 
 	// see if one is allocated for this stream
-	for (int i = 0; i < num_rmcm; i++) {
+	for (unsigned int i = 0; i < num_rmcm; i++) {
 		if (dc->res_pool->rmcm_3dlut[i].isInUse &&
 			dc->res_pool->rmcm_3dlut[i].stream == stream)
 			return &dc->res_pool->rmcm_3dlut[i];
@@ -973,7 +973,7 @@ struct dc_rmcm_3dlut *dc_stream_get_3dlut_for_stream(
 		return NULL;
 
 	//see if there is an unused 3dlut, allocate
-	for (int i = 0; i < num_rmcm; i++) {
+	for (unsigned int i = 0; i < num_rmcm; i++) {
 		if (!dc->res_pool->rmcm_3dlut[i].isInUse) {
 			dc->res_pool->rmcm_3dlut[i].isInUse = true;
 			dc->res_pool->rmcm_3dlut[i].stream = stream;
@@ -996,6 +996,7 @@ void dc_stream_release_3dlut_for_stream(
 	if (rmcm_3dlut) {
 		rmcm_3dlut->isInUse = false;
 		rmcm_3dlut->stream  = NULL;
+		rmcm_3dlut->protection_bits = 0;
 	}
 }
 
@@ -1004,9 +1005,10 @@ void dc_stream_init_rmcm_3dlut(struct dc *dc)
 {
 	unsigned int num_rmcm = dc->caps.color.mpc.num_rmcm_3dluts;
 
-	for (int i = 0; i < num_rmcm; i++) {
+	for (unsigned int i = 0; i < num_rmcm; i++) {
 		dc->res_pool->rmcm_3dlut[i].isInUse = false;
 		dc->res_pool->rmcm_3dlut[i].stream = NULL;
+		dc->res_pool->rmcm_3dlut[i].protection_bits = 0;
 	}
 }
 
