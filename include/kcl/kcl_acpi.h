@@ -32,4 +32,8 @@ acpi_dev_get_first_match_dev(const char *hid, const char *uid, s64 hrv)
 static inline void acpi_dev_put(struct acpi_device *adev) {}
 #endif
 
+#ifndef ACPI_AC_CLASS
+#define ACPI_AC_CLASS	"ac_adapter"
+#endif
+
 #endif /* AMDKCL_ACPI_H */
