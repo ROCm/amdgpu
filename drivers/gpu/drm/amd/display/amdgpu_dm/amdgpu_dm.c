@@ -14277,6 +14277,33 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 #else
 	drm_connector_update_edid_property(connector, edid);
 
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
+	/*
+	 * On older kernels, drm_connector_update_edid_property() may not
+	 * update display_info (e.g. blocked by override_edid). Parse the
+	 * standard EDID Monitor Range Limits descriptor as a fallback.
+	 */
+	if (edid && (connector->display_info.monitor_range.min_vfreq == 0 ||
+		     connector->display_info.monitor_range.max_vfreq == 0)) {
+		int i;
+
+		for (i = 0; i < 4; i++) {
+			const struct detailed_timing *timing = &edid->detailed_timings[i];
+			const struct detailed_non_pixel *data = &timing->data.other_data;
+			const struct detailed_data_monitor_range *range = &data->data.range;
+
+			if (timing->pixel_clock != 0)
+				continue;
+			if (data->type != EDID_DETAIL_MONITOR_RANGE)
+				continue;
+
+			connector->display_info.monitor_range.min_vfreq = range->min_vfreq;
+			connector->display_info.monitor_range.max_vfreq = range->max_vfreq;
+			break;
+		}
+	}
+#endif
+
 	if (!edid || !sink) {
 #endif
 		dm_con_state = to_dm_connector_state(connector->state);
