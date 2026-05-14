@@ -1316,6 +1316,217 @@ static void dm_test_set_colorop_3dlut_data_forwarded(struct kunit *test)
 			drm_color_lut32_extract(0x40000000, 12));
 }
 
+/**
+ * dm_test_set_tf_bypass - __set_tf_bypass: sets TF_TYPE_BYPASS and TRANSFER_FUNCTION_LINEAR
+ * @test: KUnit test context
+ */
+static void dm_test_set_tf_bypass(struct kunit *test)
+{
+	struct dc_transfer_func *tf;
+
+	tf = kunit_kzalloc(test, sizeof(*tf), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, tf);
+
+	tf->type = TF_TYPE_DISTRIBUTED_POINTS;
+	tf->tf = TRANSFER_FUNCTION_SRGB;
+
+	__set_tf_bypass(tf);
+
+	KUNIT_EXPECT_EQ(test, (int)tf->type, (int)TF_TYPE_BYPASS);
+	KUNIT_EXPECT_EQ(test, (int)tf->tf, (int)TRANSFER_FUNCTION_LINEAR);
+}
+
+/**
+ * dm_test_set_tf_distributed_points_srgb - __set_tf_distributed_points: sRGB predefined TF
+ * @test: KUnit test context
+ */
+static void dm_test_set_tf_distributed_points_srgb(struct kunit *test)
+{
+	struct dc_transfer_func *tf;
+
+	tf = kunit_kzalloc(test, sizeof(*tf), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, tf);
+
+	__set_tf_distributed_points(tf, TRANSFER_FUNCTION_SRGB);
+
+	KUNIT_EXPECT_EQ(test, (int)tf->type, (int)TF_TYPE_DISTRIBUTED_POINTS);
+	KUNIT_EXPECT_EQ(test, (int)tf->tf, (int)TRANSFER_FUNCTION_SRGB);
+	KUNIT_EXPECT_EQ(test, tf->sdr_ref_white_level, 80U);
+}
+
+/**
+ * dm_test_set_tf_distributed_points_pq - __set_tf_distributed_points: PQ predefined TF
+ * @test: KUnit test context
+ */
+static void dm_test_set_tf_distributed_points_pq(struct kunit *test)
+{
+	struct dc_transfer_func *tf;
+
+	tf = kunit_kzalloc(test, sizeof(*tf), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, tf);
+
+	__set_tf_distributed_points(tf, TRANSFER_FUNCTION_PQ);
+
+	KUNIT_EXPECT_EQ(test, (int)tf->type, (int)TF_TYPE_DISTRIBUTED_POINTS);
+	KUNIT_EXPECT_EQ(test, (int)tf->tf, (int)TRANSFER_FUNCTION_PQ);
+	KUNIT_EXPECT_EQ(test, tf->sdr_ref_white_level, 80U);
+}
+
+/**
+ * dm_test_set_atomic_regamma_bypass - No LUT and linear TF: must take bypass path
+ * @test: KUnit test context
+ */
+static void dm_test_set_atomic_regamma_bypass(struct kunit *test)
+{
+	struct dc_transfer_func *out_tf;
+
+	out_tf = kunit_kzalloc(test, sizeof(*out_tf), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, out_tf);
+
+	/* size=0 and tf=LINEAR: must take the bypass branch */
+	KUNIT_EXPECT_EQ(test,
+		amdgpu_dm_set_atomic_regamma(out_tf, NULL, 0, false,
+					     TRANSFER_FUNCTION_LINEAR),
+		0);
+	KUNIT_EXPECT_EQ(test, (int)out_tf->type, (int)TF_TYPE_BYPASS);
+	KUNIT_EXPECT_EQ(test, (int)out_tf->tf, (int)TRANSFER_FUNCTION_LINEAR);
+}
+
+/**
+ * dm_test_atomic_shaper_lut_bypass - No LUT and linear TF: must take bypass path
+ * @test: KUnit test context
+ */
+static void dm_test_atomic_shaper_lut_bypass(struct kunit *test)
+{
+	struct dc_transfer_func *func_shaper;
+
+	func_shaper = kunit_kzalloc(test, sizeof(*func_shaper), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, func_shaper);
+
+	/* size=0 and tf=LINEAR: must take the bypass branch */
+	KUNIT_EXPECT_EQ(test,
+		amdgpu_dm_atomic_shaper_lut(NULL, false,
+					    TRANSFER_FUNCTION_LINEAR,
+					    0, func_shaper),
+		0);
+	KUNIT_EXPECT_EQ(test, (int)func_shaper->type, (int)TF_TYPE_BYPASS);
+	KUNIT_EXPECT_EQ(test, (int)func_shaper->tf, (int)TRANSFER_FUNCTION_LINEAR);
+}
+
+/**
+ * dm_test_atomic_blend_lut_bypass - amdgpu_dm_atomic_blend_lut bypass: no LUT, linear TF -> bypass
+ * @test: KUnit test context
+ */
+static void dm_test_atomic_blend_lut_bypass(struct kunit *test)
+{
+	struct dc_transfer_func *func_blend;
+
+	func_blend = kunit_kzalloc(test, sizeof(*func_blend), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, func_blend);
+
+	/* size=0 and tf=LINEAR: must take the bypass branch */
+	KUNIT_EXPECT_EQ(test,
+		amdgpu_dm_atomic_blend_lut(NULL, false,
+					   TRANSFER_FUNCTION_LINEAR,
+					   0, func_blend),
+		0);
+	KUNIT_EXPECT_EQ(test, (int)func_blend->type, (int)TF_TYPE_BYPASS);
+	KUNIT_EXPECT_EQ(test, (int)func_blend->tf, (int)TRANSFER_FUNCTION_LINEAR);
+}
+
+/* ---- Tests for __set_colorop_in_tf_1d_curve ---- */
+
+/**
+ * dm_test_set_colorop_in_tf_1d_curve_invalid_type - Non-1D colorop type must be rejected
+ * @test: KUnit test context
+ */
+static void dm_test_set_colorop_in_tf_1d_curve_invalid_type(struct kunit *test)
+{
+	struct dc_plane_state *dc_plane_state;
+	struct drm_colorop *colorop;
+	struct drm_colorop_state *colorop_state;
+
+	dc_plane_state = kunit_kzalloc(test, sizeof(*dc_plane_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, dc_plane_state);
+
+	colorop = kunit_kzalloc(test, sizeof(*colorop), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, colorop);
+
+	colorop_state = kunit_kzalloc(test, sizeof(*colorop_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, colorop_state);
+
+	colorop->type = DRM_COLOROP_3D_LUT;
+	colorop_state->colorop = colorop;
+	colorop_state->curve_1d_type = DRM_COLOROP_1D_CURVE_SRGB_EOTF;
+
+	KUNIT_EXPECT_EQ(test,
+		__set_colorop_in_tf_1d_curve(dc_plane_state, colorop_state),
+		-EINVAL);
+}
+
+/**
+ * dm_test_set_colorop_in_tf_1d_curve_unsupported_curve - Unsupported 1D curve type must be rejected
+ * @test: KUnit test context
+ */
+static void dm_test_set_colorop_in_tf_1d_curve_unsupported_curve(struct kunit *test)
+{
+	struct dc_plane_state *dc_plane_state;
+	struct drm_colorop *colorop;
+	struct drm_colorop_state *colorop_state;
+
+	dc_plane_state = kunit_kzalloc(test, sizeof(*dc_plane_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, dc_plane_state);
+
+	colorop = kunit_kzalloc(test, sizeof(*colorop), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, colorop);
+
+	colorop_state = kunit_kzalloc(test, sizeof(*colorop_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, colorop_state);
+
+	colorop->type = DRM_COLOROP_1D_CURVE;
+	colorop_state->colorop = colorop;
+	colorop_state->curve_1d_type = DRM_COLOROP_1D_CURVE_COUNT;
+
+	KUNIT_EXPECT_EQ(test,
+		__set_colorop_in_tf_1d_curve(dc_plane_state, colorop_state),
+		-EINVAL);
+}
+
+/**
+ * dm_test_set_colorop_in_tf_1d_curve_bypass - Bypass mode forces linear bypass transfer function
+ * @test: KUnit test context
+ */
+static void dm_test_set_colorop_in_tf_1d_curve_bypass(struct kunit *test)
+{
+	struct dc_plane_state *dc_plane_state;
+	struct drm_colorop *colorop;
+	struct drm_colorop_state *colorop_state;
+
+	dc_plane_state = kunit_kzalloc(test, sizeof(*dc_plane_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, dc_plane_state);
+
+	colorop = kunit_kzalloc(test, sizeof(*colorop), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, colorop);
+
+	colorop_state = kunit_kzalloc(test, sizeof(*colorop_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, colorop_state);
+
+	colorop->type = DRM_COLOROP_1D_CURVE;
+	colorop_state->colorop = colorop;
+	colorop_state->curve_1d_type = DRM_COLOROP_1D_CURVE_SRGB_EOTF;
+	colorop_state->bypass = true;
+
+	KUNIT_EXPECT_EQ(test,
+		__set_colorop_in_tf_1d_curve(dc_plane_state, colorop_state),
+		0);
+	KUNIT_EXPECT_EQ(test,
+		(int)dc_plane_state->in_transfer_func.type,
+		(int)TF_TYPE_BYPASS);
+	KUNIT_EXPECT_EQ(test,
+		(int)dc_plane_state->in_transfer_func.tf,
+		(int)TRANSFER_FUNCTION_LINEAR);
+}
+
 static struct kunit_case dm_color_test_cases[] = {
 	/* amdgpu_dm_fixpt_from_s3132 */
 	KUNIT_CASE(dm_test_fixpt_from_s3132_zero),
@@ -1398,6 +1609,21 @@ static struct kunit_case dm_color_test_cases[] = {
 	KUNIT_CASE(dm_test_set_colorop_3dlut_zero_size),
 	KUNIT_CASE(dm_test_set_colorop_3dlut_nonzero_state_bits),
 	KUNIT_CASE(dm_test_set_colorop_3dlut_data_forwarded),
+	/* __set_tf_bypass */
+	KUNIT_CASE(dm_test_set_tf_bypass),
+	/* __set_tf_distributed_points */
+	KUNIT_CASE(dm_test_set_tf_distributed_points_srgb),
+	KUNIT_CASE(dm_test_set_tf_distributed_points_pq),
+	/* amdgpu_dm_set_atomic_regamma */
+	KUNIT_CASE(dm_test_set_atomic_regamma_bypass),
+	/* amdgpu_dm_atomic_shaper_lut */
+	KUNIT_CASE(dm_test_atomic_shaper_lut_bypass),
+	/* amdgpu_dm_atomic_blend_lut */
+	KUNIT_CASE(dm_test_atomic_blend_lut_bypass),
+	/* __set_colorop_in_tf_1d_curve */
+	KUNIT_CASE(dm_test_set_colorop_in_tf_1d_curve_invalid_type),
+	KUNIT_CASE(dm_test_set_colorop_in_tf_1d_curve_unsupported_curve),
+	KUNIT_CASE(dm_test_set_colorop_in_tf_1d_curve_bypass),
 	{}
 };
 
