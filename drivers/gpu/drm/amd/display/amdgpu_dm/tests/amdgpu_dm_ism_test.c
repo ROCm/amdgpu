@@ -781,6 +781,86 @@ static void dm_test_ism_trigger_event_invalid_transition(struct kunit *test)
 			(int)DM_ISM_STATE_FULL_POWER_RUNNING);
 }
 
+/* ===== Tests for dm_ism_dispatch_next_event ===== */
+
+/**
+ * dm_test_dispatch_next_event_hyst_wait_no_delay - zero delay_ns: IMMEDIATE in HYSTERESIS_WAITING
+ * @test: KUnit test context
+ */
+static void dm_test_dispatch_next_event_hyst_wait_no_delay(struct kunit *test)
+{
+	enum amdgpu_dm_ism_event result;
+
+	result = dm_ism_dispatch_next_event(DM_ISM_STATE_HYSTERESIS_WAITING,
+					    0, 0);
+	KUNIT_EXPECT_EQ(test, (int)result, (int)DM_ISM_EVENT_IMMEDIATE);
+}
+
+/**
+ * dm_test_dispatch_next_event_hyst_wait_with_delay - delay_ns > 0, no IMMEDIATE event returned
+ * @test: KUnit test context
+ */
+static void dm_test_dispatch_next_event_hyst_wait_with_delay(struct kunit *test)
+{
+	enum amdgpu_dm_ism_event result;
+
+	result = dm_ism_dispatch_next_event(DM_ISM_STATE_HYSTERESIS_WAITING,
+					    1000000, 0);
+	KUNIT_EXPECT_EQ(test, (int)result, (int)DM_ISM_NUM_EVENTS);
+}
+
+/**
+ * dm_test_dispatch_next_event_opt_idle_no_sso_delay - sso_delay_ns == 0 triggers IMMEDIATE event
+ * @test: KUnit test context
+ */
+static void dm_test_dispatch_next_event_opt_idle_no_sso_delay(struct kunit *test)
+{
+	enum amdgpu_dm_ism_event result;
+
+	result = dm_ism_dispatch_next_event(DM_ISM_STATE_OPTIMIZED_IDLE,
+					    0, 0);
+	KUNIT_EXPECT_EQ(test, (int)result, (int)DM_ISM_EVENT_IMMEDIATE);
+}
+
+/**
+ * dm_test_dispatch_next_event_opt_idle_with_sso_delay - sso_delay_ns > 0, SSO timer, no IMMEDIATE
+ * @test: KUnit test context
+ */
+static void dm_test_dispatch_next_event_opt_idle_with_sso_delay(struct kunit *test)
+{
+	enum amdgpu_dm_ism_event result;
+
+	result = dm_ism_dispatch_next_event(DM_ISM_STATE_OPTIMIZED_IDLE,
+					    0, 1000000);
+	KUNIT_EXPECT_EQ(test, (int)result, (int)DM_ISM_NUM_EVENTS);
+}
+
+/**
+ * dm_test_dispatch_next_event_timer_aborted - TIMER_ABORTED always returns IMMEDIATE
+ * @test: KUnit test context
+ */
+static void dm_test_dispatch_next_event_timer_aborted(struct kunit *test)
+{
+	enum amdgpu_dm_ism_event result;
+
+	result = dm_ism_dispatch_next_event(DM_ISM_STATE_TIMER_ABORTED,
+					    0, 0);
+	KUNIT_EXPECT_EQ(test, (int)result, (int)DM_ISM_EVENT_IMMEDIATE);
+}
+
+/**
+ * dm_test_dispatch_next_event_no_action_state - other states return DM_ISM_NUM_EVENTS
+ * @test: KUnit test context
+ */
+static void dm_test_dispatch_next_event_no_action_state(struct kunit *test)
+{
+	enum amdgpu_dm_ism_event result;
+
+	result = dm_ism_dispatch_next_event(DM_ISM_STATE_FULL_POWER_RUNNING,
+					    0, 0);
+	KUNIT_EXPECT_EQ(test, (int)result, (int)DM_ISM_NUM_EVENTS);
+}
+
 static struct kunit_case dm_ism_test_cases[] = {
 	/* dm_ism_next_state — FULL_POWER_RUNNING */
 	KUNIT_CASE(dm_test_ism_next_state_running_enter_idle),
@@ -836,6 +916,13 @@ static struct kunit_case dm_ism_test_cases[] = {
 	/* dm_ism_trigger_event */
 	KUNIT_CASE(dm_test_ism_trigger_event_valid_transition),
 	KUNIT_CASE(dm_test_ism_trigger_event_invalid_transition),
+	/* dm_ism_dispatch_next_event */
+	KUNIT_CASE(dm_test_dispatch_next_event_hyst_wait_no_delay),
+	KUNIT_CASE(dm_test_dispatch_next_event_hyst_wait_with_delay),
+	KUNIT_CASE(dm_test_dispatch_next_event_opt_idle_no_sso_delay),
+	KUNIT_CASE(dm_test_dispatch_next_event_opt_idle_with_sso_delay),
+	KUNIT_CASE(dm_test_dispatch_next_event_timer_aborted),
+	KUNIT_CASE(dm_test_dispatch_next_event_no_action_state),
 	{}
 };
 
