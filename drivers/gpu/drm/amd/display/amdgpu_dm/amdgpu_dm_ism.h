@@ -161,6 +161,9 @@ void dm_ism_insert_record(struct amdgpu_dm_ism *ism);
 void dm_ism_set_last_idle_ts(struct amdgpu_dm_ism *ism);
 bool dm_ism_trigger_event(struct amdgpu_dm_ism *ism,
 			  enum amdgpu_dm_ism_event event);
+enum amdgpu_dm_ism_event dm_ism_dispatch_next_event(enum amdgpu_dm_ism_state current_state,
+						    uint64_t delay_ns,
+						    uint64_t sso_delay_ns);
 #endif
 
 #endif
