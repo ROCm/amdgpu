@@ -27,9 +27,11 @@
 #ifndef AMDGPU_DM_AMDGPU_DM_PSR_H_
 #define AMDGPU_DM_AMDGPU_DM_PSR_H_
 
-#include "amdgpu.h"
 #include "dc.h"
 #include "modules/inc/mod_power.h"
+
+struct amdgpu_display_manager;
+struct amdgpu_dm_connector;
 
 /* the number of pageflips before enabling psr */
 #define AMDGPU_DM_PSR_ENTRY_DELAY 5

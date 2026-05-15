@@ -7,11 +7,7 @@
 
 #include <kunit/test.h>
 
-#include "dc.h"
-
-/* Extern declaration for the function under test */
-extern void amdgpu_dm_psr_fill_caps(struct dc_link *link,
-				     struct psr_caps *caps);
+#include "amdgpu_dm_psr.h"
 
 /*
  * Helper: allocate and zero-initialise a dc_link sufficient for
@@ -227,6 +223,43 @@ static void dm_test_psr_fill_caps_power_opts_z10_always_set(struct kunit *test)
 }
 /* End of tests for amdgpu_dm_psr_fill_caps() */
 
+/* Tests for amdgpu_dm_psr_set_event() — early-exit validation guards */
+
+static void dm_test_psr_set_event_null_stream(struct kunit *test)
+{
+	/* NULL stream → immediate false, dm is not accessed */
+	KUNIT_EXPECT_FALSE(test, amdgpu_dm_psr_set_event(NULL, NULL, true, psr_event_vsync, false));
+}
+
+static void dm_test_psr_set_event_null_link(struct kunit *test)
+{
+	struct dc_stream_state *stream;
+
+	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, stream);
+	/* stream->link remains NULL from kzalloc */
+
+	KUNIT_EXPECT_FALSE(test, amdgpu_dm_psr_set_event(NULL, stream, true, psr_event_vsync, false));
+}
+
+static void dm_test_psr_set_event_psr_not_enabled(struct kunit *test)
+{
+	struct dc_stream_state *stream;
+	struct dc_link *link;
+
+	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, stream);
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+
+	stream->link = link;
+	/* link->psr_settings.psr_feature_enabled remains false from kzalloc */
+
+	KUNIT_EXPECT_FALSE(test, amdgpu_dm_psr_set_event(NULL, stream, true, psr_event_vsync, false));
+}
+/* End of tests for amdgpu_dm_psr_set_event() */
+
 static struct kunit_case dm_psr_test_cases[] = {
 	KUNIT_CASE(dm_test_psr_fill_caps_version_1),
 	KUNIT_CASE(dm_test_psr_fill_caps_version_su1),
@@ -240,6 +273,9 @@ static struct kunit_case dm_psr_test_cases[] = {
 	KUNIT_CASE(dm_test_psr_fill_caps_dpcd_fields_unset),
 	KUNIT_CASE(dm_test_psr_fill_caps_rate_control_always_zero),
 	KUNIT_CASE(dm_test_psr_fill_caps_power_opts_z10_always_set),
+	KUNIT_CASE(dm_test_psr_set_event_null_stream),
+	KUNIT_CASE(dm_test_psr_set_event_null_link),
+	KUNIT_CASE(dm_test_psr_set_event_psr_not_enabled),
 	{}
 };
 

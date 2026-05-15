@@ -25,6 +25,7 @@
  */
 
 #include "amdgpu_dm_psr.h"
+#include "amdgpu.h"
 #include "dc_dmub_srv.h"
 #include "dc.h"
 #include "amdgpu_dm.h"
