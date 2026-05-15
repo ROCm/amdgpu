@@ -2882,12 +2882,11 @@ static int amdgpu_runtime_idle_check_userq(struct device *dev)
 	return xa_empty(&adev->userq_doorbell_xa) ? 0 : -EBUSY;
 }
 
-static int amdgpu_pmops_runtime_suspend(struct device *dev)
+static int amdgpu_pmops_runtime_checks(struct device *dev)
 {
-	struct pci_dev *pdev = to_pci_dev(dev);
-	struct drm_device *drm_dev = pci_get_drvdata(pdev);
+	struct drm_device *drm_dev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(drm_dev);
-	int ret, i;
+	int ret;
 
 	if (adev->pm.rpm_mode == AMDGPU_RUNPM_NONE) {
 		pm_runtime_forbid(dev);
@@ -2897,7 +2896,27 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 	ret = amdgpu_runtime_idle_check_display(dev);
 	if (ret)
 		return ret;
-	ret = amdgpu_runtime_idle_check_userq(dev);
+
+	return amdgpu_runtime_idle_check_userq(dev);
+}
+
+static int amdgpu_pmops_runtime_idle(struct device *dev)
+{
+	int ret;
+
+	ret = amdgpu_pmops_runtime_checks(dev);
+	pm_runtime_autosuspend(dev);
+	return ret;
+}
+
+static int amdgpu_pmops_runtime_suspend(struct device *dev)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct drm_device *drm_dev = pci_get_drvdata(pdev);
+	struct amdgpu_device *adev = drm_to_adev(drm_dev);
+	int ret, i;
+
+	ret = amdgpu_pmops_runtime_checks(dev);
 	if (ret)
 		return ret;
 
@@ -3007,27 +3026,6 @@ static int amdgpu_pmops_runtime_resume(struct device *dev)
 		drm_dev->switch_power_state = DRM_SWITCH_POWER_ON;
 	adev->in_runpm = false;
 	return 0;
-}
-
-static int amdgpu_pmops_runtime_idle(struct device *dev)
-{
-	struct drm_device *drm_dev = dev_get_drvdata(dev);
-	struct amdgpu_device *adev = drm_to_adev(drm_dev);
-	int ret;
-
-	if (adev->pm.rpm_mode == AMDGPU_RUNPM_NONE) {
-		pm_runtime_forbid(dev);
-		return -EBUSY;
-	}
-
-	ret = amdgpu_runtime_idle_check_display(dev);
-	if (ret)
-		goto done;
-
-	ret = amdgpu_runtime_idle_check_userq(dev);
-done:
-	pm_runtime_autosuspend(dev);
-	return ret;
 }
 
 static int amdgpu_drm_release(struct inode *inode, struct file *filp)
