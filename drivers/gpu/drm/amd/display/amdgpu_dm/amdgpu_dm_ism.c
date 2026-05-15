@@ -230,7 +230,8 @@ EXPORT_IF_KUNIT(dm_ism_get_idle_allow_delay);
  * dm_ism_insert_record - Insert a record into the circular history buffer
  * @ism: ISM instance
  */
-static void dm_ism_insert_record(struct amdgpu_dm_ism *ism)
+STATIC_IFN_KUNIT
+void dm_ism_insert_record(struct amdgpu_dm_ism *ism)
 {
 	struct amdgpu_dm_ism_record *record;
 
@@ -245,15 +246,19 @@ static void dm_ism_insert_record(struct amdgpu_dm_ism *ism)
 	record->duration_ns =
 		record->timestamp_ns - ism->last_idle_timestamp_ns;
 }
+EXPORT_IF_KUNIT(dm_ism_insert_record);
 
 
-static void dm_ism_set_last_idle_ts(struct amdgpu_dm_ism *ism)
+STATIC_IFN_KUNIT
+void dm_ism_set_last_idle_ts(struct amdgpu_dm_ism *ism)
 {
 	ism->last_idle_timestamp_ns = ktime_get_ns();
 }
+EXPORT_IF_KUNIT(dm_ism_set_last_idle_ts);
 
 
-static bool dm_ism_trigger_event(struct amdgpu_dm_ism *ism,
+STATIC_IFN_KUNIT
+bool dm_ism_trigger_event(struct amdgpu_dm_ism *ism,
 				 enum amdgpu_dm_ism_event event)
 {
 	enum amdgpu_dm_ism_state next_state;
@@ -268,6 +273,7 @@ static bool dm_ism_trigger_event(struct amdgpu_dm_ism *ism,
 
 	return gotNextState;
 }
+EXPORT_IF_KUNIT(dm_ism_trigger_event);
 
 
 static void dm_ism_commit_idle_optimization_state(struct amdgpu_dm_ism *ism,
