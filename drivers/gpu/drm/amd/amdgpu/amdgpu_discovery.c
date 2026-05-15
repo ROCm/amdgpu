@@ -396,6 +396,26 @@ static int amdgpu_discovery_read_binary_from_file(struct amdgpu_device *adev,
 		return r;
 	}
 
+	if (fw->size > adev->discovery.size) {
+		dev_err(adev->dev,
+			"ip discovery firmware \"%s\" too large (%zu > %u)\n",
+			fw_name, fw->size, adev->discovery.size);
+		release_firmware(fw);
+		return -EINVAL;
+	}
+
+	/* Ensure the firmware is at least large enough to contain the
+	 * binary header fields.
+	 */
+	if (fw->size < offsetof(struct binary_header, binary_size) +
+			sizeof(((struct binary_header *)0)->binary_size)) {
+		dev_err(adev->dev,
+			"ip discovery firmware \"%s\" too small (%zu)\n",
+			fw_name, fw->size);
+		release_firmware(fw);
+		return -EINVAL;
+	}
+
 	memcpy((u8 *)binary, (u8 *)fw->data, fw->size);
 	release_firmware(fw);
 
