@@ -727,6 +727,15 @@ void amdgpu_ring_set_fence_errors_and_reemit(struct amdgpu_ring *ring,
 	last_seq = amdgpu_fence_read(ring) & ring->fence_drv.num_fences_mask;
 	seq = ring->fence_drv.sync_seq & ring->fence_drv.num_fences_mask;
 
+	/* If there is nothing to reemit, return early and set an error on the fence
+	 * if applicable. If all of the fences are siganlled, this will be a nop.
+	 * if there are still fences and ring_backup_entries_to_copy is 0, then
+	 * we are skipping it on purpose.
+	 */
+	if (!ring->ring_backup_entries_to_copy) {
+		amdgpu_fence_driver_force_completion(ring, &guilty_fence->base);
+		return;
+	}
 	ring->reemit = true;
 	amdgpu_ring_alloc(ring, ring->ring_backup_entries_to_copy);
 	spin_lock_irqsave(&ring->fence_drv.lock, flags);
