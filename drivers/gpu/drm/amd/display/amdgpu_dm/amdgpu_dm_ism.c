@@ -332,15 +332,36 @@ static void dm_ism_commit_idle_optimization_state(struct amdgpu_dm_ism *ism,
 	}
 }
 
+STATIC_IFN_KUNIT
+enum amdgpu_dm_ism_event dm_ism_dispatch_next_event(
+	enum amdgpu_dm_ism_state current_state,
+	uint64_t delay_ns,
+	uint64_t sso_delay_ns)
+{
+	switch (current_state) {
+	case DM_ISM_STATE_HYSTERESIS_WAITING:
+		if (delay_ns == 0)
+			return DM_ISM_EVENT_IMMEDIATE;
+		break;
+	case DM_ISM_STATE_OPTIMIZED_IDLE:
+		if (sso_delay_ns == 0)
+			return DM_ISM_EVENT_IMMEDIATE;
+		break;
+	case DM_ISM_STATE_TIMER_ABORTED:
+		return DM_ISM_EVENT_IMMEDIATE;
+	default:
+		break;
+	}
+	return DM_ISM_NUM_EVENTS;
+}
+EXPORT_IF_KUNIT(dm_ism_dispatch_next_event);
 
 static enum amdgpu_dm_ism_event dm_ism_dispatch_power_state(
 	struct amdgpu_dm_ism *ism,
-	struct dm_crtc_state *acrtc_state,
-	enum amdgpu_dm_ism_event event)
+	struct dm_crtc_state *acrtc_state)
 {
-	enum amdgpu_dm_ism_event ret = event;
 	const struct amdgpu_dm_ism_config *config = &ism->config;
-	uint64_t delay_ns, sso_delay_ns;
+	uint64_t delay_ns = 0, sso_delay_ns = 0;
 
 	switch (ism->previous_state) {
 	case DM_ISM_STATE_HYSTERESIS_WAITING:
@@ -374,30 +395,15 @@ static enum amdgpu_dm_ism_event dm_ism_dispatch_power_state(
 	switch (ism->current_state) {
 	case DM_ISM_STATE_HYSTERESIS_WAITING:
 		dm_ism_set_last_idle_ts(ism);
-
-		/* CRTC can be disabled; allow immediate idle */
-		if (!acrtc_state->stream) {
-			ret = DM_ISM_EVENT_IMMEDIATE;
-			break;
-		}
-
-		delay_ns = dm_ism_get_idle_allow_delay(ism,
-						       acrtc_state->stream);
-		if (delay_ns == 0) {
-			ret = DM_ISM_EVENT_IMMEDIATE;
-			break;
-		}
-
+		delay_ns = dm_ism_get_idle_allow_delay(ism, acrtc_state->stream);
 		/* Schedule worker */
-		mod_delayed_work(system_dfl_wq, &ism->delayed_work,
-				 nsecs_to_jiffies(delay_ns));
-
+		if (delay_ns > 0)
+			mod_delayed_work(system_dfl_wq, &ism->delayed_work,
+					 nsecs_to_jiffies(delay_ns));
 		break;
 	case DM_ISM_STATE_OPTIMIZED_IDLE:
 		sso_delay_ns = dm_ism_get_sso_delay(ism, acrtc_state->stream);
-		if (sso_delay_ns == 0)
-			ret = DM_ISM_EVENT_IMMEDIATE;
-		else if (config->sso_num_frames < config->filter_num_frames) {
+		if (sso_delay_ns > 0) {
 			/*
 			 * If sso_num_frames is less than hysteresis frames, it
 			 * indicates that allowing idle here, then disallowing
@@ -405,13 +411,10 @@ static enum amdgpu_dm_ism_event dm_ism_dispatch_power_state(
 			 * have a negative power impact. Skip idle allow here,
 			 * and let the sso_delayed_work handle it.
 			 */
-			mod_delayed_work(system_dfl_wq,
-					 &ism->sso_delayed_work,
-					 nsecs_to_jiffies(sso_delay_ns));
-		} else {
-			/* Enable idle optimization without SSO */
-			dm_ism_commit_idle_optimization_state(
-				ism, acrtc_state->stream, false, false);
+			if (config->sso_num_frames >= config->filter_num_frames)
+				dm_ism_commit_idle_optimization_state(ism, acrtc_state->stream,
+								      false, false);
+
 			mod_delayed_work(system_dfl_wq,
 					 &ism->sso_delayed_work,
 					 nsecs_to_jiffies(sso_delay_ns));
@@ -426,13 +429,12 @@ static enum amdgpu_dm_ism_event dm_ism_dispatch_power_state(
 		dm_ism_insert_record(ism);
 		dm_ism_commit_idle_optimization_state(ism, acrtc_state->stream,
 						      true, false);
-		ret = DM_ISM_EVENT_IMMEDIATE;
 		break;
 	default:
 		break;
 	}
 
-	return ret;
+	return dm_ism_dispatch_next_event(ism->current_state, delay_ns, sso_delay_ns);
 }
 
 static char *dm_ism_events_str[DM_ISM_NUM_EVENTS] = {
@@ -487,8 +489,7 @@ void amdgpu_dm_ism_commit_event(struct amdgpu_dm_ism *ism,
 				dm_ism_states_str[ism->previous_state],
 				dm_ism_states_str[ism->current_state],
 				dm_ism_events_str[event]);
-			next_event = dm_ism_dispatch_power_state(
-				ism, acrtc_state, next_event);
+			next_event = dm_ism_dispatch_power_state(ism, acrtc_state);
 		} else {
 			trace_amdgpu_dm_ism_event(
 				acrtc->crtc_id,
