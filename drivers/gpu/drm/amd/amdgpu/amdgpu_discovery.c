@@ -840,42 +840,44 @@ static void amdgpu_discovery_read_from_harvest_table(struct amdgpu_device *adev,
 	harvest_info = (struct harvest_table *)(discovery_bin + offset);
 
 	for (i = 0; i < 32; i++) {
-		if (le16_to_cpu(harvest_info->list[i].hw_id) == 0)
+		u16 hw_id = le16_to_cpu(harvest_info->list[i].hw_id);
+		u8 inst = harvest_info->list[i].number_instance;
+
+		if (hw_id == 0)
 			break;
 
-		switch (le16_to_cpu(harvest_info->list[i].hw_id)) {
+		if (inst >= 32) {
+			dev_warn(adev->dev,
+				 "bogus harvest instance %u for hw_id %u\n",
+				 inst, hw_id);
+			continue;
+		}
+
+		switch (hw_id) {
 		case VCN_HWID:
 			(*vcn_harvest_count)++;
-			adev->vcn.harvest_config |=
-				(1 << harvest_info->list[i].number_instance);
-			adev->jpeg.harvest_config |=
-				(1 << harvest_info->list[i].number_instance);
+			adev->vcn.harvest_config |= BIT(inst);
+			adev->jpeg.harvest_config |= BIT(inst);
 
-			adev->vcn.inst_mask &=
-				~(1U << harvest_info->list[i].number_instance);
-			adev->jpeg.inst_mask &=
-				~(1U << harvest_info->list[i].number_instance);
+			adev->vcn.inst_mask &= ~BIT(inst);
+			adev->jpeg.inst_mask &= ~BIT(inst);
 			break;
 		case DMU_HWID:
 			adev->harvest_ip_mask |= AMD_HARVEST_IP_DMU_MASK;
 			break;
 		case UMC_HWID:
-			umc_harvest_config |=
-				1 << (le16_to_cpu(harvest_info->list[i].number_instance));
+			umc_harvest_config |= BIT_ULL(inst);
 			(*umc_harvest_count)++;
 			break;
 		case GC_HWID:
-			adev->gfx.xcc_mask &=
-				~(1U << harvest_info->list[i].number_instance);
+			adev->gfx.xcc_mask &= ~BIT(inst);
 			break;
 		case SDMA0_HWID:
-			adev->sdma.sdma_mask &=
-				~(1U << harvest_info->list[i].number_instance);
+			adev->sdma.sdma_mask &= ~BIT(inst);
 			break;
 #if defined(CONFIG_DRM_AMD_ISP)
 		case ISP_HWID:
-			adev->isp.harvest_config |=
-				~(1U << harvest_info->list[i].number_instance);
+			adev->isp.harvest_config |= ~BIT(inst);
 			break;
 #endif
 		default:
