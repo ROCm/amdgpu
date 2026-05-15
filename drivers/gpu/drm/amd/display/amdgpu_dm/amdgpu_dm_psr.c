@@ -123,7 +123,7 @@ bool amdgpu_dm_set_psr_caps(struct dc_link *link, struct amdgpu_dm_connector *ac
 		return false;
 
 	/*disable allow psr/psrsu/replay on eDP1*/
-	if (dc_get_edp_link_panel_inst(link->ctx->dc, link, &panel_inst) && panel_inst == 1)
+	if (dc_get_edp_link_panel_inst(dc, link, &panel_inst) && panel_inst == 1)
 		return false;
 
 	if (link_supports_psrsu(link))
@@ -145,22 +145,17 @@ bool amdgpu_dm_set_psr_caps(struct dc_link *link, struct amdgpu_dm_connector *ac
 bool amdgpu_dm_psr_is_active_allowed(struct amdgpu_display_manager *dm)
 {
 	unsigned int i;
-	bool allow_active = false;
 
-	for (i = 0; i < dm->dc->current_state->stream_count ; i++) {
-		struct dc_link *link;
-		struct dc_stream_state *stream = dm->dc->current_state->streams[i];
+	for (i = 0; i < dm->dc->current_state->stream_count; i++) {
+		const struct dc_link *link = dm->dc->current_state->streams[i]->link;
 
-		link = stream->link;
 		if (!link)
 			continue;
-		if (link->psr_settings.psr_feature_enabled &&
-		    link->psr_settings.psr_allow_active) {
-			allow_active = true;
-			break;
-		}
+
+		if (link->psr_settings.psr_feature_enabled && link->psr_settings.psr_allow_active)
+			return true;
 	}
-	return allow_active;
+	return false;
 }
 
 /*
