@@ -5,6 +5,7 @@
 #include "dcn42_soc_and_ip_translator.h"
 #include "../dcn401/dcn401_soc_and_ip_translator.h"
 #include "bounding_boxes/dcn42_soc_bb.h"
+#include "bounding_boxes/dcn42b_soc_bb.h"
 
 /* soc_and_ip_translator component used to get up-to-date values for bounding box.
  * Bounding box values are stored in several locations and locations can vary with DCN revision.
@@ -13,7 +14,10 @@
 
 static void get_default_soc_bb(struct dml2_soc_bb *soc_bb, const struct dc *dc)
 {
-	{
+	if (dc->ctx->dce_version == DCN_VERSION_4_2B) {
+		memcpy(soc_bb, &dml2_socbb_dcn42b, sizeof(struct dml2_soc_bb));
+		memcpy(&soc_bb->qos_parameters, &dml_dcn42b_variant_a_soc_qos_params, sizeof(struct dml2_soc_qos_parameters));
+	} else {
 		memcpy(soc_bb, &dml2_socbb_dcn42, sizeof(struct dml2_soc_bb));
 		memcpy(&soc_bb->qos_parameters, &dml_dcn42_variant_a_soc_qos_params, sizeof(struct dml2_soc_qos_parameters));
 	}
