@@ -407,6 +407,32 @@ static int add_all_kfd_queues_mes(struct device_queue_manager *dqm)
 	return retval;
 }
 
+static int reset_queue_mes(struct device_queue_manager *dqm, struct queue *q,
+			   int queue_type, int pipe, int queue, unsigned int db)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)dqm->dev->adev;
+	struct kfd_process_device *pdd;
+	bool use_mmio = false;
+	int r;
+
+	pdd = kfd_get_process_device_data(q->device, q->process);
+	if (!pdd)
+		return -ENODEV;
+
+	if (use_mmio)
+		r = amdgpu_mes_reset_queue_mmio(adev, queue_type, 0, 1, pipe, queue,
+						ffs(dqm->dev->xcc_mask) - 1);
+	else
+		r = amdgpu_mes_reset_user_queue(adev, queue_type, db,
+						ffs(dqm->dev->xcc_mask) - 1);
+	if (r)
+		return r;
+	/* Proceed remove_queue with reset=true */
+	remove_queue_mes_on_reset_option(dqm, q, &pdd->qpd, true, false);
+	set_queue_as_reset(dqm, q, &pdd->qpd);
+	return 0;
+}
+
 static int reset_queues_mes(struct device_queue_manager *dqm)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)dqm->dev->adev;
@@ -414,7 +440,6 @@ static int reset_queues_mes(struct device_queue_manager *dqm)
 	int num_hung = 0, r = 0, i, pipe, queue, queue_type;
 	u32 *hung_array = dqm->hung_db_array;
 	struct amdgpu_mes_hung_queue_hqd_info *hqd_info = dqm->hqd_info;
-	struct kfd_process_device *pdd;
 	struct queue *q;
 
 	if (!amdgpu_mes_queue_reset_by_mes_supported(adev)) {
@@ -468,24 +493,13 @@ static int reset_queues_mes(struct device_queue_manager *dqm)
 
 		q = find_queue_by_doorbell_offset(dqm, hung_array[i]);
 		/* skip queues not owned by KFD */
-		if (!q)
+		if (!q) {
 			continue;
-
-		pdd = kfd_get_process_device_data(q->device, q->process);
-		if (!pdd) {
-			r = -ENODEV;
-			goto fail;
+		} else {
+			r = reset_queue_mes(dqm, q, queue_type, pipe, queue, hung_array[i]);
+			if (r)
+				goto fail;
 		}
-
-		pr_warn("Hang detected doorbell %x pipe %d queue %d type %d\n",
-				hung_array[i], pipe, queue, queue_type);
-		r = amdgpu_mes_reset_user_queue(adev, queue_type, hung_array[i],
-						ffs(dqm->dev->xcc_mask) - 1);
-		if (r)
-			goto fail;
-		/* Proceed remove_queue with reset=true */
-		remove_queue_mes_on_reset_option(dqm, q, &pdd->qpd, true, false);
-		set_queue_as_reset(dqm, q, &pdd->qpd);
 	}
 
 	dqm->detect_hang_count = num_hung;
