@@ -117,6 +117,27 @@ struct dcn42_clk_internal {
 	uint32_t CLK8_CLK_TICK_CNT__TIMER_THRESHOLD;
 };
 
+struct dcn42b_clk_internal {
+	int dummy;
+	uint32_t CLK5_CLK0_CURRENT_CNT; //dispclk
+	uint32_t CLK5_CLK1_CURRENT_CNT; //dppclk
+	uint32_t CLK5_CLK2_CURRENT_CNT; //dprefclk
+	uint32_t CLK5_CLK3_CURRENT_CNT; //dcfclk
+	//uint32_t CLK5_CLK4_CURRENT_CNT; //dtbclk
+	uint32_t CLK5_CLK0_DS_CNTL;	    //dispclk deep_sleep_divider
+	uint32_t CLK5_CLK1_DS_CNTL;	    //dppclk deep_sleep_divider
+	uint32_t CLK5_CLK2_DS_CNTL;	    //dprefclk deep_sleep_divider
+	uint32_t CLK5_CLK3_DS_CNTL;	    //dcfclk deep_sleep_divider
+	uint32_t CLK5_CLK3_ALLOW_DS;	//dcf_deep_sleep_allow
+	//uint32_t CLK8_CLK4_DS_CNTL;	    //dtbclk deep_sleep_divider
+	uint32_t CLK5_CLK0_BYPASS_CNTL; //dispclk bypass
+	uint32_t CLK5_CLK1_BYPASS_CNTL; //dppclk bypass
+	uint32_t CLK5_CLK2_BYPASS_CNTL; //dprefclk bypass
+	uint32_t CLK5_CLK3_BYPASS_CNTL; //dcfclk bypass
+	//uint32_t CLK5_CLK4_BYPASS_CNTL; //dtbclk bypass
+	uint32_t CLK5_CLK_TICK_CNT__TIMER_THRESHOLD;
+};
+
 /* Will these bw structures be ASIC specific? */
 
 #define MAX_NUM_DPM_LVL		8
