@@ -406,7 +406,10 @@ uint8_t amdgpu_mm_rreg8(struct amdgpu_device *adev, uint32_t offset)
 
 	if (offset < adev->rmmio_size)
 		return (readb(adev->rmmio + offset));
-	BUG();
+
+	dev_err(adev->dev, "invalid MMIO read offset 0x%x (rmmio size 0x%x)\n",
+		offset, (unsigned int)adev->rmmio_size);
+	return 0;
 }
 
 /**
@@ -469,10 +472,13 @@ void amdgpu_mm_wreg8(struct amdgpu_device *adev, uint32_t offset, uint8_t value)
 	if (amdgpu_device_skip_hw_access(adev))
 		return;
 
-	if (offset < adev->rmmio_size)
+	if (offset < adev->rmmio_size) {
 		writeb(value, adev->rmmio + offset);
-	else
-		BUG();
+	} else {
+		dev_err(adev->dev, "invalid MMIO write offset 0x%x (rmmio size 0x%x)\n",
+			offset, (unsigned int)adev->rmmio_size);
+		return;
+	}
 }
 
 /**
