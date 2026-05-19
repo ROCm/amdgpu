@@ -485,8 +485,6 @@ struct amd_pm_funcs {
 	u32 (*get_mclk)(void *handle, bool low);
 	int (*display_configuration_change)(void *handle,
 		const struct amd_pp_display_configuration *input);
-	int (*get_display_power_level)(void *handle,
-		struct amd_pp_simple_clock_info *output);
 	int (*get_current_clocks)(void *handle,
 		struct amd_pp_clock_info *clocks);
 	int (*get_clock_by_type)(void *handle,

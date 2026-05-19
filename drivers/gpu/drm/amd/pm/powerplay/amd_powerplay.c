@@ -1020,17 +1020,6 @@ static int pp_display_configuration_change(void *handle,
 	return 0;
 }
 
-static int pp_get_display_power_level(void *handle,
-		struct amd_pp_simple_clock_info *output)
-{
-	struct pp_hwmgr *hwmgr = handle;
-
-	if (!hwmgr || !hwmgr->pm_en || !output)
-		return -EINVAL;
-
-	return phm_get_dal_power_level(hwmgr, output);
-}
-
 static int pp_get_current_clocks(void *handle,
 		struct amd_pp_clock_info *clocks)
 {
@@ -1588,7 +1577,6 @@ static const struct amd_pm_funcs pp_dpm_funcs = {
 	.get_sclk = pp_dpm_get_sclk,
 	.get_mclk = pp_dpm_get_mclk,
 	.display_configuration_change = pp_display_configuration_change,
-	.get_display_power_level = pp_get_display_power_level,
 	.get_current_clocks = pp_get_current_clocks,
 	.get_clock_by_type = pp_get_clock_by_type,
 	.get_clock_by_type_with_latency = pp_get_clock_by_type_with_latency,
