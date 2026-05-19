@@ -60,9 +60,11 @@ EXPORT_IF_KUNIT(amdgpu_dm_supported_blnd_tfs);
 
 #define LUT3D_SIZE		17
 
+#ifdef HAVE_DRM_COLOROP_FUNCS
 static const struct drm_colorop_funcs dm_colorop_funcs = {
 	.destroy = drm_colorop_destroy,
 };
+#endif
 
 STATIC_IFN_KUNIT int
 amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane,
@@ -81,7 +83,10 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 		goto cleanup;
 	}
 
-	ret = drm_plane_colorop_curve_1d_init(dev, ops[i], plane, &dm_colorop_funcs,
+	ret = drm_plane_colorop_curve_1d_init(dev, ops[i], plane,
+#ifdef HAVE_DRM_COLOROP_FUNCS
+					      &dm_colorop_funcs,
+#endif
 					      amdgpu_dm_supported_degam_tfs,
 					      DRM_COLOROP_FLAG_ALLOW_BYPASS);
 	if (ret)
@@ -98,7 +103,10 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 		goto cleanup;
 	}
 
-	ret = drm_plane_colorop_mult_init(dev, ops[i], plane, &dm_colorop_funcs,
+	ret = drm_plane_colorop_mult_init(dev, ops[i], plane,
+#ifdef HAVE_DRM_COLOROP_FUNCS
+					  &dm_colorop_funcs,
+#endif
 					  DRM_COLOROP_FLAG_ALLOW_BYPASS);
 	if (ret)
 		goto cleanup;
@@ -115,7 +123,9 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 	}
 
 	ret = drm_plane_colorop_ctm_3x4_init(dev, ops[i], plane,
+#ifdef HAVE_DRM_COLOROP_FUNCS
 					     &dm_colorop_funcs,
+#endif
 					     DRM_COLOROP_FLAG_ALLOW_BYPASS);
 	if (ret)
 		goto cleanup;
@@ -132,7 +142,10 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 			goto cleanup;
 		}
 
-		ret = drm_plane_colorop_curve_1d_init(dev, ops[i], plane, &dm_colorop_funcs,
+		ret = drm_plane_colorop_curve_1d_init(dev, ops[i], plane,
+#ifdef HAVE_DRM_COLOROP_FUNCS
+						&dm_colorop_funcs,
+#endif
 						amdgpu_dm_supported_shaper_tfs,
 						DRM_COLOROP_FLAG_ALLOW_BYPASS);
 		if (ret)
@@ -150,7 +163,9 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 		}
 
 		ret = drm_plane_colorop_curve_1d_lut_init(dev, ops[i], plane,
+#ifdef HAVE_DRM_COLOROP_FUNCS
 							&dm_colorop_funcs,
+#endif
 							MAX_COLOR_LUT_ENTRIES,
 							DRM_COLOROP_LUT1D_INTERPOLATION_LINEAR,
 							DRM_COLOROP_FLAG_ALLOW_BYPASS);
@@ -169,7 +184,10 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 		}
 
 		ret = drm_plane_colorop_3dlut_init(dev, ops[i], plane,
-					&dm_colorop_funcs, LUT3D_SIZE,
+#ifdef HAVE_DRM_COLOROP_FUNCS
+					&dm_colorop_funcs,
+#endif
+					LUT3D_SIZE,
 					DRM_COLOROP_LUT3D_INTERPOLATION_TETRAHEDRAL,
 					DRM_COLOROP_FLAG_ALLOW_BYPASS);
 		if (ret)
@@ -187,7 +205,10 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 		goto cleanup;
 	}
 
-	ret = drm_plane_colorop_curve_1d_init(dev, ops[i], plane, &dm_colorop_funcs,
+	ret = drm_plane_colorop_curve_1d_init(dev, ops[i], plane,
+#ifdef HAVE_DRM_COLOROP_FUNCS
+					      &dm_colorop_funcs,
+#endif
 					      amdgpu_dm_supported_blnd_tfs,
 					      DRM_COLOROP_FLAG_ALLOW_BYPASS);
 	if (ret)
@@ -204,7 +225,10 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 		goto cleanup;
 	}
 
-	ret = drm_plane_colorop_curve_1d_lut_init(dev, ops[i], plane, &dm_colorop_funcs,
+	ret = drm_plane_colorop_curve_1d_lut_init(dev, ops[i], plane,
+#ifdef HAVE_DRM_COLOROP_FUNCS
+						  &dm_colorop_funcs,
+#endif
 						  MAX_COLOR_LUT_ENTRIES,
 						  DRM_COLOROP_LUT1D_INTERPOLATION_LINEAR,
 						  DRM_COLOROP_FLAG_ALLOW_BYPASS);

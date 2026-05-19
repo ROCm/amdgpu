@@ -255,6 +255,9 @@
 /* drm_client_setup() is available */
 #define HAVE_DRM_CLIENT_SETUP 1
 
+/* struct drm_colorop_funcs is available */
+#define HAVE_DRM_COLOROP_FUNCS 1
+
 /* struct drm_color_ctm_3x4 is available */
 #define HAVE_DRM_COLOR_CTM_3X4 1
 
