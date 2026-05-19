@@ -246,10 +246,6 @@ enum dm_acpi_display_type {
 	AcpiDisplayType_DFP6 = 12
 };
 
-struct dm_pp_power_level_change_request {
-	enum dm_pp_clocks_state power_level;
-};
-
 struct dm_pp_clock_for_voltage_req {
 	enum dm_pp_clock_type clk_type;
 	uint32_t clocks_in_khz;

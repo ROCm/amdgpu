@@ -417,14 +417,6 @@ bool dm_pp_notify_wm_clock_changes(
 	return false;
 }
 
-bool dm_pp_apply_power_level_change_request(
-	const struct dc_context *ctx,
-	struct dm_pp_power_level_change_request *level_change_req)
-{
-	/* TODO: to be implemented */
-	return false;
-}
-
 bool dm_pp_apply_clock_for_voltage_request(
 	const struct dc_context *ctx,
 	struct dm_pp_clock_for_voltage_req *clock_for_voltage_req)
