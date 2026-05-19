@@ -72,12 +72,12 @@ static void dm_test_supported_shaper_tfs_has_gamma22(struct kunit *test)
 			  BIT(DRM_COLOROP_1D_CURVE_GAMMA22));
 }
 
-static void dm_test_supported_degam_tfs_no_extra_bits(struct kunit *test)
+static void dm_test_supported_shaper_tfs_no_extra_bits(struct kunit *test)
 {
-	u64 expected = BIT(DRM_COLOROP_1D_CURVE_SRGB_EOTF) |
-		       BIT(DRM_COLOROP_1D_CURVE_PQ_125_EOTF) |
-		       BIT(DRM_COLOROP_1D_CURVE_BT2020_INV_OETF) |
-		       BIT(DRM_COLOROP_1D_CURVE_GAMMA22_INV);
+	u64 expected = BIT(DRM_COLOROP_1D_CURVE_SRGB_INV_EOTF) |
+		       BIT(DRM_COLOROP_1D_CURVE_PQ_125_INV_EOTF) |
+		       BIT(DRM_COLOROP_1D_CURVE_BT2020_OETF) |
+		       BIT(DRM_COLOROP_1D_CURVE_GAMMA22);
 
 	KUNIT_EXPECT_EQ(test, amdgpu_dm_supported_shaper_tfs, expected);
 }

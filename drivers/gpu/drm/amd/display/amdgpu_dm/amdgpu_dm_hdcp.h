@@ -94,7 +94,7 @@ void hdcp_destroy(struct kobject *kobj, struct hdcp_workqueue *work);
 
 struct hdcp_workqueue *hdcp_create_workqueue(struct amdgpu_device *adev, struct cp_psp *cp_psp, struct dc *dc);
 
-#ifdef CONFIG_DRM_AMD_DC_KUNIT_TEST
+#if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 void process_output(struct hdcp_workqueue *hdcp_work);
 #endif
 

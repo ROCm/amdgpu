@@ -42,7 +42,7 @@ struct dc_rgb;
 struct fixed31_32;
 struct tetrahedral_params;
 
-#ifdef CONFIG_DRM_AMD_DC_KUNIT_TEST
+#if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 /*
  * Prototypes for functions exposed to KUnit tests. The enum types
  * used below (dc_transfer_func_predefined, amdgpu_transfer_function,
