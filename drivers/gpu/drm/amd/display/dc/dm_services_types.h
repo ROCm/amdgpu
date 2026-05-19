@@ -254,9 +254,6 @@ struct dm_pp_clock_for_voltage_req {
 struct dm_pp_static_clock_info {
 	uint32_t max_sclk_khz;
 	uint32_t max_mclk_khz;
-
-	/* max possible display block clocks state */
-	enum dm_pp_clocks_state max_clocks_state;
 };
 
 struct dtn_min_clk_info {
