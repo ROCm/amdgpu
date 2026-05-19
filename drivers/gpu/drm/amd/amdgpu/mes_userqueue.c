@@ -207,7 +207,7 @@ int mes_userq_reset_queue(struct amdgpu_device *adev,
 			  unsigned int db)
 {
 	struct amdgpu_usermode_queue *uq;
-	bool use_mmio = false;
+	bool use_mmio = adev->gfx.mec.use_mmio_for_reset;
 	unsigned long uq_id;
 	int r;
 

@@ -138,7 +138,12 @@ static void amdgpu_userq_hang_detect_work(struct work_struct *work)
 
 	if (amdgpu_userq_is_reset_type_supported(adev, queue->queue_type,
 						 AMDGPU_RESET_TYPE_PER_QUEUE)) {
-		int r = userq_funcs->reset(queue);
+		int r;
+
+		if (queue->queue_type == AMDGPU_HW_IP_COMPUTE)
+			r = amdgpu_gfx_reset_mes_compute(adev, NULL, NULL, NULL, NULL);
+		else
+			r = userq_funcs->reset(queue);
 		if (r)
 			gpu_reset = true;
 	} else {
