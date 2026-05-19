@@ -89,13 +89,6 @@ int dce112_set_clock(struct clk_mgr *clk_mgr_base, int requested_clk_khz)
 	bp->funcs->set_dce_clock(bp, &dce_clk_params);
 	actual_clock = dce_clk_params.target_clock_frequency;
 
-	/*
-	 * from power down, we need mark the clock state as ClocksStateNominal
-	 * from HWReset, so when resume we will call pplib voltage regulator.
-	 */
-	if (requested_clk_khz == 0)
-		clk_mgr_dce->cur_min_clks_state = DM_PP_CLOCKS_STATE_NOMINAL;
-
 	/*Program DP ref Clock*/
 	/*VBIOS will determine DPREFCLK frequency, so we don't set it*/
 	dce_clk_params.target_clock_frequency = 0;
@@ -142,14 +135,6 @@ int dce112_set_dispclk(struct clk_mgr_internal *clk_mgr, int requested_clk_khz)
 
 	bp->funcs->set_dce_clock(bp, &dce_clk_params);
 	actual_clock = dce_clk_params.target_clock_frequency;
-
-	/*
-	 * from power down, we need mark the clock state as ClocksStateNominal
-	 * from HWReset, so when resume we will call pplib voltage regulator.
-	 */
-	if (requested_clk_khz == 0)
-		clk_mgr->cur_min_clks_state = DM_PP_CLOCKS_STATE_NOMINAL;
-
 
 	if (dmcu && dmcu->funcs->is_dmcu_initialized(dmcu)) {
 		if (clk_mgr->dfs_bypass_disp_clk != actual_clock)

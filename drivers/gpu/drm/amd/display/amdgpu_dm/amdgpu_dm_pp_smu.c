@@ -183,33 +183,6 @@ static enum amd_pp_clock_type dc_to_pp_clock_type(
 	return amd_pp_clk_type;
 }
 
-static enum dm_pp_clocks_state pp_to_dc_powerlevel_state(
-			enum PP_DAL_POWERLEVEL max_clocks_state)
-{
-	switch (max_clocks_state) {
-	case PP_DAL_POWERLEVEL_0:
-		return DM_PP_CLOCKS_DPM_STATE_LEVEL_0;
-	case PP_DAL_POWERLEVEL_1:
-		return DM_PP_CLOCKS_DPM_STATE_LEVEL_1;
-	case PP_DAL_POWERLEVEL_2:
-		return DM_PP_CLOCKS_DPM_STATE_LEVEL_2;
-	case PP_DAL_POWERLEVEL_3:
-		return DM_PP_CLOCKS_DPM_STATE_LEVEL_3;
-	case PP_DAL_POWERLEVEL_4:
-		return DM_PP_CLOCKS_DPM_STATE_LEVEL_4;
-	case PP_DAL_POWERLEVEL_5:
-		return DM_PP_CLOCKS_DPM_STATE_LEVEL_5;
-	case PP_DAL_POWERLEVEL_6:
-		return DM_PP_CLOCKS_DPM_STATE_LEVEL_6;
-	case PP_DAL_POWERLEVEL_7:
-		return DM_PP_CLOCKS_DPM_STATE_LEVEL_7;
-	default:
-		DRM_ERROR("DM_PPLIB: invalid powerlevel state: %d!\n",
-				max_clocks_state);
-		return DM_PP_CLOCKS_STATE_INVALID;
-	}
-}
-
 static void pp_to_dc_clock_levels(
 		const struct amd_pp_clocks *pp_clks,
 		struct dm_pp_clock_levels *dc_clks,
@@ -434,23 +407,6 @@ bool dm_pp_apply_clock_for_voltage_request(
 	ret = amdgpu_dpm_display_clock_voltage_request(adev, &pp_clock_request);
 	if (ret && (ret != -EOPNOTSUPP))
 		return false;
-
-	return true;
-}
-
-bool dm_pp_get_static_clocks(
-	const struct dc_context *ctx,
-	struct dm_pp_static_clock_info *static_clk_info)
-{
-	struct amdgpu_device *adev = ctx->driver_context;
-	struct amd_pp_clock_info pp_clk_info = {0};
-
-	if (amdgpu_dpm_get_current_clocks(adev, &pp_clk_info))
-		return false;
-
-	static_clk_info->max_clocks_state = pp_to_dc_powerlevel_state(pp_clk_info.max_clocks_state);
-	static_clk_info->max_mclk_khz = pp_clk_info.max_memory_clock * 10;
-	static_clk_info->max_sclk_khz = pp_clk_info.max_engine_clock * 10;
 
 	return true;
 }

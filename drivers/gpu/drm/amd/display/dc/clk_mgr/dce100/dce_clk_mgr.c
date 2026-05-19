@@ -257,11 +257,6 @@ int dce_set_clock(
 		actual_clock = pxl_clk_params.dfs_bypass_display_clock;
 	}
 
-	/* from power down, we need mark the clock state as ClocksStateNominal
-	 * from HWReset, so when resume we will call pplib voltage regulator.*/
-	if (requested_clk_khz == 0)
-		clk_mgr_dce->cur_min_clks_state = DM_PP_CLOCKS_STATE_NOMINAL;
-
 	if (dmcu && dmcu->funcs->is_dmcu_initialized(dmcu))
 		dmcu->funcs->set_psr_wait_loop(dmcu, actual_clock / 1000 / 7);
 
@@ -425,7 +420,6 @@ void dce_clk_mgr_construct(
 		struct clk_mgr_internal *clk_mgr)
 {
 	struct clk_mgr *base = &clk_mgr->base;
-	struct dm_pp_static_clock_info static_clk_info = {0};
 
 	if (ctx->dce_version <= DCE_VERSION_6_4)
 		memcpy(clk_mgr->max_clks_by_state,
@@ -450,14 +444,6 @@ void dce_clk_mgr_construct(
 	clk_mgr->dprefclk_ss_percentage = 0;
 	clk_mgr->dprefclk_ss_divider = 1000;
 	clk_mgr->ss_on_dprefclk = false;
-
-	if (ctx->dce_version >= DCE_VERSION_8_0) {
-		if (dm_pp_get_static_clocks(ctx, &static_clk_info))
-			clk_mgr->max_clks_state = static_clk_info.max_clocks_state;
-		else
-			clk_mgr->max_clks_state = DM_PP_CLOCKS_STATE_NOMINAL;
-		clk_mgr->cur_min_clks_state = DM_PP_CLOCKS_STATE_INVALID;
-	}
 
 	base->clks.max_supported_dispclk_khz =
 		clk_mgr->max_clks_by_state[DM_PP_CLOCKS_STATE_PERFORMANCE].display_clk_khz;

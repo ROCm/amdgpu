@@ -477,8 +477,6 @@ struct clk_mgr_internal {
 	 */
 	int dprefclk_ss_divider;
 
-	enum dm_pp_clocks_state max_clks_state;
-	enum dm_pp_clocks_state cur_min_clks_state;
 	bool periodic_retraining_disabled;
 
 	unsigned int cur_phyclk_req_table[MAX_LINKS];
