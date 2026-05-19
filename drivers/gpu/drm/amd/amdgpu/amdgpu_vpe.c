@@ -30,6 +30,7 @@
 #include "soc15_common.h"
 #include "vpe_v6_1.h"
 #include "vpe_v2_0.h"
+#include "vpe_v3_0.h"
 
 #define AMDGPU_CSA_VPE_SIZE 	64
 /* VPE CSA resides in the 4th page of CSA */
@@ -314,6 +315,9 @@ static int vpe_early_init(struct amdgpu_ip_block *ip_block)
 	case IP_VERSION(2, 0, 0):
 	case IP_VERSION(2, 2, 0):
 		vpe_v2_0_set_funcs(vpe);
+		break;
+	case IP_VERSION(3, 0, 0):
+		vpe_v3_0_set_funcs(vpe);
 		break;
 	default:
 		return -EINVAL;
@@ -1038,6 +1042,19 @@ const struct amd_ip_funcs vpe2_ip_funcs = {
 	.set_powergating_state = vpe_set_powergating_state,
 };
 
+const struct amd_ip_funcs vpe3_ip_funcs = {
+	.name = "vpe_v3_0",
+	.early_init = vpe_early_init,
+	.sw_init = vpe_sw_init,
+	.sw_fini = vpe_sw_fini,
+	.hw_init = vpe_hw_init,
+	.hw_fini = vpe_hw_fini,
+	.suspend = vpe_suspend,
+	.resume = vpe_resume,
+	.set_clockgating_state = vpe_set_clockgating_state,
+	.set_powergating_state = vpe_set_powergating_state,
+};
+
 const struct amdgpu_ip_block_version vpe_v6_1_ip_block = {
 	.type = AMD_IP_BLOCK_TYPE_VPE,
 	.major = 6,
@@ -1052,4 +1069,12 @@ const struct amdgpu_ip_block_version vpe_v2_0_ip_block = {
 	.minor = 0,
 	.rev = 0,
 	.funcs = &vpe2_ip_funcs,
+};
+
+const struct amdgpu_ip_block_version vpe_v3_0_ip_block = {
+	.type = AMD_IP_BLOCK_TYPE_VPE,
+	.major = 3,
+	.minor = 0,
+	.rev = 0,
+	.funcs = &vpe3_ip_funcs,
 };
