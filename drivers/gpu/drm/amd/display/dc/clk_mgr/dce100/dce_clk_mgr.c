@@ -62,32 +62,6 @@ static const struct clk_mgr_mask disp_clk_mask = {
 		CLK_COMMON_MASK_SH_LIST_DCE_COMMON_BASE(_MASK)
 };
 
-/* Max clock values for each state indexed by "enum clocks_state": */
-static const struct state_dependent_clocks dce60_max_clks_by_state[] = {
-/* ClocksStateInvalid - should not be used */
-{ .display_clk_khz = 0, .pixel_clk_khz = 0 },
-/* ClocksStateUltraLow - not expected to be used for DCE 6.0 */
-{ .display_clk_khz = 0, .pixel_clk_khz = 0 },
-/* ClocksStateLow */
-{ .display_clk_khz = 352000, .pixel_clk_khz = 330000},
-/* ClocksStateNominal */
-{ .display_clk_khz = 600000, .pixel_clk_khz = 400000 },
-/* ClocksStatePerformance */
-{ .display_clk_khz = 600000, .pixel_clk_khz = 400000 } };
-
-/* Max clock values for each state indexed by "enum clocks_state": */
-static const struct state_dependent_clocks dce80_max_clks_by_state[] = {
-/* ClocksStateInvalid - should not be used */
-{ .display_clk_khz = 0, .pixel_clk_khz = 0 },
-/* ClocksStateUltraLow - not expected to be used for DCE 8.0 */
-{ .display_clk_khz = 0, .pixel_clk_khz = 0 },
-/* ClocksStateLow */
-{ .display_clk_khz = 352000, .pixel_clk_khz = 330000},
-/* ClocksStateNominal */
-{ .display_clk_khz = 625000, .pixel_clk_khz = 400000 },
-/* ClocksStatePerformance */
-{ .display_clk_khz = 625000, .pixel_clk_khz = 400000 } };
-
 unsigned int dentist_get_divider_from_did(unsigned int did)
 {
 	if (did < DENTIST_BASE_DID_1)
@@ -268,7 +242,6 @@ static void dce_clock_read_integrated_info(struct clk_mgr_internal *clk_mgr_dce)
 {
 	struct dc_debug_options *debug = &clk_mgr_dce->base.ctx->dc->debug;
 	struct dc_bios *bp = clk_mgr_dce->base.ctx->dc_bios;
-	int i;
 
 	if (bp->integrated_info)
 		clk_mgr_dce->base.dentist_vco_freq_khz = bp->integrated_info->dentist_vco_freq;
@@ -276,40 +249,6 @@ static void dce_clock_read_integrated_info(struct clk_mgr_internal *clk_mgr_dce)
 		clk_mgr_dce->base.dentist_vco_freq_khz = bp->fw_info.smu_gpu_pll_output_freq;
 		if (clk_mgr_dce->base.dentist_vco_freq_khz == 0)
 			clk_mgr_dce->base.dentist_vco_freq_khz = 3600000;
-	}
-
-	/*update the maximum display clock for each power state*/
-	for (i = 0; i < NUMBER_OF_DISP_CLK_VOLTAGE; ++i) {
-		enum dm_pp_clocks_state clk_state = DM_PP_CLOCKS_STATE_INVALID;
-
-		switch (i) {
-		case 0:
-			clk_state = DM_PP_CLOCKS_STATE_ULTRA_LOW;
-			break;
-
-		case 1:
-			clk_state = DM_PP_CLOCKS_STATE_LOW;
-			break;
-
-		case 2:
-			clk_state = DM_PP_CLOCKS_STATE_NOMINAL;
-			break;
-
-		case 3:
-			clk_state = DM_PP_CLOCKS_STATE_PERFORMANCE;
-			break;
-
-		default:
-			clk_state = DM_PP_CLOCKS_STATE_INVALID;
-			break;
-		}
-
-		/*Do not allow bad VBIOS/SBIOS to override with invalid values,
-		 * check for > 100MHz*/
-		if (bp->integrated_info)
-			if (bp->integrated_info->disp_clk_voltage[i].max_supported_clk >= 100000)
-				clk_mgr_dce->max_clks_by_state[clk_state].display_clk_khz =
-					bp->integrated_info->disp_clk_voltage[i].max_supported_clk;
 	}
 
 	if (!debug->disable_dfs_bypass && bp->integrated_info)
@@ -418,16 +357,6 @@ void dce_clk_mgr_construct(
 		struct clk_mgr_internal *clk_mgr)
 {
 	struct clk_mgr *base = &clk_mgr->base;
-
-	if (ctx->dce_version <= DCE_VERSION_6_4)
-		memcpy(clk_mgr->max_clks_by_state,
-			dce60_max_clks_by_state,
-			sizeof(dce60_max_clks_by_state));
-	else
-		memcpy(clk_mgr->max_clks_by_state,
-			dce80_max_clks_by_state,
-			sizeof(dce80_max_clks_by_state));
-
 
 	base->ctx = ctx;
 	base->funcs = &dce_funcs;

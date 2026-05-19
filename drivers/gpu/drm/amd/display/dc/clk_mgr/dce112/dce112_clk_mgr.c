@@ -53,19 +53,6 @@ static const struct clk_mgr_mask disp_clk_mask = {
 		CLK_COMMON_MASK_SH_LIST_DCE_COMMON_BASE(_MASK)
 };
 
-static const struct state_dependent_clocks dce112_max_clks_by_state[] = {
-/*ClocksStateInvalid - should not be used*/
-{ .display_clk_khz = 0, .pixel_clk_khz = 0 },
-/*ClocksStateUltraLow - currently by HW design team not supposed to be used*/
-{ .display_clk_khz = 389189, .pixel_clk_khz = 346672 },
-/*ClocksStateLow*/
-{ .display_clk_khz = 459000, .pixel_clk_khz = 400000 },
-/*ClocksStateNominal*/
-{ .display_clk_khz = 667000, .pixel_clk_khz = 600000 },
-/*ClocksStatePerformance*/
-{ .display_clk_khz = 1132000, .pixel_clk_khz = 600000 } };
-
-
 //TODO: remove use the two broken down functions
 int dce112_set_clock(struct clk_mgr *clk_mgr_base, int requested_clk_khz)
 {
@@ -201,10 +188,6 @@ void dce112_clk_mgr_construct(
 		struct clk_mgr_internal *clk_mgr)
 {
 	dce_clk_mgr_construct(ctx, clk_mgr);
-
-	memcpy(clk_mgr->max_clks_by_state,
-		dce112_max_clks_by_state,
-		sizeof(dce112_max_clks_by_state));
 
 	clk_mgr->regs = &disp_clk_regs;
 	clk_mgr->clk_mgr_shift = &disp_clk_shift;

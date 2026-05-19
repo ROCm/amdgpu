@@ -51,18 +51,6 @@ static const struct clk_mgr_mask disp_clk_mask = {
 		CLK_COMMON_MASK_SH_LIST_DCE_COMMON_BASE(_MASK)
 };
 
-static const struct state_dependent_clocks dce110_max_clks_by_state[] = {
-/*ClocksStateInvalid - should not be used*/
-{ .display_clk_khz = 0, .pixel_clk_khz = 0 },
-/*ClocksStateUltraLow - currently by HW design team not supposed to be used*/
-{ .display_clk_khz = 352000, .pixel_clk_khz = 330000 },
-/*ClocksStateLow*/
-{ .display_clk_khz = 352000, .pixel_clk_khz = 330000 },
-/*ClocksStateNominal*/
-{ .display_clk_khz = 467000, .pixel_clk_khz = 400000 },
-/*ClocksStatePerformance*/
-{ .display_clk_khz = 643000, .pixel_clk_khz = 400000 } };
-
 static uint32_t determine_sclk_from_bounding_box(
 		const struct dc *dc,
 		uint32_t required_sclk)
@@ -280,10 +268,6 @@ void dce110_clk_mgr_construct(
 		struct clk_mgr_internal *clk_mgr)
 {
 	dce_clk_mgr_construct(ctx, clk_mgr);
-
-	memcpy(clk_mgr->max_clks_by_state,
-		dce110_max_clks_by_state,
-		sizeof(dce110_max_clks_by_state));
 
 	clk_mgr->regs = &disp_clk_regs;
 	clk_mgr->clk_mgr_shift = &disp_clk_shift;
