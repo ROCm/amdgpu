@@ -3888,16 +3888,18 @@ static void si_notify_hardware_vpu_recovery_event(struct amdgpu_device *adev)
 }
 #endif
 
-#if 0
-static int si_notify_hw_of_powersource(struct amdgpu_device *adev, bool ac_power)
+static void si_notify_hw_of_powersource(void *handle)
 {
-	if (ac_power)
-		return (amdgpu_si_send_msg_to_smc(adev, PPSMC_MSG_RunningOnAC) == PPSMC_Result_OK) ?
-			0 : -EINVAL;
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-	return 0;
+	/* Check if the platform already manages the AC/DC switch via dedicated GPIO. */
+	if (adev->pm.dpm.platform_caps & ATOM_PP_PLATFORM_CAP_HARDWAREDC)
+		return;
+
+	/* The SMU automatically notices DC, but needs to be notified when switching to AC. */
+	if (adev->pm.ac_power)
+		amdgpu_si_send_msg_to_smc(adev, PPSMC_MSG_RunningOnAC);
 }
-#endif
 
 static PPSMC_Result si_send_msg_to_smc_with_parameter(struct amdgpu_device *adev,
 						      PPSMC_Msg msg, u32 parameter)
@@ -8166,6 +8168,7 @@ static const struct amd_pm_funcs si_dpm_funcs = {
 	.get_vce_clock_state = amdgpu_get_vce_clock_state,
 	.read_sensor = &si_dpm_read_sensor,
 	.pm_compute_clocks = amdgpu_legacy_dpm_compute_clocks,
+	.notify_ac_dc = si_notify_hw_of_powersource,
 };
 
 static const struct amdgpu_irq_src_funcs si_dpm_irq_funcs = {
