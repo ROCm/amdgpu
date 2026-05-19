@@ -1843,9 +1843,10 @@ static int navi10_set_power_profile_mode(struct smu_context *smu,
 				return -ENOMEM;
 		}
 		if (custom_params && custom_params_max_idx) {
-			if (custom_params_max_idx != NAVI10_CUSTOM_PARAMS_COUNT)
-				return -EINVAL;
-			if (custom_params[0] >= NAVI10_CUSTOM_PARAMS_CLOCKS_COUNT)
+			if (!smu_cmn_custom_params_count_valid(custom_params_max_idx,
+							       NAVI10_CUSTOM_PARAMS_COUNT) ||
+			    !smu_cmn_custom_params_clock_valid(custom_params[0],
+							       NAVI10_CUSTOM_PARAMS_CLOCKS_COUNT))
 				return -EINVAL;
 			idx = custom_params[0] * NAVI10_CUSTOM_PARAMS_COUNT;
 			smu->custom_profile_params[idx] = 1;
