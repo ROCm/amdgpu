@@ -391,9 +391,7 @@ static void dce_update_clocks(struct clk_mgr *clk_mgr_base,
 			struct dc_state *context,
 			bool safe_to_lower)
 {
-	struct clk_mgr_internal *clk_mgr_dce = TO_CLK_MGR_INTERNAL(clk_mgr_base);
-	const int max_disp_clk =
-		clk_mgr_dce->max_clks_by_state[DM_PP_CLOCKS_STATE_PERFORMANCE].display_clk_khz;
+	const int max_disp_clk = clk_mgr_base->clks.max_supported_dispclk_khz;
 	int patched_disp_clk = MIN(max_disp_clk, context->bw_ctx.bw.dce.dispclk_khz);
 
 	if (should_set_clock(safe_to_lower, patched_disp_clk, clk_mgr_base->clks.dispclk_khz)) {
@@ -445,8 +443,16 @@ void dce_clk_mgr_construct(
 	clk_mgr->dprefclk_ss_divider = 1000;
 	clk_mgr->ss_on_dprefclk = false;
 
-	base->clks.max_supported_dispclk_khz =
-		clk_mgr->max_clks_by_state[DM_PP_CLOCKS_STATE_PERFORMANCE].display_clk_khz;
+	if (ctx->dce_version >= DCE_VERSION_12_0)
+		base->clks.max_supported_dispclk_khz = 1133000;
+	else if (ctx->dce_version >= DCE_VERSION_11_2)
+		base->clks.max_supported_dispclk_khz = 1132000;
+	else if (ctx->dce_version >= DCE_VERSION_11_0)
+		base->clks.max_supported_dispclk_khz = 643000;
+	else if (ctx->dce_version >= DCE_VERSION_8_0)
+		base->clks.max_supported_dispclk_khz = 625000;
+	else
+		base->clks.max_supported_dispclk_khz = 600000;
 
 	dce_clock_read_integrated_info(clk_mgr);
 	dce_clock_read_ss_info(clk_mgr);
