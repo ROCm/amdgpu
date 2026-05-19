@@ -38,7 +38,8 @@ static int ras_get_block_ecc_info(struct ras_core_context *ras_core,
 	struct ras_ecc_count err_data;
 	int ret;
 
-	if (cmd->input_size != sizeof(struct ras_cmd_block_ecc_info_req))
+	if ((cmd->input_size != sizeof(struct ras_cmd_block_ecc_info_req)) ||
+		(cmd->output_buf_size < sizeof(*output_data)))
 		return RAS_CMD__ERROR_INVALID_INPUT_SIZE;
 
 	memset(&err_data, 0, sizeof(err_data));
@@ -122,7 +123,8 @@ static int ras_cmd_get_bad_pages(struct ras_core_context *ras_core,
 			(struct ras_cmd_bad_pages_info_rsp *)cmd->output_buff_raw;
 	int ret;
 
-	if (cmd->input_size != sizeof(struct ras_cmd_bad_pages_info_req))
+	if ((cmd->input_size != sizeof(struct ras_cmd_bad_pages_info_req)) ||
+		(cmd->output_buf_size < sizeof(*output_data)))
 		return RAS_CMD__ERROR_INVALID_INPUT_SIZE;
 
 	ret = ras_cmd_get_group_bad_pages(ras_core, input_data->group_index, output_data);
@@ -177,7 +179,8 @@ static int ras_cmd_get_cper_snapshot(struct ras_core_context *ras_core,
 			(struct ras_cmd_cper_snapshot_rsp *)cmd->output_buff_raw;
 	struct ras_log_batch_overview overview;
 
-	if (cmd->input_size != sizeof(struct ras_cmd_cper_snapshot_req))
+	if ((cmd->input_size != sizeof(struct ras_cmd_cper_snapshot_req)) ||
+		(cmd->output_buf_size < sizeof(*output_data)))
 		return RAS_CMD__ERROR_INVALID_INPUT_SIZE;
 
 	ras_log_ring_get_batch_overview(ras_core, &overview);
@@ -206,7 +209,8 @@ static int ras_cmd_get_cper_records(struct ras_core_context *ras_core,
 	uint8_t *buffer;
 	int ret = 0, i, count;
 
-	if (cmd->input_size != sizeof(struct ras_cmd_cper_record_req))
+	if ((cmd->input_size != sizeof(struct ras_cmd_cper_record_req)) ||
+		(cmd->output_buf_size < sizeof(*rsp)))
 		return RAS_CMD__ERROR_INVALID_INPUT_SIZE;
 
 	if (!req->buf_size || !req->buf_ptr || !req->cper_num ||
@@ -261,7 +265,8 @@ static int ras_cmd_get_batch_trace_snapshot(struct ras_core_context *ras_core,
 	struct ras_log_batch_overview overview;
 
 
-	if (cmd->input_size != sizeof(struct ras_cmd_batch_trace_snapshot_req))
+	if ((cmd->input_size != sizeof(struct ras_cmd_batch_trace_snapshot_req)) ||
+		(cmd->output_buf_size < sizeof(*rsp)))
 		return RAS_CMD__ERROR_INVALID_INPUT_SIZE;
 
 	ras_log_ring_get_batch_overview(ras_core, &overview);
@@ -289,7 +294,8 @@ static int ras_cmd_get_batch_trace_records(struct ras_core_context *ras_core,
 	uint64_t id;
 	bool completed = false;
 
-	if (cmd->input_size != sizeof(struct ras_cmd_batch_trace_record_req))
+	if ((cmd->input_size != sizeof(struct ras_cmd_batch_trace_record_req)) ||
+		(cmd->output_buf_size < sizeof(*output_data)))
 		return RAS_CMD__ERROR_INVALID_INPUT_SIZE;
 
 	if ((!input_data->batch_num) || (input_data->batch_num > RAS_CMD_MAX_BATCH_NUM))
@@ -415,6 +421,10 @@ static int ras_cmd_inject_error(struct ras_core_context *ras_core,
 		.address = req->address,
 		.value = req->method,
 	};
+
+	if ((cmd->input_size != sizeof(*req)) ||
+		(cmd->output_buf_size < sizeof(*output_data)))
+		return RAS_CMD__ERROR_INVALID_INPUT_SIZE;
 
 	ret = ras_psp_trigger_error(ras_core, &block_info, req->instance_mask);
 	if (!ret) {

@@ -261,7 +261,8 @@ static int amdgpu_virt_ras_get_cper_records(struct ras_core_context *ras_core,
 	uint8_t *out_buf;
 	int ret = 0, i, count;
 
-	if (cmd->input_size != sizeof(struct ras_cmd_cper_record_req))
+	if (cmd->input_size != sizeof(struct ras_cmd_cper_record_req) ||
+		(cmd->output_buf_size < sizeof(*rsp)))
 		return RAS_CMD__ERROR_INVALID_INPUT_SIZE;
 
 	if (!req->buf_size || !req->buf_ptr || !req->cper_num ||
@@ -471,7 +472,7 @@ int amdgpu_virt_ras_handle_cmd(struct ras_core_context *ras_core,
 
 	cmd->cmd_res = res;
 
-	if (cmd->output_size > cmd->output_buf_size) {
+	if (!res && (cmd->output_size > cmd->output_buf_size)) {
 		RAS_DEV_ERR(ras_core->dev,
 			"Output data size 0x%x exceeds buffer size 0x%x!\n",
 			cmd->output_size, cmd->output_buf_size);
