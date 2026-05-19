@@ -788,7 +788,10 @@ bool edp_setup_psr(struct dc_link *link,
 		}
 	}
 
-	psr_context->channel = link->ddc->ddc_pin->hw_info.ddc_channel;
+	if (dc->config.dp_connector_no_native_i2c && link->no_ddc_pin)
+		psr_context->channel = (enum channel_id)link->aux_hw_inst;
+	else
+		psr_context->channel = link->ddc->ddc_pin->hw_info.ddc_channel;
 	psr_context->transmitterId = link->link_enc->transmitter;
 	psr_context->engineId = link->link_enc->preferred_engine;
 

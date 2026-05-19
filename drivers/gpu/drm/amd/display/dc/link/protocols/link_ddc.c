@@ -119,25 +119,32 @@ static void ddc_service_construct(
 	ddc_service->link = init_data->link;
 	ddc_service->ctx = init_data->ctx;
 
-	if (init_data->is_dpia_link ||
-	    dcb->funcs->get_i2c_info(dcb, init_data->id, &i2c_info) != BP_RESULT_OK) {
-		ddc_service->ddc_pin = NULL;
-	} else {
-		DC_LOGGER_INIT(ddc_service->ctx->logger);
-		DC_LOG_DC("BIOS object table - i2c_line: %d", i2c_info.i2c_line);
-		DC_LOG_DC("BIOS object table - i2c_engine_id: %d", i2c_info.i2c_engine_id);
+	if (ddc_service->link && ddc_service->ctx->dc->config.dp_connector_no_native_i2c &&
+		ddc_service->link->no_ddc_pin) {
+		// Obtain aux instance info from i2c_info without GPIO DDC pin info
+		if (dcb->funcs->get_connector_aux_info(dcb, init_data->id, &i2c_info) == BP_RESULT_OK)
+			ddc_service->link->aux_hw_inst = (uint8_t)i2c_info.i2c_line;
+	}  else {
+		if (init_data->is_dpia_link ||
+		dcb->funcs->get_i2c_info(dcb, init_data->id, &i2c_info) != BP_RESULT_OK) {
+			ddc_service->ddc_pin = NULL;
+		} else {
+			DC_LOGGER_INIT(ddc_service->ctx->logger);
+			DC_LOG_DC("BIOS object table - i2c_line: %d", i2c_info.i2c_line);
+			DC_LOG_DC("BIOS object table - i2c_engine_id: %d", i2c_info.i2c_engine_id);
 
-		hw_info.ddc_channel = i2c_info.i2c_line;
-		if (ddc_service->link != NULL)
-			hw_info.hw_supported = i2c_info.i2c_hw_assist;
-		else
-			hw_info.hw_supported = false;
+			hw_info.ddc_channel = i2c_info.i2c_line;
+			if (ddc_service->link != NULL)
+				hw_info.hw_supported = i2c_info.i2c_hw_assist;
+			else
+				hw_info.hw_supported = false;
 
-		ddc_service->ddc_pin = dal_gpio_create_ddc(
-			gpio_service,
-			i2c_info.gpio_info.clk_a_register_index,
-			1 << i2c_info.gpio_info.clk_a_shift,
-			&hw_info);
+			ddc_service->ddc_pin = dal_gpio_create_ddc(
+				gpio_service,
+				i2c_info.gpio_info.clk_a_register_index,
+				1 << i2c_info.gpio_info.clk_a_shift,
+				&hw_info);
+		}
 	}
 
 	ddc_service->flags.EDID_QUERY_DONE_ONCE = false;
@@ -518,11 +525,18 @@ bool try_to_configure_aux_timeout(struct ddc_service *ddc,
 	if (ddc->link->ep_type != DISPLAY_ENDPOINT_PHY)
 		return true;
 
-	if (ddc->ctx->dc->res_pool->engines[ddc_pin->pin_data->en]->funcs->configure_timeout) {
-		ddc->ctx->dc->res_pool->engines[ddc_pin->pin_data->en]->funcs->configure_timeout(ddc, timeout);
-		result = true;
-	}
+	if (ddc->ctx->dc->config.dp_connector_no_native_i2c && ddc->link->no_ddc_pin) {
+		if (ddc->ctx->dc->res_pool->engines[ddc->link->aux_hw_inst]->funcs->configure_timeout) {
+			ddc->ctx->dc->res_pool->engines[ddc->link->aux_hw_inst]->funcs->configure_timeout(ddc, timeout);
+			result = true;
+		}
+	} else {
+		if (ddc->ctx->dc->res_pool->engines[ddc_pin->pin_data->en]->funcs->configure_timeout) {
+			ddc->ctx->dc->res_pool->engines[ddc_pin->pin_data->en]->funcs->configure_timeout(ddc, timeout);
+			result = true;
+		}
 
+	}
 	return result;
 }
 

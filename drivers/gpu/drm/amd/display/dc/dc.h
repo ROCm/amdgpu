@@ -559,6 +559,7 @@ struct dc_config {
 	bool enable_dpia_pre_training;
 	bool unify_link_enc_assignment;
 	bool enable_cursor_offload;
+	bool dp_connector_no_native_i2c;
 	bool frame_update_cmd_version2;
 	struct spl_sharpness_range dcn_sharpness_range;
 	struct spl_sharpness_range dcn_override_sharpness_range;
@@ -1651,6 +1652,13 @@ struct dc_scratch_space {
 	 */
 	struct dc_link_training_overrides preferred_training_settings;
 	struct dp_audio_test_data audio_test_data;
+
+	/* On ASICs with dp_connector_no_native_i2c cap set and no_ddc_pin cap
+	 * set by IFWI, link aux_hw_inst is used in aux layer functions instead
+	 * of ddc_pin to know which aux instance is associated with link.
+	 */
+	bool no_ddc_pin;
+	enum gpio_ddc_line aux_hw_inst;
 
 	enum gpio_ddc_line ddc_hw_inst;
 

@@ -718,6 +718,69 @@ static enum bp_result bios_parser_get_gpio_pin_info(
 	return BP_RESULT_NORECORD;
 }
 
+static enum bp_result bios_parser_get_connector_aux_info(struct dc_bios *dcb,
+	struct graphics_object_id id,
+	struct graphics_object_i2c_info *info)
+{
+	uint32_t offset;
+	struct atom_display_object_path_v2 *object;
+	struct atom_display_object_path_v3 *object_path_v3;
+	struct atom_common_record_header *header;
+	struct atom_i2c_record *record;
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
+	if (!info)
+		return BP_RESULT_BADINPUT;
+
+	switch (bp->object_info_tbl.revision.minor) {
+	case 4:
+	default:
+		object = get_bios_object(bp, id);
+
+		if (!object)
+			return BP_RESULT_BADINPUT;
+
+		offset = object->disp_recordoffset + bp->object_info_tbl_offset;
+		break;
+	case 5:
+		object_path_v3 = get_bios_object_from_path_v3(bp, id);
+
+		if (!object_path_v3)
+			return BP_RESULT_BADINPUT;
+
+		offset = object_path_v3->disp_recordoffset + bp->object_info_tbl_offset;
+		break;
+	}
+
+	for (;;) {
+		header = GET_IMAGE(struct atom_common_record_header, offset);
+
+		if (!header)
+			return BP_RESULT_BADBIOSTABLE;
+
+		if (header->record_type == LAST_RECORD_TYPE ||
+			!header->record_size)
+			break;
+
+		if (header->record_type == ATOM_I2C_RECORD_TYPE
+			&& sizeof(struct atom_i2c_record) <=
+			header->record_size) {
+			/* get_connector_aux_info - which aux instance is used it is based
+			 * on record->i2c_id field only, does not need GPIO DDC
+			 */
+			record = (struct atom_i2c_record *)header;
+
+			info->i2c_line = record->i2c_id & I2C_HW_LANE_MUX;
+
+			return BP_RESULT_OK;
+		}
+
+		offset += header->record_size;
+	}
+
+	return BP_RESULT_NORECORD;
+}
+
 static struct device_id device_type_from_device_id(uint16_t device_id)
 {
 
@@ -2349,6 +2412,9 @@ static enum bp_result bios_parser_get_disp_connector_caps_info(
 									? 1 : 0;
 		info->INTERNAL_DISPLAY_BL = (record_path_v3->connector_caps & ATOM_CONNECTOR_CAP_INTERNAL_DISPLAY_BL)
 										? 1 : 0;
+		// All aux transactions for this connector should rely only on aux instance, not on ddc instance
+		info->NO_DDC_PIN = (record_path_v3->connector_caps & ATOM_CONNECTOR_CAP_DP_PLUS_PLUS_TYPE2_ONLY) ? 1 : 0;
+
 		break;
 	}
 
@@ -3717,6 +3783,7 @@ static const struct dc_vbios_funcs vbios_funcs = {
 	.get_lttpr_interop = bios_parser_get_lttpr_interop,
 
 	.get_connector_speed_cap_info = bios_parser_get_connector_speed_cap_info,
+	.get_connector_aux_info = bios_parser_get_connector_aux_info,
 };
 
 static bool bios_parser2_construct(
