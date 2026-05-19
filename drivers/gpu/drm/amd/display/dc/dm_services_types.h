@@ -36,30 +36,7 @@ struct dm_pp_clock_range {
 	int max_khz;
 };
 
-enum dm_pp_clocks_state {
-	DM_PP_CLOCKS_STATE_INVALID,
-	DM_PP_CLOCKS_STATE_ULTRA_LOW,
-	DM_PP_CLOCKS_STATE_LOW,
-	DM_PP_CLOCKS_STATE_NOMINAL,
-	DM_PP_CLOCKS_STATE_PERFORMANCE,
-
-	/* Starting from DCE11, Max 8 levels of DPM state supported. */
-	DM_PP_CLOCKS_DPM_STATE_LEVEL_INVALID = DM_PP_CLOCKS_STATE_INVALID,
-	DM_PP_CLOCKS_DPM_STATE_LEVEL_0,
-	DM_PP_CLOCKS_DPM_STATE_LEVEL_1,
-	DM_PP_CLOCKS_DPM_STATE_LEVEL_2,
-	/* to be backward compatible */
-	DM_PP_CLOCKS_DPM_STATE_LEVEL_3,
-	DM_PP_CLOCKS_DPM_STATE_LEVEL_4,
-	DM_PP_CLOCKS_DPM_STATE_LEVEL_5,
-	DM_PP_CLOCKS_DPM_STATE_LEVEL_6,
-	DM_PP_CLOCKS_DPM_STATE_LEVEL_7,
-
-	DM_PP_CLOCKS_MAX_STATES
-};
-
 struct dm_pp_gpu_clock_range {
-	enum dm_pp_clocks_state clock_state;
 	struct dm_pp_clock_range sclk;
 	struct dm_pp_clock_range mclk;
 	struct dm_pp_clock_range eclk;
