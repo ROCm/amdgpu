@@ -114,8 +114,7 @@ static int kfd_pc_sample_thread(void *param)
 		for_each_inst(inst, node->xcc_mask)
 			node->kfd2kgd->override_core_cg(adev, 1, inst);
 
-	while (!kthread_should_stop() &&
-			!signal_pending(node->pcs_data.hosttrap_entry.pc_sample_thread)) {
+	while (!kthread_should_stop() && !signal_pending(current)) {
 		if (!need_wait) {
 			next_trap_time = ktime_add_us(ktime_get_raw(), timeout);
 
