@@ -426,7 +426,7 @@ struct amd_pm_funcs {
 	void (*display_configuration_changed)(void *handle);
 	void (*print_power_state)(void *handle, void *ps);
 	bool (*vblank_too_short)(void *handle);
-	void (*enable_bapm)(void *handle, bool enable);
+	void (*notify_ac_dc)(void *handle);
 	int (*check_state_equal)(void *handle,
 				void  *cps,
 				void  *rps,
