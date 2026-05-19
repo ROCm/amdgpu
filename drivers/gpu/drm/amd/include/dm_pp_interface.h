@@ -113,7 +113,6 @@ struct amd_pp_display_configuration {
 struct amd_pp_simple_clock_info {
 	uint32_t	engine_max_clock;
 	uint32_t	memory_max_clock;
-	uint32_t	level;
 };
 
 enum PP_DAL_POWERLEVEL {

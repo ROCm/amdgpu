@@ -288,7 +288,6 @@ bool dm_pp_get_clock_levels_by_type(
 		DRM_INFO("DM_PPLIB: Warning: using default validation clocks!\n");
 		validation_clks.engine_max_clock = 72000;
 		validation_clks.memory_max_clock = 80000;
-		validation_clks.level = 0;
 	}
 
 	DRM_INFO("DM_PPLIB: Validation clocks:\n");
@@ -296,8 +295,6 @@ bool dm_pp_get_clock_levels_by_type(
 			validation_clks.engine_max_clock);
 	DRM_INFO("DM_PPLIB:    memory_max_clock: %d\n",
 			validation_clks.memory_max_clock);
-	DRM_INFO("DM_PPLIB:    level           : %d\n",
-			validation_clks.level);
 
 	/* Translate 10 kHz to kHz. */
 	validation_clks.engine_max_clock *= 10;
