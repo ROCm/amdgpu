@@ -377,6 +377,30 @@ int amdgpu_gfx_kiq_init(struct amdgpu_device *adev,
 	return 0;
 }
 
+void amdgpu_gfx_mqd_reset_restore(struct amdgpu_ring *ring)
+{
+	struct amdgpu_device *adev = ring->adev;
+	int mqd_idx, mqd_size;
+
+	/* restore mqd with the backup copy */
+	if (ring->funcs->type == AMDGPU_RING_TYPE_COMPUTE) {
+		mqd_idx = ring - &adev->gfx.compute_ring[0];
+		mqd_size = adev->mqds[AMDGPU_HW_IP_COMPUTE].mqd_size;
+		if (adev->gfx.mec.mqd_backup[mqd_idx])
+			memcpy_toio(ring->mqd_ptr, adev->gfx.mec.mqd_backup[mqd_idx], mqd_size);
+	} else if (ring->funcs->type == AMDGPU_RING_TYPE_GFX) {
+		mqd_size = adev->mqds[AMDGPU_HW_IP_GFX].mqd_size;
+		mqd_idx = ring - &adev->gfx.gfx_ring[0];
+
+		if (adev->gfx.me.mqd_backup[mqd_idx])
+			memcpy_toio(ring->mqd_ptr, adev->gfx.me.mqd_backup[mqd_idx], mqd_size);
+	}
+	/* reset the ring */
+	ring->wptr = 0;
+	atomic64_set((atomic64_t *)ring->wptr_cpu_addr, 0);
+	amdgpu_ring_clear_ring(ring);
+}
+
 /* create MQD for each compute/gfx queue */
 int amdgpu_gfx_mqd_sw_init(struct amdgpu_device *adev,
 			   unsigned int mqd_size, int xcc_id)
