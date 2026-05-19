@@ -415,40 +415,43 @@ static enum channel_id get_ddc_line(struct dc_link *link)
 
 	channel = CHANNEL_ID_UNKNOWN;
 
-	ddc = get_ddc_pin(link->ddc);
+	if (link->ctx->dc->config.dp_connector_no_native_i2c && link->no_ddc_pin) {
+		channel = link->aux_hw_inst + 1;
+	} else {
+		ddc = get_ddc_pin(link->ddc);
 
-	if (ddc) {
-		switch (dal_ddc_get_line(ddc)) {
-		case GPIO_DDC_LINE_DDC1:
-			channel = CHANNEL_ID_DDC1;
-			break;
-		case GPIO_DDC_LINE_DDC2:
-			channel = CHANNEL_ID_DDC2;
-			break;
-		case GPIO_DDC_LINE_DDC3:
-			channel = CHANNEL_ID_DDC3;
-			break;
-		case GPIO_DDC_LINE_DDC4:
-			channel = CHANNEL_ID_DDC4;
-			break;
-		case GPIO_DDC_LINE_DDC5:
-			channel = CHANNEL_ID_DDC5;
-			break;
-		case GPIO_DDC_LINE_DDC6:
-			channel = CHANNEL_ID_DDC6;
-			break;
-		case GPIO_DDC_LINE_DDC_VGA:
-			channel = CHANNEL_ID_DDC_VGA;
-			break;
-		case GPIO_DDC_LINE_I2C_PAD:
-			channel = CHANNEL_ID_I2C_PAD;
-			break;
-		default:
-			BREAK_TO_DEBUGGER();
-			break;
+		if (ddc) {
+			switch (dal_ddc_get_line(ddc)) {
+			case GPIO_DDC_LINE_DDC1:
+				channel = CHANNEL_ID_DDC1;
+				break;
+			case GPIO_DDC_LINE_DDC2:
+				channel = CHANNEL_ID_DDC2;
+				break;
+			case GPIO_DDC_LINE_DDC3:
+				channel = CHANNEL_ID_DDC3;
+				break;
+			case GPIO_DDC_LINE_DDC4:
+				channel = CHANNEL_ID_DDC4;
+				break;
+			case GPIO_DDC_LINE_DDC5:
+				channel = CHANNEL_ID_DDC5;
+				break;
+			case GPIO_DDC_LINE_DDC6:
+				channel = CHANNEL_ID_DDC6;
+				break;
+			case GPIO_DDC_LINE_DDC_VGA:
+				channel = CHANNEL_ID_DDC_VGA;
+				break;
+			case GPIO_DDC_LINE_I2C_PAD:
+				channel = CHANNEL_ID_I2C_PAD;
+				break;
+			default:
+				BREAK_TO_DEBUGGER();
+				break;
+			}
 		}
 	}
-
 	return channel;
 }
 
@@ -546,6 +549,7 @@ static bool construct_phy(struct dc_link *link,
 		bios->funcs->get_disp_connector_caps_info(bios, link->link_id, &disp_connect_caps_info);
 		link->is_internal_display = (disp_connect_caps_info.INTERNAL_DISPLAY != 0);
 		DC_LOG_DC("BIOS object table - is_internal_display: %d", link->is_internal_display);
+		link->no_ddc_pin = disp_connect_caps_info.NO_DDC_PIN != 0;
 	}
 
 	if (link->link_id.type != OBJECT_TYPE_CONNECTOR) {
@@ -568,15 +572,19 @@ static bool construct_phy(struct dc_link *link,
 		goto ddc_create_fail;
 	}
 
-	/* Embedded display connectors such as LVDS may not have DDC. */
-	if (!link->ddc->ddc_pin &&
-	    !dc_is_embedded_signal(link->connector_signal)) {
-		DC_ERROR("Failed to get I2C info for connector!\n");
-		goto ddc_create_fail;
-	}
+	if (link->ctx->dc->config.dp_connector_no_native_i2c && link->no_ddc_pin) {
+		link->ddc_hw_inst = link->aux_hw_inst;
+	} else {
+		/* Embedded display connectors such as LVDS may not have DDC. */
+		if (!link->ddc->ddc_pin &&
+		    !dc_is_embedded_signal(link->connector_signal)) {
+			DC_ERROR("Failed to get I2C info for connector!\n");
+			goto ddc_create_fail;
+		}
 
-	link->ddc_hw_inst =
-		dal_ddc_get_line(get_ddc_pin(link->ddc));
+		link->ddc_hw_inst =
+			dal_ddc_get_line(get_ddc_pin(link->ddc));
+	}
 
 	enc_init_data.ctx = dc_ctx;
 	enc_init_data.connector = link->link_id;

@@ -102,8 +102,8 @@ bool dm_atomic_write_poll_read_i2c(
 	if (!link)
 		return false;
 
-	const bool over_aux = false;
-	const uint32_t ddc_line = link->ddc->ddc_pin->pin_data->en;
+	const bool over_aux = link->no_ddc_pin;
+	const uint32_t ddc_line = over_aux ? link->aux_hw_inst : link->ddc->ddc_pin->pin_data->en;
 
 	union dmub_rb_cmd commands[3] = { 0 };
 	const bool converted = op_i2c_convert(&commands[0], write, FUSED_REQUEST_WRITE, ddc_line, over_aux)

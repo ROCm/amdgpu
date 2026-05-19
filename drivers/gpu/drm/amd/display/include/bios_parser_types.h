@@ -317,6 +317,7 @@ struct bp_spread_spectrum_parameters {
 struct bp_disp_connector_caps_info {
 	uint32_t INTERNAL_DISPLAY    : 1;
 	uint32_t INTERNAL_DISPLAY_BL : 1;
+	uint32_t NO_DDC_PIN : 1;
 };
 
 struct bp_encoder_cap_info {
