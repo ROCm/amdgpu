@@ -220,40 +220,6 @@ uint32_t dce_get_max_pixel_clock_for_all_paths(struct dc_state *context)
 	return max_pix_clk;
 }
 
-enum dm_pp_clocks_state dce_get_required_clocks_state(
-	struct clk_mgr *clk_mgr_base,
-	struct dc_state *context)
-{
-	struct clk_mgr_internal *clk_mgr_dce = TO_CLK_MGR_INTERNAL(clk_mgr_base);
-	int i;
-	enum dm_pp_clocks_state low_req_clk;
-	int max_pix_clk = dce_get_max_pixel_clock_for_all_paths(context);
-
-	/* Iterate from highest supported to lowest valid state, and update
-	 * lowest RequiredState with the lowest state that satisfies
-	 * all required clocks
-	 */
-	for (i = clk_mgr_dce->max_clks_state; i >= DM_PP_CLOCKS_STATE_ULTRA_LOW; i--)
-		if (context->bw_ctx.bw.dce.dispclk_khz >
-				clk_mgr_dce->max_clks_by_state[i].display_clk_khz
-			|| max_pix_clk >
-				clk_mgr_dce->max_clks_by_state[i].pixel_clk_khz)
-			break;
-
-	low_req_clk = i + 1;
-	if (low_req_clk > clk_mgr_dce->max_clks_state) {
-		/* set max clock state for high phyclock, invalid on exceeding display clock */
-		if (clk_mgr_dce->max_clks_by_state[clk_mgr_dce->max_clks_state].display_clk_khz
-				< context->bw_ctx.bw.dce.dispclk_khz)
-			low_req_clk = DM_PP_CLOCKS_STATE_INVALID;
-		else
-			low_req_clk = clk_mgr_dce->max_clks_state;
-	}
-
-	return low_req_clk;
-}
-
-
 /* TODO: remove use the two broken down functions */
 int dce_set_clock(
 	struct clk_mgr *clk_mgr_base,
