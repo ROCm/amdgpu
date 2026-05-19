@@ -1393,7 +1393,6 @@ static ssize_t amdgpu_set_pp_power_profile_mode(struct device *dev,
 	long parameter[64];
 	char *sub_str, buf_cpy[128];
 	char *tmp_str;
-	uint32_t i = 0;
 	char tmp[2];
 	long int profile_mode = 0;
 	const char delimiter[3] = {' ', '\n', '\0'};
@@ -1402,18 +1401,18 @@ static ssize_t amdgpu_set_pp_power_profile_mode(struct device *dev,
 	if (count == 0 || sysfs_streq(buf, ""))
 		return -EINVAL;
 
-	tmp[0] = *(buf);
+	tmp[0] = *(buf++);
 	tmp[1] = '\0';
 	ret = kstrtol(tmp, 0, &profile_mode);
 	if (ret)
 		return -EINVAL;
 
 	if (profile_mode == PP_SMC_POWER_PROFILE_CUSTOM) {
-		if (count < 2 || count > 127)
+		if (count < 2 || count > sizeof(buf_cpy))
 			return -EINVAL;
-		while (isspace(*++buf))
-			i++;
-		memcpy(buf_cpy, buf, count-i);
+		while (isspace(*buf))
+			buf++;
+		strscpy(buf_cpy, buf, sizeof(buf_cpy));
 		tmp_str = buf_cpy;
 		while ((sub_str = strsep(&tmp_str, delimiter)) != NULL) {
 			if (strlen(sub_str) == 0)
