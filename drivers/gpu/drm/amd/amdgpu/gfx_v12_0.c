@@ -1603,6 +1603,9 @@ static int gfx_v12_0_sw_init(struct amdgpu_ip_block *ip_block)
 	if (r)
 		return r;
 
+	adev->gfx.me.use_mmio_for_reset = false;
+	adev->gfx.mec.use_mmio_for_reset = true;
+
 	return 0;
 }
 
@@ -5245,7 +5248,7 @@ static int gfx_v12_0_reset_kgq(struct amdgpu_ring *ring,
 			       struct amdgpu_fence *timedout_fence)
 {
 	struct amdgpu_device *adev = ring->adev;
-	bool use_mmio = false;
+	bool use_mmio = adev->gfx.me.use_mmio_for_reset;
 	int r;
 
 	amdgpu_ring_reset_helper_begin(ring, timedout_fence);
@@ -5276,7 +5279,7 @@ static int gfx_v12_0_reset_kcq(struct amdgpu_ring *ring,
 			       struct amdgpu_fence *timedout_fence)
 {
 	struct amdgpu_device *adev = ring->adev;
-	bool use_mmio = true;
+	bool use_mmio = adev->gfx.mec.use_mmio_for_reset;
 	int r;
 
 	amdgpu_ring_reset_helper_begin(ring, timedout_fence);

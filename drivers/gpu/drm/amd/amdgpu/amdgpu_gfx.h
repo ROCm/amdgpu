@@ -116,6 +116,7 @@ struct amdgpu_mec {
 	u32 num_pipe_per_mec;
 	u32 num_queue_per_pipe;
 	void			*mqd_backup[AMDGPU_MAX_COMPUTE_RINGS * AMDGPU_MAX_GC_INSTANCES];
+	bool use_mmio_for_reset;
 };
 
 struct amdgpu_mec_bitmap {
@@ -401,6 +402,7 @@ struct amdgpu_me {
 	uint32_t			num_pipe_per_me;
 	uint32_t			num_queue_per_pipe;
 	void				*mqd_backup[AMDGPU_MAX_GFX_RINGS];
+	bool				use_mmio_for_reset;
 
 	/* These are the resources for which amdgpu takes ownership */
 	DECLARE_BITMAP(queue_bitmap, AMDGPU_MAX_GFX_QUEUES);
