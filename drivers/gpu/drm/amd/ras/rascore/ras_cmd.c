@@ -202,11 +202,12 @@ static int ras_cmd_get_cper_records(struct ras_core_context *ras_core,
 			(struct ras_cmd_cper_record_req *)cmd->input_buff_raw;
 	struct ras_cmd_cper_record_rsp *rsp =
 			(struct ras_cmd_cper_record_rsp *)cmd->output_buff_raw;
-	struct ras_log_info *trace[MAX_RECORD_PER_BATCH] = {0};
+	struct ras_log_info *trace = NULL;
+	uint32_t trace_count = MAX_RECORD_PER_BATCH;
 	struct ras_log_batch_overview overview;
 	uint32_t offset = 0, real_data_len = 0;
 	uint64_t batch_id;
-	uint8_t *buffer;
+	uint8_t *buffer = NULL;
 	int ret = 0, i, count;
 
 	if ((cmd->input_size != sizeof(struct ras_cmd_cper_record_req)) ||
@@ -221,6 +222,12 @@ static int ras_cmd_get_cper_records(struct ras_core_context *ras_core,
 	if (!buffer)
 		return RAS_CMD__ERROR_GENERIC;
 
+	trace = kcalloc(trace_count, sizeof(*trace), GFP_KERNEL);
+	if (!trace) {
+		ret = RAS_CMD__ERROR_GENERIC;
+		goto out;
+	}
+
 	ras_log_ring_get_batch_overview(ras_core, &overview);
 	for (i = 0; i < req->cper_num; i++) {
 		batch_id = req->cper_start_id + i;
@@ -228,7 +235,7 @@ static int ras_cmd_get_cper_records(struct ras_core_context *ras_core,
 			break;
 
 		count = ras_log_ring_get_batch_records(ras_core, batch_id, trace,
-					ARRAY_SIZE(trace));
+					trace_count);
 		if (count > 0) {
 			ret = ras_cper_generate_cper(ras_core, trace, count,
 					&buffer[offset], req->buf_size - offset, &real_data_len);
@@ -241,8 +248,8 @@ static int ras_cmd_get_cper_records(struct ras_core_context *ras_core,
 
 	if ((ret && (ret != -ENOMEM)) ||
 		copy_to_user(u64_to_user_ptr(req->buf_ptr), buffer, offset)) {
-		kfree(buffer);
-		return RAS_CMD__ERROR_GENERIC;
+		ret = RAS_CMD__ERROR_GENERIC;
+		goto out;
 	}
 
 	rsp->real_data_size = offset;
@@ -251,10 +258,12 @@ static int ras_cmd_get_cper_records(struct ras_core_context *ras_core,
 	rsp->version = 0;
 
 	cmd->output_size = sizeof(struct ras_cmd_cper_record_rsp);
+	ret = RAS_CMD__SUCCESS;
 
+out:
+	kfree(trace);
 	kfree(buffer);
-
-	return RAS_CMD__SUCCESS;
+	return ret;
 }
 
 static int ras_cmd_get_batch_trace_snapshot(struct ras_core_context *ras_core,
@@ -288,7 +297,8 @@ static int ras_cmd_get_batch_trace_records(struct ras_core_context *ras_core,
 	struct ras_cmd_batch_trace_record_rsp *output_data =
 			(struct ras_cmd_batch_trace_record_rsp *)cmd->output_buff_raw;
 	struct ras_log_batch_overview overview;
-	struct ras_log_info *trace_arry[MAX_RECORD_PER_BATCH] = {0};
+	struct ras_log_info *trace_arry = NULL;
+	uint32_t trace_count = MAX_RECORD_PER_BATCH;
 	struct ras_log_info *record;
 	int i, j, count = 0, offset = 0;
 	uint64_t id;
@@ -306,6 +316,10 @@ static int ras_cmd_get_batch_trace_records(struct ras_core_context *ras_core,
 	    (input_data->start_batch_id >= overview.last_batch_id))
 		return RAS_CMD__ERROR_INVALID_INPUT_SIZE;
 
+	trace_arry = kcalloc(trace_count, sizeof(*trace_arry), GFP_KERNEL);
+	if (!trace_arry)
+		return RAS_CMD__ERROR_GENERIC;
+
 	for (i = 0; i < input_data->batch_num; i++) {
 		id = input_data->start_batch_id + i;
 		if (id >= overview.last_batch_id) {
@@ -314,17 +328,17 @@ static int ras_cmd_get_batch_trace_records(struct ras_core_context *ras_core,
 		}
 
 		count = ras_log_ring_get_batch_records(ras_core,
-					id, trace_arry, ARRAY_SIZE(trace_arry));
+					id, trace_arry, trace_count);
 		if (count > 0) {
 			if ((offset + count) > RAS_CMD_MAX_TRACE_NUM)
 				break;
 			for (j = 0; j < count; j++) {
 				record = &output_data->records[offset + j];
-				record->seqno = trace_arry[j]->seqno;
-				record->timestamp = trace_arry[j]->timestamp;
-				record->event = trace_arry[j]->event;
+				record->seqno = trace_arry[j].seqno;
+				record->timestamp = trace_arry[j].timestamp;
+				record->event = trace_arry[j].event;
 				memcpy(&record->aca_reg,
-					&trace_arry[j]->aca_reg, sizeof(trace_arry[j]->aca_reg));
+					&trace_arry[j].aca_reg, sizeof(trace_arry[j].aca_reg));
 			}
 		} else {
 			count = 0;
@@ -342,6 +356,8 @@ static int ras_cmd_get_batch_trace_records(struct ras_core_context *ras_core,
 	output_data->version = 0;
 
 	cmd->output_size = sizeof(struct ras_cmd_batch_trace_record_rsp);
+
+	kfree(trace_arry);
 
 	return RAS_CMD__SUCCESS;
 }
