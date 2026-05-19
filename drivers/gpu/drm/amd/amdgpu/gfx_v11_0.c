@@ -6823,29 +6823,8 @@ static int gfx_v11_0_reset_kgq(struct amdgpu_ring *ring,
 {
 	struct amdgpu_device *adev = ring->adev;
 	bool use_mmio = adev->gfx.me.use_mmio_for_reset;
-	int r;
 
-	amdgpu_ring_reset_helper_begin(ring, timedout_fence);
-
-	r = amdgpu_mes_reset_legacy_queue(ring->adev, ring, vmid, use_mmio, 0);
-	if (r)
-		return r;
-
-	if (use_mmio) {
-		r = amdgpu_mes_unmap_legacy_queue(adev, ring,
-						  RESET_QUEUES, 0, 0, 0);
-		if (r)
-			return r;
-		amdgpu_gfx_mqd_reset_restore(ring);
-
-		r = amdgpu_mes_map_legacy_queue(adev, ring, 0);
-		if (r) {
-			dev_err(adev->dev, "failed to remap kgq\n");
-			return r;
-		}
-	}
-
-	return amdgpu_ring_reset_helper_end(ring, timedout_fence);
+	return amdgpu_gfx_mes_reset_queue(ring, vmid, timedout_fence, use_mmio);
 }
 
 static int gfx_v11_0_reset_kcq(struct amdgpu_ring *ring,
@@ -6854,29 +6833,8 @@ static int gfx_v11_0_reset_kcq(struct amdgpu_ring *ring,
 {
 	struct amdgpu_device *adev = ring->adev;
 	bool use_mmio = adev->gfx.mec.use_mmio_for_reset;
-	int r = 0;
 
-	amdgpu_ring_reset_helper_begin(ring, timedout_fence);
-
-	r = amdgpu_mes_reset_legacy_queue(ring->adev, ring, vmid, use_mmio, 0);
-	if (r)
-		return r;
-
-	if (use_mmio) {
-		r = amdgpu_mes_unmap_legacy_queue(adev, ring,
-						  RESET_QUEUES, 0, 0, 0);
-		if (r)
-			return r;
-		amdgpu_gfx_mqd_reset_restore(ring);
-
-		r = amdgpu_mes_map_legacy_queue(adev, ring, 0);
-		if (r) {
-			dev_err(adev->dev, "failed to remap kcq\n");
-			return r;
-		}
-	}
-
-	return amdgpu_ring_reset_helper_end(ring, timedout_fence);
+	return amdgpu_gfx_mes_reset_queue(ring, vmid, timedout_fence, use_mmio);
 }
 
 static void gfx_v11_ip_print(struct amdgpu_ip_block *ip_block, struct drm_printer *p)

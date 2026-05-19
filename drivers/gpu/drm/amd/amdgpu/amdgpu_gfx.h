@@ -588,7 +588,6 @@ void amdgpu_gfx_kiq_fini(struct amdgpu_device *adev, int xcc_id);
 int amdgpu_gfx_kiq_init(struct amdgpu_device *adev,
 			unsigned hpd_size, int xcc_id);
 
-void amdgpu_gfx_mqd_reset_restore(struct amdgpu_ring *ring);
 int amdgpu_gfx_mqd_sw_init(struct amdgpu_device *adev,
 			   unsigned mqd_size, int xcc_id);
 void amdgpu_gfx_mqd_sw_fini(struct amdgpu_device *adev, int xcc_id);
@@ -669,6 +668,11 @@ void amdgpu_debugfs_gfx_sched_mask_init(struct amdgpu_device *adev);
 void amdgpu_debugfs_compute_sched_mask_init(struct amdgpu_device *adev);
 
 int amdgpu_gfx_ring_preempt_ib(struct amdgpu_ring *ring);
+
+int amdgpu_gfx_mes_reset_queue(struct amdgpu_ring *ring,
+			       unsigned int vmid,
+			       struct amdgpu_fence *timedout_fence,
+			       bool use_mmio);
 
 static inline const char *amdgpu_gfx_compute_mode_desc(int mode)
 {

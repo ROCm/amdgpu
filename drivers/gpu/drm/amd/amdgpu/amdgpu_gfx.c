@@ -377,7 +377,7 @@ int amdgpu_gfx_kiq_init(struct amdgpu_device *adev,
 	return 0;
 }
 
-void amdgpu_gfx_mqd_reset_restore(struct amdgpu_ring *ring)
+static void amdgpu_gfx_mqd_reset_restore(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 	int mqd_idx, mqd_size;
@@ -1986,6 +1986,37 @@ static ssize_t amdgpu_gfx_get_compute_reset_mask(struct device *dev,
 		return -ENODEV;
 
 	return amdgpu_show_reset_mask(buf, adev->gfx.compute_supported_reset);
+}
+
+int amdgpu_gfx_mes_reset_queue(struct amdgpu_ring *ring,
+			       unsigned int vmid,
+			       struct amdgpu_fence *timedout_fence,
+			       bool use_mmio)
+{
+	struct amdgpu_device *adev = ring->adev;
+	int r;
+
+	amdgpu_ring_reset_helper_begin(ring, timedout_fence);
+
+	r = amdgpu_mes_reset_legacy_queue(ring->adev, ring, vmid, use_mmio, 0);
+	if (r)
+		return r;
+
+	if (use_mmio) {
+		r = amdgpu_mes_unmap_legacy_queue(adev, ring,
+						  RESET_QUEUES, 0, 0, 0);
+		if (r)
+			return r;
+		amdgpu_gfx_mqd_reset_restore(ring);
+
+		r = amdgpu_mes_map_legacy_queue(adev, ring, 0);
+		if (r) {
+			dev_err(adev->dev, "failed to remap kgq\n");
+			return r;
+		}
+	}
+
+	return amdgpu_ring_reset_helper_end(ring, timedout_fence);
 }
 
 static DEVICE_ATTR(run_cleaner_shader, 0200,
