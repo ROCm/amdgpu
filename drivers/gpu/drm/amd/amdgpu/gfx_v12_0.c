@@ -5260,9 +5260,8 @@ static int gfx_v12_0_reset_kcq(struct amdgpu_ring *ring,
 			       struct amdgpu_fence *timedout_fence)
 {
 	struct amdgpu_device *adev = ring->adev;
-	bool use_mmio = adev->gfx.mec.use_mmio_for_reset;
 
-	return amdgpu_gfx_mes_reset_queue(ring, vmid, timedout_fence, use_mmio);
+	return amdgpu_gfx_reset_mes_compute(adev, ring, timedout_fence, NULL, NULL);
 }
 
 static void gfx_v12_0_ring_begin_use(struct amdgpu_ring *ring)
