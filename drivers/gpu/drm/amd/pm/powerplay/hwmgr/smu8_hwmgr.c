@@ -1522,27 +1522,6 @@ static int smu8_store_cc6_data(struct pp_hwmgr *hwmgr, uint32_t separation_time,
 	return 0;
 }
 
-static int smu8_get_dal_power_level(struct pp_hwmgr *hwmgr,
-		struct amd_pp_simple_clock_info *info)
-{
-	uint32_t i;
-	const struct phm_clock_voltage_dependency_table *table =
-			hwmgr->dyn_state.vddc_dep_on_dal_pwrl;
-	const struct phm_clock_and_voltage_limits *limits =
-			&hwmgr->dyn_state.max_clock_voltage_on_ac;
-
-	info->engine_max_clock = limits->sclk;
-	info->memory_max_clock = limits->mclk;
-
-	for (i = table->count - 1; i > 0; i--) {
-		if (limits->vddc >= table->entries[i].v) {
-			info->level = table->entries[i].clk;
-			return 0;
-		}
-	}
-	return -EINVAL;
-}
-
 static int smu8_force_clock_level(struct pp_hwmgr *hwmgr,
 		enum pp_clock_type type, uint32_t mask)
 {
@@ -2063,7 +2042,6 @@ static const struct pp_hwmgr_func smu8_hwmgr_funcs = {
 	.store_cc6_data = smu8_store_cc6_data,
 	.force_clock_level = smu8_force_clock_level,
 	.emit_clock_levels = smu8_emit_clock_levels,
-	.get_dal_power_level = smu8_get_dal_power_level,
 	.get_performance_level = smu8_get_performance_level,
 	.get_current_shallow_sleep_clocks = smu8_get_current_shallow_sleep_clocks,
 	.get_clock_by_type = smu8_get_clock_by_type,
