@@ -255,10 +255,6 @@ void smu_v13_0_init_msg_ctl(struct smu_context *smu,
 
 int smu_v13_0_mode1_reset(struct smu_context *smu);
 
-int smu_v13_0_get_pptable_from_firmware(struct smu_context *smu,
-					void **table,
-					uint32_t *size,
-					uint32_t pptable_id);
 
 int smu_v13_0_update_pcie_parameters(struct smu_context *smu,
 				     uint8_t pcie_gen_cap,
