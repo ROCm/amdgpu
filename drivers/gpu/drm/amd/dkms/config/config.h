@@ -1358,6 +1358,9 @@
 /* ww_mutex_trylock() has context arg */
 #define HAVE_WW_MUTEX_TRYLOCK_CONTEXT_ARG 1
 
+/* zap_special_vma_range() is available */
+#define HAVE_ZAP_SPECIAL_VMA_RANGE 1
+
 /* zone_device_page_init() is available */
 /* #undef HAVE_ZONE_DEVICE_PAGE_INIT */
 

@@ -175,7 +175,11 @@ static void kfd_doorbell_unmap_locked(struct kfd_process_device *pdd)
 			process->lead_thread->pid, vma->vm_start);
 
 	size = kfd_doorbell_process_slice(pdd->dev->kfd);
+#ifdef HAVE_ZAP_SPECIAL_VMA_RANGE
+	zap_special_vma_range(vma, vma->vm_start, size);
+#else
 	zap_vma_ptes(vma, vma->vm_start, size);
+#endif
 	pdd->qpd.doorbell_mapped = 0;
 }
 
