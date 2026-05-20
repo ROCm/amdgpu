@@ -2028,7 +2028,7 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 		adev->flags |= AMD_IS_PX;
 
 	if (!(adev->flags & AMD_IS_APU)) {
-		parent = pcie_find_root_port(adev->pdev);
+		parent = amdgpu_device_find_parent(adev);
 		adev->has_pr3 = parent ? pci_pr3_present(parent) : false;
 	}
 
