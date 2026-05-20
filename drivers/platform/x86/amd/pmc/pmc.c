@@ -120,6 +120,11 @@ static void amd_pmc_get_smu_mb(struct amd_pmc_dev *dev)
 		dev->smu_arg = AMD_PMC_REGISTER_ARGUMENT;
 		dev->smu_rsp = AMD_PMC_REGISTER_RESPONSE;
 		break;
+	case PCI_DEVICE_ID_AMD_1AH_M80H_ROOT:
+		dev->smu_msg = AMD_PMC_REGISTER_MSG_1AH_80H;
+		dev->smu_arg = AMD_PMC_REGISTER_ARG_1AH_80H;
+		dev->smu_rsp = AMD_PMC_REGISTER_RSP_1AH_80H;
+		break;
 	}
 }
 
