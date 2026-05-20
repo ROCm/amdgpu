@@ -1157,6 +1157,81 @@ module_param_named(user_queue, amdgpu_user_queue, int, 0444);
 MODULE_PARM_DESC(ptl, "Enable PTL (-1 = auto, 0 = disable (default), 1 = enable, 2 = permanently disable)");
 module_param_named(ptl, amdgpu_ptl, int, 0444);
 
+/**
+ * DOC: kfd_free_wait_ms (int)
+ *
+ * Wall-clock deadline (ms) for the bounded wait on pin_count == 0
+ * inside amdgpu_amdkfd_gpuvm_free_memory_of_gpu() when hipFree()
+ * encounters an RDMA-pinned BO.  Together with kfd_free_on_pinned
+ * this controls whether hipFree returns -EBUSY (legacy) or waits
+ * up to N ms and then queues the BO for the orphan reaper.
+ *
+ * Default 0 keeps the legacy silent-orphan behaviour byte-identical.
+ */
+int amdgpu_kfd_free_wait_ms;
+MODULE_PARM_DESC(kfd_free_wait_ms,
+	"Max ms to wait for pin_count==0 in hipFree path on RDMA-pinned BOs (default 0 = no wait)");
+module_param_named(kfd_free_wait_ms, amdgpu_kfd_free_wait_ms, int, 0644);
+
+/**
+ * DOC: kfd_unpin_drain_ms (int)
+ *
+ * Wall-clock deadline (ms) for the bounded dma_resv_wait_timeout()
+ * inside amdgpu_kfd_unpin_drain() -- ensures no in-flight fence
+ * (peer RDMA WR, SDMA copy, etc.) races with the pin_count drop.
+ *
+ * Default 0 disables the drain (preserves stock behaviour).
+ */
+int amdgpu_kfd_unpin_drain_ms;
+MODULE_PARM_DESC(kfd_unpin_drain_ms,
+	"Strict dma_resv drain timeout in unpin path (default 0 = disabled)");
+module_param_named(kfd_unpin_drain_ms, amdgpu_kfd_unpin_drain_ms, int, 0644);
+
+/**
+ * DOC: kfd_free_on_pinned (int)
+ *
+ * Policy when hipFree() is called on a BO still RDMA-pinned:
+ *   0 = legacy silent orphan (memory leaks until process exit)
+ *   1 = bounded wait kfd_free_wait_ms, then queue for orphan reaper
+ *       so userspace hipFree always succeeds and the memory is
+ *       reclaimed once the peer releases the pin (or forcibly by
+ *       the reaper after pin_orphan_timeout_ms).
+ *
+ * Default 0 (legacy).
+ */
+int amdgpu_kfd_free_on_pinned;
+MODULE_PARM_DESC(kfd_free_on_pinned,
+	"Policy on hipFree of RDMA-pinned BO (0=legacy orphan, 1=bounded-wait + reaper)");
+module_param_named(kfd_free_on_pinned, amdgpu_kfd_free_on_pinned, int, 0644);
+
+/**
+ * DOC: pin_orphan_timeout_ms (int)
+ *
+ * Age (ms) after which the pin-orphan reaper force-unpins a BO
+ * still parked on adev->kfd.orphan_list.  When kfd_free_on_pinned
+ * is 1 and the bounded wait times out, the BO is queued here.
+ *
+ * Default 0 disables the reaper.
+ */
+int amdgpu_pin_orphan_timeout_ms;
+MODULE_PARM_DESC(pin_orphan_timeout_ms,
+	"Age threshold (ms) for the pin-orphan reaper to force-unpin a BO (default 0 = disabled)");
+module_param_named(pin_orphan_timeout_ms, amdgpu_pin_orphan_timeout_ms, int, 0644);
+
+/**
+ * DOC: pin_reaper_interval_ms (int)
+ *
+ * Delay (ms) between pin-orphan reaper background passes.  At each
+ * tick the reaper walks adev->kfd.orphan_list and force-unpins any
+ * BO older than pin_orphan_timeout_ms.
+ *
+ * Default 0 disables the reaper.
+ */
+int amdgpu_pin_reaper_interval_ms;
+MODULE_PARM_DESC(pin_reaper_interval_ms,
+	"Tick interval (ms) of the pin-orphan reaper background worker (default 0 = disabled)");
+module_param_named(pin_reaper_interval_ms, amdgpu_pin_reaper_interval_ms, int, 0644);
+
 /* These devices are not supported by amdgpu.
  * They are supported by the mach64, r128, radeon drivers
  */

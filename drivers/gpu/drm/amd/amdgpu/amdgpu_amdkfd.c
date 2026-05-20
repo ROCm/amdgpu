@@ -231,10 +231,18 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 
 		INIT_WORK(&adev->kfd.reset_work, amdgpu_amdkfd_reset_work);
 	}
+
+	/* Start the RDMA-pin orphan reaper background worker.  No-op
+	 * when the relevant module parameters are unset (default).
+	 */
+	amdgpu_kfd_reaper_start(adev);
 }
 
 void amdgpu_amdkfd_device_fini_sw(struct amdgpu_device *adev)
 {
+	/* Tear down the RDMA-pin orphan reaper before the KFD device. */
+	amdgpu_kfd_reaper_stop(adev);
+
 	if (adev->kfd.dev) {
 		kgd2kfd_device_exit(adev->kfd.dev);
 		adev->kfd.dev = NULL;

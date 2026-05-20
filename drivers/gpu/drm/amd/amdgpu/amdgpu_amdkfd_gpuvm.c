@@ -2093,6 +2093,44 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	/* Unreference the ipc_obj if applicable */
 	kfd_ipc_obj_put(&mem->ipc_obj);
 
+	/* Bounded-wait + queue-to-orphan policy for hipFree on RDMA-pinned
+	 * BOs.  Gated by amdgpu_kfd_free_on_pinned:
+	 *   0 = legacy silent orphan (leaks until process exit)
+	 *   1 = bounded wait amdgpu_kfd_free_wait_ms, then queue for the
+	 *       reaper.  Userspace hipFree always succeeds; the memory
+	 *       is reclaimed once the peer releases the pin (or forcibly
+	 *       after amdgpu_pin_orphan_timeout_ms via the reaper).
+	 */
+	if (mem->bo && mem->bo->tbo.pin_count > 0) {
+		int wait_rc = -EBUSY;
+		int policy = amdgpu_kfd_free_on_pinned;
+		u64 sz = amdgpu_bo_size(mem->bo);
+
+		atomic64_inc(&adev->kfd.free_wait_pinned_count);
+
+		if (policy >= 1 && amdgpu_kfd_free_wait_ms > 0) {
+			int r = amdgpu_bo_reserve(mem->bo, false);
+
+			if (!r) {
+				wait_rc = amdgpu_kfd_wait_pin_drop(mem->bo,
+					amdgpu_kfd_free_wait_ms);
+				amdgpu_bo_unreserve(mem->bo);
+			}
+
+			if (wait_rc == -EBUSY) {
+				atomic64_inc(&adev->kfd.free_wait_pinned_timeout);
+				dev_warn_ratelimited(adev->dev,
+					"amdgpu_kfd: hipFree pinned timeout bo=%p size=%lluMB pin_count=%d after %dms; queueing for orphan reaper\n",
+					mem->bo, sz >> 20,
+					mem->bo->tbo.pin_count,
+					amdgpu_kfd_free_wait_ms);
+			}
+		}
+
+		if (wait_rc == -EBUSY && policy >= 1)
+			(void)amdgpu_kfd_orphan_queue(adev, mem->bo, sz);
+	}
+
 	/* Free the BO*/
 	drm_vma_node_revoke(&mem->bo->tbo.base.vma_node, drm_priv);
 	if (!mem->ipc_obj)

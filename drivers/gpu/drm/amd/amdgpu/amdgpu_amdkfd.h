@@ -29,6 +29,7 @@
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/kthread.h>
+#include <linux/sched.h>
 #include <linux/workqueue.h>
 #include <linux/mmu_notifier.h>
 #include <linux/memremap.h>
@@ -117,11 +118,48 @@ struct amdgpu_kfd_dev {
 	/* Client for KFD BO GEM handle allocations */
 	struct drm_client_dev client;
 
+	/* RDMA pin orphan reaper + bounded-wait free-on-pinned policy.
+	 * Initialised by amdgpu_kfd_reaper_start() in device_init,
+	 * torn down by amdgpu_kfd_reaper_stop() in device_fini_sw.
+	 */
+	spinlock_t orphan_lock;
+	struct list_head orphan_list;       /* kfd_orphan_pin nodes */
+	atomic64_t rdma_pin_orphans_queued;
+	atomic64_t rdma_pin_orphans_reaped;
+	atomic64_t free_wait_pinned_count;
+	atomic64_t free_wait_pinned_timeout;
+	atomic64_t unpin_drain_timeouts;
+	struct delayed_work reaper_work;
+	bool reaper_started;
+
 	/* HMM page migration MEMORY_DEVICE_PRIVATE mapping
 	 * Must be last --ends in a flexible-array member.
 	 */
 	struct dev_pagemap pgmap;
 };
+
+/*
+ * Queue node parked on amdgpu_kfd_dev::orphan_list when hipFree() is
+ * called on a BO that still has pin_count > 0 (typically held by an
+ * RDMA peer driver).  The reaper background worker walks the list
+ * and force-unpins entries older than amdgpu_pin_orphan_timeout_ms.
+ */
+struct kfd_orphan_pin {
+	struct list_head node;
+	struct amdgpu_bo *bo;             /* extra ref held -- see amdgpu_kfd_orphan_queue */
+	u64 queued_at_jiffies;
+	u64 bytes;
+	pid_t owner_pid;
+	char owner_comm[TASK_COMM_LEN];
+};
+
+/* Helpers + reaper lifecycle (see amdgpu_kfd_pin_reaper.c). */
+int amdgpu_kfd_unpin_drain(struct amdgpu_bo *bo, int timeout_ms);
+int amdgpu_kfd_wait_pin_drop(struct amdgpu_bo *bo, int timeout_ms);
+int amdgpu_kfd_orphan_queue(struct amdgpu_device *adev,
+			    struct amdgpu_bo *bo, u64 bytes);
+void amdgpu_kfd_reaper_start(struct amdgpu_device *adev);
+void amdgpu_kfd_reaper_stop(struct amdgpu_device *adev);
 
 enum kgd_engine_type {
 	KGD_ENGINE_PFP = 1,
