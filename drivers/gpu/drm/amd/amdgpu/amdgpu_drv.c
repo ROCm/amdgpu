@@ -1157,6 +1157,32 @@ module_param_named(user_queue, amdgpu_user_queue, int, 0444);
 MODULE_PARM_DESC(ptl, "Enable PTL (-1 = auto, 0 = disable (default), 1 = enable, 2 = permanently disable)");
 module_param_named(ptl, amdgpu_ptl, int, 0444);
 
+/**
+ * DOC: gtt_lock_timeout_ms (int)
+ *
+ * Maximum milliseconds to wait acquiring `mman.gtt_window_lock` in
+ * amdgpu_ttm_copy_mem_to_mem(), amdgpu_ttm_clear_buffer() and
+ * amdgpu_fill_buffer() before returning -ETIME.
+ *
+ * Default 0 keeps the historical unbounded mutex_lock() behaviour.
+ * Any positive value converts the acquisition to a bounded
+ * trylock-and-sleep loop, returning -ETIME at the deadline so the
+ * caller can fail fast instead of parking on a wedged ring/queue.
+ * Values below 100 ms are clamped up to 100 ms to avoid mis-
+ * configurations turning the GTT window contention path into a
+ * fail-only path.
+ *
+ * Validated under multi-tenant HIP/AMDGPU serving load where SDMA
+ * ring stalls were observed to park the GTT-window holder for
+ * minutes-plus.  With gtt_lock_timeout_ms=4000 the callers exit
+ * with -ETIME and the higher-level survival policy decides whether
+ * to retry, re-queue, or surface the error to the application.
+ */
+int amdgpu_gtt_lock_timeout_ms;
+MODULE_PARM_DESC(gtt_lock_timeout_ms,
+	"Max ms to wait on mman.gtt_window_lock acquisition before returning -ETIME (default 0 = unbounded mutex_lock)");
+module_param_named(gtt_lock_timeout_ms, amdgpu_gtt_lock_timeout_ms, int, 0644);
+
 /* These devices are not supported by amdgpu.
  * They are supported by the mach64, r128, radeon drivers
  */

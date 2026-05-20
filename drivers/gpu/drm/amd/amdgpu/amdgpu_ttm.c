@@ -307,6 +307,51 @@ static int amdgpu_ttm_map_buffer(struct ttm_buffer_object *bo,
  * move and different for a BO to BO copy.
  *
  */
+/*
+ * amdgpu_ttm_lock_gtt_window - bounded acquire of mman.gtt_window_lock
+ * @adev: amdgpu device whose mman.gtt_window_lock to acquire
+ *
+ * If the gtt_lock_timeout_ms module parameter is 0 (the default),
+ * this function degrades to a plain mutex_lock(), preserving the
+ * historical behaviour byte-identically.
+ *
+ * If gtt_lock_timeout_ms is positive, the lock is acquired via a
+ * trylock-and-msleep loop bounded by a wall-clock deadline.  On
+ * timeout the helper returns -ETIME so the caller can fail fast.
+ * Values below 100 ms are clamped up to 100 ms.  Pending signals
+ * are propagated as -ERESTARTSYS.
+ *
+ * Return: 0 on lock acquired, -ETIME on deadline, -ERESTARTSYS on
+ * signal.  Callers must call mutex_unlock(&adev->mman.gtt_window_lock)
+ * on success.
+ */
+static int amdgpu_ttm_lock_gtt_window(struct amdgpu_device *adev)
+{
+	int timeout_ms = READ_ONCE(amdgpu_gtt_lock_timeout_ms);
+	ktime_t deadline;
+
+	if (timeout_ms <= 0) {
+		mutex_lock(&adev->mman.gtt_window_lock);
+		return 0;
+	}
+
+	if (timeout_ms < 100)
+		timeout_ms = 100;
+
+	if (mutex_trylock(&adev->mman.gtt_window_lock))
+		return 0;
+
+	deadline = ktime_add_ms(ktime_get(), timeout_ms);
+	while (!ktime_after(ktime_get(), deadline)) {
+		if (mutex_trylock(&adev->mman.gtt_window_lock))
+			return 0;
+		if (schedule_timeout_interruptible(msecs_to_jiffies(1)) ||
+		    signal_pending(current))
+			return -ERESTARTSYS;
+	}
+	return -ETIME;
+}
+
 __attribute__((nonnull))
 static int amdgpu_ttm_copy_mem_to_mem(struct amdgpu_device *adev,
 				      const struct amdgpu_copy_mem *src,
@@ -331,7 +376,10 @@ static int amdgpu_ttm_copy_mem_to_mem(struct amdgpu_device *adev,
 	amdgpu_res_first(src->mem, src->offset, size, &src_mm);
 	amdgpu_res_first(dst->mem, dst->offset, size, &dst_mm);
 
-	mutex_lock(&adev->mman.gtt_window_lock);
+	r = amdgpu_ttm_lock_gtt_window(adev);
+	if (r)
+		return r;
+
 	while (src_mm.remaining) {
 		uint64_t from, to, cur_size, tiling_flags;
 		uint32_t num_type, data_format, max_com, write_compress_disable;
@@ -2838,7 +2886,10 @@ int amdgpu_ttm_clear_buffer(struct amdgpu_bo *bo,
 
 	amdgpu_res_first(bo->tbo.resource, 0, amdgpu_bo_size(bo), &cursor);
 
-	mutex_lock(&adev->mman.gtt_window_lock);
+	r = amdgpu_ttm_lock_gtt_window(adev);
+	if (r)
+		return r;
+
 	while (cursor.remaining) {
 		struct dma_fence *next = NULL;
 		u64 size;
@@ -2892,7 +2943,10 @@ int amdgpu_fill_buffer(struct amdgpu_bo *bo,
 
 	amdgpu_res_first(bo->tbo.resource, 0, amdgpu_bo_size(bo), &dst);
 
-	mutex_lock(&adev->mman.gtt_window_lock);
+	r = amdgpu_ttm_lock_gtt_window(adev);
+	if (r)
+		return r;
+
 	while (dst.remaining) {
 		struct dma_fence *next;
 		uint64_t cur_size, to;
