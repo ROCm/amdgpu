@@ -179,7 +179,7 @@ static int mes_userq_unmap(struct amdgpu_usermode_queue *queue)
 	return r;
 }
 
-static int mes_userq_reset(struct amdgpu_usermode_queue *queue)
+int mes_userq_reset(struct amdgpu_usermode_queue *queue)
 {
 	struct amdgpu_userq_mgr *uq_mgr = queue->userq_mgr;
 	struct amdgpu_device *adev = uq_mgr->adev;
@@ -197,6 +197,43 @@ static int mes_userq_reset(struct amdgpu_usermode_queue *queue)
 	if (r)
 		return r;
 	return mes_userq_unmap(queue);
+}
+
+int mes_userq_reset_queue(struct amdgpu_device *adev,
+			  struct amdgpu_usermode_queue *guilty_uq,
+			  int queue_type,
+			  unsigned int pipe,
+			  unsigned int queue,
+			  unsigned int db)
+{
+	struct amdgpu_usermode_queue *uq;
+	bool use_mmio = false;
+	unsigned long uq_id;
+	int r;
+
+	xa_for_each(&adev->userq_doorbell_xa, uq_id, uq) {
+		if (uq->queue_type == queue_type) {
+			if (uq == guilty_uq)
+				continue;
+			if (uq->doorbell_index == db) {
+				uq->state = AMDGPU_USERQ_STATE_HUNG;
+				if (use_mmio)
+					r = amdgpu_mes_reset_queue_mmio(adev, queue_type, 0, 1, pipe, queue, 0);
+				else
+					r = amdgpu_mes_reset_user_queue(adev, queue_type, db, 0);
+				if (r)
+					return r;
+				r = mes_userq_unmap(uq);
+				if (r)
+					return r;
+				atomic_inc(&adev->gpu_reset_counter);
+				amdgpu_userq_fence_driver_force_completion(uq);
+				drm_dev_wedged_event(adev_to_drm(adev), DRM_WEDGE_RECOVERY_NONE, NULL);
+				break;
+			}
+		}
+	}
+	return 0;
 }
 
 static int mes_userq_create_ctx_space(struct amdgpu_userq_mgr *uq_mgr,
