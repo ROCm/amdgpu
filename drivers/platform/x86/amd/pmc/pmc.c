@@ -110,11 +110,15 @@ static void amd_pmc_get_smu_mb(struct amd_pmc_dev *dev)
 	case AMD_CPU_ID_YC:
 	case AMD_CPU_ID_CB:
 	case AMD_CPU_ID_PS:
-		dev->smu_msg = 0x538;
+		dev->smu_msg = AMD_PMC_REGISTER_MESSAGE;
+		dev->smu_arg = AMD_PMC_REGISTER_ARGUMENT;
+		dev->smu_rsp = AMD_PMC_REGISTER_RESPONSE;
 		break;
 	case PCI_DEVICE_ID_AMD_1AH_M20H_ROOT:
 	case PCI_DEVICE_ID_AMD_1AH_M60H_ROOT:
-		dev->smu_msg = 0x938;
+		dev->smu_msg = AMD_PMC_REGISTER_MSG_1AH_20H;
+		dev->smu_arg = AMD_PMC_REGISTER_ARGUMENT;
+		dev->smu_rsp = AMD_PMC_REGISTER_RESPONSE;
 		break;
 	}
 }
@@ -441,8 +445,8 @@ static void amd_pmc_dump_registers(struct amd_pmc_dev *dev)
 		response = dev->stb_arg.resp;
 	} else {
 		message = dev->smu_msg;
-		argument = AMD_PMC_REGISTER_ARGUMENT;
-		response = AMD_PMC_REGISTER_RESPONSE;
+		argument = dev->smu_arg;
+		response = dev->smu_rsp;
 	}
 
 	value = amd_pmc_reg_read(dev, response);
@@ -468,8 +472,8 @@ int amd_pmc_send_cmd(struct amd_pmc_dev *dev, u32 arg, u32 *data, u8 msg, bool r
 		response = dev->stb_arg.resp;
 	} else {
 		message = dev->smu_msg;
-		argument = AMD_PMC_REGISTER_ARGUMENT;
-		response = AMD_PMC_REGISTER_RESPONSE;
+		argument = dev->smu_arg;
+		response = dev->smu_rsp;
 	}
 
 	/* Wait until we get a valid response */

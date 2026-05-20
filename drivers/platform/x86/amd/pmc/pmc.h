@@ -17,6 +17,10 @@
 /* SMU communication registers */
 #define AMD_PMC_REGISTER_RESPONSE	0x980
 #define AMD_PMC_REGISTER_ARGUMENT	0x9BC
+#define AMD_PMC_REGISTER_MESSAGE	0x538
+
+/* SMU communication registers for 1Ah 20h SoC */
+#define AMD_PMC_REGISTER_MSG_1AH_20H	0x938
 
 /* PMC Scratch Registers */
 #define AMD_PMC_SCRATCH_REG_CZN		0x94
@@ -102,6 +106,8 @@ struct amd_pmc_dev {
 	const struct amd_pmc_bit_map *ips_ptr;
 	u32 num_ips;
 	u32 smu_msg;
+	u32 smu_arg;
+	u32 smu_rsp;
 /* SMU version information */
 	u8 smu_program;
 	u8 major;
