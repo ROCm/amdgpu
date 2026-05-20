@@ -49,6 +49,35 @@
 #include <kcl/kcl_drm_suballoc.h>
 #include <linux/module.h>
 
+/*
+ * suballoc_timeout_ms - max ms to block in kcl_drm_suballoc_new() waiting
+ * for a free suballocation slot before returning -ETIME.
+ *
+ * Default 4000 ms.  Set to 0 to restore stock unbounded behaviour
+ * (MAX_SCHEDULE_TIMEOUT).  Validated under multi-tenant SDMA-heavy serving
+ * workload where the legacy unbounded path was observed to park caller
+ * threads in wait_event() for >100 s when a SDMA queue stalled.
+ *
+ * Usage:
+ *   modprobe amdkcl suballoc_timeout_ms=4000
+ *   echo 4000 > /sys/module/amdkcl/parameters/suballoc_timeout_ms
+ */
+static int suballoc_timeout_ms = 4000;
+module_param(suballoc_timeout_ms, int, 0644);
+MODULE_PARM_DESC(suballoc_timeout_ms,
+	"Max ms to wait in kcl_drm_suballoc_new before returning -ETIME (default 4000; 0 = unbounded)");
+
+static inline long kcl_drm_suballoc_timeout_jiffies(void)
+{
+	int ms = READ_ONCE(suballoc_timeout_ms);
+
+	if (ms <= 0)
+		return MAX_SCHEDULE_TIMEOUT;
+	if (ms < 100)
+		ms = 100;
+	return msecs_to_jiffies(ms);
+}
+
 #ifndef HAVE_DRM_SUBALLOC_MANAGER_INIT
 static void kcl_drm_suballoc_remove_locked(struct drm_suballoc *sa);
 static void kcl_drm_suballoc_try_free(struct drm_suballoc_manager *sa_manager);
@@ -361,15 +390,20 @@ kcl_drm_suballoc_new(struct drm_suballoc_manager *sa_manager, size_t size,
 
 		if (count) {
 			long t;
+			long timeout_j = kcl_drm_suballoc_timeout_jiffies();
 
 			spin_unlock(&sa_manager->wq.lock);
 			t = dma_fence_wait_any_timeout(fences, count, intr,
-						       MAX_SCHEDULE_TIMEOUT,
+						       timeout_j,
 						       NULL);
 			for (i = 0; i < count; ++i)
 				dma_fence_put(fences[i]);
 
-			r = (t > 0) ? 0 : t;
+			/* t > 0  : woken normally
+			 * t == 0 : suballoc_timeout_ms deadline hit -> -ETIME
+			 * t < 0  : signal / error
+			 */
+			r = (t > 0) ? 0 : (t == 0 ? -ETIME : t);
 			spin_lock(&sa_manager->wq.lock);
 		} else if (intr) {
 			/* if we have nothing to wait for block */
@@ -377,10 +411,20 @@ kcl_drm_suballoc_new(struct drm_suballoc_manager *sa_manager, size_t size,
 				(sa_manager->wq,
 				 kcl___drm_suballoc_event(sa_manager, size, align));
 		} else {
+			long timeout_j = kcl_drm_suballoc_timeout_jiffies();
+			long ret;
+
 			spin_unlock(&sa_manager->wq.lock);
-			wait_event(sa_manager->wq,
-				   kcl_drm_suballoc_event(sa_manager, size, align));
-			r = 0;
+			if (timeout_j == MAX_SCHEDULE_TIMEOUT) {
+				wait_event(sa_manager->wq,
+					   kcl_drm_suballoc_event(sa_manager, size, align));
+				r = 0;
+			} else {
+				ret = wait_event_timeout(sa_manager->wq,
+					kcl_drm_suballoc_event(sa_manager, size, align),
+					timeout_j);
+				r = (ret == 0) ? -ETIME : 0;
+			}
 			spin_lock(&sa_manager->wq.lock);
 		}
 	} while (!r);
