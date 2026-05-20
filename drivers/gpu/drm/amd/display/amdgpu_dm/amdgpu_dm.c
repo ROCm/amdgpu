@@ -2037,8 +2037,7 @@ static int dm_resume(struct amdgpu_ip_block *ip_block)
 		for (i = 0; i < dc_state->stream_count; i++) {
 			dc_state->streams[i]->mode_changed = true;
 			for (j = 0; j < dc_state->stream_status[i].plane_count; j++) {
-				dc_state->stream_status[i].plane_states[j]->update_flags.raw
-					= 0xffffffff;
+				dc_pipe_update_bits_set_full(&dc_state->stream_status[i].plane_states[j]->update_bits);
 			}
 		}
 
@@ -6460,7 +6459,7 @@ static int dm_update_plane_state(struct dc *dc,
 		/* Tell DC to do a full surface update every time there
 		 * is a plane change. Inefficient, but works for now.
 		 */
-		dm_new_plane_state->dc_state->update_flags.bits.full_update = 1;
+		dm_new_plane_state->dc_state->update_bits.full_update = 1;
 
 		*lock_and_validation_needed = true;
 	}

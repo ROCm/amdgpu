@@ -1028,20 +1028,20 @@ void hwss_build_fast_sequence(struct dc *dc,
 		current_mpc_pipe = current_pipe;
 		while (current_mpc_pipe) {
 			if (current_mpc_pipe->plane_state) {
-				if (dc->hwss.set_flip_control_gsl && current_mpc_pipe->plane_state->update_flags.raw) {
+				if (dc->hwss.set_flip_control_gsl && dc_pipe_update_bits_is_any_set(&current_mpc_pipe->plane_state->update_bits)) {
 					block_sequence[*num_steps].params.set_flip_control_gsl_params.hubp = current_mpc_pipe->plane_res.hubp;
 					block_sequence[*num_steps].params.set_flip_control_gsl_params.flip_immediate = current_mpc_pipe->plane_state->flip_immediate;
 					block_sequence[*num_steps].func = HUBP_SET_FLIP_CONTROL_GSL;
 					(*num_steps)++;
 				}
-				if (dc->hwss.program_triplebuffer && dc->debug.enable_tri_buf && current_mpc_pipe->plane_state->update_flags.raw) {
+				if (dc->hwss.program_triplebuffer && dc->debug.enable_tri_buf && dc_pipe_update_bits_is_any_set(&current_mpc_pipe->plane_state->update_bits)) {
 					block_sequence[*num_steps].params.program_triplebuffer_params.dc = dc;
 					block_sequence[*num_steps].params.program_triplebuffer_params.pipe_ctx = current_mpc_pipe;
 					block_sequence[*num_steps].params.program_triplebuffer_params.enableTripleBuffer = current_mpc_pipe->plane_state->triplebuffer_flips;
 					block_sequence[*num_steps].func = HUBP_PROGRAM_TRIPLEBUFFER;
 					(*num_steps)++;
 				}
-				if (dc->hwss.update_plane_addr && current_mpc_pipe->plane_state->update_flags.bits.addr_update) {
+				if (dc->hwss.update_plane_addr && current_mpc_pipe->plane_state->update_bits.addr_update) {
 					if (resource_is_pipe_type(current_mpc_pipe, OTG_MASTER) &&
 							stream_status->mall_stream_config.type == SUBVP_MAIN) {
 						block_sequence[*num_steps].params.subvp_save_surf_addr.dc_dmub_srv = dc->ctx->dmub_srv;
@@ -1057,7 +1057,7 @@ void hwss_build_fast_sequence(struct dc *dc,
 					(*num_steps)++;
 				}
 
-				if (hws->funcs.set_input_transfer_func && current_mpc_pipe->plane_state->update_flags.bits.gamma_change) {
+				if (hws->funcs.set_input_transfer_func && current_mpc_pipe->plane_state->update_bits.gamma_change) {
 					block_sequence[*num_steps].params.set_input_transfer_func_params.dc = dc;
 					block_sequence[*num_steps].params.set_input_transfer_func_params.pipe_ctx = current_mpc_pipe;
 					block_sequence[*num_steps].params.set_input_transfer_func_params.plane_state = current_mpc_pipe->plane_state;
@@ -1066,23 +1066,23 @@ void hwss_build_fast_sequence(struct dc *dc,
 				}
 
 				if (dc->hwss.program_gamut_remap &&
-						(current_mpc_pipe->plane_state->update_flags.bits.gamut_remap_change ||
+						(current_mpc_pipe->plane_state->update_bits.gamut_remap_change ||
 						 current_mpc_pipe->stream->update_flags.bits.gamut_remap)) {
 					block_sequence[*num_steps].params.program_gamut_remap_params.pipe_ctx = current_mpc_pipe;
 					block_sequence[*num_steps].func = DPP_PROGRAM_GAMUT_REMAP;
 					(*num_steps)++;
 				}
-				if (current_mpc_pipe->plane_state->update_flags.bits.input_csc_change) {
+				if (current_mpc_pipe->plane_state->update_bits.input_csc_change) {
 					block_sequence[*num_steps].params.setup_dpp_params.pipe_ctx = current_mpc_pipe;
 					block_sequence[*num_steps].func = DPP_SETUP_DPP;
 					(*num_steps)++;
 				}
-				if (current_mpc_pipe->plane_state->update_flags.bits.coeff_reduction_change) {
+				if (current_mpc_pipe->plane_state->update_bits.coeff_reduction_change) {
 					block_sequence[*num_steps].params.program_bias_and_scale_params.pipe_ctx = current_mpc_pipe;
 					block_sequence[*num_steps].func = DPP_PROGRAM_BIAS_AND_SCALE;
 					(*num_steps)++;
 				}
-				if (current_mpc_pipe->plane_state->update_flags.bits.cm_hist_change) {
+				if (current_mpc_pipe->plane_state->update_bits.cm_hist_change) {
 					block_sequence[*num_steps].params.control_cm_hist_params.dpp
 						= current_mpc_pipe->plane_res.dpp;
 					block_sequence[*num_steps].params.control_cm_hist_params.cm_hist_control
@@ -1095,7 +1095,7 @@ void hwss_build_fast_sequence(struct dc *dc,
 
 				if (current_mpc_pipe->plane_res.dpp &&
 						current_mpc_pipe->plane_res.dpp->funcs->set_cursor_matrix &&
-						current_mpc_pipe->plane_state->update_flags.bits.cursor_csc_color_matrix_change) {
+						current_mpc_pipe->plane_state->update_bits.cursor_csc_color_matrix_change) {
 					block_sequence[*num_steps].params.dpp_set_cursor_matrix_params.dpp = current_mpc_pipe->plane_res.dpp;
 					block_sequence[*num_steps].params.dpp_set_cursor_matrix_params.color_space = current_mpc_pipe->plane_state->color_space;
 					block_sequence[*num_steps].params.dpp_set_cursor_matrix_params.cursor_csc_color_matrix = &current_mpc_pipe->plane_state->cursor_csc_color_matrix;
@@ -1176,7 +1176,7 @@ void hwss_build_fast_sequence(struct dc *dc,
 		while (current_mpc_pipe) {
 			if (!current_mpc_pipe->bottom_pipe && !current_mpc_pipe->next_odm_pipe &&
 					current_mpc_pipe->stream && current_mpc_pipe->plane_state &&
-					current_mpc_pipe->plane_state->update_flags.bits.addr_update &&
+					current_mpc_pipe->plane_state->update_bits.addr_update &&
 					!current_mpc_pipe->plane_state->skip_manual_trigger) {
 				if (dc->hwss.program_cursor_offload_now) {
 					block_sequence[*num_steps].params.program_cursor_update_now_params.dc = dc;

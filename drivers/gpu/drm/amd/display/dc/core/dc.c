@@ -2310,7 +2310,7 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 	for (i = 0; i < context->stream_count; i++) {
 		uint32_t prev_dsc_changed = context->streams[i]->update_flags.bits.dsc_changed;
 
-		context->streams[i]->update_flags.raw = 0xFFFFFFFF;
+		stream_update_flags_set_full(&context->streams[i]->update_flags);
 		context->streams[i]->update_flags.bits.dsc_changed = prev_dsc_changed;
 	}
 
@@ -2416,7 +2416,7 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 
 	/* Clear update flags that were set earlier to avoid redundant programming */
 	for (i = 0; i < context->stream_count; i++) {
-		context->streams[i]->update_flags.raw = 0x0;
+		stream_update_flags_clear(&context->streams[i]->update_flags);
 	}
 
 	old_state = dc->current_state;
@@ -2764,7 +2764,7 @@ static bool is_surface_in_context(
 
 static struct surface_update_descriptor get_plane_info_update_type(const struct dc_surface_update *u)
 {
-	union surface_update_flags *update_flags = &u->surface->update_flags;
+	struct pipe_update_bits *update_bits = &u->surface->update_bits;
 	struct surface_update_descriptor update_type = { UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_NONE };
 
 	if (!u->plane_info)
@@ -2774,37 +2774,37 @@ static struct surface_update_descriptor get_plane_info_update_type(const struct 
 	elevate_update_type(&update_type, UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_STREAM);
 
 	if (u->plane_info->color_space != u->surface->color_space) {
-		update_flags->bits.color_space_change = 1;
+		update_bits->color_space_change = 1;
 		elevate_update_type(&update_type, UPDATE_TYPE_MED, LOCK_DESCRIPTOR_STREAM);
 	}
 
 	if (u->plane_info->horizontal_mirror != u->surface->horizontal_mirror) {
-		update_flags->bits.horizontal_mirror_change = 1;
+		update_bits->horizontal_mirror_change = 1;
 		elevate_update_type(&update_type, UPDATE_TYPE_MED, LOCK_DESCRIPTOR_STREAM);
 	}
 
 	if (u->plane_info->rotation != u->surface->rotation) {
-		update_flags->bits.rotation_change = 1;
+		update_bits->rotation_change = 1;
 		elevate_update_type(&update_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 	}
 
 	if (u->plane_info->format != u->surface->format) {
-		update_flags->bits.pixel_format_change = 1;
+		update_bits->pixel_format_change = 1;
 		elevate_update_type(&update_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 	}
 
 	if (u->plane_info->stereo_format != u->surface->stereo_format) {
-		update_flags->bits.stereo_format_change = 1;
+		update_bits->stereo_format_change = 1;
 		elevate_update_type(&update_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 	}
 
 	if (u->plane_info->per_pixel_alpha != u->surface->per_pixel_alpha) {
-		update_flags->bits.per_pixel_alpha_change = 1;
+		update_bits->per_pixel_alpha_change = 1;
 		elevate_update_type(&update_type, UPDATE_TYPE_MED, LOCK_DESCRIPTOR_STREAM);
 	}
 
 	if (u->plane_info->global_alpha_value != u->surface->global_alpha_value) {
-		update_flags->bits.global_alpha_change = 1;
+		update_bits->global_alpha_change = 1;
 		elevate_update_type(&update_type, UPDATE_TYPE_MED, LOCK_DESCRIPTOR_STREAM);
 	}
 
@@ -2816,7 +2816,7 @@ static struct surface_update_descriptor get_plane_info_update_type(const struct 
 		 * stutter period calculation. Triggering a full update will
 		 * recalculate stutter period.
 		 */
-		update_flags->bits.dcc_change = 1;
+		update_bits->dcc_change = 1;
 		elevate_update_type(&update_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 	}
 
@@ -2825,25 +2825,25 @@ static struct surface_update_descriptor get_plane_info_update_type(const struct 
 		/* different bytes per element will require full bandwidth
 		 * and DML calculation
 		 */
-		update_flags->bits.bpp_change = 1;
+		update_bits->bpp_change = 1;
 		elevate_update_type(&update_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 	}
 
 	if (u->plane_info->plane_size.surface_pitch != u->surface->plane_size.surface_pitch
 			|| u->plane_info->plane_size.chroma_pitch != u->surface->plane_size.chroma_pitch) {
-		update_flags->bits.plane_size_change = 1;
+		update_bits->plane_size_change = 1;
 		elevate_update_type(&update_type, UPDATE_TYPE_MED, LOCK_DESCRIPTOR_STREAM);
 	}
 
 	const struct dc_tiling_info *tiling = &u->plane_info->tiling_info;
 
 	if (memcmp(tiling, &u->surface->tiling_info, sizeof(*tiling)) != 0) {
-		update_flags->bits.swizzle_change = 1;
+		update_bits->swizzle_change = 1;
 
 		if (tiling->flags.avoid_full_update_on_tiling_change) {
 			elevate_update_type(&update_type, UPDATE_TYPE_MED, LOCK_DESCRIPTOR_STREAM);
 		} else {
-			update_flags->bits.bandwidth_change = 1;
+			update_bits->bandwidth_change = 1;
 			elevate_update_type(&update_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 		}
 	}
@@ -2853,10 +2853,10 @@ static struct surface_update_descriptor get_plane_info_update_type(const struct 
 }
 
 static struct surface_update_descriptor get_scaling_info_update_type(
-		const struct dc_check_config *check_config,
-		const struct dc_surface_update *u)
+	const struct dc_check_config *check_config,
+	const struct dc_surface_update *u)
 {
-	union surface_update_flags *update_flags = &u->surface->update_flags;
+	struct pipe_update_bits *update_bits = &u->surface->update_bits;
 	struct surface_update_descriptor update_type = { UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_NONE };
 
 	if (!u->scaling_info)
@@ -2873,26 +2873,26 @@ static struct surface_update_descriptor get_scaling_info_update_type(
 			|| u->scaling_info->clip_rect.height != u->surface->clip_rect.height
 			|| u->scaling_info->scaling_quality.integer_scaling !=
 					u->surface->scaling_quality.integer_scaling) {
-		update_flags->bits.scaling_change = 1;
+		update_bits->scaling_change = 1;
 		elevate_update_type(&update_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 
 		if (u->scaling_info->src_rect.width > u->surface->src_rect.width
 				|| u->scaling_info->src_rect.height > u->surface->src_rect.height)
 			/* Making src rect bigger requires a bandwidth change */
-			update_flags->bits.clock_change = 1;
+			update_bits->clock_change = 1;
 
 		if ((u->scaling_info->dst_rect.width < u->surface->dst_rect.width
 			|| u->scaling_info->dst_rect.height < u->surface->dst_rect.height)
 				&& (u->scaling_info->dst_rect.width < u->surface->src_rect.width
 					|| u->scaling_info->dst_rect.height < u->surface->src_rect.height))
 			/* Making dst rect smaller requires a bandwidth change */
-			update_flags->bits.bandwidth_change = 1;
+			update_bits->bandwidth_change = 1;
 
 		if (u->scaling_info->src_rect.width > (int)check_config->max_optimizable_video_width &&
 			(u->scaling_info->clip_rect.width > u->surface->clip_rect.width ||
 			 u->scaling_info->clip_rect.height > u->surface->clip_rect.height))
 			 /* Changing clip size of a large surface may result in MPC slice count change */
-			update_flags->bits.bandwidth_change = 1;
+			update_bits->bandwidth_change = 1;
 	}
 
 	if (u->scaling_info->src_rect.x != u->surface->src_rect.x
@@ -2902,7 +2902,7 @@ static struct surface_update_descriptor get_scaling_info_update_type(
 			|| u->scaling_info->dst_rect.x != u->surface->dst_rect.x
 			|| u->scaling_info->dst_rect.y != u->surface->dst_rect.y) {
 		elevate_update_type(&update_type, UPDATE_TYPE_MED, LOCK_DESCRIPTOR_STREAM);
-		update_flags->bits.position_change = 1;
+		update_bits->position_change = 1;
 	}
 
 	return update_type;
@@ -2913,15 +2913,15 @@ static struct surface_update_descriptor det_surface_update(
 		struct dc_surface_update *u)
 {
 	struct surface_update_descriptor overall_type = { UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_NONE };
-	union surface_update_flags *update_flags = &u->surface->update_flags;
+	struct pipe_update_bits *update_bits = &u->surface->update_bits;
 
 	if (u->surface->force_full_update) {
-		update_flags->raw = 0xFFFFFFFF;
+		dc_pipe_update_bits_set_full(update_bits);
 		elevate_update_type(&overall_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 		return overall_type;
 	}
 
-	update_flags->raw = 0; // Reset all flags
+	dc_pipe_update_bits_clear(update_bits);
 
 	struct surface_update_descriptor inner_type = get_plane_info_update_type(u);
 
@@ -2931,47 +2931,47 @@ static struct surface_update_descriptor det_surface_update(
 	elevate_update_type(&overall_type, inner_type.update_type, inner_type.lock_descriptor);
 
 	if (u->flip_addr) {
-		update_flags->bits.addr_update = 1;
+		update_bits->addr_update = 1;
 		elevate_update_type(&overall_type, UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_STREAM);
 
 		if (u->flip_addr->address.tmz_surface != u->surface->address.tmz_surface) {
-			update_flags->bits.tmz_changed = 1;
+			update_bits->tmz_changed = 1;
 			elevate_update_type(&overall_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 		}
 	}
 	if (u->in_transfer_func) {
-		update_flags->bits.in_transfer_func_change = 1;
+		update_bits->in_transfer_func_change = 1;
 		elevate_update_type(&overall_type, UPDATE_TYPE_MED, LOCK_DESCRIPTOR_STREAM);
 	}
 
 	if (u->input_csc_color_matrix) {
-		update_flags->bits.input_csc_change = 1;
+		update_bits->input_csc_change = 1;
 		elevate_update_type(&overall_type, UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_STREAM);
 	}
 
 	if (u->cursor_csc_color_matrix) {
-		update_flags->bits.cursor_csc_color_matrix_change = 1;
+		update_bits->cursor_csc_color_matrix_change = 1;
 		elevate_update_type(&overall_type, UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_STREAM);
 	}
 
 	if (u->coeff_reduction_factor) {
-		update_flags->bits.coeff_reduction_change = 1;
+		update_bits->coeff_reduction_change = 1;
 		elevate_update_type(&overall_type, UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_STREAM);
 	}
 
 	if (u->gamut_remap_matrix) {
-		update_flags->bits.gamut_remap_change = 1;
+		update_bits->gamut_remap_change = 1;
 		elevate_update_type(&overall_type, UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_STREAM);
 	}
 
 	if ((u->cm && u->cm->flags.bits.blend_enable) ||
 			(u->gamma && dce_use_lut(u->plane_info ? u->plane_info->format : u->surface->format))) {
-		update_flags->bits.gamma_change = 1;
+		update_bits->gamma_change = 1;
 		elevate_update_type(&overall_type, UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_STREAM);
 	}
 
 	if (u->cm && (u->cm->flags.bits.lut3d_enable || u->cm->flags.bits.shaper_enable)) {
-		update_flags->bits.lut_3d = 1;
+		update_bits->lut_3d = 1;
 		elevate_update_type(&overall_type, UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_STREAM);
 	}
 
@@ -2989,19 +2989,19 @@ static struct surface_update_descriptor det_surface_update(
 	if (u->hdr_mult.value)
 		if (u->hdr_mult.value != u->surface->hdr_mult.value) {
 			// TODO: Should be fast?
-			update_flags->bits.hdr_mult = 1;
+			update_bits->hdr_mult = 1;
 			elevate_update_type(&overall_type, UPDATE_TYPE_MED, LOCK_DESCRIPTOR_STREAM);
 		}
 
 	if (u->sdr_white_level_nits)
 		if (u->sdr_white_level_nits != u->surface->sdr_white_level_nits) {
 			// TODO: Should be fast?
-			update_flags->bits.sdr_white_level_nits = 1;
+			update_bits->sdr_white_level_nits = 1;
 			elevate_update_type(&overall_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 		}
 
 	if (u->cm_hist_control) {
-		update_flags->bits.cm_hist_change = 1;
+		update_bits->cm_hist_change = 1;
 		elevate_update_type(&overall_type, UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_STREAM);
 	}
 
@@ -3016,7 +3016,7 @@ static struct surface_update_descriptor det_surface_update(
 				|| u->cm->flags.bits.blend_enable != u->surface->cm.flags.bits.blend_enable
 				|| u->cm->flags.bits.lut3d_enable != u->surface->cm.flags.bits.lut3d_enable
 				|| u->cm->flags.bits.lut3d_dma_enable != u->surface->cm.flags.bits.lut3d_dma_enable) {
-			update_flags->bits.mcm_transfer_function_enable_change = 1;
+			update_bits->mcm_transfer_function_enable_change = 1;
 			elevate_update_type(&overall_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 		}
 
@@ -3026,17 +3026,17 @@ static struct surface_update_descriptor det_surface_update(
 		}
 	}
 
-	if (update_flags->bits.lut_3d &&
+	if (update_bits->lut_3d &&
 			!u->surface->cm.flags.bits.lut3d_dma_enable) {
 		elevate_update_type(&overall_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 	}
 
 	if (check_config->enable_legacy_fast_update &&
-			(update_flags->bits.gamma_change ||
-			update_flags->bits.gamut_remap_change ||
-			update_flags->bits.input_csc_change ||
-			update_flags->bits.cm_hist_change ||
-			update_flags->bits.coeff_reduction_change)) {
+			(update_bits->gamma_change ||
+			update_bits->gamut_remap_change ||
+			update_bits->input_csc_change ||
+			update_bits->cm_hist_change ||
+			update_bits->coeff_reduction_change)) {
 		elevate_update_type(&overall_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 	}
 	return overall_type;
@@ -3061,7 +3061,7 @@ static void force_immediate_gsl_plane_flip(struct dc *dc, struct dc_surface_upda
 	if (has_flip_immediate_plane && surface_count > 1) {
 		for (i = 0; i < surface_count; i++) {
 			if (updates[i].surface->flip_immediate)
-				updates[i].surface->update_flags.bits.addr_update = 1;
+				updates[i].surface->update_bits.addr_update = 1;
 		}
 	}
 }
@@ -3216,9 +3216,9 @@ struct surface_update_descriptor dc_check_update_surfaces_for_stream(
 		struct dc_stream_update *stream_update)
 {
 	if (stream_update)
-		stream_update->stream->update_flags.raw = 0;
+		stream_update_flags_clear(&stream_update->stream->update_flags);
 	for (int i = 0; i < surface_count; i++)
-		updates[i].surface->update_flags.raw = 0;
+		dc_pipe_update_bits_clear(&updates[i].surface->update_bits);
 
 	return check_update_surfaces_for_stream(check_config, updates, surface_count, stream_update);
 }
@@ -3766,11 +3766,11 @@ static bool update_planes_and_stream_state(struct dc *dc,
 	if (update_type == UPDATE_TYPE_FULL) {
 		if (stream_update) {
 			uint32_t dsc_changed = stream_update->stream->update_flags.bits.dsc_changed;
-			stream_update->stream->update_flags.raw = 0xFFFFFFFF;
+			stream_update_flags_set_full(&stream_update->stream->update_flags);
 			stream_update->stream->update_flags.bits.dsc_changed = dsc_changed;
 		}
 		for (i = 0; i < surface_count; i++)
-			srf_updates[i].surface->update_flags.raw = 0xFFFFFFFF;
+			dc_pipe_update_bits_set_full(&srf_updates[i].surface->update_bits);
 	}
 
 	if (update_type >= update_surface_trace_level)
@@ -3819,7 +3819,7 @@ static bool update_planes_and_stream_state(struct dc *dc,
 
 		if (update_type != UPDATE_TYPE_MED)
 			continue;
-		if (surface->update_flags.bits.position_change) {
+		if (surface->update_bits.position_change) {
 			for (j = 0; j < dc->res_pool->pipe_count; j++) {
 				struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
 
@@ -4602,14 +4602,23 @@ static void build_dmub_update_dirty_rect(
 	}
 }
 
-static bool check_address_only_update(union surface_update_flags update_flags)
+/**
+ * dc_check_address_only_update - Check if addr_update is the sole flag set
+ *
+ * @update_bits: The pipe update bits to check
+ *
+ * Determines whether an update contains only an address change with no other
+ * pending updates.
+ *
+ * Return: %true if addr_update is the sole bit set, %false otherwise.
+ */
+bool dc_check_address_only_update(struct pipe_update_bits update_bits)
 {
-	union surface_update_flags addr_only_update_flags;
-	addr_only_update_flags.raw = 0;
-	addr_only_update_flags.bits.addr_update = 1;
+	struct pipe_update_bits check = update_bits;  /* 1. Copy all flags from input */
 
-	return update_flags.bits.addr_update &&
-			!(update_flags.raw & ~addr_only_update_flags.raw);
+	check.addr_update = 0;                        /* 2. Zero the addr_update bit in the copy */
+	return update_bits.addr_update &&             /* 3. Check addr_update was set in original */
+			!dc_pipe_update_bits_is_any_set(&check); /* 4. Check no other bits remain in the copy */
 }
 
 /**
@@ -4669,7 +4678,7 @@ static void commit_plane_for_stream_offload_fams2_flip(struct dc *dc,
 				continue;
 
 			/* update pipe context for plane */
-			if (pipe_ctx->plane_state->update_flags.bits.addr_update)
+			if (pipe_ctx->plane_state->update_bits.addr_update)
 				dc->hwss.update_plane_addr(dc, pipe_ctx);
 		}
 	}
@@ -4707,8 +4716,8 @@ static void commit_planes_for_stream_fast(struct dc *dc,
 		should_offload_fams2_flip = true;
 		for (i = 0; i < surface_count; i++) {
 			if (srf_updates[i].surface &&
-					srf_updates[i].surface->update_flags.raw &&
-					!check_address_only_update(srf_updates[i].surface->update_flags)) {
+					dc_pipe_update_bits_is_any_set(&srf_updates[i].surface->update_bits) &&
+					!dc_check_address_only_update(srf_updates[i].surface->update_bits)) {
 				/* more than address update, need to acquire FAMS2 lock */
 				should_offload_fams2_flip = false;
 				break;
@@ -4799,7 +4808,7 @@ static void commit_planes_for_stream_fast(struct dc *dc,
 	 * so no need to clear here.
 	 */
 	if (top_pipe_to_program->stream)
-		top_pipe_to_program->stream->update_flags.raw = 0;
+		stream_update_flags_clear(&top_pipe_to_program->stream->update_flags);
 }
 
 static void commit_planes_for_stream(struct dc *dc,
@@ -5137,7 +5146,7 @@ static void commit_planes_for_stream(struct dc *dc,
 					dc->hwss.program_triplebuffer(
 						dc, pipe_ctx, pipe_ctx->plane_state->triplebuffer_flips);
 				}
-				if (pipe_ctx->plane_state->update_flags.bits.addr_update)
+				if (pipe_ctx->plane_state->update_bits.addr_update)
 					dc->hwss.update_plane_addr(dc, pipe_ctx);
 			}
 		}
@@ -5228,7 +5237,7 @@ static void commit_planes_for_stream(struct dc *dc,
 
 		if (pipe_ctx->bottom_pipe || pipe_ctx->next_odm_pipe ||
 				!pipe_ctx->stream || !should_update_pipe_for_stream(context, pipe_ctx, stream) ||
-				!pipe_ctx->plane_state->update_flags.bits.addr_update ||
+				!pipe_ctx->plane_state->update_bits.addr_update ||
 				pipe_ctx->plane_state->skip_manual_trigger)
 			continue;
 
@@ -5667,7 +5676,7 @@ static bool commit_minimal_transition_state(struct dc *dc,
 	/* force full surface update */
 	for (i = 0; i < dc->current_state->stream_count; i++) {
 		for (j = 0; j < (unsigned int)dc->current_state->stream_status[i].plane_count; j++) {
-			dc->current_state->stream_status[i].plane_states[j]->update_flags.raw = 0xFFFFFFFF;
+			dc_pipe_update_bits_set_full(&dc->current_state->stream_status[i].plane_states[j]->update_bits);
 		}
 	}
 
@@ -6108,17 +6117,17 @@ static bool update_planes_and_stream_v3(struct dc *dc,
 	return true;
 }
 
-static void clear_update_flags(struct dc_surface_update *srf_updates,
+static void clear_update_bits(struct dc_surface_update *srf_updates,
 	int surface_count, struct dc_stream_state *stream)
 {
 	int i;
 
 	if (stream)
-		stream->update_flags.raw = 0;
+		stream_update_flags_clear(&stream->update_flags);
 
 	for (i = 0; i < surface_count; i++)
 		if (srf_updates[i].surface)
-			srf_updates[i].surface->update_flags.raw = 0;
+			dc_pipe_update_bits_clear(&srf_updates[i].surface->update_bits);
 }
 
 bool dc_update_planes_and_stream(struct dc *dc,
@@ -6170,7 +6179,7 @@ void dc_commit_updates_for_stream(struct dc *dc,
 	}
 
 	if (ret && dc->ctx->dce_version >= DCN_VERSION_3_2)
-		clear_update_flags(srf_updates, surface_count, stream);
+		clear_update_bits(srf_updates, surface_count, stream);
 }
 
 uint8_t dc_get_current_stream_count(struct dc *dc)
@@ -7920,7 +7929,7 @@ struct dc_update_scratch_space {
 	struct dc_stream_state *stream;
 	struct dc_stream_update *stream_update;
 	bool update_v3;
-	bool do_clear_update_flags;
+	bool do_clear_update_bits;
 	enum surface_update_type update_type;
 	struct dc_state *new_context;
 	enum update_v3_flow flow;
@@ -7963,8 +7972,8 @@ static bool update_planes_and_stream_cleanup_v2(
 		const struct dc_update_scratch_space *scratch
 )
 {
-	if (scratch->do_clear_update_flags)
-		clear_update_flags(scratch->surface_updates, scratch->surface_count, scratch->stream);
+	if (scratch->do_clear_update_bits)
+		clear_update_bits(scratch->surface_updates, scratch->surface_count, scratch->stream);
 
 	return false;
 }
@@ -8218,8 +8227,8 @@ static bool update_planes_and_stream_cleanup_v3(
 		ASSERT(false);
 	}
 
-	if (scratch->do_clear_update_flags)
-		clear_update_flags(scratch->surface_updates, scratch->surface_count, scratch->stream);
+	if (scratch->do_clear_update_bits)
+		clear_update_bits(scratch->surface_updates, scratch->surface_count, scratch->stream);
 
 	return false;
 }
@@ -8242,7 +8251,7 @@ struct dc_update_scratch_space *dc_update_planes_and_stream_init(
 		.stream = stream,
 		.stream_update = stream_update,
 		.update_v3 = version >= DCN_VERSION_4_01 || version == DCN_VERSION_3_2 || version == DCN_VERSION_3_21,
-		.do_clear_update_flags = version >= DCN_VERSION_1_0,
+		.do_clear_update_bits = version >= DCN_VERSION_1_0,
 	};
 
 	return scratch;

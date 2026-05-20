@@ -1465,7 +1465,7 @@ void dcn32_update_phantom_vp_position(struct dc *dc,
 
 		if (pipe->stream && dc_state_get_pipe_subvp_type(context, pipe) == SUBVP_MAIN &&
 				dc_state_get_paired_subvp_stream(context, pipe->stream) == phantom_pipe->stream) {
-			if (pipe->plane_state && pipe->plane_state->update_flags.bits.position_change) {
+			if (pipe->plane_state && pipe->plane_state->update_bits.position_change) {
 
 				phantom_plane->src_rect.x = pipe->plane_state->src_rect.x;
 				phantom_plane->src_rect.y = pipe->plane_state->src_rect.y;
@@ -1473,7 +1473,7 @@ void dcn32_update_phantom_vp_position(struct dc *dc,
 				phantom_plane->dst_rect.x = pipe->plane_state->dst_rect.x;
 				phantom_plane->dst_rect.y = pipe->plane_state->dst_rect.y;
 
-				phantom_pipe->plane_state->update_flags.bits.position_change = 1;
+				phantom_pipe->plane_state->update_bits.position_change = 1;
 				resource_build_scaling_params(phantom_pipe);
 				return;
 			}

@@ -1543,46 +1543,119 @@ struct dc_plane_status {
 	struct cm_hist cm_hist;
 };
 
-union surface_update_flags {
-
-	struct {
-		uint32_t addr_update:1;
-		/* Medium updates */
-		uint32_t dcc_change:1;
-		uint32_t color_space_change:1;
-		uint32_t horizontal_mirror_change:1;
-		uint32_t per_pixel_alpha_change:1;
-		uint32_t global_alpha_change:1;
-		uint32_t hdr_mult:1;
-		uint32_t rotation_change:1;
-		uint32_t swizzle_change:1;
-		uint32_t scaling_change:1;
-		uint32_t position_change:1;
-		uint32_t in_transfer_func_change:1;
-		uint32_t input_csc_change:1;
-		uint32_t coeff_reduction_change:1;
-		uint32_t pixel_format_change:1;
-		uint32_t plane_size_change:1;
-		uint32_t gamut_remap_change:1;
-		uint32_t cursor_csc_color_matrix_change:1;
-
-		/* Full updates */
-		uint32_t new_plane:1;
-		uint32_t bpp_change:1;
-		uint32_t gamma_change:1;
-		uint32_t bandwidth_change:1;
-		uint32_t clock_change:1;
-		uint32_t stereo_format_change:1;
-		uint32_t lut_3d:1;
-		uint32_t tmz_changed:1;
-		uint32_t mcm_transfer_function_enable_change:1; /* disable or enable MCM transfer func */
-		uint32_t full_update:1;
-		uint32_t sdr_white_level_nits:1;
-		uint32_t cm_hist_change:1;
-	} bits;
-
-	uint32_t raw;
+struct pipe_update_bits {
+	uint32_t addr_update:1;
+	uint32_t dcc_change:1;
+	uint32_t color_space_change:1;
+	uint32_t horizontal_mirror_change:1;
+	uint32_t per_pixel_alpha_change:1;
+	uint32_t global_alpha_change:1;
+	uint32_t hdr_mult:1;
+	uint32_t rotation_change:1;
+	uint32_t swizzle_change:1;
+	uint32_t scaling_change:1;
+	uint32_t position_change:1;
+	uint32_t in_transfer_func_change:1;
+	uint32_t input_csc_change:1;
+	uint32_t coeff_reduction_change:1;
+	uint32_t pixel_format_change:1;
+	uint32_t plane_size_change:1;
+	uint32_t gamut_remap_change:1;
+	uint32_t cursor_csc_color_matrix_change:1;
+	uint32_t new_plane:1;
+	uint32_t bpp_change:1;
+	uint32_t gamma_change:1;
+	uint32_t bandwidth_change:1;
+	uint32_t clock_change:1;
+	uint32_t stereo_format_change:1;
+	uint32_t lut_3d:1;
+	uint32_t tmz_changed:1;
+	uint32_t mcm_transfer_function_enable_change:1; /* disable or enable MCM transfer func */
+	uint32_t full_update:1;
+	uint32_t sdr_white_level_nits:1;
+	uint32_t cm_hist_change:1;
+	/* NOTE: When adding a new field, also update:
+	 *   - dc_pipe_update_bits_set_full()
+	 *   - dc_pipe_update_bits_is_any_set()
+	 */
 };
+
+static inline void dc_pipe_update_bits_clear(struct pipe_update_bits *flags)
+{
+	/* memset ensures padding bits are zeroed */
+	memset(flags, 0, sizeof(*flags));
+}
+
+static inline void dc_pipe_update_bits_set_full(struct pipe_update_bits *flags)
+{
+	dc_pipe_update_bits_clear(flags);
+	flags->addr_update = 1;
+	flags->dcc_change = 1;
+	flags->color_space_change = 1;
+	flags->horizontal_mirror_change = 1;
+	flags->per_pixel_alpha_change = 1;
+	flags->global_alpha_change = 1;
+	flags->hdr_mult = 1;
+	flags->rotation_change = 1;
+	flags->swizzle_change = 1;
+	flags->scaling_change = 1;
+	flags->position_change = 1;
+	flags->in_transfer_func_change = 1;
+	flags->input_csc_change = 1;
+	flags->coeff_reduction_change = 1;
+	flags->pixel_format_change = 1;
+	flags->plane_size_change = 1;
+	flags->gamut_remap_change = 1;
+	flags->cursor_csc_color_matrix_change = 1;
+	flags->new_plane = 1;
+	flags->bpp_change = 1;
+	flags->gamma_change = 1;
+	flags->bandwidth_change = 1;
+	flags->clock_change = 1;
+	flags->stereo_format_change = 1;
+	flags->lut_3d = 1;
+	flags->tmz_changed = 1;
+	flags->mcm_transfer_function_enable_change = 1;
+	flags->full_update = 1;
+	flags->sdr_white_level_nits = 1;
+	flags->cm_hist_change = 1;
+}
+
+static inline bool dc_pipe_update_bits_is_any_set(const struct pipe_update_bits *flags)
+{
+	return flags->addr_update ||
+		flags->dcc_change ||
+		flags->color_space_change ||
+		flags->horizontal_mirror_change ||
+		flags->per_pixel_alpha_change ||
+		flags->global_alpha_change ||
+		flags->hdr_mult ||
+		flags->rotation_change ||
+		flags->swizzle_change ||
+		flags->scaling_change ||
+		flags->position_change ||
+		flags->in_transfer_func_change ||
+		flags->input_csc_change ||
+		flags->coeff_reduction_change ||
+		flags->pixel_format_change ||
+		flags->plane_size_change ||
+		flags->gamut_remap_change ||
+		flags->cursor_csc_color_matrix_change ||
+		flags->new_plane ||
+		flags->bpp_change ||
+		flags->gamma_change ||
+		flags->bandwidth_change ||
+		flags->clock_change ||
+		flags->stereo_format_change ||
+		flags->lut_3d ||
+		flags->tmz_changed ||
+		flags->mcm_transfer_function_enable_change ||
+		flags->full_update ||
+		flags->sdr_white_level_nits ||
+		flags->cm_hist_change;
+}
+
+bool dc_check_address_only_update(struct pipe_update_bits update_bits);
 
 #define DC_REMOVE_PLANE_POINTERS 1
 
@@ -1640,7 +1713,7 @@ struct dc_plane_state {
 	bool horizontal_mirror;
 	unsigned int layer_index;
 
-	union surface_update_flags update_flags;
+	struct pipe_update_bits update_bits;
 	bool flip_int_enabled;
 	bool skip_manual_trigger;
 

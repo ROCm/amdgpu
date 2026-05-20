@@ -1421,7 +1421,7 @@ void dcn401_wait_for_dcc_meta_propagation(const struct dc *dc,
 		if (pipe_ctx->plane_state &&
 				pipe_ctx->plane_state->dcc.enable &&
 				pipe_ctx->plane_state->flip_immediate &&
-				pipe_ctx->plane_state->update_flags.bits.addr_update) {
+				pipe_ctx->plane_state->update_bits.addr_update) {
 			is_wait_needed = true;
 			break;
 		}
@@ -2268,18 +2268,18 @@ void dcn401_program_pipe(
 	}
 
 	if (pipe_ctx->plane_state && (pipe_ctx->update_flags.raw ||
-	    pipe_ctx->plane_state->update_flags.raw ||
+	    dc_pipe_update_bits_is_any_set(&pipe_ctx->plane_state->update_bits) ||
 	    pipe_ctx->stream->update_flags.raw))
 		dc->hwss.update_dchubp_dpp(dc, pipe_ctx, context);
 
 	if (pipe_ctx->plane_state && (pipe_ctx->update_flags.bits.enable ||
-		pipe_ctx->plane_state->update_flags.bits.hdr_mult))
+		pipe_ctx->plane_state->update_bits.hdr_mult))
 		hws->funcs.set_hdr_multiplier(pipe_ctx);
 
 	if (pipe_ctx->plane_state &&
-		(pipe_ctx->plane_state->update_flags.bits.in_transfer_func_change ||
-			pipe_ctx->plane_state->update_flags.bits.gamma_change ||
-			pipe_ctx->plane_state->update_flags.bits.lut_3d ||
+		(pipe_ctx->plane_state->update_bits.in_transfer_func_change ||
+			pipe_ctx->plane_state->update_bits.gamma_change ||
+			pipe_ctx->plane_state->update_bits.lut_3d ||
 			pipe_ctx->update_flags.bits.enable))
 		hws->funcs.set_input_transfer_func(dc, pipe_ctx, pipe_ctx->plane_state);
 
@@ -2338,7 +2338,7 @@ void dcn401_program_pipe(
 			pipe_ctx->stream_res.test_pattern_params.offset);
 	}
 	if (pipe_ctx->plane_state
-		&& pipe_ctx->plane_state->update_flags.bits.cm_hist_change
+		&& pipe_ctx->plane_state->update_bits.cm_hist_change
 		&& hws->funcs.program_cm_hist)
 		hws->funcs.program_cm_hist(dc, pipe_ctx, pipe_ctx->plane_state);
 }
@@ -2419,7 +2419,7 @@ void dcn401_program_pipe_sequence(
 	}
 
 	if (pipe_ctx->plane_state && (pipe_ctx->update_flags.raw ||
-	    pipe_ctx->plane_state->update_flags.raw ||
+	    dc_pipe_update_bits_is_any_set(&pipe_ctx->plane_state->update_bits) ||
 	    pipe_ctx->stream->update_flags.raw)) {
 
 		if (dc->hwss.update_dchubp_dpp_sequence)
@@ -2427,15 +2427,15 @@ void dcn401_program_pipe_sequence(
 	}
 
 	if (pipe_ctx->plane_state && (pipe_ctx->update_flags.bits.enable ||
-		pipe_ctx->plane_state->update_flags.bits.hdr_mult)) {
+		pipe_ctx->plane_state->update_bits.hdr_mult)) {
 
 		hws->funcs.set_hdr_multiplier_sequence(pipe_ctx, seq_state);
 	}
 
 	if (pipe_ctx->plane_state &&
-		(pipe_ctx->plane_state->update_flags.bits.in_transfer_func_change ||
-			pipe_ctx->plane_state->update_flags.bits.gamma_change ||
-			pipe_ctx->plane_state->update_flags.bits.lut_3d ||
+		(pipe_ctx->plane_state->update_bits.in_transfer_func_change ||
+			pipe_ctx->plane_state->update_bits.gamma_change ||
+			pipe_ctx->plane_state->update_bits.lut_3d ||
 			pipe_ctx->update_flags.bits.enable)) {
 
 		hwss_add_dpp_set_input_transfer_func(seq_state, dc, pipe_ctx, pipe_ctx->plane_state);
@@ -2493,7 +2493,7 @@ void dcn401_program_pipe_sequence(
 	}
 
 	if (pipe_ctx->plane_state
-			&& pipe_ctx->plane_state->update_flags.bits.cm_hist_change
+			&& pipe_ctx->plane_state->update_bits.cm_hist_change
 			&& hws->funcs.program_cm_hist) {
 
 		hwss_add_dpp_program_cm_hist(seq_state, pipe_ctx->plane_res.dpp,
@@ -2647,7 +2647,7 @@ void dcn401_program_front_end_for_ctx(
 		pipe = &context->res_ctx.pipe_ctx[i];
 		if (!pipe->top_pipe && !pipe->prev_odm_pipe
 			&& pipe->stream && pipe->stream->num_wb_info > 0
-			&& (pipe->update_flags.raw || (pipe->plane_state && pipe->plane_state->update_flags.raw)
+			&& (pipe->update_flags.raw || (pipe->plane_state && dc_pipe_update_bits_is_any_set(&pipe->plane_state->update_bits))
 				|| pipe->stream->update_flags.raw)
 			&& hws->funcs.program_all_writeback_pipes_in_tree)
 			hws->funcs.program_all_writeback_pipes_in_tree(dc, pipe->stream, context);
@@ -3733,10 +3733,10 @@ void dcn401_update_dchubp_dpp_sequence(struct dc *dc,
 	/* Step 7: DPP setup - input CSC and format setup */
 	if (pipe_ctx->update_flags.bits.enable ||
 			pipe_ctx->update_flags.bits.plane_changed ||
-			plane_state->update_flags.bits.bpp_change ||
-			plane_state->update_flags.bits.input_csc_change ||
-			plane_state->update_flags.bits.color_space_change ||
-			plane_state->update_flags.bits.coeff_reduction_change) {
+			plane_state->update_bits.bpp_change ||
+			plane_state->update_bits.input_csc_change ||
+			plane_state->update_bits.color_space_change ||
+			plane_state->update_bits.coeff_reduction_change) {
 		hwss_add_dpp_setup_dpp(seq_state, pipe_ctx);
 
 		/* Step 8: DPP cursor matrix setup */
@@ -3753,8 +3753,8 @@ void dcn401_update_dchubp_dpp_sequence(struct dc *dc,
 	/* Step 10: MPCC updates */
 	if (pipe_ctx->update_flags.bits.mpcc ||
 	     pipe_ctx->update_flags.bits.plane_changed ||
-	     plane_state->update_flags.bits.global_alpha_change ||
-	     plane_state->update_flags.bits.per_pixel_alpha_change) {
+	     plane_state->update_bits.global_alpha_change ||
+	     plane_state->update_bits.per_pixel_alpha_change) {
 
 		/* Check if update_mpcc_sequence is implemented and prefer it over single MPC_UPDATE_MPCC step */
 		if (hws->funcs.update_mpcc_sequence)
@@ -3763,9 +3763,9 @@ void dcn401_update_dchubp_dpp_sequence(struct dc *dc,
 
 	/* Step 11: DPP scaler setup */
 	if (pipe_ctx->update_flags.bits.scaler ||
-			plane_state->update_flags.bits.scaling_change ||
-			plane_state->update_flags.bits.position_change ||
-			plane_state->update_flags.bits.per_pixel_alpha_change ||
+			plane_state->update_bits.scaling_change ||
+			plane_state->update_bits.position_change ||
+			plane_state->update_bits.per_pixel_alpha_change ||
 			pipe_ctx->stream->update_flags.bits.scaling) {
 		pipe_ctx->plane_res.scl_data.lb_params.alpha_en = pipe_ctx->plane_state->per_pixel_alpha;
 		ASSERT(pipe_ctx->plane_res.scl_data.lb_params.depth == LB_PIXEL_DEPTH_36BPP);
@@ -3774,8 +3774,8 @@ void dcn401_update_dchubp_dpp_sequence(struct dc *dc,
 
 	/* Step 12: HUBP viewport programming */
 	if (pipe_ctx->update_flags.bits.viewport ||
-	     (context == dc->current_state && plane_state->update_flags.bits.position_change) ||
-	     (context == dc->current_state && plane_state->update_flags.bits.scaling_change) ||
+	     (context == dc->current_state && plane_state->update_bits.position_change) ||
+	     (context == dc->current_state && plane_state->update_bits.scaling_change) ||
 	     (context == dc->current_state && pipe_ctx->stream->update_flags.bits.scaling)) {
 		hwss_add_hubp_mem_program_viewport(seq_state, hubp,
 			&pipe_ctx->plane_res.scl_data.viewport, &pipe_ctx->plane_res.scl_data.viewport_c);
@@ -3807,7 +3807,7 @@ void dcn401_update_dchubp_dpp_sequence(struct dc *dc,
 	if (pipe_ctx->update_flags.bits.enable || pipe_ctx->update_flags.bits.opp_changed ||
 			pipe_ctx->update_flags.bits.plane_changed ||
 			pipe_ctx->stream->update_flags.bits.gamut_remap ||
-			plane_state->update_flags.bits.gamut_remap_change ||
+			plane_state->update_bits.gamut_remap_change ||
 			pipe_ctx->stream->update_flags.bits.out_csc) {
 
 		/* Gamut remap */
@@ -3822,14 +3822,14 @@ void dcn401_update_dchubp_dpp_sequence(struct dc *dc,
 	if (pipe_ctx->update_flags.bits.enable ||
 			pipe_ctx->update_flags.bits.plane_changed ||
 			pipe_ctx->update_flags.bits.opp_changed ||
-			plane_state->update_flags.bits.pixel_format_change ||
-			plane_state->update_flags.bits.horizontal_mirror_change ||
-			plane_state->update_flags.bits.rotation_change ||
-			plane_state->update_flags.bits.swizzle_change ||
-			plane_state->update_flags.bits.dcc_change ||
-			plane_state->update_flags.bits.bpp_change ||
-			plane_state->update_flags.bits.scaling_change ||
-			plane_state->update_flags.bits.plane_size_change) {
+			plane_state->update_bits.pixel_format_change ||
+			plane_state->update_bits.horizontal_mirror_change ||
+			plane_state->update_bits.rotation_change ||
+			plane_state->update_bits.swizzle_change ||
+			plane_state->update_bits.dcc_change ||
+			plane_state->update_bits.bpp_change ||
+			plane_state->update_bits.scaling_change ||
+			plane_state->update_bits.plane_size_change) {
 		struct plane_size size = plane_state->plane_size;
 
 		size.surface_size = pipe_ctx->plane_res.scl_data.viewport;
@@ -3843,7 +3843,7 @@ void dcn401_update_dchubp_dpp_sequence(struct dc *dc,
 	/* Step 19: Update plane address (with SubVP support) */
 	if (pipe_ctx->update_flags.bits.enable ||
 	     pipe_ctx->update_flags.bits.plane_changed ||
-	     plane_state->update_flags.bits.addr_update) {
+	     plane_state->update_bits.addr_update) {
 
 		/* SubVP save surface address if needed */
 		if (resource_is_pipe_type(pipe_ctx, OTG_MASTER) && pipe_mall_type == SUBVP_MAIN) {
@@ -3916,7 +3916,7 @@ void dcn401_update_mpcc_sequence(struct dc *dc,
 	mpcc_id = hubp->inst;
 
 	/* Step 1: Update blending if no full update needed */
-	if (!pipe_ctx->plane_state->update_flags.bits.full_update &&
+	if (!pipe_ctx->plane_state->update_bits.full_update &&
 	    !pipe_ctx->update_flags.bits.mpcc) {
 
 		/* Update blending configuration */
