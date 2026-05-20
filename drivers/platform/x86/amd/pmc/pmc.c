@@ -101,6 +101,24 @@ static inline void amd_pmc_reg_write(struct amd_pmc_dev *dev, int reg_offset, u3
 	iowrite32(val, dev->regbase + reg_offset);
 }
 
+static void amd_pmc_get_smu_mb(struct amd_pmc_dev *dev)
+{
+	switch (dev->cpu_id) {
+	case AMD_CPU_ID_PCO:
+	case AMD_CPU_ID_RN:
+	case AMD_CPU_ID_VG:
+	case AMD_CPU_ID_YC:
+	case AMD_CPU_ID_CB:
+	case AMD_CPU_ID_PS:
+		dev->smu_msg = 0x538;
+		break;
+	case PCI_DEVICE_ID_AMD_1AH_M20H_ROOT:
+	case PCI_DEVICE_ID_AMD_1AH_M60H_ROOT:
+		dev->smu_msg = 0x938;
+		break;
+	}
+}
+
 static void amd_pmc_get_ip_info(struct amd_pmc_dev *dev)
 {
 	switch (dev->cpu_id) {
@@ -111,12 +129,10 @@ static void amd_pmc_get_ip_info(struct amd_pmc_dev *dev)
 	case AMD_CPU_ID_CB:
 		dev->num_ips = 12;
 		dev->ips_ptr = soc15_ip_blk;
-		dev->smu_msg = 0x538;
 		break;
 	case AMD_CPU_ID_PS:
 		dev->num_ips = 21;
 		dev->ips_ptr = soc15_ip_blk;
-		dev->smu_msg = 0x538;
 		break;
 	case PCI_DEVICE_ID_AMD_1AH_M20H_ROOT:
 	case PCI_DEVICE_ID_AMD_1AH_M60H_ROOT:
@@ -127,7 +143,6 @@ static void amd_pmc_get_ip_info(struct amd_pmc_dev *dev)
 			dev->num_ips = ARRAY_SIZE(soc15_ip_blk);
 			dev->ips_ptr = soc15_ip_blk;
 		}
-		dev->smu_msg = 0x938;
 		break;
 	}
 }
@@ -781,6 +796,9 @@ static int amd_pmc_probe(struct platform_device *pdev)
 
 	/* Get num of IP blocks within the SoC */
 	amd_pmc_get_ip_info(dev);
+
+	/* Populate SMU msg offset */
+	amd_pmc_get_smu_mb(dev);
 
 	platform_set_drvdata(pdev, dev);
 	if (IS_ENABLED(CONFIG_SUSPEND)) {
