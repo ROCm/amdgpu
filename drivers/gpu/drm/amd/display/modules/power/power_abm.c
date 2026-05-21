@@ -849,8 +849,12 @@ bool mod_power_set_backlight_nits(struct mod_power *mod_power,
 	core_power = MOD_POWER_TO_CORE(mod_power);
 	link = dc_stream_get_link(stream);
 
-	ASSERT(link->ddc->ddc_pin->hw_info.ddc_channel <= 0xFF);
-	aux_inst = (uint8_t)link->ddc->ddc_pin->hw_info.ddc_channel;
+	if (link->ctx->dc->config.dp_connector_no_native_i2c && link->no_ddc_pin) {
+		aux_inst = (uint8_t)link->aux_hw_inst;
+	} else {
+		ASSERT(link->ddc->ddc_pin->hw_info.ddc_channel <= 0xFF);
+		aux_inst = (uint8_t)link->ddc->ddc_pin->hw_info.ddc_channel;
+	}
 
 	if (!dc_get_edp_link_panel_inst(core_power->dc, stream->link, &panel_inst))
 		return false;
@@ -937,8 +941,12 @@ bool mod_power_set_backlight_percent(struct mod_power *mod_power,
 
 	core_power = MOD_POWER_TO_CORE(mod_power);
 	link = dc_stream_get_link(stream);
-	ASSERT(link->ddc->ddc_pin->hw_info.ddc_channel <= 0xFF);
-	aux_inst = (uint8_t)link->ddc->ddc_pin->hw_info.ddc_channel;
+	if (link->ctx->dc->config.dp_connector_no_native_i2c && link->no_ddc_pin) {
+		aux_inst = (uint8_t)link->aux_hw_inst;
+	} else {
+		ASSERT(link->ddc->ddc_pin->hw_info.ddc_channel <= 0xFF);
+		aux_inst = (uint8_t)link->ddc->ddc_pin->hw_info.ddc_channel;
+	}
 
 	if (!dc_get_edp_link_panel_inst(core_power->dc, stream->link, &panel_inst))
 		return false;
