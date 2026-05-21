@@ -801,6 +801,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.replay_skip_crtc_disabled = true,
 	.psr_skip_crtc_disable = true,
 	.force_odm2to1_for_edp_pixclk_mhz = 0, // disable the policy for now
+	.iommu_mismatch_temp_wka = 0x7,
 };
 
 static const struct dc_check_config config_defaults = {

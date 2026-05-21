@@ -20,6 +20,12 @@ static void hubp42_set_fgcg(struct hubp *hubp, bool enable)
 {
 	struct dcn20_hubp *hubp2 = TO_DCN20_HUBP(hubp);
 
+	/* Temporary workaround for IOMMU mismatch issue.
+	 * Fine grain control via bit1 of debug flag.
+	 */
+	if (hubp->ctx->dc->debug.iommu_mismatch_temp_wka & 0x2)
+		enable = false;
+
 	REG_UPDATE(HUBP_CLK_CNTL, HUBP_FGCG_REP_DIS, !enable);
 }
 

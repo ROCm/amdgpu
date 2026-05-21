@@ -81,8 +81,12 @@ void dccg42_enable_global_fgcg(struct dccg *dccg, bool value)
 {
 	struct dcn_dccg *dccg_dcn = TO_DCN_DCCG(dccg);
 
-	if (dccg->ctx->dc->debug.disable_clock_gate)
+	/* Temporary workaround for IOMMU mismatch issue.
+	 * Fine grain control via bit2 of debug flag.
+	 */
+	if (dccg->ctx->dc->debug.disable_clock_gate || (dccg->ctx->dc->debug.iommu_mismatch_temp_wka & 0x4))
 		value = false;
+
 	REG_UPDATE(DCCG_GLOBAL_FGCG_REP_CNTL, DCCG_GLOBAL_FGCG_REP_DIS, !value);
 }
 
