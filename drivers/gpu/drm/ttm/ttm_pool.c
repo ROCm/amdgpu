@@ -338,6 +338,9 @@ static void ttm_pool_type_give(struct ttm_pool_type *pt, struct page *p)
 
 static enum lru_status take_one_from_lru(struct list_head *item,
 					 struct list_lru_one *list,
+#ifndef HAVE_3ARGS_LIST_LRU_WALK_CB
+					 spinlock_t *lock,
+#endif
 					 void *cb_arg)
 {
 	struct page **out_page = cb_arg;
@@ -382,6 +385,9 @@ static void ttm_pool_type_init(struct ttm_pool_type *pt, struct ttm_pool *pool,
 
 static enum lru_status pool_move_to_dispose_list(struct list_head *item,
 						 struct list_lru_one *list,
+#ifndef HAVE_3ARGS_LIST_LRU_WALK_CB
+						 spinlock_t *lock,
+#endif
 						 void *cb_arg)
 {
 	struct list_head *dispose = cb_arg;
