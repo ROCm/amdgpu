@@ -10,6 +10,7 @@ extern void amdkcl_numa_init(void);
 extern void amdkcl_workqueue_init(void);
 extern void amdkcl_prime_init(void);
 extern void amdkcl_security_init(void);
+extern void amdkcl_list_lru_init(void);
 
 int __init amdkcl_init(void)
 {
@@ -21,6 +22,7 @@ int __init amdkcl_init(void)
 	amdkcl_workqueue_init();
 	amdkcl_prime_init();
 	amdkcl_security_init();
+	amdkcl_list_lru_init();
 
 	return 0;
 }
