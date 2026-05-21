@@ -4,6 +4,9 @@
 /* whether invalidate_range_start() wants 2 args */
 #define HAVE_2ARGS_INVALIDATE_RANGE_START 1
 
+/* list_lru_add() takes 4 args and is exported */
+#define HAVE_4ARGS_LIST_LRU_ADD 1
+
 /* whether invalidate_range_start() wants 5 args */
 /* #undef HAVE_5ARGS_INVALIDATE_RANGE_START */
 
@@ -1032,6 +1035,15 @@
 
 /* list_is_head() is available */
 #define HAVE_LIST_IS_HEAD 1
+
+/* list_lru_add_obj() is available */
+#define HAVE_LIST_LRU_ADD_OBJ 1
+
+/* struct list_lru wraps node[] inside ->ext (UEK KABI) */
+/* #undef HAVE_LIST_LRU_EXT */
+
+/* struct list_lru_one has a lock member */
+#define HAVE_LIST_LRU_ONE_LOCK 1
 
 /* list_rotate_to_front() is available */
 #define HAVE_LIST_ROTATE_TO_FRONT 1
