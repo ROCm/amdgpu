@@ -4,6 +4,9 @@
 /* whether invalidate_range_start() wants 2 args */
 #define HAVE_2ARGS_INVALIDATE_RANGE_START 1
 
+/* list_lru_walk_cb takes 3 args (no spinlock) */
+#define HAVE_3ARGS_LIST_LRU_WALK_CB 1
+
 /* list_lru_add() takes 4 args and is exported */
 #define HAVE_4ARGS_LIST_LRU_ADD 1
 
