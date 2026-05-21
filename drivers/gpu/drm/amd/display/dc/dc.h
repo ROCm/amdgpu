@@ -63,7 +63,7 @@ struct dcn_dsc_reg_state;
 struct dcn_optc_reg_state;
 struct dcn_dccg_reg_state;
 
-#define DC_VER "3.2.381"
+#define DC_VER "3.2.382"
 
 /**
  * MAX_SURFACES - representative of the upper bound of surfaces that can be piped to a single CRTC
@@ -540,7 +540,7 @@ struct dc_config {
 	bool use_default_clock_table;
 	bool force_bios_enable_lttpr;
 	uint8_t force_bios_fixed_vs;
-	int sdpif_request_limit_words_per_umc;
+	unsigned int sdpif_request_limit_words_per_umc;
 	bool dc_mode_clk_limit_support;
 	bool EnableMinDispClkODM;
 	bool enable_auto_dpm_test_logs;
@@ -944,20 +944,20 @@ struct dc_virtual_addr_space_config {
 };
 
 struct dc_bounding_box_overrides {
-	int sr_exit_time_ns;
-	int sr_enter_plus_exit_time_ns;
-	int sr_exit_z8_time_ns;
-	int sr_enter_plus_exit_z8_time_ns;
-	int urgent_latency_ns;
-	int percent_of_ideal_drambw;
-	int dram_clock_change_latency_ns;
-	int dummy_clock_change_latency_ns;
-	int fclk_clock_change_latency_ns;
+	unsigned int sr_exit_time_ns;
+	unsigned int sr_enter_plus_exit_time_ns;
+	unsigned int sr_exit_z8_time_ns;
+	unsigned int sr_enter_plus_exit_z8_time_ns;
+	unsigned int urgent_latency_ns;
+	unsigned int percent_of_ideal_drambw;
+	unsigned int dram_clock_change_latency_ns;
+	unsigned int dummy_clock_change_latency_ns;
+	unsigned int fclk_clock_change_latency_ns;
 	/* This forces a hard min on the DCFCLK we use
 	 * for DML.  Unlike the debug option for forcing
 	 * DCFCLK, this override affects watermark calculations
 	 */
-	int min_dcfclk_mhz;
+	unsigned int min_dcfclk_mhz;
 };
 
 struct dc_qos_info {
@@ -990,7 +990,7 @@ struct link_service;
 struct dc_debug_options {
 	bool disable_dsc;
 	enum visual_confirm visual_confirm;
-	int visual_confirm_rect_height;
+	unsigned int visual_confirm_rect_height;
 
 	bool sanity_checks;
 	bool max_disp_clk;
@@ -1026,23 +1026,23 @@ struct dc_debug_options {
 	bool disable_io_clk_power_gate;
 	bool disable_mem_power_gate;
 	bool disable_dio_power_gate;
-	int dsc_min_slice_height_override;
-	int dsc_bpp_increment_div;
+	unsigned int dsc_min_slice_height_override;
+	unsigned int dsc_bpp_increment_div;
 	bool disable_pplib_wm_range;
 	enum wm_report_mode pplib_wm_report_mode;
 	unsigned int min_disp_clk_khz;
 	unsigned int min_dpp_clk_khz;
 	unsigned int min_dram_clk_khz;
-	int sr_exit_time_dpm0_ns;
-	int sr_enter_plus_exit_time_dpm0_ns;
-	int sr_exit_time_ns;
-	int sr_enter_plus_exit_time_ns;
-	int sr_exit_z8_time_ns;
-	int sr_enter_plus_exit_z8_time_ns;
-	int urgent_latency_ns;
+	unsigned int sr_exit_time_dpm0_ns;
+	unsigned int sr_enter_plus_exit_time_dpm0_ns;
+	unsigned int sr_exit_time_ns;
+	unsigned int sr_enter_plus_exit_time_ns;
+	unsigned int sr_exit_z8_time_ns;
+	unsigned int sr_enter_plus_exit_z8_time_ns;
+	unsigned int urgent_latency_ns;
 	uint32_t underflow_assert_delay_us;
-	int percent_of_ideal_drambw;
-	int dram_clock_change_latency_ns;
+	unsigned int percent_of_ideal_drambw;
+	unsigned int dram_clock_change_latency_ns;
 	bool optimized_watermark;
 	int always_scale;
 	bool disable_pplib_clock_request;
@@ -1067,8 +1067,8 @@ struct dc_debug_options {
 	uint8_t seamless_boot_odm_combine;
 	uint8_t force_odm_combine_4to1; //bit vector based on otg inst
 
-	int minimum_z8_residency_time;
-	int minimum_z10_residency_time;
+	unsigned int minimum_z8_residency_time;
+	unsigned int minimum_z10_residency_time;
 	bool disable_z9_mpc;
 	unsigned int force_fclk_khz;
 	bool enable_tri_buf;
@@ -1117,7 +1117,7 @@ struct dc_debug_options {
 	uint8_t fec_enable_delay_in100us;
 	bool enable_driver_sequence_debug;
 	enum det_size crb_alloc_policy;
-	int crb_alloc_policy_min_disp_count;
+	unsigned int crb_alloc_policy_min_disp_count;
 	bool disable_z10;
 	bool enable_z9_disable_interface;
 	bool psr_skip_crtc_disable;
@@ -1222,6 +1222,7 @@ struct dc_debug_options {
 	unsigned int force_vmin_threshold;
 	bool enable_otg_frame_sync_pwa;
 	unsigned int min_deep_sleep_dcfclk_khz;
+	unsigned int force_odm2to1_for_edp_pixclk_mhz;
 };
 
 
@@ -1294,7 +1295,7 @@ void dc_hardware_init(struct dc *dc);
 int dc_get_vmid_use_vector(struct dc *dc);
 void dc_setup_vm_context(struct dc *dc, struct dc_virtual_addr_space_config *va_config, int vmid);
 /* Returns the number of vmids supported */
-int dc_setup_system_context(struct dc *dc, struct dc_phy_addr_space_config *pa_config);
+unsigned int dc_setup_system_context(struct dc *dc, struct dc_phy_addr_space_config *pa_config);
 void dc_init_callbacks(struct dc *dc,
 		const struct dc_callback_init *init_params);
 void dc_deinit_callbacks(struct dc *dc);
@@ -1469,13 +1470,10 @@ union surface_update_flags {
 		uint32_t full_update:1;
 		uint32_t sdr_white_level_nits:1;
 		uint32_t cm_hist_change:1;
-		uint32_t reserved:2; /* adjust when adding new flags */
 	} bits;
 
 	uint32_t raw;
 };
-
-bool dc_check_address_only_update(union surface_update_flags update_flags);
 
 #define DC_REMOVE_PLANE_POINTERS 1
 
@@ -1523,7 +1521,7 @@ struct dc_plane_state {
 	bool visible;
 	bool flip_immediate;
 	bool horizontal_mirror;
-	int layer_index;
+	unsigned int layer_index;
 
 	union surface_update_flags update_flags;
 	bool flip_int_enabled;
@@ -1553,7 +1551,7 @@ struct dc_plane_state {
 	struct dc_csc_transform cursor_csc_color_matrix;
 	bool adaptive_sharpness_en;
 	int adaptive_sharpness_policy;
-	int sharpness_level;
+	unsigned int sharpness_level;
 	enum linear_light_scaling linear_light_scaling;
 	unsigned int sdr_white_level_nits;
 	struct cm_hist_control cm_hist_control;
@@ -1576,7 +1574,7 @@ struct dc_plane_info {
 	bool global_alpha;
 	int  global_alpha_value;
 	bool input_csc_enabled;
-	int layer_index;
+	unsigned int layer_index;
 	enum chroma_cositing cositing;
 };
 
@@ -1856,6 +1854,32 @@ struct dc_scaling_info {
 	struct scaling_taps scaling_quality;
 };
 
+struct dc_fast_update {
+	const struct dc_flip_addrs *flip_addr;
+	const struct dc_gamma *gamma;
+	const struct colorspace_transform *gamut_remap_matrix;
+	const struct dc_csc_transform *input_csc_color_matrix;
+	const struct fixed31_32 *coeff_reduction_factor;
+	struct dc_transfer_func *out_transfer_func;
+	struct dc_csc_transform *output_csc_transform;
+	const struct dc_csc_transform *cursor_csc_color_matrix;
+	struct cm_hist_control *cm_hist_control;
+	/* stream-level fast updates */
+	const struct colorspace_transform *gamut_remap;
+	const struct dc_cursor_attributes *cursor_attributes;
+	const struct dc_cursor_position *cursor_position;
+	const struct periodic_interrupt_config *periodic_interrupt;
+	const enum dc_dither_option *dither_option;
+	struct dc_info_packet *vrr_infopacket;
+	struct dc_info_packet *vsc_infopacket;
+	struct dc_info_packet *vsp_infopacket;
+	struct dc_info_packet *hfvsif_infopacket;
+	struct dc_info_packet *vtem_infopacket;
+	struct dc_info_packet *adaptive_sync_infopacket;
+	struct dc_info_packet *avi_infopacket;
+	struct dc_info_packet *hdr_static_metadata;
+};
+
 struct dc_surface_update {
 	struct dc_plane_state *surface;
 
@@ -1968,7 +1992,7 @@ enum dc_status dc_validate_plane(struct dc *dc, const struct dc_plane_state *pla
 
 enum dc_status dc_validate_with_context(struct dc *dc,
 					const struct dc_validation_set set[],
-					int set_count,
+					unsigned int set_count,
 					struct dc_state *context,
 					enum dc_validate_mode validate_mode);
 
@@ -1990,6 +2014,11 @@ bool dc_resource_is_dsc_encoding_supported(const struct dc *dc);
 void get_audio_check(struct audio_info *aud_modes,
 	struct audio_check *aud_chk);
 
+bool fast_nonaddr_updates_exist(struct dc_fast_update *fast_update, int surface_count);
+void populate_fast_updates(struct dc_fast_update *fast_update,
+		struct dc_surface_update *srf_updates,
+		int surface_count,
+		struct dc_stream_update *stream_update);
 /*
  * Set up streams and links associated to drive sinks
  * The streams parameter is an absolute set of all active streams.
@@ -2075,7 +2104,7 @@ struct dc_sink_init_data;
 struct dc_sink *dc_link_add_remote_sink(
 		struct dc_link *dc_link,
 		const uint8_t *edid,
-		int len,
+		unsigned int len,
 		struct dc_sink_init_data *init_data);
 
 /* Remove remote sink from a link with dc_connection_mst_branch connection type.
@@ -2872,9 +2901,9 @@ bool dc_can_clear_cursor_limit(const struct dc *dc);
  * including OTG underflow status, current read positions, frame count, and per-HUBP debug data.
  * The results are stored in the provided out_data structure for further analysis or logging.
  */
-void dc_get_underflow_debug_data_for_otg(struct dc *dc, int primary_otg_inst, struct dc_underflow_debug_data *out_data);
+void dc_get_underflow_debug_data_for_otg(struct dc *dc, unsigned int primary_otg_inst, struct dc_underflow_debug_data *out_data);
 
-void dc_get_power_feature_status(struct dc *dc, int primary_otg_inst, struct power_features *out_data);
+void dc_get_power_feature_status(struct dc *dc, unsigned int primary_otg_inst, struct power_features *out_data);
 
 /*
  * Software state variables used to program register fields across the display pipeline

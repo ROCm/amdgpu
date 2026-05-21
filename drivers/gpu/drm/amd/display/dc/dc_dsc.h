@@ -92,7 +92,7 @@ uint32_t dc_dsc_stream_bandwidth_in_kbps(const struct dc_crtc_timing *timing,
 
 uint32_t dc_dsc_stream_bandwidth_overhead_in_kbps(
 		const struct dc_crtc_timing *timing,
-		const int num_slices_h,
+		const uint32_t num_slices_h,
 		const bool is_dp);
 
 void dc_dsc_dump_decoder_caps(const struct display_stream_compressor *dsc,

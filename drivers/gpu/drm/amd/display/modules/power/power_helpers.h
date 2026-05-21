@@ -28,6 +28,7 @@
 #include "dc/inc/hw/dmcu.h"
 #include "dc/inc/hw/abm.h"
 #include "dc/inc/core_types.h"
+#include "mod_power.h"
 
 struct resource_pool;
 

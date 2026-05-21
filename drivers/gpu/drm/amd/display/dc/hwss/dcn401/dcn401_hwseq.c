@@ -493,12 +493,10 @@ void dcn401_populate_mcm_luts(struct dc *dc,
 		break;
 	case DC_CM2_TRANSFER_FUNC_SOURCE_VIDMEM:
 		switch (mcm_luts.lut3d_data.gpu_mem_params.size) {
-#if defined(CONFIG_DRM_AMD_DC_DCN4_2)
 		case DC_CM2_GPU_MEM_SIZE_333333:
 			if (dc->caps.color.mpc.rmcm_3d_lut_caps.lut_dim_caps.dim_33)
 				width = hubp_3dlut_fl_width_33;
 			break;
-#endif
 		case DC_CM2_GPU_MEM_SIZE_171717:
 			width = hubp_3dlut_fl_width_17;
 			break;
@@ -1952,6 +1950,9 @@ void dcn401_perform_3dlut_wa_unlock(struct pipe_ctx *pipe_ctx)
 	 * This is meant to work around a known HW issue where VREADY will cancel the pending 3DLUT_ENABLE signal regardless
 	 * of whether OTG lock is currently being held or not.
 	 */
+	if (!pipe_ctx)
+		return;
+
 	struct pipe_ctx *wa_pipes[MAX_PIPES] = { NULL };
 	struct pipe_ctx *odm_pipe, *mpc_pipe;
 	int i, wa_pipe_ct = 0;

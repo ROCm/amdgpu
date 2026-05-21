@@ -228,9 +228,9 @@ bool dsc2_get_packed_pps(struct display_stream_compressor *dsc, const struct dsc
 void dsc2_enable(struct display_stream_compressor *dsc, int opp_pipe)
 {
 	struct dcn20_dsc *dsc20 = TO_DCN20_DSC(dsc);
-	int dsc_clock_en;
-	int dsc_fw_config;
-	int enabled_opp_pipe;
+	uint32_t dsc_clock_en;
+	uint32_t dsc_fw_config;
+	uint32_t enabled_opp_pipe;
 
 	DC_LOG_DSC("enable DSC %d at opp pipe %d", dsc->inst, opp_pipe);
 
@@ -253,7 +253,7 @@ void dsc2_enable(struct display_stream_compressor *dsc, int opp_pipe)
 void dsc2_disable(struct display_stream_compressor *dsc)
 {
 	struct dcn20_dsc *dsc20 = TO_DCN20_DSC(dsc);
-	int dsc_clock_en;
+	uint32_t dsc_clock_en;
 
 	DC_LOG_DSC("disable DSC %d", dsc->inst);
 

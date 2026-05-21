@@ -488,12 +488,11 @@ bool dc_dmub_srv_p_state_delegate(struct dc *dc, bool should_manage_pstate, stru
 	for (i = 0, k = 0; context && i < dc->res_pool->pipe_count; i++) {
 		struct pipe_ctx *pipe = &context->res_ctx.pipe_ctx[i];
 
-		if (!resource_is_pipe_type(pipe, OTG_MASTER))
+		if (!resource_is_pipe_type(pipe, OTG_MASTER) || !pipe->stream)
 			continue;
 
 		stream_status = dc_state_get_stream_status(context, pipe->stream);
 		if (stream_status && stream_status->fpo_in_use) {
-			struct pipe_ctx *pipe = &context->res_ctx.pipe_ctx[i];
 			uint8_t min_refresh_in_hz;
 
 			min_refresh_in_hz = (uint8_t)((pipe->stream->timing.min_refresh_in_uhz + 999999) / 1000000);

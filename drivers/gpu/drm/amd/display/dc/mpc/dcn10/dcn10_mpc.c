@@ -375,7 +375,7 @@ void mpc1_mpc_init(struct mpc *mpc)
 void mpc1_mpc_init_single_inst(struct mpc *mpc, unsigned int mpcc_id)
 {
 	struct dcn10_mpc *mpc10 = TO_DCN10_MPC(mpc);
-	int opp_id;
+	uint32_t opp_id;
 
 	REG_GET(MPCC_OPP_ID[mpcc_id], MPCC_OPP_ID, &opp_id);
 

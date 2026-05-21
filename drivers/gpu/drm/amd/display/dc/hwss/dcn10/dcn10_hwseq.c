@@ -2485,7 +2485,8 @@ void dcn10_enable_vblanks_synchronization(
 	(void)group_index;
 	struct output_pixel_processor *opp;
 	struct timing_generator *tg;
-	int i, width = 0, height = 0, master;
+	int i, master;
+	uint32_t width = 0, height = 0;
 
 	DC_LOGGER_INIT(dc->ctx);
 
@@ -2551,7 +2552,8 @@ void dcn10_enable_timing_synchronization(
 	(void)group_index;
 	struct output_pixel_processor *opp;
 	struct timing_generator *tg;
-	int i, width = 0, height = 0;
+	int i;
+	uint32_t width = 0, height = 0;
 
 	DC_LOGGER_INIT(dc->ctx);
 
@@ -3636,8 +3638,8 @@ void dcn10_update_pending_status(struct pipe_ctx *pipe_ctx)
 
 	if (dc->hwseq->wa_state.disallow_self_refresh_during_multi_plane_transition_applied) {
 		struct dce_hwseq *hwseq = dc->hwseq;
-		struct timing_generator *tg = dc->res_pool->timing_generators[0];
-		unsigned int cur_frame = tg->funcs->get_frame_count(tg);
+		struct timing_generator *wa_tg = dc->res_pool->timing_generators[0];
+		unsigned int cur_frame = wa_tg->funcs->get_frame_count(wa_tg);
 
 		if (cur_frame != hwseq->wa_state.disallow_self_refresh_during_multi_plane_transition_applied_on_frame) {
 			struct hubbub *hubbub = dc->res_pool->hubbub;

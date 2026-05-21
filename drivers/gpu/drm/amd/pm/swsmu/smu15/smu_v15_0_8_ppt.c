@@ -1313,23 +1313,21 @@ static int smu_v15_0_8_system_features_control(struct smu_context *smu,
 static int smu_v15_0_8_get_enabled_mask(struct smu_context *smu,
 					struct smu_feature_bits *feature_mask)
 {
-	struct smu_msg_args args = {
-		.msg = SMU_MSG_GetEnabledSmuFeatures,
-		.num_args = 0,
-		.num_out_args = 2,
-	};
+	uint32_t out[2];
 	int ret;
 
 	if (!feature_mask)
 		return -EINVAL;
 
-	ret = smu->msg_ctl.ops->send_msg(&smu->msg_ctl, &args);
+	ret = smu_cmn_send_smc_msg_with_params(smu,
+					       SMU_MSG_GetEnabledSmuFeatures,
+					       NULL, 0,
+					       out, ARRAY_SIZE(out));
 
 	if (ret)
 		return ret;
 
-	smu_feature_bits_from_arr32(feature_mask, args.out_args,
-				    SMU_FEATURE_NUM_DEFAULT);
+	smu_feature_bits_from_arr32(feature_mask, out, SMU_FEATURE_NUM_DEFAULT);
 
 	return 0;
 }

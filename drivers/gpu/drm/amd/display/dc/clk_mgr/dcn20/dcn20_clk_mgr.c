@@ -430,8 +430,8 @@ void dcn2_read_clocks_from_hw_dentist(struct clk_mgr *clk_mgr_base)
 	struct clk_mgr_internal *clk_mgr = TO_CLK_MGR_INTERNAL(clk_mgr_base);
 	uint32_t dispclk_wdivider;
 	uint32_t dppclk_wdivider;
-	int disp_divider;
-	int dpp_divider;
+	unsigned int disp_divider;
+	unsigned int dpp_divider;
 
 	REG_GET(DENTIST_DISPCLK_CNTL, DENTIST_DISPCLK_WDIVIDER, &dispclk_wdivider);
 	REG_GET(DENTIST_DISPCLK_CNTL, DENTIST_DPPCLK_WDIVIDER, &dppclk_wdivider);
@@ -534,8 +534,8 @@ void dcn20_clk_mgr_construct(
 		struct pp_smu_funcs *pp_smu,
 		struct dccg *dccg)
 {
-	int dprefclk_did;
-	int target_div;
+	unsigned int dprefclk_did;
+	unsigned int target_div;
 	uint32_t pll_req_reg;
 	struct fixed31_32 pll_req;
 

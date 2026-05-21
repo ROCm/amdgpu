@@ -123,9 +123,6 @@ union stream_update_flags {
 		uint32_t info_frame : 1;
 		uint32_t dmdata : 1;
 		uint32_t dither : 1;
-		uint32_t func_shaper : 1;
-		uint32_t lut3d_func : 1;
-		uint32_t reserved : 11; /* adjust when adding new flags */
 	} bits;
 
 	uint32_t raw;
@@ -159,8 +156,8 @@ struct luminance_data {
 	int luminance_millinits[LUMINANCE_DATA_TABLE_SIZE];
 	int flicker_criteria_milli_nits_GAMING;
 	int flicker_criteria_milli_nits_STATIC;
-	int nominal_refresh_rate;
-	int dm_max_decrease_from_nominal;
+	unsigned int nominal_refresh_rate;
+	unsigned int dm_max_decrease_from_nominal;
 };
 
 enum dc_drr_trigger_mode {
@@ -497,6 +494,9 @@ struct surface_update_descriptor dc_check_update_surfaces_for_stream(
 		struct dc_surface_update *updates,
 		int surface_count,
 		struct dc_stream_update *stream_update);
+
+struct dc_link *dc_stream_get_link(
+	const struct dc_stream_state *dc_stream);
 
 /**
  * Create a new default stream for the requested sink

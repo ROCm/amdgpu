@@ -917,7 +917,7 @@ struct dsc_dec_dpcd_caps {
 	union dsc_slice_caps2 slice_caps2;
 	int32_t lb_bit_depth;
 	bool is_block_pred_supported;
-	int32_t edp_max_bits_per_pixel; /* Valid only in eDP */
+	uint32_t edp_max_bits_per_pixel; /* Valid only in eDP */
 	union dsc_color_formats color_formats;
 	union dsc_color_depth color_depth;
 	int32_t throughput_mode_0_mps; /* In MPs */

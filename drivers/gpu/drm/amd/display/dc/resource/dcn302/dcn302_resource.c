@@ -738,7 +738,7 @@ static const struct dcn30_dwbc_mask dwbc30_mask = {
 
 static bool dcn302_dwbc_create(struct dc_context *ctx, struct resource_pool *pool)
 {
-	int i;
+	unsigned int i;
 	uint32_t pipe_count = pool->res_cap->num_dwb;
 
 	for (i = 0; i < pipe_count; i++) {
@@ -773,7 +773,7 @@ static const struct dcn30_mmhubbub_mask mcif_wb30_mask = {
 
 static bool dcn302_mmhubbub_create(struct dc_context *ctx, struct resource_pool *pool)
 {
-	int i;
+	unsigned int i;
 	uint32_t pipe_count = pool->res_cap->num_dwb;
 
 	for (i = 0; i < pipe_count; i++) {
@@ -1036,7 +1036,7 @@ static void dcn302_resource_destruct(struct resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->res_cap->num_dsc; i++) {
+	for (i = 0; i < (unsigned int)pool->res_cap->num_dsc; i++) {
 		if (pool->dscs[i] != NULL)
 			dcn20_dsc_destroy(&pool->dscs[i]);
 	}
@@ -1071,7 +1071,7 @@ static void dcn302_resource_destruct(struct resource_pool *pool)
 			dal_irq_service_destroy(&pool->irqs);
 	}
 
-	for (i = 0; i < pool->res_cap->num_ddc; i++) {
+	for (i = 0; i < (unsigned int)pool->res_cap->num_ddc; i++) {
 		if (pool->engines[i] != NULL)
 			dce110_engine_destroy(&pool->engines[i]);
 		if (pool->hw_i2cs[i] != NULL) {
@@ -1084,19 +1084,19 @@ static void dcn302_resource_destruct(struct resource_pool *pool)
 		}
 	}
 
-	for (i = 0; i < pool->res_cap->num_opp; i++) {
+	for (i = 0; i < (unsigned int)pool->res_cap->num_opp; i++) {
 		if (pool->opps[i] != NULL)
 			pool->opps[i]->funcs->opp_destroy(&pool->opps[i]);
 	}
 
-	for (i = 0; i < pool->res_cap->num_timing_generator; i++) {
+	for (i = 0; i < (unsigned int)pool->res_cap->num_timing_generator; i++) {
 		if (pool->timing_generators[i] != NULL)	{
 			kfree(DCN10TG_FROM_TG(pool->timing_generators[i]));
 			pool->timing_generators[i] = NULL;
 		}
 	}
 
-	for (i = 0; i < pool->res_cap->num_dwb; i++) {
+	for (i = 0; i < (unsigned int)pool->res_cap->num_dwb; i++) {
 		if (pool->dwbc[i] != NULL) {
 			kfree(TO_DCN30_DWBC(pool->dwbc[i]));
 			pool->dwbc[i] = NULL;
@@ -1120,7 +1120,7 @@ static void dcn302_resource_destruct(struct resource_pool *pool)
 	if (pool->dp_clock_source != NULL)
 		dcn20_clock_source_destroy(&pool->dp_clock_source);
 
-	for (i = 0; i < pool->res_cap->num_mpc_3dlut; i++) {
+	for (i = 0; i < (unsigned int)pool->res_cap->num_mpc_3dlut; i++) {
 		if (pool->mpc_lut[i] != NULL) {
 			dc_3dlut_func_release(pool->mpc_lut[i]);
 			pool->mpc_lut[i] = NULL;
@@ -1371,7 +1371,7 @@ static bool dcn302_resource_construct(
 					CLOCK_SOURCE_ID_DP_DTO,
 					&clk_src_regs[0], true);
 
-	for (i = 0; i < pool->clk_src_count; i++) {
+	for (i = 0; i < (int)pool->clk_src_count; i++) {
 		if (pool->clock_sources[i] == NULL) {
 			dm_error("DC: failed to create clock sources!\n");
 			BREAK_TO_DEBUGGER();
@@ -1416,7 +1416,7 @@ static bool dcn302_resource_construct(
 	}
 
 	/* HUBPs, DPPs, OPPs and TGs */
-	for (i = 0; i < pool->pipe_count; i++) {
+	for (i = 0; i < (int)pool->pipe_count; i++) {
 		pool->hubps[i] = dcn302_hubp_create(ctx, i);
 		if (pool->hubps[i] == NULL) {
 			BREAK_TO_DEBUGGER();
@@ -1526,7 +1526,7 @@ static bool dcn302_resource_construct(
 
 	dc->caps.max_planes =  pool->pipe_count;
 
-	for (i = 0; i < dc->caps.max_planes; ++i)
+	for (i = 0; i < (int)dc->caps.max_planes; ++i)
 		dc->caps.planes[i] = plane_cap;
 
 	dc->caps.max_odm_combine_factor = 4;

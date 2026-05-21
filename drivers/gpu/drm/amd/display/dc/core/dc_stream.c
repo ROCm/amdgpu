@@ -259,6 +259,12 @@ const struct dc_stream_status *dc_stream_get_status_const(
 	return dc_state_get_stream_status(dc->current_state, stream);
 }
 
+struct dc_link *dc_stream_get_link(
+	const struct dc_stream_state *stream)
+{
+	return stream->link;
+}
+
 void program_cursor_attributes(
 	struct dc *dc,
 	struct dc_stream_state *stream)
@@ -596,7 +602,7 @@ bool dc_stream_add_writeback(struct dc *dc,
 
 	if (dc->hwss.enable_writeback) {
 		struct dc_stream_status *stream_status = dc_stream_get_status(stream);
-		struct dwbc *dwb = dc->res_pool->dwbc[wb_info->dwb_pipe_inst];
+		dwb = dc->res_pool->dwbc[wb_info->dwb_pipe_inst];
 		if (stream_status)
 			dwb->otg_inst = stream_status->primary_otg_inst;
 	}
@@ -608,7 +614,7 @@ bool dc_stream_add_writeback(struct dc *dc,
 
 	/* enable writeback */
 	if (dc->hwss.enable_writeback) {
-		struct dwbc *dwb = dc->res_pool->dwbc[wb_info->dwb_pipe_inst];
+		dwb = dc->res_pool->dwbc[wb_info->dwb_pipe_inst];
 
 		if (dwb->funcs->is_enabled(dwb)) {
 			/* writeback pipe already enabled, only need to update */

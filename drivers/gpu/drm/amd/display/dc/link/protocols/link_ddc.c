@@ -401,12 +401,7 @@ int link_aux_transfer_raw(struct ddc_service *ddc,
 		struct aux_payload *payload,
 		enum aux_return_code_type *operation_result)
 {
-	if (ddc->ctx->dc->debug.enable_dmub_aux_for_legacy_ddc ||
-	    !ddc->ddc_pin) {
-		return dce_aux_transfer_dmub_raw(ddc, payload, operation_result);
-	} else {
-		return dce_aux_transfer_raw(ddc, payload, operation_result);
-	}
+	return dce_aux_transfer_raw(ddc, payload, operation_result);
 }
 
 uint32_t link_get_fixed_vs_pe_retimer_write_address(struct dc_link *link)

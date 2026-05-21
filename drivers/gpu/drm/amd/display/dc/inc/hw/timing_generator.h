@@ -32,9 +32,9 @@ struct dc_bios;
 
 /* Contains CRTC vertical/horizontal pixel counters */
 struct crtc_position {
-	int32_t vertical_count;
-	int32_t horizontal_count;
-	int32_t nominal_vcount;
+	uint32_t vertical_count;
+	uint32_t horizontal_count;
+	uint32_t nominal_vcount;
 };
 
 struct dcp_gsl_params {
@@ -321,7 +321,7 @@ struct timing_generator {
 	const struct timing_generator_funcs *funcs;
 	struct dc_bios *bp;
 	struct dc_context *ctx;
-	int inst;
+	uint32_t inst;
 };
 
 struct dc_crtc_timing;

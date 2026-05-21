@@ -296,7 +296,7 @@ static void CalculateWatermarksAndDRAMSpeedChangeSupport(
 		double UrgentOutOfOrderReturn,
 		double ReturnBW,
 		bool GPUVMEnable,
-		int dpte_group_bytes[],
+		unsigned int dpte_group_bytes[],
 		unsigned int MetaChunkSize,
 		double UrgentLatency,
 		double ExtraLatency,
@@ -307,7 +307,7 @@ static void CalculateWatermarksAndDRAMSpeedChangeSupport(
 		double SRExitTime,
 		double SREnterPlusExitTime,
 		double DCFCLKDeepSleep,
-		int DPPPerPlane[],
+		unsigned int DPPPerPlane[],
 		bool DCCEnable[],
 		double DPPCLK[],
 		double SwathWidthSingleDPPY[],
@@ -346,7 +346,7 @@ static void CalculateDCFCLKDeepSleep(
 		double BytePerPixelDETC[],
 		double VRatio[],
 		double SwathWidthY[],
-		int DPPPerPlane[],
+		unsigned int DPPPerPlane[],
 		double HRatio[],
 		double PixelClock[],
 		double PSCL_THROUGHPUT[],
@@ -390,7 +390,7 @@ static void CalculatePixelDeliveryTimes(
 		double                 VRatioPrefetchC[],
 		unsigned int           swath_width_luma_ub[],
 		unsigned int           swath_width_chroma_ub[],
-		int                    DPPPerPlane[],
+		unsigned int           DPPPerPlane[],
 		double                 HRatio[],
 		double                 PixelClock[],
 		double                 PSCL_THROUGHPUT[],
@@ -436,7 +436,7 @@ static void CalculateMetaAndPTETimes(
 		unsigned int           meta_row_height[],
 		unsigned int           meta_req_width[],
 		unsigned int           meta_req_height[],
-		int                   dpte_group_bytes[],
+		unsigned int           dpte_group_bytes[],
 		unsigned int           PTERequestSizeY[],
 		unsigned int           PTERequestSizeC[],
 		unsigned int           PixelPTEReqWidthY[],
@@ -477,8 +477,8 @@ static double CalculateExtraLatency(
 		bool GPUVMEnable,
 		bool HostVMEnable,
 		int NumberOfActivePlanes,
-		int NumberOfDPP[],
-		int dpte_group_bytes[],
+		unsigned int NumberOfDPP[],
+		unsigned int dpte_group_bytes[],
 		double PercentOfIdealDRAMFabricAndSDPPortBWReceivedAfterUrgLatencyPixelMixedWithVMData,
 		double PercentOfIdealDRAMFabricAndSDPPortBWReceivedAfterUrgLatencyVMDataOnly,
 		int HostVMMaxPageTableLevels,
@@ -4809,14 +4809,14 @@ void dml21_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 				mode_lib->vba.MaximumReadBandwidthWithoutPrefetch = 0.0;
 				mode_lib->vba.MaximumReadBandwidthWithPrefetch = 0.0;
 				for (k = 0; k <= mode_lib->vba.NumberOfActivePlanes - 1; k++) {
-					unsigned int m;
+					unsigned int cursor_idx;
 
 					locals->cursor_bw[k] = 0;
 					locals->cursor_bw_pre[k] = 0;
-					for (m = 0; m < mode_lib->vba.NumberOfCursors[k]; m++) {
-						locals->cursor_bw[k] = mode_lib->vba.CursorWidth[k][m] * mode_lib->vba.CursorBPP[k][m]
+					for (cursor_idx = 0; cursor_idx < mode_lib->vba.NumberOfCursors[k]; cursor_idx++) {
+						locals->cursor_bw[k] = mode_lib->vba.CursorWidth[k][cursor_idx] * mode_lib->vba.CursorBPP[k][cursor_idx]
 							/ 8.0 / (mode_lib->vba.HTotal[k] / mode_lib->vba.PixelClock[k]) * mode_lib->vba.VRatio[k];
-						locals->cursor_bw_pre[k] = mode_lib->vba.CursorWidth[k][m] * mode_lib->vba.CursorBPP[k][m]
+						locals->cursor_bw_pre[k] = mode_lib->vba.CursorWidth[k][cursor_idx] * mode_lib->vba.CursorBPP[k][cursor_idx]
 							/ 8.0 / (mode_lib->vba.HTotal[k] / mode_lib->vba.PixelClock[k]) * locals->VRatioPreY[i][j][k];
 					}
 
@@ -5257,7 +5257,7 @@ static void CalculateWatermarksAndDRAMSpeedChangeSupport(
 		double UrgentOutOfOrderReturn,
 		double ReturnBW,
 		bool GPUVMEnable,
-		int dpte_group_bytes[],
+		unsigned int dpte_group_bytes[],
 		unsigned int MetaChunkSize,
 		double UrgentLatency,
 		double ExtraLatency,
@@ -5268,7 +5268,7 @@ static void CalculateWatermarksAndDRAMSpeedChangeSupport(
 		double SRExitTime,
 		double SREnterPlusExitTime,
 		double DCFCLKDeepSleep,
-		int DPPPerPlane[],
+		unsigned int DPPPerPlane[],
 		bool DCCEnable[],
 		double DPPCLK[],
 		double SwathWidthSingleDPPY[],
@@ -5543,7 +5543,7 @@ static void CalculateDCFCLKDeepSleep(
 		double BytePerPixelDETC[],
 		double VRatio[],
 		double SwathWidthY[],
-		int DPPPerPlane[],
+		unsigned int DPPPerPlane[],
 		double HRatio[],
 		double PixelClock[],
 		double PSCL_THROUGHPUT[],
@@ -5749,7 +5749,7 @@ static void CalculatePixelDeliveryTimes(
 		double VRatioPrefetchC[],
 		unsigned int swath_width_luma_ub[],
 		unsigned int swath_width_chroma_ub[],
-		int DPPPerPlane[],
+		unsigned int DPPPerPlane[],
 		double HRatio[],
 		double PixelClock[],
 		double PSCL_THROUGHPUT[],
@@ -5870,7 +5870,7 @@ static void CalculateMetaAndPTETimes(
 		unsigned int meta_row_height[],
 		unsigned int meta_req_width[],
 		unsigned int meta_req_height[],
-		int dpte_group_bytes[],
+		unsigned int dpte_group_bytes[],
 		unsigned int PTERequestSizeY[],
 		unsigned int PTERequestSizeC[],
 		unsigned int PixelPTEReqWidthY[],
@@ -6126,8 +6126,8 @@ static double CalculateExtraLatency(
 		bool GPUVMEnable,
 		bool HostVMEnable,
 		int NumberOfActivePlanes,
-		int NumberOfDPP[],
-		int dpte_group_bytes[],
+		unsigned int NumberOfDPP[],
+		unsigned int dpte_group_bytes[],
 		double PercentOfIdealDRAMFabricAndSDPPortBWReceivedAfterUrgLatencyPixelMixedWithVMData,
 		double PercentOfIdealDRAMFabricAndSDPPortBWReceivedAfterUrgLatencyVMDataOnly,
 		int HostVMMaxPageTableLevels,

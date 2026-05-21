@@ -548,7 +548,7 @@ bool dpp3_get_optimal_number_of_taps(
 
 static void dpp3_deferred_update(struct dpp *dpp_base)
 {
-	int bypass_state;
+	uint32_t bypass_state;
 	struct dcn3_dpp *dpp = TO_DCN30_DPP(dpp_base);
 
 	if (dpp_base->deferred_reg_writes.bits.disable_dscl) {

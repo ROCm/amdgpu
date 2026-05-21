@@ -312,6 +312,9 @@ int amdgpu_mes_suspend(struct amdgpu_device *adev, u32 xcc_id)
 	memset(&input, 0x0, sizeof(struct mes_suspend_gang_input));
 	input.suspend_all_gangs = 1;
 	input.xcc_id = xcc_id;
+	if ((amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(12, 1, 0)) &&
+		((adev->mes.sched_version & AMDGPU_MES_VERSION_MASK) >= 0x71))
+		input.suspend_all_sdma_gangs = 1;
 
 	/*
 	 * Avoid taking any other locks under MES lock to avoid circular

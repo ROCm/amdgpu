@@ -126,7 +126,7 @@ static inline struct bw_fixed bw_div(const struct bw_fixed arg1, const struct bw
 static inline struct bw_fixed bw_mod(const struct bw_fixed arg1, const struct bw_fixed arg2)
 {
 	struct bw_fixed res;
-	div64_u64_rem(arg1.value, arg2.value, (uint64_t *)&res.value);
+	div64_u64_rem((uint64_t)arg1.value, (uint64_t)arg2.value, (uint64_t *)&res.value);
 	return res;
 }
 

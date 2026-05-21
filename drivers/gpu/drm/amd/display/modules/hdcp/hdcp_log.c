@@ -44,7 +44,7 @@ void mod_hdcp_dump_binary_message(uint8_t *msg, uint32_t msg_size,
 		for (i = 0; i < msg_size; i++) {
 			if (i % bytes_per_line == 0)
 				buf[buf_pos++] = '\n';
-			sprintf(&buf[buf_pos], "%02X ", msg[i]);
+			sprintf((char *)&buf[buf_pos], "%02X ", msg[i]);
 			buf_pos += byte_size;
 		}
 		buf[buf_pos++] = '\0';

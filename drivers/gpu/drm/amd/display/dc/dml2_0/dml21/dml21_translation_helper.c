@@ -613,6 +613,7 @@ static void populate_dml21_plane_config_from_plane_state(struct dml2_context *dm
 
 	plane->composition.viewport.stationary = false;
 
+#ifndef TRIM_CM2
 	if (plane_state->mcm_luts.lut3d_data.lut3d_src == DC_CM2_TRANSFER_FUNC_SOURCE_VIDMEM) {
 		plane->tdlut.setup_for_tdlut = true;
 
@@ -643,7 +644,39 @@ static void populate_dml21_plane_config_from_plane_state(struct dml2_context *dm
 			break;
 		}
 	}
+#else
+	if (plane_state->cm.flags.bits.lut3d_dma_enable) {
+		plane->tdlut.setup_for_tdlut = true;
 
+		switch (plane_state->cm.lut3d_dma.swizzle) {
+		case CM_LUT_3D_SWIZZLE_LINEAR_RGB:
+		case CM_LUT_3D_SWIZZLE_LINEAR_BGR:
+			plane->tdlut.tdlut_addressing_mode = dml2_tdlut_sw_linear;
+			break;
+		case CM_LUT_1D_PACKED_LINEAR:
+			plane->tdlut.tdlut_addressing_mode = dml2_tdlut_simple_linear;
+			break;
+		}
+
+		switch (plane_state->cm.lut3d_dma.size) {
+		case CM_LUT_SIZE_171717:
+			plane->tdlut.tdlut_width_mode = dml2_tdlut_width_17_cube;
+			break;
+		case CM_LUT_SIZE_333333:
+			plane->tdlut.tdlut_width_mode = dml2_tdlut_width_33_cube;
+			break;
+		// handling when use case and HW support available
+		case CM_LUT_SIZE_454545:
+		case CM_LUT_SIZE_656565:
+			break;
+		case CM_LUT_SIZE_NONE:
+		case CM_LUT_SIZE_999:
+		default:
+			//plane->tdlut.tdlut_width_mode = dml2_tdlut_width_flatten; // dml2_tdlut_width_flatten undefined
+			break;
+		}
+	}
+#endif // TRIM_CM2
 	plane->tdlut.setup_for_tdlut |= dml_ctx->config.force_tdlut_enable;
 
 	plane->dynamic_meta_data.enable = false;

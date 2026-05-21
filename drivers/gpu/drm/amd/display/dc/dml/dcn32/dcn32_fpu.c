@@ -1400,7 +1400,7 @@ static void try_odm_power_optimization_and_revalidate(
 		display_e2e_pipe_params_st *pipes,
 		int *split,
 		bool *merge,
-		unsigned int *vlevel,
+		int *vlevel,
 		int pipe_cnt)
 {
 	int i;
@@ -2216,7 +2216,7 @@ bool dcn32_internal_validate_bw(struct dc *dc,
 	if (repopulate_pipes) {
 		int flag_max_mpc_comb = vba->maxMpcComb;
 		int flag_vlevel = vlevel;
-		int i;
+		int j;
 
 		pipe_cnt = dc->res_pool->funcs->populate_dml_pipes(dc, context, pipes, validate_mode);
 		if (!dc->config.enable_windowed_mpo_odm)
@@ -2231,19 +2231,20 @@ bool dcn32_internal_validate_bw(struct dc *dc,
 					dm_prefetch_support_uclk_fclk_and_stutter_if_possible;
 
 		vlevel = dml_get_voltage_level(&context->bw_ctx.dml, pipes, pipe_cnt);
+		const int num_states = (int)context->bw_ctx.dml.soc.num_states;
 
-		if (vlevel == context->bw_ctx.dml.soc.num_states) {
+		if (vlevel == num_states) {
 			/* failed after DET size changes */
 			goto validate_fail;
 		} else if (flag_max_mpc_comb == 0 &&
 				flag_max_mpc_comb != context->bw_ctx.dml.vba.maxMpcComb) {
 			/* check the context constructed with pipe split flags is still valid*/
 			bool flags_valid = false;
-			for (i = flag_vlevel; i < (int)context->bw_ctx.dml.soc.num_states; i++) {
-				if (vba->ModeSupport[i][flag_max_mpc_comb]) {
+			for (j = flag_vlevel; j < (int)context->bw_ctx.dml.soc.num_states; j++) {
+				if (vba->ModeSupport[j][flag_max_mpc_comb]) {
 					vba->maxMpcComb = flag_max_mpc_comb;
-					vba->VoltageLevel = i;
-					vlevel = i;
+					vba->VoltageLevel = j;
+					vlevel = j;
 					flags_valid = true;
 					break;
 				}
