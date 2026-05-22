@@ -52,7 +52,7 @@ enum dc_status dcn401_enable_stream_timing(
 void dcn401_enable_stream(struct pipe_ctx *pipe_ctx);
 void dcn401_populate_mcm_luts(struct dc *dc,
 		struct pipe_ctx *pipe_ctx,
-		struct dc_cm2_func_luts mcm_luts,
+		const struct dc_plane_cm *cm,
 		bool lut_bank_a);
 void dcn401_setup_hpo_hw_control(const struct dce_hwseq *hws, bool enable);
 

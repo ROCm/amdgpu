@@ -1489,6 +1489,47 @@ struct dc_3dlut {
 	struct fixed31_32 hdr_multiplier;
 	union dc_3dlut_state state;
 };
+
+/* 3DLUT DMA (Fast Load) params */
+struct dc_3dlut_dma {
+	struct dc_plane_address addr;
+	enum dc_cm_lut_swizzle swizzle;
+	enum dc_cm_lut_pixel_format format;
+	uint16_t bias; /* FP1.5.10 */
+	uint16_t scale; /* FP1.5.10 */
+	enum dc_cm_lut_size size;
+};
+
+/* color manager */
+union dc_plane_cm_flags {
+	unsigned int all;
+	struct {
+		unsigned int shaper_enable    : 1;
+		unsigned int lut3d_enable     : 1;
+		unsigned int blend_enable     : 1;
+		/* whether legacy (lut3d_func) or DMA is valid */
+		unsigned int lut3d_dma_enable : 1;
+#if defined(CONFIG_DRM_AMD_DC_DCN4_2)
+		/* RMCM lut to be used instead of MCM */
+		unsigned int rmcm_enable	 : 1;
+		unsigned int reserved: 27;
+#else
+		unsigned int reserved: 28;
+#endif
+	} bits;
+};
+
+struct dc_plane_cm {
+	struct kref refcount;
+	struct dc_transfer_func shaper_func;
+	union {
+		struct dc_3dlut lut3d_func;
+		struct dc_3dlut_dma lut3d_dma;
+	};
+	struct dc_transfer_func blend_func;
+	union dc_plane_cm_flags flags;
+};
+
 /*
  * This structure is filled in by dc_surface_get_status and contains
  * the last requested address and the currently active address so the called
@@ -1567,14 +1608,22 @@ struct dc_plane_state {
 	struct fixed31_32 hdr_mult;
 	struct colorspace_transform gamut_remap_matrix;
 
+	enum dc_color_space color_space;
+
+#ifndef TRIM_CM2
 	// TODO: No longer used, remove
 	struct dc_hdr_static_metadata hdr_static_ctx;
-
-	enum dc_color_space color_space;
 
 	struct dc_3dlut lut3d_func;
 	struct dc_transfer_func in_shaper_func;
 	struct dc_transfer_func blend_tf;
+	enum dc_cm2_shaper_3dlut_setting mcm_shaper_3dlut_setting;
+	bool mcm_lut1d_enable;
+	struct dc_cm2_func_luts mcm_luts;
+#endif /* TRIM_CM2 */
+	bool lut_bank_a;
+	enum mpcc_movable_cm_location mcm_location;
+	struct dc_plane_cm cm;
 
 	struct dc_transfer_func *gamcor_tf;
 	enum surface_pixel_format format;
@@ -1611,11 +1660,6 @@ struct dc_plane_state {
 
 	bool is_statically_allocated;
 	enum chroma_cositing cositing;
-	enum dc_cm2_shaper_3dlut_setting mcm_shaper_3dlut_setting;
-	bool mcm_lut1d_enable;
-	struct dc_cm2_func_luts mcm_luts;
-	bool lut_bank_a;
-	enum mpcc_movable_cm_location mcm_location;
 	struct dc_csc_transform cursor_csc_color_matrix;
 	bool adaptive_sharpness_en;
 	int adaptive_sharpness_policy;
@@ -1979,17 +2023,7 @@ struct dc_surface_update {
 
 	const struct dc_csc_transform *input_csc_color_matrix;
 	const struct fixed31_32 *coeff_reduction_factor;
-	const struct dc_transfer_func *func_shaper;
-	const struct dc_3dlut *lut3d_func;
-	const struct dc_transfer_func *blend_tf;
 	const struct colorspace_transform *gamut_remap_matrix;
-	/*
-	 * Color Transformations for pre-blend MCM (Shaper, 3DLUT, 1DLUT)
-	 *
-	 * change cm2_params.component_settings: Full update
-	 * change cm2_params.cm2_luts: Fast update
-	 */
-	const struct dc_cm2_parameters *cm2_params;
 	const struct dc_plane_cm *cm;
 	const struct dc_csc_transform *cursor_csc_color_matrix;
 	unsigned int sdr_white_level_nits;
@@ -2034,6 +2068,10 @@ struct dc_transfer_func *dc_create_transfer_func(void);
 struct dc_3dlut *dc_create_3dlut_func(void);
 void dc_3dlut_func_release(struct dc_3dlut *lut);
 void dc_3dlut_func_retain(struct dc_3dlut *lut);
+
+struct dc_plane_cm *dc_plane_cm_create(void);
+void dc_plane_cm_release(struct dc_plane_cm *cm);
+void dc_plane_cm_retain(struct dc_plane_cm *cm);
 
 void dc_post_update_surfaces_to_stream(
 		struct dc *dc);

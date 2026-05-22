@@ -2964,14 +2964,26 @@ static struct surface_update_descriptor det_surface_update(
 		elevate_update_type(&overall_type, UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_STREAM);
 	}
 
-	if (u->blend_tf || (u->gamma && dce_use_lut(u->plane_info ? u->plane_info->format : u->surface->format))) {
+	if ((u->cm && u->cm->flags.bits.blend_enable) ||
+			(u->gamma && dce_use_lut(u->plane_info ? u->plane_info->format : u->surface->format))) {
 		update_flags->bits.gamma_change = 1;
 		elevate_update_type(&overall_type, UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_STREAM);
 	}
 
-	if (u->lut3d_func || u->func_shaper) {
+	if (u->cm && (u->cm->flags.bits.lut3d_enable || u->cm->flags.bits.shaper_enable)) {
 		update_flags->bits.lut_3d = 1;
 		elevate_update_type(&overall_type, UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_STREAM);
+	}
+
+	if (u->cm && u->cm->flags.bits.lut3d_dma_enable != u->surface->cm.flags.bits.lut3d_dma_enable &&
+			u->cm->flags.bits.lut3d_enable && u->surface->cm.flags.bits.lut3d_enable) {
+		/* Toggling 3DLUT loading between DMA and Host is illegal */
+		BREAK_TO_DEBUGGER();
+	}
+
+	if (u->cm && u->cm->flags.bits.lut3d_enable && !u->cm->flags.bits.lut3d_dma_enable) {
+		/* Host loading 3DLUT requires full update but only stream lock  */
+		elevate_update_type(&overall_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_STREAM);
 	}
 
 	if (u->hdr_mult.value)
@@ -2992,17 +3004,30 @@ static struct surface_update_descriptor det_surface_update(
 		update_flags->bits.cm_hist_change = 1;
 		elevate_update_type(&overall_type, UPDATE_TYPE_FAST, LOCK_DESCRIPTOR_STREAM);
 	}
-	if (u->cm2_params) {
-		if (u->cm2_params->component_settings.shaper_3dlut_setting != u->surface->mcm_shaper_3dlut_setting
-				|| u->cm2_params->component_settings.lut1d_enable != u->surface->mcm_lut1d_enable
-				|| u->cm2_params->cm2_luts.lut3d_data.lut3d_src != u->surface->mcm_luts.lut3d_data.lut3d_src) {
+
+	if (u->cm) {
+		const union dc_plane_cm_flags blend_only_flags = {
+			.bits = {
+				.blend_enable = 1,
+			}
+		};
+
+		if (u->cm->flags.bits.shaper_enable != u->surface->cm.flags.bits.shaper_enable
+				|| u->cm->flags.bits.blend_enable != u->surface->cm.flags.bits.blend_enable
+				|| u->cm->flags.bits.lut3d_enable != u->surface->cm.flags.bits.lut3d_enable
+				|| u->cm->flags.bits.lut3d_dma_enable != u->surface->cm.flags.bits.lut3d_dma_enable) {
 			update_flags->bits.mcm_transfer_function_enable_change = 1;
+			elevate_update_type(&overall_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
+		}
+
+		if ((u->cm->flags.all != blend_only_flags.all && u->cm->flags.all != 0) ||
+				(u->surface->cm.flags.all != blend_only_flags.all && u->surface->cm.flags.all != 0)) {
 			elevate_update_type(&overall_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 		}
 	}
 
 	if (update_flags->bits.lut_3d &&
-			u->surface->mcm_luts.lut3d_data.lut3d_src != DC_CM2_TRANSFER_FUNC_SOURCE_VIDMEM) {
+			!u->surface->cm.flags.bits.lut3d_dma_enable) {
 		elevate_update_type(&overall_type, UPDATE_TYPE_FULL, LOCK_DESCRIPTOR_GLOBAL);
 	}
 
@@ -3304,23 +3329,54 @@ static void copy_surface_update_to_plane(
 			sizeof(struct dc_transfer_func_distributed_points));
 	}
 
-	if (srf_update->cm2_params) {
-		surface->mcm_shaper_3dlut_setting = srf_update->cm2_params->component_settings.shaper_3dlut_setting;
-		surface->mcm_lut1d_enable = srf_update->cm2_params->component_settings.lut1d_enable;
-		surface->mcm_luts = srf_update->cm2_params->cm2_luts;
+	/* Shaper, 3DLUT, 1DLUT */
+	if (srf_update->cm) {
+		struct kref refcount = surface->cm.refcount;
+
+		memcpy(&surface->cm, srf_update->cm, sizeof(surface->cm));
+		surface->cm.refcount = refcount;
+
+#ifndef TRIM_CM2
+		/* Populate mcm_luts from cm for legacy consumers (dml2, hwseq) */
+		surface->mcm_luts.lut1d_func = &surface->cm.blend_func;
+		surface->mcm_luts.shaper = &surface->cm.shaper_func;
+		if (srf_update->cm->flags.bits.lut3d_dma_enable) {
+			surface->mcm_luts.lut3d_data.lut3d_src = DC_CM2_TRANSFER_FUNC_SOURCE_VIDMEM;
+			surface->mcm_luts.lut3d_data.gpu_mem_params.addr = surface->cm.lut3d_dma.addr;
+			surface->mcm_luts.lut3d_data.gpu_mem_params.layout =
+				(surface->cm.lut3d_dma.swizzle == CM_LUT_3D_SWIZZLE_LINEAR_RGB) ?
+					DC_CM2_GPU_MEM_LAYOUT_3D_SWIZZLE_LINEAR_RGB :
+				(surface->cm.lut3d_dma.swizzle == CM_LUT_3D_SWIZZLE_LINEAR_BGR) ?
+					DC_CM2_GPU_MEM_LAYOUT_3D_SWIZZLE_LINEAR_BGR :
+					DC_CM2_GPU_MEM_LAYOUT_1D_PACKED_LINEAR;
+			surface->mcm_luts.lut3d_data.gpu_mem_params.format_params.format =
+				(surface->cm.lut3d_dma.format == CM_LUT_PIXEL_FORMAT_RGBA16161616_UNORM_12MSB) ?
+					DC_CM2_GPU_MEM_FORMAT_16161616_UNORM_12MSB :
+				(surface->cm.lut3d_dma.format == CM_LUT_PIXEL_FORMAT_RGBA16161616_UNORM_12LSB) ?
+					DC_CM2_GPU_MEM_FORMAT_16161616_UNORM_12LSB :
+					DC_CM2_GPU_MEM_FORMAT_16161616_FLOAT_FP1_5_10;
+			surface->mcm_luts.lut3d_data.gpu_mem_params.format_params.float_params.bias =
+				surface->cm.lut3d_dma.bias;
+			surface->mcm_luts.lut3d_data.gpu_mem_params.format_params.float_params.scale =
+				surface->cm.lut3d_dma.scale;
+			surface->mcm_luts.lut3d_data.gpu_mem_params.component_order =
+				DC_CM2_GPU_MEM_PIXEL_COMPONENT_ORDER_RGBA;
+			surface->mcm_luts.lut3d_data.gpu_mem_params.size = DC_CM2_GPU_MEM_SIZE_TRANSFORMED;
+			surface->mcm_luts.lut3d_data.mpc_3dlut_enable = (srf_update->cm->flags.bits.lut3d_enable != 0);
+		} else {
+			surface->mcm_luts.lut3d_data.lut3d_src = DC_CM2_TRANSFER_FUNC_SOURCE_SYSMEM;
+			surface->mcm_luts.lut3d_data.lut3d_func = &surface->cm.lut3d_func;
+		}
+
+		if (srf_update->cm->flags.bits.shaper_enable &&
+				srf_update->cm->flags.bits.lut3d_enable)
+			surface->mcm_shaper_3dlut_setting = DC_CM2_SHAPER_3DLUT_SETTING_ENABLE_SHAPER_3DLUT;
+		else if (srf_update->cm->flags.bits.shaper_enable)
+			surface->mcm_shaper_3dlut_setting = DC_CM2_SHAPER_3DLUT_SETTING_ENABLE_SHAPER;
+		else
+			surface->mcm_shaper_3dlut_setting = DC_CM2_SHAPER_3DLUT_SETTING_BYPASS_ALL;
+#endif /* TRIM_CM2 */
 	}
-
-	if (srf_update->func_shaper) {
-		memcpy(&surface->in_shaper_func, srf_update->func_shaper,
-		sizeof(surface->in_shaper_func));
-
-		if (surface->mcm_shaper_3dlut_setting >= DC_CM2_SHAPER_3DLUT_SETTING_ENABLE_SHAPER)
-			surface->mcm_luts.shaper = &surface->in_shaper_func;
-	}
-
-	if (srf_update->lut3d_func)
-		memcpy(&surface->lut3d_func, srf_update->lut3d_func,
-		sizeof(surface->lut3d_func));
 
 	if (srf_update->hdr_mult.value)
 		surface->hdr_mult =
@@ -3330,15 +3386,10 @@ static void copy_surface_update_to_plane(
 		surface->sdr_white_level_nits =
 				srf_update->sdr_white_level_nits;
 
-	if (srf_update->blend_tf) {
-		memcpy(&surface->blend_tf, srf_update->blend_tf,
-		sizeof(surface->blend_tf));
-
-		if (surface->mcm_lut1d_enable)
-			surface->mcm_luts.lut1d_func = &surface->blend_tf;
-	}
-
-	if (srf_update->cm2_params || srf_update->blend_tf)
+	if (srf_update->cm &&
+			(srf_update->cm->flags.bits.blend_enable ||
+			srf_update->cm->flags.bits.shaper_enable ||
+			srf_update->cm->flags.bits.lut3d_enable))
 		surface->lut_bank_a = !surface->lut_bank_a;
 
 	if (srf_update->input_csc_color_matrix)
@@ -5074,11 +5125,9 @@ static void commit_planes_for_stream(struct dc *dc,
 				if (!should_update_pipe_for_plane(context, pipe_ctx, plane_state))
 					continue;
 
-				if (srf_updates[i].cm2_params &&
-						srf_updates[i].cm2_params->cm2_luts.lut3d_data.lut3d_src ==
-								DC_CM2_TRANSFER_FUNC_SOURCE_VIDMEM &&
-						srf_updates[i].cm2_params->component_settings.shaper_3dlut_setting ==
-								DC_CM2_SHAPER_3DLUT_SETTING_ENABLE_SHAPER_3DLUT &&
+				if (srf_updates[i].cm &&
+						srf_updates[i].cm->flags.bits.lut3d_enable &&
+						srf_updates[i].cm->flags.bits.lut3d_dma_enable &&
 						dc->hwss.trigger_3dlut_dma_load)
 					dc->hwss.trigger_3dlut_dma_load(dc, pipe_ctx);
 
@@ -5793,14 +5842,9 @@ static bool full_update_required(
 				(srf_updates[i].sdr_white_level_nits &&
 				srf_updates[i].sdr_white_level_nits != srf_updates->surface->sdr_white_level_nits) ||
 				srf_updates[i].in_transfer_func ||
-				srf_updates[i].func_shaper ||
-				srf_updates[i].lut3d_func ||
 				srf_updates[i].surface->force_full_update ||
 				(srf_updates[i].flip_addr &&
-				srf_updates[i].flip_addr->address.tmz_surface != srf_updates[i].surface->address.tmz_surface) ||
-				(srf_updates[i].cm2_params &&
-				 (srf_updates[i].cm2_params->component_settings.shaper_3dlut_setting != srf_updates[i].surface->mcm_shaper_3dlut_setting ||
-				  srf_updates[i].cm2_params->component_settings.lut1d_enable != srf_updates[i].surface->mcm_lut1d_enable))))
+				srf_updates[i].flip_addr->address.tmz_surface != srf_updates[i].surface->address.tmz_surface)))
 			return true;
 	}
 
@@ -7543,7 +7587,7 @@ bool dc_capture_register_software_state(struct dc *dc, struct dc_register_softwa
 			struct dc_plane_state *plane_state = pipe_ctx->plane_state;
 
 			/* MPCC blending tree and mode control - capture actual blend configuration */
-			state->mpc.mpcc_mode[i] = (plane_state->blend_tf.type != TF_TYPE_BYPASS) ? 1 : 0;
+			state->mpc.mpcc_mode[i] = (plane_state->cm.blend_func.type != TF_TYPE_BYPASS) ? 1 : 0;
 			state->mpc.mpcc_alpha_blend_mode[i] = plane_state->per_pixel_alpha ? 1 : 0;
 			state->mpc.mpcc_alpha_multiplied_mode[i] = plane_state->pre_multiplied_alpha ? 1 : 0;
 			state->mpc.mpcc_blnd_active_overlap_only[i] = 0; /* Default - no overlap restriction */

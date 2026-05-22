@@ -1053,26 +1053,28 @@ EXPORT_IF_KUNIT(__drm_3dlut32_to_dc_3dlut);
 /* amdgpu_dm_atomic_lut3d - set DRM 3D LUT to DC stream
  * @drm_lut3d: user 3D LUT
  * @drm_lut3d_size: size of 3D LUT
- * @lut3d: DC 3D LUT
+ * @cm: DC Color Manager (includes 3D LUT)
  *
  * Map user 3D LUT data to DC 3D LUT and all necessary bits to program it
  * on DCN accordingly.
  */
 STATIC_IFN_KUNIT void amdgpu_dm_atomic_lut3d(const struct drm_color_lut *drm_lut3d,
 				     uint32_t drm_lut3d_size,
-				     struct dc_3dlut *lut)
+				     struct dc_plane_cm *cm)
 {
 	if (!drm_lut3d_size) {
-		lut->state.bits.initialized = 0;
+		cm->lut3d_func.state.bits.initialized = 0;
+		cm->flags.bits.lut3d_enable = 0;
 	} else {
 		/* Stride and bit depth are not programmable by API yet.
 		 * Therefore, only supports 17x17x17 3D LUT (12-bit).
 		 */
-		lut->lut_3d.use_tetrahedral_9 = false;
-		lut->lut_3d.use_12bits = true;
-		lut->state.bits.initialized = 1;
-		__drm_3dlut_to_dc_3dlut(drm_lut3d, drm_lut3d_size, &lut->lut_3d,
-					lut->lut_3d.use_tetrahedral_9,
+		cm->lut3d_func.lut_3d.use_tetrahedral_9 = false;
+		cm->lut3d_func.lut_3d.use_12bits = true;
+		cm->lut3d_func.state.bits.initialized = 1;
+		cm->flags.bits.lut3d_enable = 1;
+		__drm_3dlut_to_dc_3dlut(drm_lut3d, drm_lut3d_size, &cm->lut3d_func.lut_3d,
+					cm->lut3d_func.lut_3d.use_tetrahedral_9,
 					MAX_COLOR_3DLUT_BITDEPTH);
 	}
 }
@@ -1082,7 +1084,7 @@ STATIC_IFN_KUNIT int amdgpu_dm_atomic_shaper_lut(const struct drm_color_lut *sha
 				       bool has_rom,
 				       enum dc_transfer_func_predefined tf,
 				       uint32_t shaper_size,
-				       struct dc_transfer_func *func_shaper)
+				       struct dc_plane_cm *cm)
 {
 	int ret = 0;
 
@@ -1091,10 +1093,13 @@ STATIC_IFN_KUNIT int amdgpu_dm_atomic_shaper_lut(const struct drm_color_lut *sha
 		 * If user shaper LUT is set, we assume a linear color space
 		 * (linearized by degamma 1D LUT or not).
 		 */
-		__set_tf_distributed_points(func_shaper, tf);
-		ret = __set_output_tf(func_shaper, shaper_lut, shaper_size, has_rom);
+		__set_tf_distributed_points(&cm->shaper_func, tf);
+		cm->flags.bits.shaper_enable = 1;
+
+		ret = __set_output_tf(&cm->shaper_func, shaper_lut, shaper_size, has_rom);
 	} else {
-		__set_tf_bypass(func_shaper);
+		__set_tf_bypass(&cm->shaper_func);
+		cm->flags.bits.shaper_enable = 0;
 	}
 
 	return ret;
@@ -1105,7 +1110,7 @@ STATIC_IFN_KUNIT int amdgpu_dm_atomic_blend_lut(const struct drm_color_lut *blen
 				       bool has_rom,
 				       enum dc_transfer_func_predefined tf,
 				       uint32_t blend_size,
-				       struct dc_transfer_func *func_blend)
+				       struct dc_plane_cm *cm)
 {
 	int ret = 0;
 
@@ -1117,10 +1122,13 @@ STATIC_IFN_KUNIT int amdgpu_dm_atomic_blend_lut(const struct drm_color_lut *blen
 		 * module to fill the parameters that will be translated to HW
 		 * points.
 		 */
-		__set_tf_distributed_points(func_blend, tf);
-		ret = __set_input_tf(NULL, func_blend, blend_lut, blend_size);
+		__set_tf_distributed_points(&cm->blend_func, tf);
+		cm->flags.bits.blend_enable = 1;
+
+		ret = __set_input_tf(NULL, &cm->blend_func, blend_lut, blend_size);
 	} else {
-		__set_tf_bypass(func_blend);
+		__set_tf_bypass(&cm->blend_func);
+		cm->flags.bits.blend_enable = 0;
 	}
 
 	return ret;
@@ -1639,7 +1647,7 @@ __set_dm_plane_colorop_shaper(struct drm_plane_state *plane_state,
 	struct drm_colorop_state *colorop_state = NULL, *new_colorop_state;
 	struct drm_atomic_commit *state = plane_state->state;
 	enum dc_transfer_func_predefined default_tf = TRANSFER_FUNCTION_LINEAR;
-	struct dc_transfer_func *tf = &dc_plane_state->in_shaper_func;
+	struct dc_transfer_func *tf = &dc_plane_state->cm.shaper_func;
 	const struct drm_color_lut32 *shaper_lut;
 	struct drm_device *dev = colorop->dev;
 	bool enabled = false;
@@ -1700,8 +1708,12 @@ __set_dm_plane_colorop_shaper(struct drm_plane_state *plane_state,
 		}
 	}
 
-	if (!enabled)
+	if (!enabled) {
 		tf->type = TF_TYPE_BYPASS;
+		dc_plane_state->cm.flags.bits.shaper_enable = 0;
+	} else {
+		dc_plane_state->cm.flags.bits.shaper_enable = 1;
+	}
 
 	return 0;
 }
@@ -1745,7 +1757,7 @@ __set_dm_plane_colorop_3dlut(struct drm_plane_state *plane_state,
 {
 	struct drm_colorop *old_colorop;
 	struct drm_colorop_state *colorop_state = NULL, *new_colorop_state;
-	struct dc_transfer_func *tf = &dc_plane_state->in_shaper_func;
+	struct dc_transfer_func *tf = &dc_plane_state->cm.shaper_func;
 	struct drm_atomic_commit *state = plane_state->state;
 	const struct amdgpu_device *adev = drm_to_adev(colorop->dev);
 	bool has_3dlut = adev->dm.dc->caps.color.dpp.hw_3d_lut || adev->dm.dc->caps.color.mpc.preblend;
@@ -1773,12 +1785,14 @@ __set_dm_plane_colorop_3dlut(struct drm_plane_state *plane_state,
 		drm_dbg(dev, "3D LUT colorop with ID: %d\n", colorop->base.id);
 		lut3d = __extract_blob_lut32(colorop_state->data, &lut3d_size);
 		lut3d_size = lut3d != NULL ? lut3d_size : 0;
-		ret = __set_colorop_3dlut(lut3d, lut3d_size, &dc_plane_state->lut3d_func);
+		ret = __set_colorop_3dlut(lut3d, lut3d_size, &dc_plane_state->cm.lut3d_func);
 		if (ret) {
 			drm_dbg(dev, "3D LUT colorop with ID: %d has LUT size = %d\n",
 				colorop->base.id, lut3d_size);
 			return ret;
 		}
+
+		dc_plane_state->cm.flags.bits.lut3d_enable = 1;
 
 		/* 3D LUT requires shaper. If shaper colorop is bypassed, enable shaper curve
 		 * with TRANSFER_FUNCTION_LINEAR
@@ -1789,6 +1803,8 @@ __set_dm_plane_colorop_3dlut(struct drm_plane_state *plane_state,
 			tf->sdr_ref_white_level = SDR_WHITE_LEVEL_INIT_VALUE;
 			ret = __set_output_tf_32(tf, NULL, 0, false);
 		}
+	} else {
+		dc_plane_state->cm.flags.bits.lut3d_enable = 0;
 	}
 
 	return ret;
@@ -1803,11 +1819,13 @@ __set_dm_plane_colorop_blend(struct drm_plane_state *plane_state,
 	struct drm_colorop_state *colorop_state = NULL, *new_colorop_state;
 	struct drm_atomic_commit *state = plane_state->state;
 	enum dc_transfer_func_predefined default_tf = TRANSFER_FUNCTION_LINEAR;
-	struct dc_transfer_func *tf = &dc_plane_state->blend_tf;
+	struct dc_transfer_func *tf = &dc_plane_state->cm.blend_func;
 	const struct drm_color_lut32 *blend_lut = NULL;
 	struct drm_device *dev = colorop->dev;
 	uint32_t blend_size = 0;
 	int i = 0;
+
+	dc_plane_state->cm.flags.bits.blend_enable = 0;
 
 	/* 1D Curve - BLND TF */
 	old_colorop = colorop;
@@ -1825,6 +1843,7 @@ __set_dm_plane_colorop_blend(struct drm_plane_state *plane_state,
 		tf->type = TF_TYPE_DISTRIBUTED_POINTS;
 		tf->tf = default_tf = amdgpu_colorop_tf_to_dc_tf(colorop_state->curve_1d_type);
 		tf->sdr_ref_white_level = SDR_WHITE_LEVEL_INIT_VALUE;
+		dc_plane_state->cm.flags.bits.blend_enable = 1;
 		__set_input_tf_32(NULL, tf, blend_lut, blend_size);
 	}
 
@@ -1850,6 +1869,7 @@ __set_dm_plane_colorop_blend(struct drm_plane_state *plane_state,
 		tf->type = TF_TYPE_DISTRIBUTED_POINTS;
 		tf->tf = default_tf;
 		tf->sdr_ref_white_level = SDR_WHITE_LEVEL_INIT_VALUE;
+		dc_plane_state->cm.flags.bits.blend_enable = 1;
 		blend_lut = __extract_blob_lut32(colorop_state->data, &blend_size);
 		blend_size = blend_lut != NULL ? blend_size : 0;
 
@@ -1881,11 +1901,11 @@ amdgpu_dm_plane_set_color_properties(struct drm_plane_state *plane_state,
 	lut3d = __extract_blob_lut(dm_plane_state->lut3d, &lut3d_size);
 	lut3d_size = lut3d != NULL ? lut3d_size : 0;
 
-	amdgpu_dm_atomic_lut3d(lut3d, lut3d_size, &dc_plane_state->lut3d_func);
+	amdgpu_dm_atomic_lut3d(lut3d, lut3d_size, &dc_plane_state->cm);
 	ret = amdgpu_dm_atomic_shaper_lut(shaper_lut, false,
 					  amdgpu_tf_to_dc_tf(shaper_tf),
 					  shaper_size,
-					  &dc_plane_state->in_shaper_func);
+					  &dc_plane_state->cm);
 	if (ret) {
 		drm_dbg_kms(plane_state->plane->dev,
 			    "setting plane %d shaper LUT failed.\n",
@@ -1900,7 +1920,8 @@ amdgpu_dm_plane_set_color_properties(struct drm_plane_state *plane_state,
 
 	ret = amdgpu_dm_atomic_blend_lut(blend_lut, false,
 					 amdgpu_tf_to_dc_tf(blend_tf),
-					 blend_size, &dc_plane_state->blend_tf);
+					 blend_size, &dc_plane_state->cm);
+
 	if (ret) {
 		drm_dbg_kms(plane_state->plane->dev,
 			    "setting plane %d gamma lut failed.\n",

@@ -489,12 +489,14 @@ bool dcn32_set_mcm_luts(
 	const struct pwl_params *lut_params = NULL;
 
 	// 1D LUT
-	if (plane_state->blend_tf.type == TF_TYPE_HWPWL)
-		lut_params = &plane_state->blend_tf.pwl;
-	else if (plane_state->blend_tf.type == TF_TYPE_DISTRIBUTED_POINTS) {
-		result = cm3_helper_translate_curve_to_hw_format(plane_state->ctx,
-								 &plane_state->blend_tf,
-								 &dpp_base->regamma_params, false);
+	if (plane_state->cm.blend_func.type == TF_TYPE_HWPWL)
+		lut_params = &plane_state->cm.blend_func.pwl;
+	else if (plane_state->cm.blend_func.type == TF_TYPE_DISTRIBUTED_POINTS) {
+		result = cm3_helper_translate_curve_to_hw_format(
+			plane_state->ctx,
+			&plane_state->cm.blend_func,
+			&dpp_base->regamma_params,
+			false);
 		if (!result)
 			return result;
 
@@ -504,21 +506,22 @@ bool dcn32_set_mcm_luts(
 	lut_params = NULL;
 
 	// Shaper
-	if (plane_state->in_shaper_func.type == TF_TYPE_HWPWL)
-		lut_params = &plane_state->in_shaper_func.pwl;
-	else if (plane_state->in_shaper_func.type == TF_TYPE_DISTRIBUTED_POINTS) {
+	if (plane_state->cm.shaper_func.type == TF_TYPE_HWPWL)
+		lut_params = &plane_state->cm.shaper_func.pwl;
+	else if (plane_state->cm.shaper_func.type == TF_TYPE_DISTRIBUTED_POINTS) {
 		// TODO: dpp_base replace
 		rval = cm3_helper_translate_curve_to_hw_format(plane_state->ctx,
-							&plane_state->in_shaper_func,
-							&dpp_base->shaper_params, true);
+			&plane_state->cm.shaper_func,
+			&dpp_base->shaper_params,
+			true);
 		lut_params = rval ? &dpp_base->shaper_params : NULL;
 	}
 
 	mpc->funcs->program_shaper(mpc, lut_params, mpcc_id);
 
 	// 3D
-	if (plane_state->lut3d_func.state.bits.initialized == 1)
-		result = mpc->funcs->program_3dlut(mpc, &plane_state->lut3d_func.lut_3d, mpcc_id);
+	if (plane_state->cm.lut3d_func.state.bits.initialized == 1)
+		result = mpc->funcs->program_3dlut(mpc, &plane_state->cm.lut3d_func.lut_3d, mpcc_id);
 	else
 		result = mpc->funcs->program_3dlut(mpc, NULL, mpcc_id);
 
