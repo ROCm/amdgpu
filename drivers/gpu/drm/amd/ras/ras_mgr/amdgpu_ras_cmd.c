@@ -288,5 +288,5 @@ int amdgpu_ras_submit_cmd(struct ras_core_context *ras_core, struct ras_cmd_ctx 
 		return RAS_CMD__SUCCESS_EXEED_BUFFER;
 	}
 
-	return RAS_CMD__SUCCESS;
+	return res;
 }
