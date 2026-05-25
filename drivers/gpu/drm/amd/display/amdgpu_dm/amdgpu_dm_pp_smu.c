@@ -686,17 +686,6 @@ static enum pp_smu_status pp_rn_get_dpm_clock_table(
 	return PP_SMU_RESULT_OK;
 }
 
-static enum pp_smu_status pp_rn_set_wm_ranges(struct pp_smu *pp,
-		struct pp_smu_wm_range_sets *ranges)
-{
-	const struct dc_context *ctx = pp->dm;
-	struct amdgpu_device *adev = ctx->driver_context;
-
-	amdgpu_dpm_set_watermarks_for_clocks_ranges(adev, ranges);
-
-	return PP_SMU_RESULT_OK;
-}
-
 void dm_pp_get_funcs(
 		struct dc_context *ctx,
 		struct pp_smu_funcs *funcs)
@@ -743,7 +732,7 @@ void dm_pp_get_funcs(
 	case DCN_VERSION_2_1:
 		funcs->ctx.ver = PP_SMU_VER_RN;
 		funcs->rn_funcs.pp_smu.dm = ctx;
-		funcs->rn_funcs.set_wm_ranges = pp_rn_set_wm_ranges;
+		funcs->rn_funcs.set_wm_ranges = pp_nv_set_wm_ranges;
 		funcs->rn_funcs.get_dpm_clock_table = pp_rn_get_dpm_clock_table;
 		break;
 	default:
