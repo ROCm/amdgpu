@@ -39,6 +39,7 @@
 
 #include "dc.h"
 #include "dm_helpers.h"
+#include "amdgpu_dm_kunit_helpers.h"
 
 #include "ddc_service_types.h"
 #include "dpcd_defs.h"
@@ -287,6 +288,7 @@ bool needs_dsc_aux_workaround(struct dc_link *link)
 
 	return false;
 }
+EXPORT_IF_KUNIT(needs_dsc_aux_workaround);
 
 #if defined(CONFIG_DRM_AMD_DC_FP)
 static bool is_synaptics_cascaded_panamera(struct dc_link *link, struct drm_dp_mst_port *port)

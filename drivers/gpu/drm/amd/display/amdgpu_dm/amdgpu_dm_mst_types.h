@@ -57,8 +57,14 @@ enum mst_msg_ready_type {
 	DOWN_OR_UP_MSG_RDY_EVENT = 3
 };
 
+struct amdgpu_device;
 struct amdgpu_display_manager;
 struct amdgpu_dm_connector;
+struct dc_state;
+struct dc_stream_state;
+struct dm_atomic_state;
+struct drm_atomic_state;
+struct drm_dp_mst_topology_mgr;
 
 uint32_t dm_mst_get_pbn_divider(struct dc_link *link);
 
