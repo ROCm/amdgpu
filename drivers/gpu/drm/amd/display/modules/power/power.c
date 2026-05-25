@@ -501,3 +501,8 @@ bool mod_power_notify_mode_change(struct mod_power *mod_power,
 
 	return true;
 }
+
+bool mod_power_only_edp(const struct dc_state *context, const struct dc_stream_state *stream)
+{
+	return context && context->stream_count == 1 && dc_is_embedded_signal(stream->signal);
+}
