@@ -59,9 +59,11 @@ static int amdgpu_dm_wb_encoder_atomic_check(struct drm_encoder *encoder,
 		return -EINVAL;
 	}
 
-	for (i = 0; i < sizeof(amdgpu_dm_wb_formats) / sizeof(u32); i++) {
-		if (fb->format->format == amdgpu_dm_wb_formats[i])
+	for (i = 0; i < ARRAY_SIZE(amdgpu_dm_wb_formats); i++) {
+		if (fb->format->format == amdgpu_dm_wb_formats[i]) {
 			found = true;
+			break;
+		}
 	}
 
 	if (!found) {
@@ -191,7 +193,7 @@ int amdgpu_dm_wb_connector_init(struct amdgpu_display_manager *dm,
 {
 	struct dc *dc = dm->dc;
 	struct dc_link *link = dc_get_link_at_index(dc, link_index);
-	int res = 0;
+	int res;
 
 	wbcon->link = link;
 
