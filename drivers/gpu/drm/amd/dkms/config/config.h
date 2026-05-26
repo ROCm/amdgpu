@@ -1247,9 +1247,6 @@
 /* struct smca_bank is available */
 /* #undef HAVE_STRUCT_SMCA_BANK */
 
-/* struct xarray is available */
-#define HAVE_STRUCT_XARRAY 1
-
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */
 

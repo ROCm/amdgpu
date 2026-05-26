@@ -54,11 +54,7 @@ static const guid_t amd_xcc_dsm_guid = GUID_INIT(0x8267f5d5, 0xa556, 0x44f2,
 
 #define AMD_XCC_MAX_HID 24
 
-#ifdef HAVE_STRUCT_XARRAY
 struct xarray numa_info_xa;
-#else
-struct idr numa_info_idr;
-#endif
 
 /* Encapsulates the XCD acpi object information */
 struct amdgpu_acpi_xcc_info {
@@ -896,11 +892,7 @@ static struct amdgpu_numa_info *amdgpu_acpi_get_numa_info(uint32_t pxm)
 	struct amdgpu_numa_info *numa_info;
 	int nid;
 
-#ifdef HAVE_STRUCT_XARRAY
 	numa_info = xa_load(&numa_info_xa, pxm);
-#else
-	numa_info = idr_find(&numa_info_idr, pxm);
-#endif
 
 	if (!numa_info) {
 		struct sysinfo info;
@@ -919,11 +911,7 @@ static struct amdgpu_numa_info *amdgpu_acpi_get_numa_info(uint32_t pxm)
 		} else {
 			numa_info->size = amdgpu_acpi_get_numa_size(nid);
 		}
-#ifdef HAVE_STRUCT_XARRAY
 		xa_store(&numa_info_xa, numa_info->pxm, numa_info, GFP_KERNEL);
-#else
-		idr_alloc(&numa_info_idr, numa_info, numa_info->pxm, numa_info->pxm + 1, GFP_KERNEL);
-#endif
 	}
 
 	return numa_info;
@@ -1164,11 +1152,8 @@ int amdgpu_acpi_enumerate_xcc(void)
 	u32 sbdf;
 
 	INIT_LIST_HEAD(&amdgpu_acpi_dev_list);
-#ifdef HAVE_STRUCT_XARRAY
 	xa_init(&numa_info_xa);
-#else
-	idr_init(&numa_info_idr);
-#endif
+
 	for (id = 0; id < AMD_XCC_MAX_HID; id++) {
 		sprintf(hid, "%s%d", "AMD", AMD_XCC_HID_START + id);
 		acpi_dev = acpi_dev_get_first_match_dev(hid, NULL, -1);
@@ -1528,17 +1513,10 @@ void amdgpu_acpi_release(void)
 	struct amdgpu_numa_info *numa_info;
 	unsigned long index;
 
-#ifdef HAVE_STRUCT_XARRAY
 	xa_for_each(&numa_info_xa, index, numa_info) {
 		kfree(numa_info);
 		xa_erase(&numa_info_xa, index);
 	}
-#else
-	idr_for_each_entry(&numa_info_idr, numa_info, index) {
-		kfree(numa_info);
-		idr_remove(&numa_info_idr, index);
-	}
-#endif
 
 	if (list_empty(&amdgpu_acpi_dev_list))
 		return;

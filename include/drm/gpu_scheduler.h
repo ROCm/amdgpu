@@ -30,10 +30,6 @@
 #include <linux/xarray.h>
 #include <linux/workqueue.h>
 
-#ifndef HAVE_CONFIG_H
-#define HAVE_STRUCT_XARRAY	1
-#endif
-
 #define MAX_WAIT_SCHED_ENTITY_Q_EMPTY msecs_to_jiffies(1000)
 
 /**
@@ -363,10 +359,8 @@ struct drm_sched_job {
 
 	enum drm_sched_priority		s_priority;
 	u32				credits;
-#ifdef HAVE_STRUCT_XARRAY
 	/** @last_dependency: tracks @dependencies as they signal */
 	unsigned int			last_dependency;
-#endif
 	atomic_t			karma;
 
 	struct spsc_node		queue_node;
@@ -390,9 +384,7 @@ struct drm_sched_job {
 	 * drm_sched_job_add_dependency() and
 	 * drm_sched_job_add_implicit_dependencies().
 	 */
-#ifdef HAVE_STRUCT_XARRAY
 	struct xarray			dependencies;
-#endif
 };
 
 /**

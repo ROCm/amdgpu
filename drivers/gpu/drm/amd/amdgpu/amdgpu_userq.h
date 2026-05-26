@@ -61,7 +61,6 @@ struct amdgpu_usermode_queue {
 	struct amdgpu_userq_obj	db_obj;
 	struct amdgpu_userq_obj fw_obj;
 	struct amdgpu_userq_obj wptr_obj;
-#ifdef HAVE_STRUCT_XARRAY
 	/**
 	 * @fence_drv_lock: Protecting @fence_drv_xa.
 	 */
@@ -74,10 +73,6 @@ struct amdgpu_usermode_queue {
 	 * Dropped on the next signaled dma_fence or queue destruction.
 	 */
 	struct xarray		fence_drv_xa;
-#else
-	struct idr		fence_drv_idr;
-	spinlock_t		fence_drv_lock;
-#endif
 	struct amdgpu_userq_fence_driver *fence_drv;
 	struct dma_fence	*last_fence;
 	u32			xcp_id;

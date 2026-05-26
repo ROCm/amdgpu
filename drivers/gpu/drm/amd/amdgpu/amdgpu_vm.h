@@ -24,7 +24,6 @@
 #ifndef __AMDGPU_VM_H__
 #define __AMDGPU_VM_H__
 
-#include <linux/idr.h>
 #include <linux/kfifo.h>
 #include <linux/rbtree.h>
 #include <drm/gpu_scheduler.h>
@@ -483,12 +482,8 @@ struct amdgpu_vm_manager {
 	/* PASID to VM mapping, will be used in interrupt context to
 	 * look up VM of a page fault
 	 */
-#ifdef HAVE_STRUCT_XARRAY
 	struct xarray				pasids;
-#else
-	struct idr				pasid_idr;
-	spinlock_t				pasid_lock;
-#endif
+
 	/* Global registration of recent page fault information */
 	struct amdgpu_vm_fault_info	fault_info;
 };

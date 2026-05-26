@@ -1030,17 +1030,12 @@ struct amdgpu_device {
 	struct amdgpu_mqd               mqds[AMDGPU_HW_IP_NUM];
 	const struct amdgpu_userq_funcs *userq_funcs[AMDGPU_HW_IP_NUM];
 
-#ifdef HAVE_STRUCT_XARRAY
 	/**
 	 * @userq_doorbell_xa: Global user queue map (doorbell index → queue)
 	 * Key: doorbell_index (unique global identifier for the queue)
 	 * Value: struct amdgpu_usermode_queue
 	 */
 	struct xarray userq_doorbell_xa;
-#else
-	struct idr			userq_idr;
-	spinlock_t			userq_lock;
-#endif
 
 	/* df */
 	struct amdgpu_df                df;

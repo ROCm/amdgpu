@@ -28,7 +28,6 @@
 
 #include <linux/dma-fence-array.h>
 #include <linux/interval_tree_generic.h>
-#include <linux/idr.h>
 #include <linux/dma-buf.h>
 
 #include <drm/amdgpu_drm.h>
@@ -2489,15 +2488,9 @@ amdgpu_vm_get_vm_from_pasid(struct amdgpu_device *adev, u32 pasid)
 	struct amdgpu_vm *vm;
 	unsigned long flags;
 
-#ifdef HAVE_STRUCT_XARRAY
 	xa_lock_irqsave(&adev->vm_manager.pasids, flags);
 	vm = xa_load(&adev->vm_manager.pasids, pasid);
 	xa_unlock_irqrestore(&adev->vm_manager.pasids, flags);
-#else
-	spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
-	vm = idr_find(&adev->vm_manager.pasid_idr, pasid);
-	spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
-#endif
 
 	return vm;
 }
@@ -2901,12 +2894,7 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 	adev->vm_manager.vm_update_mode = 0;
 #endif
 
-#ifdef HAVE_STRUCT_XARRAY
 	xa_init_flags(&adev->vm_manager.pasids, XA_FLAGS_LOCK_IRQ);
-#else
-	idr_init(&adev->vm_manager.pasid_idr);
-	spin_lock_init(&adev->vm_manager.pasid_lock);
-#endif
 }
 
 /**
@@ -2918,13 +2906,8 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
  */
 void amdgpu_vm_manager_fini(struct amdgpu_device *adev)
 {
-#ifdef HAVE_STRUCT_XARRAY
 	WARN_ON(!xa_empty(&adev->vm_manager.pasids));
 	xa_destroy(&adev->vm_manager.pasids);
-#else
-	WARN_ON(!idr_is_empty(&adev->vm_manager.pasid_idr));
-	idr_destroy(&adev->vm_manager.pasid_idr);
-#endif
 
 	amdgpu_vmid_mgr_fini(adev);
 	amdgpu_pasid_mgr_cleanup();
@@ -3184,13 +3167,8 @@ void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
 	struct amdgpu_vm *vm;
 	unsigned long flags;
 
-#ifdef HAVE_STRUCT_XARRAY
 	xa_lock_irqsave(&adev->vm_manager.pasids, flags);
 	vm = xa_load(&adev->vm_manager.pasids, pasid);
-#else
-	spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
-	vm = idr_find(&adev->vm_manager.pasid_idr, pasid);
-#endif
 
 	/* Don't update the fault cache if status is 0.  In the multiple
 	 * fault case, subsequent faults will return a 0 status which is
@@ -3224,11 +3202,7 @@ void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
 			WARN_ONCE(1, "Invalid vmhub %u\n", vmhub);
 		}
 	}
-#ifdef HAVE_STRUCT_XARRAY
 	xa_unlock_irqrestore(&adev->vm_manager.pasids, flags);
-#else
-	spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
-#endif
 }
 
 void amdgpu_vm_print_task_info(struct amdgpu_device *adev,

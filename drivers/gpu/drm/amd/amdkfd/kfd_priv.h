@@ -960,10 +960,8 @@ struct kfd_process_device {
 	uint64_t page_out;
 
 	/* xarray of counters for ais; entries are of type struct ais_counter_entry *, indexed by pci_dev_fn */
-#ifdef HAVE_STRUCT_XARRAY
 	struct kobject *kobj_ais;
 	struct xarray ais_counters_xa;
-#endif
 
 	/* Exception code status*/
 	uint64_t exception_status;
