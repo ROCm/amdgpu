@@ -433,11 +433,13 @@ static void dm_set_panel_type(struct amdgpu_dm_connector *aconnector)
 			link->panel_type = PANEL_TYPE_OLED;
 	}
 
-	/*
-	 * TODO: get panel type from DID2 that has device technology field
-	 * to specify if it's OLED or not. But we need to wait for DID2
-	 * support in DC and EDID parser to be able to use it here.
-	 */
+	/* If VSDB and DPCD didn't determine panel type, check DID */
+	if (link->panel_type == PANEL_TYPE_NONE) {
+		if (display_info->panel_type == DRM_MODE_PANEL_TYPE_LCD)
+			link->panel_type = PANEL_TYPE_LCD;
+		else if (display_info->panel_type == DRM_MODE_PANEL_TYPE_OLED)
+			link->panel_type = PANEL_TYPE_OLED;
+	}
 
 	if (link->panel_type == PANEL_TYPE_NONE) {
 		struct drm_amd_vsdb_info *vsdb = &display_info->amd_vsdb;
@@ -455,6 +457,10 @@ static void dm_set_panel_type(struct amdgpu_dm_connector *aconnector)
 		drm_object_property_set_value(&connector->base,
 		    adev_to_drm(adev)->mode_config.panel_type_property,
 		    DRM_MODE_PANEL_TYPE_OLED);
+	else if (link->panel_type == PANEL_TYPE_LCD)
+		drm_object_property_set_value(&connector->base,
+		    adev_to_drm(adev)->mode_config.panel_type_property,
+		    DRM_MODE_PANEL_TYPE_LCD);
 	else
 		drm_object_property_set_value(&connector->base,
 		    adev_to_drm(adev)->mode_config.panel_type_property,
