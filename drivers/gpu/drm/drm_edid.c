@@ -6715,30 +6715,35 @@ static void drm_reset_display_info(struct drm_connector *connector)
 	memset(&info->amd_vsdb, 0, sizeof(info->amd_vsdb));
 }
 
+static void drm_displayid_process_base_section_header(struct drm_connector *connector,
+						      const struct displayid_iter *iter)
+{
+	struct drm_display_info *info = &connector->display_info;
+
+	drm_dbg_kms(connector->dev,
+		    "[CONNECTOR:%d:%s] DisplayID extension version 0x%02x, primary use 0x%02x\n",
+		    connector->base.id, connector->name,
+		    displayid_version(iter),
+		    displayid_primary_use(iter));
+	if (displayid_version(iter) == DISPLAY_ID_STRUCTURE_VER_20 &&
+	    (displayid_primary_use(iter) == PRIMARY_USE_HEAD_MOUNTED_VR ||
+	     displayid_primary_use(iter) == PRIMARY_USE_HEAD_MOUNTED_AR))
+		info->non_desktop = true;
+}
+
 static void update_displayid_info(struct drm_connector *connector,
 				  const struct drm_edid *drm_edid)
 {
-	struct drm_display_info *info = &connector->display_info;
 	const struct displayid_block *block;
 	struct displayid_iter iter;
+	bool base_section_header_processed = false;
 
 	displayid_iter_edid_begin(drm_edid, &iter);
 	displayid_iter_for_each(block, &iter) {
-		drm_dbg_kms(connector->dev,
-			    "[CONNECTOR:%d:%s] DisplayID extension version 0x%02x, primary use 0x%02x\n",
-			    connector->base.id, connector->name,
-			    displayid_version(&iter),
-			    displayid_primary_use(&iter));
-		if (displayid_version(&iter) == DISPLAY_ID_STRUCTURE_VER_20 &&
-		    (displayid_primary_use(&iter) == PRIMARY_USE_HEAD_MOUNTED_VR ||
-		     displayid_primary_use(&iter) == PRIMARY_USE_HEAD_MOUNTED_AR))
-			info->non_desktop = true;
-
-		/*
-		 * We're only interested in the base section here, no need to
-		 * iterate further.
-		 */
-		break;
+		if (!base_section_header_processed) {
+			drm_displayid_process_base_section_header(connector, &iter);
+			base_section_header_processed = true;
+		}
 	}
 	displayid_iter_end(&iter);
 }
