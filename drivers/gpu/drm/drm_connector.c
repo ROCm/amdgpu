@@ -1176,6 +1176,7 @@ static const struct drm_prop_enum_list drm_link_status_enum_list[] = {
 static const struct drm_prop_enum_list drm_panel_type_enum_list[] = {
 	{ DRM_MODE_PANEL_TYPE_UNKNOWN, "unknown" },
 	{ DRM_MODE_PANEL_TYPE_OLED, "OLED" },
+	{ DRM_MODE_PANEL_TYPE_LCD, "LCD" },
 };
 
 /**
@@ -1508,7 +1509,7 @@ EXPORT_SYMBOL(drm_hdmi_connector_get_output_format_name);
  * 	never read back the value of "DPMS" because it can be incorrect.
  * panel_type:
  * 	Immutable enum property to indicate the type of connected panel.
- * 	Possible values are "unknown" (default) and "OLED".
+ * 	Possible values are "unknown" (default), "OLED", and "LCD".
  * PATH:
  * 	Connector path property to identify how this sink is physically
  * 	connected. Used by DP MST. This should be set by calling
