@@ -57,8 +57,7 @@ static enum hrtimer_restart amdgpu_vkms_vblank_simulate(struct hrtimer *timer)
 	ret_overrun = hrtimer_forward_now(&amdgpu_crtc->vblank_timer,
 					  output->period_ns);
 	if (ret_overrun != 1)
-		drm_warn(amdgpu_crtc->base.dev,
-			 "%s: vblank timer overrun count: %llu\n",
+		drm_warn(amdgpu_crtc->base.dev, "%s: vblank timer overrun count: %llu\n",
 			 __func__, ret_overrun);
 
 	ret = drm_crtc_handle_vblank(crtc);
@@ -684,6 +683,13 @@ static int amdgpu_vkms_sw_init(struct amdgpu_ip_block *ip_block)
 static int amdgpu_vkms_sw_fini(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
+#ifndef DRM_CRTC_VBLANK_TIMER_FUNCS
+	int i = 0;
+
+	for (i = 0; i < adev->mode_info.num_crtc; i++)
+		if (adev->mode_info.crtcs[i])
+			hrtimer_cancel(&adev->mode_info.crtcs[i]->vblank_timer);
+#endif
 
 	drm_kms_helper_poll_fini(adev_to_drm(adev));
 	drm_mode_config_cleanup(adev_to_drm(adev));
