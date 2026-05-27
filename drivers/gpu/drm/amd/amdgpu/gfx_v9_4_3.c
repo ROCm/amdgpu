@@ -1116,22 +1116,24 @@ static int gfx_v9_4_3_sw_init(struct amdgpu_ip_block *ip_block)
 	/* set up the compute queues - allocate horizontally across pipes */
 	for (xcc_id = 0; xcc_id < num_xcc; xcc_id++) {
 		ring_id = 0;
-		for (i = 0; i < adev->gfx.mec.num_mec; ++i) {
-			for (j = 0; j < adev->gfx.mec.num_queue_per_pipe; j++) {
-				for (k = 0; k < adev->gfx.mec.num_pipe_per_mec;
-				     k++) {
-					if (!amdgpu_gfx_is_mec_queue_enabled(
-							adev, xcc_id, i, k, j))
-						continue;
+		if (!adev->gfx.disable_kq) {
+			for (i = 0; i < adev->gfx.mec.num_mec; ++i) {
+				for (j = 0; j < adev->gfx.mec.num_queue_per_pipe; j++) {
+					for (k = 0; k < adev->gfx.mec.num_pipe_per_mec;
+					     k++) {
+						if (!amdgpu_gfx_is_mec_queue_enabled(
+							    adev, xcc_id, i, k, j))
+							continue;
 
-					r = gfx_v9_4_3_compute_ring_init(adev,
-								       ring_id,
-								       xcc_id,
-								       i, k, j);
-					if (r)
-						return r;
+						r = gfx_v9_4_3_compute_ring_init(adev,
+										 ring_id,
+										 xcc_id,
+										 i, k, j);
+						if (r)
+							return r;
 
-					ring_id++;
+						ring_id++;
+					}
 				}
 			}
 		}
@@ -2391,6 +2393,65 @@ static void gfx_v9_4_3_xcc_fini(struct amdgpu_device *adev, int xcc_id)
 	gfx_v9_4_3_xcc_cp_compute_enable(adev, false, xcc_id);
 }
 
+static int gfx_v9_4_3_set_userq_eop_interrupts(struct amdgpu_device *adev,
+					       bool enable)
+{
+	int num_xcc = NUM_XCC(adev->gfx.xcc_mask);
+	unsigned int irq_type;
+	int m, p, xcc_id, r;
+
+	if (adev->gfx.disable_kq) {
+		for (xcc_id = 0; xcc_id < num_xcc; xcc_id++) {
+			for (m = 0; m < adev->gfx.mec.num_mec; ++m) {
+				for (p = 0; p < adev->gfx.mec.num_pipe_per_mec; p++) {
+					irq_type = AMDGPU_CP_IRQ_COMPUTE_MEC1_PIPE0_EOP
+						+ (m * adev->gfx.mec.num_pipe_per_mec)
+						+ p;
+
+					if (enable)
+						r = amdgpu_irq_get(adev, &adev->gfx.eop_irq,
+								   irq_type);
+					else
+						r = amdgpu_irq_put(adev, &adev->gfx.eop_irq,
+								   irq_type);
+					if (r) {
+						if (!enable)
+							return r;
+						goto err_compute;
+					}
+				}
+			}
+		}
+	}
+
+	return 0;
+
+err_compute:
+	for (p--; p >= 0; p--) {
+		irq_type = AMDGPU_CP_IRQ_COMPUTE_MEC1_PIPE0_EOP
+			+ (m * adev->gfx.mec.num_pipe_per_mec) + p;
+		amdgpu_irq_put(adev, &adev->gfx.eop_irq, irq_type);
+	}
+	for (m--; m >= 0; m--) {
+		for (p = adev->gfx.mec.num_pipe_per_mec - 1; p >= 0; p--) {
+			irq_type = AMDGPU_CP_IRQ_COMPUTE_MEC1_PIPE0_EOP
+				+ (m * adev->gfx.mec.num_pipe_per_mec) + p;
+			amdgpu_irq_put(adev, &adev->gfx.eop_irq, irq_type);
+		}
+	}
+	for (xcc_id--; xcc_id >= 0; xcc_id--) {
+		for (m = adev->gfx.mec.num_mec - 1; m <= 0; m--) {
+			for (p = adev->gfx.mec.num_pipe_per_mec - 1; p >= 0; p--) {
+				irq_type = AMDGPU_CP_IRQ_COMPUTE_MEC1_PIPE0_EOP
+					+ (m * adev->gfx.mec.num_pipe_per_mec) + p;
+				amdgpu_irq_put(adev, &adev->gfx.eop_irq, irq_type);
+			}
+		}
+	}
+
+	return r;
+}
+
 static int gfx_v9_4_3_hw_init(struct amdgpu_ip_block *ip_block)
 {
 	int r;
@@ -2423,9 +2484,14 @@ static int gfx_v9_4_3_hw_init(struct amdgpu_ip_block *ip_block)
 	r = amdgpu_irq_get(adev, &adev->gfx.bad_op_irq, 0);
 	if (r)
 		goto err_bad_op;
+	r = gfx_v9_4_3_set_userq_eop_interrupts(adev, true);
+	if (r)
+		goto err_bad_eop;
 
 	return 0;
 
+err_bad_eop:
+	amdgpu_irq_put(adev, &adev->gfx.bad_op_irq, 0);
 err_bad_op:
 	amdgpu_irq_put(adev, &adev->gfx.priv_inst_irq, 0);
 err_priv_inst:
@@ -2509,6 +2575,7 @@ static int gfx_v9_4_3_hw_fini(struct amdgpu_ip_block *ip_block)
 	amdgpu_irq_put(adev, &adev->gfx.bad_op_irq, 0);
 	amdgpu_irq_put(adev, &adev->gfx.priv_inst_irq, 0);
 	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
+	gfx_v9_4_3_set_userq_eop_interrupts(adev, false);
 
 	num_xcc = NUM_XCC(adev->gfx.xcc_mask);
 	for (i = 0; i < num_xcc; i++) {
@@ -2745,9 +2812,27 @@ static int gfx_v9_4_3_early_init(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
 
-	adev->gfx.num_compute_rings = min(amdgpu_gfx_get_num_kcq(adev),
-					  AMDGPU_MAX_COMPUTE_RINGS);
 	gfx_v9_4_3_set_spm_funcs(adev);
+
+	switch (amdgpu_user_queue) {
+	case -1:
+	case 0:
+	default:
+		adev->gfx.disable_kq = false;
+		adev->gfx.disable_uq = true;
+		break;
+	case 2:
+		adev->gfx.disable_kq = true;
+		adev->gfx.disable_uq = true;
+		break;
+	}
+
+	if (adev->gfx.disable_kq)
+		adev->gfx.num_compute_rings = 0;
+	else
+		adev->gfx.num_compute_rings = min(amdgpu_gfx_get_num_kcq(adev),
+						  AMDGPU_MAX_COMPUTE_RINGS);
+
 	gfx_v9_4_3_set_kiq_pm4_funcs(adev);
 	gfx_v9_4_3_set_ring_funcs(adev);
 	gfx_v9_4_3_set_irq_funcs(adev);
