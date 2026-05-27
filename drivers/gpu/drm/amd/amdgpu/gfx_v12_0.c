@@ -3660,6 +3660,78 @@ static void gfx_v12_0_init_golden_registers(struct amdgpu_device *adev)
 	}
 }
 
+static int gfx_v12_0_set_userq_eop_interrupts(struct amdgpu_device *adev,
+					      bool enable)
+{
+	unsigned int irq_type;
+	int m, p, r;
+
+	if (adev->userq_funcs[AMDGPU_HW_IP_GFX]) {
+		for (m = 0; m < adev->gfx.me.num_me; m++) {
+			for (p = 0; p < adev->gfx.me.num_pipe_per_me; p++) {
+				irq_type = AMDGPU_CP_IRQ_GFX_ME0_PIPE0_EOP + p;
+				if (enable)
+					r = amdgpu_irq_get(adev, &adev->gfx.eop_irq, irq_type);
+				else
+					r = amdgpu_irq_put(adev, &adev->gfx.eop_irq, irq_type);
+				if (r) {
+					if (!enable)
+						return r;
+					goto err_gfx;
+				}
+			}
+		}
+	}
+
+	if (adev->userq_funcs[AMDGPU_HW_IP_COMPUTE]) {
+		for (m = 0; m < adev->gfx.mec.num_mec; ++m) {
+			for (p = 0; p < adev->gfx.mec.num_pipe_per_mec; p++) {
+				irq_type = AMDGPU_CP_IRQ_COMPUTE_MEC1_PIPE0_EOP
+					+ (m * adev->gfx.mec.num_pipe_per_mec)
+					+ p;
+				if (enable)
+					r = amdgpu_irq_get(adev, &adev->gfx.eop_irq, irq_type);
+				else
+					r = amdgpu_irq_put(adev, &adev->gfx.eop_irq, irq_type);
+				if (r) {
+					if (!enable)
+						return r;
+					goto err_compute;
+				}
+			}
+		}
+	}
+
+	return 0;
+
+err_compute:
+	for (p--; p >= 0; p--) {
+		irq_type = AMDGPU_CP_IRQ_COMPUTE_MEC1_PIPE0_EOP
+			+ (m * adev->gfx.mec.num_pipe_per_mec) + p;
+		amdgpu_irq_put(adev, &adev->gfx.eop_irq, irq_type);
+	}
+	for (m--; m >= 0; m--) {
+		for (p = adev->gfx.mec.num_pipe_per_mec - 1; p >= 0; p--) {
+			irq_type = AMDGPU_CP_IRQ_COMPUTE_MEC1_PIPE0_EOP
+				+ (m * adev->gfx.mec.num_pipe_per_mec) + p;
+			amdgpu_irq_put(adev, &adev->gfx.eop_irq, irq_type);
+		}
+	}
+	m = adev->gfx.me.num_me;
+err_gfx:
+	for (p--; p >= 0; p--) {
+		irq_type = AMDGPU_CP_IRQ_GFX_ME0_PIPE0_EOP + p;
+		amdgpu_irq_put(adev, &adev->gfx.eop_irq, irq_type);
+	}
+	for (m--; m >= 0; m--) {
+		for (p = adev->gfx.me.num_pipe_per_me - 1; p >= 0; p--) {
+			irq_type = AMDGPU_CP_IRQ_GFX_ME0_PIPE0_EOP + p;
+			amdgpu_irq_put(adev, &adev->gfx.eop_irq, irq_type);
+		}
+	}
+	return r;
+}
+
 static int gfx_v12_0_hw_init(struct amdgpu_ip_block *ip_block)
 {
 	int r;
@@ -3747,50 +3819,31 @@ static int gfx_v12_0_hw_init(struct amdgpu_ip_block *ip_block)
 	if (r)
 		return r;
 
-	return r;
-}
+	r = amdgpu_irq_get(adev, &adev->gfx.priv_reg_irq, 0);
+	if (r)
+		return r;
 
-static int gfx_v12_0_set_userq_eop_interrupts(struct amdgpu_device *adev,
-					      bool enable)
-{
-	unsigned int irq_type;
-	int m, p, r;
+	r = amdgpu_irq_get(adev, &adev->gfx.priv_inst_irq, 0);
+	if (r)
+		goto err_priv_inst;
 
-	if (adev->userq_funcs[AMDGPU_HW_IP_GFX]) {
-		for (m = 0; m < adev->gfx.me.num_me; m++) {
-			for (p = 0; p < adev->gfx.me.num_pipe_per_me; p++) {
-				irq_type = AMDGPU_CP_IRQ_GFX_ME0_PIPE0_EOP + p;
-				if (enable)
-					r = amdgpu_irq_get(adev, &adev->gfx.eop_irq,
-							   irq_type);
-				else
-					r = amdgpu_irq_put(adev, &adev->gfx.eop_irq,
-							   irq_type);
-				if (r)
-					return r;
-			}
-		}
-	}
+	r = amdgpu_irq_get(adev, &adev->gfx.bad_op_irq, 0);
+	if (r)
+		goto err_bad_op;
 
-	if (adev->userq_funcs[AMDGPU_HW_IP_COMPUTE]) {
-		for (m = 0; m < adev->gfx.mec.num_mec; ++m) {
-			for (p = 0; p < adev->gfx.mec.num_pipe_per_mec; p++) {
-				irq_type = AMDGPU_CP_IRQ_COMPUTE_MEC1_PIPE0_EOP
-					+ (m * adev->gfx.mec.num_pipe_per_mec)
-					+ p;
-				if (enable)
-					r = amdgpu_irq_get(adev, &adev->gfx.eop_irq,
-							   irq_type);
-				else
-					r = amdgpu_irq_put(adev, &adev->gfx.eop_irq,
-							   irq_type);
-				if (r)
-					return r;
-			}
-		}
-	}
+	r = gfx_v12_0_set_userq_eop_interrupts(adev, true);
+	if (r)
+		goto err_userq_eop;
 
 	return 0;
+
+err_userq_eop:
+	amdgpu_irq_put(adev, &adev->gfx.bad_op_irq, 0);
+err_bad_op:
+	amdgpu_irq_put(adev, &adev->gfx.priv_inst_irq, 0);
+err_priv_inst:
+	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
+	return r;
 }
 
 static int gfx_v12_0_hw_fini(struct amdgpu_ip_block *ip_block)
@@ -3800,10 +3853,10 @@ static int gfx_v12_0_hw_fini(struct amdgpu_ip_block *ip_block)
 
 	cancel_delayed_work_sync(&adev->gfx.idle_work);
 
-	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
-	amdgpu_irq_put(adev, &adev->gfx.priv_inst_irq, 0);
-	amdgpu_irq_put(adev, &adev->gfx.bad_op_irq, 0);
 	gfx_v12_0_set_userq_eop_interrupts(adev, false);
+	amdgpu_irq_put(adev, &adev->gfx.bad_op_irq, 0);
+	amdgpu_irq_put(adev, &adev->gfx.priv_inst_irq, 0);
+	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
 
 	if (!adev->no_hw_access) {
 		if (amdgpu_async_gfx_ring) {
@@ -3930,30 +3983,6 @@ static int gfx_v12_0_early_init(struct amdgpu_ip_block *ip_block)
 	gfx_v12_0_init_rlcg_reg_access_ctrl(adev);
 
 	return gfx_v12_0_init_microcode(adev);
-}
-
-static int gfx_v12_0_late_init(struct amdgpu_ip_block *ip_block)
-{
-	struct amdgpu_device *adev = ip_block->adev;
-	int r;
-
-	r = amdgpu_irq_get(adev, &adev->gfx.priv_reg_irq, 0);
-	if (r)
-		return r;
-
-	r = amdgpu_irq_get(adev, &adev->gfx.priv_inst_irq, 0);
-	if (r)
-		return r;
-
-	r = amdgpu_irq_get(adev, &adev->gfx.bad_op_irq, 0);
-	if (r)
-		return r;
-
-	r = gfx_v12_0_set_userq_eop_interrupts(adev, true);
-	if (r)
-		return r;
-
-	return 0;
 }
 
 static bool gfx_v12_0_is_rlc_enabled(struct amdgpu_device *adev)
@@ -5252,7 +5281,6 @@ static void gfx_v12_0_ring_end_use(struct amdgpu_ring *ring)
 static const struct amd_ip_funcs gfx_v12_0_ip_funcs = {
 	.name = "gfx_v12_0",
 	.early_init = gfx_v12_0_early_init,
-	.late_init = gfx_v12_0_late_init,
 	.sw_init = gfx_v12_0_sw_init,
 	.sw_fini = gfx_v12_0_sw_fini,
 	.hw_init = gfx_v12_0_hw_init,
