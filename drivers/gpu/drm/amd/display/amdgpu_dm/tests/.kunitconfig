@@ -15,6 +15,9 @@ CONFIG_I2C=y
 CONFIG_POWER_SUPPLY=y
 CONFIG_CRC16=y
 
+# Treat warnings as errors
+CONFIG_WERROR=y
+
 # GCOV Coverage - see tools/testing/kunit/configs/coverage_uml.config
 CONFIG_DEBUG_KERNEL=y
 CONFIG_DEBUG_INFO=y
