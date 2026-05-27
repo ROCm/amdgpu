@@ -1359,6 +1359,19 @@ static int sdma_v4_4_2_early_init(struct amdgpu_ip_block *ip_block)
 	struct amdgpu_device *adev = ip_block->adev;
 	int r;
 
+	switch (amdgpu_user_queue) {
+	case -1:
+	case 0:
+	default:
+		adev->sdma.no_user_submission = false;
+		adev->sdma.disable_uq = true;
+		break;
+	case 2:
+		adev->sdma.no_user_submission = true;
+		adev->sdma.disable_uq = true;
+		break;
+	}
+
 	r = sdma_v4_4_2_init_microcode(adev);
 	if (r)
 		return r;
@@ -1478,6 +1491,7 @@ static int sdma_v4_4_2_sw_init(struct amdgpu_ip_block *ip_block)
 		/* doorbell size is 2 dwords, get DWORD offset */
 		ring->doorbell_index = adev->doorbell_index.sdma_engine[i] << 1;
 		ring->vm_hub = AMDGPU_MMHUB0(aid_id);
+		ring->no_user_submission = adev->sdma.no_user_submission;
 
 		sprintf(ring->name, "sdma%d.%d", aid_id,
 				i % adev->sdma.num_inst_per_aid);
