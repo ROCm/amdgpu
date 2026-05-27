@@ -182,6 +182,70 @@ void process_output(struct hdcp_workqueue *hdcp_work)
 }
 EXPORT_IF_KUNIT(process_output);
 
+STATIC_IFN_KUNIT
+bool hdcp_get_content_protection_from_status(
+	unsigned int hdcp_content_type,
+	enum mod_hdcp_encryption_status encryption_status,
+	unsigned int *content_protection)
+{
+	if (encryption_status == MOD_HDCP_ENCRYPTION_STATUS_HDCP_OFF) {
+		*content_protection = DRM_MODE_CONTENT_PROTECTION_DESIRED;
+		return true;
+	}
+
+	if (hdcp_content_type == DRM_MODE_HDCP_CONTENT_TYPE0 &&
+	    encryption_status <= MOD_HDCP_ENCRYPTION_STATUS_HDCP2_TYPE0_ON) {
+		*content_protection = DRM_MODE_CONTENT_PROTECTION_ENABLED;
+		return true;
+	}
+
+	if (hdcp_content_type == DRM_MODE_HDCP_CONTENT_TYPE1 &&
+	    encryption_status == MOD_HDCP_ENCRYPTION_STATUS_HDCP2_TYPE1_ON) {
+		*content_protection = DRM_MODE_CONTENT_PROTECTION_ENABLED;
+		return true;
+	}
+
+	return false;
+}
+EXPORT_IF_KUNIT(hdcp_get_content_protection_from_status);
+
+STATIC_IFN_KUNIT
+void hdcp_get_link_display_adjustments(
+	bool enable_encryption,
+	u8 content_type,
+	bool fused_io_supported,
+	bool hdcp_lc_force_fw_enable,
+	bool hdcp_lc_enable_sw_fallback,
+	struct mod_hdcp_link_adjustment *link_adjust,
+	struct mod_hdcp_display_adjustment *display_adjust)
+{
+	memset(link_adjust, 0, sizeof(*link_adjust));
+	memset(display_adjust, 0, sizeof(*display_adjust));
+
+	if (!enable_encryption) {
+		display_adjust->disable =
+			MOD_HDCP_DISPLAY_DISABLE_AUTHENTICATION;
+		return;
+	}
+
+	display_adjust->disable = MOD_HDCP_DISPLAY_NOT_DISABLE;
+	link_adjust->auth_delay = 2;
+	link_adjust->retry_limit = MAX_NUM_OF_ATTEMPTS;
+
+	if (content_type == DRM_MODE_HDCP_CONTENT_TYPE0) {
+		link_adjust->hdcp2.force_type = MOD_HDCP_FORCE_TYPE_0;
+	} else if (content_type == DRM_MODE_HDCP_CONTENT_TYPE1) {
+		link_adjust->hdcp1.disable = 1;
+		link_adjust->hdcp2.force_type = MOD_HDCP_FORCE_TYPE_1;
+	}
+
+	link_adjust->hdcp2.use_fw_locality_check =
+		fused_io_supported || hdcp_lc_force_fw_enable;
+	link_adjust->hdcp2.use_sw_locality_fallback =
+		hdcp_lc_enable_sw_fallback;
+}
+EXPORT_IF_KUNIT(hdcp_get_link_display_adjustments);
+
 static void link_lock(struct hdcp_workqueue *work, bool lock)
 {
 	int i = 0;
@@ -212,8 +276,11 @@ void hdcp_update_display(struct hdcp_workqueue *hdcp_work,
 		drm_connector_put(&hdcp_w->aconnector[conn_index]->base);
 	hdcp_w->aconnector[conn_index] = aconnector;
 
-	memset(&link_adjust, 0, sizeof(link_adjust));
-	memset(&display_adjust, 0, sizeof(display_adjust));
+	hdcp_get_link_display_adjustments(enable_encryption, content_type,
+			dc->caps.fused_io_supported,
+			dc->debug.hdcp_lc_force_fw_enable,
+			dc->debug.hdcp_lc_enable_sw_fallback,
+			&link_adjust, &display_adjust);
 
 	if (enable_encryption) {
 		/* Explicitly set the saved SRM as sysfs call will be after we already enabled hdcp
@@ -224,25 +291,9 @@ void hdcp_update_display(struct hdcp_workqueue *hdcp_work,
 				    hdcp_work->srm_size,
 				    &hdcp_work->srm_version);
 
-		display_adjust.disable = MOD_HDCP_DISPLAY_NOT_DISABLE;
-
-		link_adjust.auth_delay = 2;
-		link_adjust.retry_limit = MAX_NUM_OF_ATTEMPTS;
-
-		if (content_type == DRM_MODE_HDCP_CONTENT_TYPE0) {
-			link_adjust.hdcp2.force_type = MOD_HDCP_FORCE_TYPE_0;
-		} else if (content_type == DRM_MODE_HDCP_CONTENT_TYPE1) {
-			link_adjust.hdcp1.disable = 1;
-			link_adjust.hdcp2.force_type = MOD_HDCP_FORCE_TYPE_1;
-		}
-		link_adjust.hdcp2.use_fw_locality_check =
-				(dc->caps.fused_io_supported || dc->debug.hdcp_lc_force_fw_enable);
-		link_adjust.hdcp2.use_sw_locality_fallback = dc->debug.hdcp_lc_enable_sw_fallback;
-
 		schedule_delayed_work(&hdcp_w->property_validate_dwork,
 				      msecs_to_jiffies(DRM_HDCP_CHECK_PERIOD_MS));
 	} else {
-		display_adjust.disable = MOD_HDCP_DISPLAY_DISABLE_AUTHENTICATION;
 		hdcp_w->encryption_status[conn_index] = MOD_HDCP_ENCRYPTION_STATUS_HDCP_OFF;
 		cancel_delayed_work(&hdcp_w->property_validate_dwork);
 	}
@@ -338,6 +389,7 @@ static void event_property_update(struct work_struct *work)
 							property_update_work);
 	struct amdgpu_dm_connector *aconnector = NULL;
 	struct drm_device *dev;
+	unsigned int content_protection;
 	long ret;
 	unsigned int conn_index;
 	struct drm_connector *connector;
@@ -377,30 +429,16 @@ static void event_property_update(struct work_struct *work)
 					MOD_HDCP_ENCRYPTION_STATUS_HDCP_OFF;
 			}
 		}
-		if (hdcp_work->encryption_status[conn_index] !=
-			MOD_HDCP_ENCRYPTION_STATUS_HDCP_OFF) {
-#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
-			if (conn_state->hdcp_content_type ==
-				DRM_MODE_HDCP_CONTENT_TYPE0 &&
-				hdcp_work->encryption_status[conn_index] <=
-				MOD_HDCP_ENCRYPTION_STATUS_HDCP2_TYPE0_ON) {
+		
+		if (hdcp_get_content_protection_from_status(conn_state->hdcp_content_type,
+							    hdcp_work->encryption_status[conn_index],
+							    &content_protection)) {
+			if (content_protection == DRM_MODE_CONTENT_PROTECTION_ENABLED)
 				DRM_DEBUG_DRIVER("[HDCP_DM] DRM_MODE_CONTENT_PROTECTION_ENABLED\n");
-				drm_hdcp_update_content_protection(connector,
-								   DRM_MODE_CONTENT_PROTECTION_ENABLED);
-			} else if (conn_state->hdcp_content_type ==
-					DRM_MODE_HDCP_CONTENT_TYPE1 &&
-					hdcp_work->encryption_status[conn_index] ==
-					MOD_HDCP_ENCRYPTION_STATUS_HDCP2_TYPE1_ON) {
-				drm_hdcp_update_content_protection(connector,
-								   DRM_MODE_CONTENT_PROTECTION_ENABLED);
-			}
-#else
-			drm_hdcp_update_content_protection(&aconnector->base, DRM_MODE_CONTENT_PROTECTION_ENABLED);
-#endif
-		} else {
-			DRM_DEBUG_DRIVER("[HDCP_DM] DRM_MODE_CONTENT_PROTECTION_DESIRED\n");
-			drm_hdcp_update_content_protection(connector,
-							   DRM_MODE_CONTENT_PROTECTION_DESIRED);
+			else
+				DRM_DEBUG_DRIVER("[HDCP_DM] DRM_MODE_CONTENT_PROTECTION_DESIRED\n");
+
+			drm_hdcp_update_content_protection(connector, content_protection);
 		}
 		drm_modeset_unlock(&dev->mode_config.connection_mutex);
 	}
