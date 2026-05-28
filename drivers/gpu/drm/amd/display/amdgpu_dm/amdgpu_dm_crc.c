@@ -496,7 +496,7 @@ amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc, const char *src_name,
 {
 	enum amdgpu_dm_pipe_crc_source source = dm_parse_crc_source(src_name);
 
-	if (source < 0) {
+	if (source == AMDGPU_DM_PIPE_CRC_SOURCE_INVALID) {
 		DRM_DEBUG_DRIVER("Unknown CRC source %s for CRTC%d\n",
 				 src_name, crtc->index);
 		return -EINVAL;
@@ -595,7 +595,7 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name)
 	bool enabled = false;
 	int ret = 0;
 
-	if (source < 0) {
+	if (source == AMDGPU_DM_PIPE_CRC_SOURCE_INVALID) {
 		DRM_DEBUG_DRIVER("Unknown CRC source %s for CRTC%d\n",
 				 src_name, crtc->index);
 		return -EINVAL;
@@ -724,7 +724,7 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name)
 		}
 	} else if (enabled && !enable) {
 		drm_crtc_vblank_put(crtc);
-		if (dm_is_crc_source_dprx(source)) {
+		if (dm_is_crc_source_dprx(cur_crc_src)) {
 			if (drm_dp_stop_crc(aux)) {
 				DRM_DEBUG_DRIVER("dp stop crc failed\n");
 				ret = -EINVAL;
@@ -767,9 +767,9 @@ void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc)
 {
 	struct dm_crtc_state *crtc_state;
 	struct dc_stream_state *stream_state;
-	struct drm_device *drm_dev = NULL;
+	struct drm_device *drm_dev;
 	enum amdgpu_dm_pipe_crc_source cur_crc_src;
-	struct amdgpu_crtc *acrtc = NULL;
+	struct amdgpu_crtc *acrtc;
 	uint32_t crcs[3];
 	unsigned long flags;
 
