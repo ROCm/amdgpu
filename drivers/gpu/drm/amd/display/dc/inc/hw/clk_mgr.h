@@ -337,6 +337,8 @@ struct clk_mgr_funcs {
 	void (*exit_low_power_state)(struct clk_mgr *clk_mgr);
 	bool (*is_ips_supported)(struct clk_mgr *clk_mgr);
 
+	void (*set_idle_power_optimizations)(struct clk_mgr *clk_mgr, bool enable);
+
 	void (*init_clocks)(struct clk_mgr *clk_mgr);
 
 	void (*dump_clk_registers)(struct clk_state_registers_and_bypass *regs_and_bypass,
