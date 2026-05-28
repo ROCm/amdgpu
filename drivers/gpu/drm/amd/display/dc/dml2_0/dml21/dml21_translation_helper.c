@@ -48,6 +48,7 @@ static enum dml2_project_id dml21_dcn_revision_to_dml2_project_id(enum dce_versi
 		project_id = dml2_project_dcn4x_stage2_auto_drr_svp;
 		break;
 	case DCN_VERSION_4_2:
+	case DCN_VERSION_4_2B:
 		project_id = dml2_project_dcn42;
 		break;
 	default:
