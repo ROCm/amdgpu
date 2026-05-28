@@ -30,6 +30,7 @@
 #include "dc.h"
 #include "core_types.h"
 #include "dm_pp_smu.h"
+struct utm_qos_model;
 
 /* Constants */
 #define DDR4_DRAM_WIDTH   64
@@ -311,6 +312,7 @@ struct clk_bw_params {
 	struct wm_table wm_table;
 	struct dummy_pstate_entry dummy_pstate_table[4];
 	struct clk_limit_table_entry dc_mode_limit;
+	const struct utm_qos_model *utm_qos_model;
 };
 /* Public interfaces */
 
