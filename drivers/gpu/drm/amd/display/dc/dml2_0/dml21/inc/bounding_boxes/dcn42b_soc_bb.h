@@ -75,7 +75,7 @@ static const struct dml2_soc_bb dml2_socbb_dcn42b = {
 				.clk_values_khz = {2},
 		},
 		.uclk = {
-				.clk_values_khz = {400000},
+				.clk_values_khz = {2400000},
 				.num_clk_values = 1,
 		},
 		.fclk = {
