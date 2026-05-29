@@ -9,6 +9,9 @@
 #include <linux/types.h>
 
 #include "dc.h"
+#include "dm_services.h"
+#include "dm_pp_smu.h"
+#include "amdgpu.h"
 #include "amdgpu_mode.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_pp_smu.h"
@@ -210,6 +213,704 @@ static void dm_test_dc_to_pp_clock_type_invalid(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, (int)dc_to_pp_clock_type(0), 0);
 }
 
+/* ---- Tests for pp_to_dc_clock_levels ---- */
+
+/**
+ * dm_test_pp_to_dc_clock_levels_within_limit - Test normal copy within limit
+ * @test: KUnit test context
+ *
+ * Verify that pp_to_dc_clock_levels correctly copies clock values when the
+ * count is within DM_PP_MAX_CLOCK_LEVELS.
+ */
+static void dm_test_pp_to_dc_clock_levels_within_limit(struct kunit *test)
+{
+	struct amd_pp_clocks pp_clks = {};
+	struct dm_pp_clock_levels dc_clks = {};
+
+	pp_clks.count = 3;
+	pp_clks.clock[0] = 300000;
+	pp_clks.clock[1] = 500000;
+	pp_clks.clock[2] = 700000;
+
+	pp_to_dc_clock_levels(&pp_clks, &dc_clks, DM_PP_CLOCK_TYPE_ENGINE_CLK);
+
+	KUNIT_EXPECT_EQ(test, dc_clks.num_levels, 3U);
+	KUNIT_EXPECT_EQ(test, dc_clks.clocks_in_khz[0], 300000U);
+	KUNIT_EXPECT_EQ(test, dc_clks.clocks_in_khz[1], 500000U);
+	KUNIT_EXPECT_EQ(test, dc_clks.clocks_in_khz[2], 700000U);
+}
+
+/**
+ * dm_test_pp_to_dc_clock_levels_caps_at_max - Test count capping at max
+ * @test: KUnit test context
+ *
+ * Verify that pp_to_dc_clock_levels caps num_levels at DM_PP_MAX_CLOCK_LEVELS
+ * when the input count exceeds the maximum.
+ */
+static void dm_test_pp_to_dc_clock_levels_caps_at_max(struct kunit *test)
+{
+	struct amd_pp_clocks pp_clks = {};
+	struct dm_pp_clock_levels dc_clks = {};
+	uint32_t i;
+
+	pp_clks.count = DM_PP_MAX_CLOCK_LEVELS + 1;
+	for (i = 0; i < DM_PP_MAX_CLOCK_LEVELS; i++)
+		pp_clks.clock[i] = (i + 1) * 100000;
+
+	pp_to_dc_clock_levels(&pp_clks, &dc_clks, DM_PP_CLOCK_TYPE_ENGINE_CLK);
+
+	KUNIT_EXPECT_EQ(test, dc_clks.num_levels, (uint32_t)DM_PP_MAX_CLOCK_LEVELS);
+}
+
+/* ---- Tests for pp_to_dc_clock_levels_with_latency ---- */
+
+/**
+ * dm_test_pp_to_dc_clock_levels_latency_within_limit - Test normal copy
+ * @test: KUnit test context
+ *
+ * Verify that pp_to_dc_clock_levels_with_latency correctly copies clock
+ * and latency values when count is within limits.
+ */
+static void dm_test_pp_to_dc_clock_levels_latency_within_limit(struct kunit *test)
+{
+	struct pp_clock_levels_with_latency pp_clks = {};
+	struct dm_pp_clock_levels_with_latency dc_clks = {};
+
+	pp_clks.num_levels = 2;
+	pp_clks.data[0].clocks_in_khz = 400000;
+	pp_clks.data[0].latency_in_us = 10;
+	pp_clks.data[1].clocks_in_khz = 800000;
+	pp_clks.data[1].latency_in_us = 20;
+
+	pp_to_dc_clock_levels_with_latency(&pp_clks, &dc_clks,
+					   DM_PP_CLOCK_TYPE_ENGINE_CLK);
+
+	KUNIT_EXPECT_EQ(test, dc_clks.num_levels, 2U);
+	KUNIT_EXPECT_EQ(test, dc_clks.data[0].clocks_in_khz, 400000U);
+	KUNIT_EXPECT_EQ(test, dc_clks.data[0].latency_in_us, 10U);
+	KUNIT_EXPECT_EQ(test, dc_clks.data[1].clocks_in_khz, 800000U);
+	KUNIT_EXPECT_EQ(test, dc_clks.data[1].latency_in_us, 20U);
+}
+
+/**
+ * dm_test_pp_to_dc_clock_levels_latency_caps_at_max - Test count capping
+ * @test: KUnit test context
+ *
+ * Verify that pp_to_dc_clock_levels_with_latency caps num_levels at
+ * DM_PP_MAX_CLOCK_LEVELS when input exceeds the maximum.
+ */
+static void dm_test_pp_to_dc_clock_levels_latency_caps_at_max(struct kunit *test)
+{
+	struct pp_clock_levels_with_latency pp_clks = {};
+	struct dm_pp_clock_levels_with_latency dc_clks = {};
+
+	pp_clks.num_levels = DM_PP_MAX_CLOCK_LEVELS + 1;
+
+	pp_to_dc_clock_levels_with_latency(&pp_clks, &dc_clks,
+					   DM_PP_CLOCK_TYPE_ENGINE_CLK);
+
+	KUNIT_EXPECT_EQ(test, dc_clks.num_levels, (uint32_t)DM_PP_MAX_CLOCK_LEVELS);
+}
+
+/* ---- Tests for pp_to_dc_clock_levels_with_voltage ---- */
+
+/**
+ * dm_test_pp_to_dc_clock_levels_voltage_within_limit - Test normal copy
+ * @test: KUnit test context
+ *
+ * Verify that pp_to_dc_clock_levels_with_voltage correctly copies clock
+ * and voltage values when count is within limits.
+ */
+static void dm_test_pp_to_dc_clock_levels_voltage_within_limit(struct kunit *test)
+{
+	struct pp_clock_levels_with_voltage pp_clks = {};
+	struct dm_pp_clock_levels_with_voltage dc_clks = {};
+
+	pp_clks.num_levels = 2;
+	pp_clks.data[0].clocks_in_khz = 300000;
+	pp_clks.data[0].voltage_in_mv = 800;
+	pp_clks.data[1].clocks_in_khz = 600000;
+	pp_clks.data[1].voltage_in_mv = 950;
+
+	pp_to_dc_clock_levels_with_voltage(&pp_clks, &dc_clks,
+					   DM_PP_CLOCK_TYPE_MEMORY_CLK);
+
+	KUNIT_EXPECT_EQ(test, dc_clks.num_levels, 2U);
+	KUNIT_EXPECT_EQ(test, dc_clks.data[0].clocks_in_khz, 300000U);
+	KUNIT_EXPECT_EQ(test, dc_clks.data[0].voltage_in_mv, 800U);
+	KUNIT_EXPECT_EQ(test, dc_clks.data[1].clocks_in_khz, 600000U);
+	KUNIT_EXPECT_EQ(test, dc_clks.data[1].voltage_in_mv, 950U);
+}
+
+/**
+ * dm_test_pp_to_dc_clock_levels_voltage_caps_at_max - Test count capping
+ * @test: KUnit test context
+ *
+ * Verify that pp_to_dc_clock_levels_with_voltage caps num_levels at
+ * DM_PP_MAX_CLOCK_LEVELS when input exceeds the maximum.
+ */
+static void dm_test_pp_to_dc_clock_levels_voltage_caps_at_max(struct kunit *test)
+{
+	struct pp_clock_levels_with_voltage pp_clks = {};
+	struct dm_pp_clock_levels_with_voltage dc_clks = {};
+
+	pp_clks.num_levels = DM_PP_MAX_CLOCK_LEVELS + 1;
+
+	pp_to_dc_clock_levels_with_voltage(&pp_clks, &dc_clks,
+					   DM_PP_CLOCK_TYPE_MEMORY_CLK);
+
+	KUNIT_EXPECT_EQ(test, dc_clks.num_levels, (uint32_t)DM_PP_MAX_CLOCK_LEVELS);
+}
+
+/* ---- Tests for dm_pp_get_funcs ---- */
+
+/**
+ * dm_test_get_funcs_rv - Test Raven PP SMU function table setup
+ * @test: KUnit test context
+ *
+ * Verify that DCN 1.0 initializes the Raven SMU function table and stores
+ * the DC context in the PP SMU handle.
+ */
+static void dm_test_get_funcs_rv(struct kunit *test)
+{
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu_funcs *funcs = kunit_kzalloc(test, sizeof(*funcs), GFP_KERNEL);
+
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	KUNIT_ASSERT_NOT_NULL(test, funcs);
+
+	ctx->dce_version = DCN_VERSION_1_0;
+
+	dm_pp_get_funcs(ctx, funcs);
+
+	KUNIT_EXPECT_EQ(test, funcs->ctx.ver, PP_SMU_VER_RV);
+	KUNIT_EXPECT_PTR_EQ(test, funcs->rv_funcs.pp_smu.dm, ctx);
+	KUNIT_EXPECT_TRUE(test, funcs->rv_funcs.set_wm_ranges != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->rv_funcs.set_pme_wa_enable != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->rv_funcs.set_display_count != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->rv_funcs.set_min_deep_sleep_dcfclk != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->rv_funcs.set_hard_min_dcfclk_by_freq != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->rv_funcs.set_hard_min_fclk_by_freq != NULL);
+	KUNIT_EXPECT_FALSE(test, funcs->rv_funcs.set_hard_min_socclk_by_freq != NULL);
+}
+
+/**
+ * dm_test_get_funcs_rv_101 - Test DCN 1.01 Raven PP SMU setup
+ * @test: KUnit test context
+ *
+ * Verify that DCN 1.01 uses the same Raven SMU function table as DCN 1.0.
+ */
+static void dm_test_get_funcs_rv_101(struct kunit *test)
+{
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu_funcs *funcs = kunit_kzalloc(test, sizeof(*funcs), GFP_KERNEL);
+
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	KUNIT_ASSERT_NOT_NULL(test, funcs);
+
+	ctx->dce_version = DCN_VERSION_1_01;
+
+	dm_pp_get_funcs(ctx, funcs);
+
+	KUNIT_EXPECT_EQ(test, funcs->ctx.ver, PP_SMU_VER_RV);
+	KUNIT_EXPECT_PTR_EQ(test, funcs->rv_funcs.pp_smu.dm, ctx);
+	KUNIT_EXPECT_TRUE(test, funcs->rv_funcs.set_display_count != NULL);
+}
+
+/**
+ * dm_test_get_funcs_nv - Test Navi PP SMU function table setup
+ * @test: KUnit test context
+ *
+ * Verify that DCN 2.0 initializes the Navi SMU function table and leaves the
+ * unsupported PME workaround callback unset.
+ */
+static void dm_test_get_funcs_nv(struct kunit *test)
+{
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu_funcs *funcs = kunit_kzalloc(test, sizeof(*funcs), GFP_KERNEL);
+
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	KUNIT_ASSERT_NOT_NULL(test, funcs);
+
+	ctx->dce_version = DCN_VERSION_2_0;
+
+	dm_pp_get_funcs(ctx, funcs);
+
+	KUNIT_EXPECT_EQ(test, funcs->ctx.ver, PP_SMU_VER_NV);
+	KUNIT_EXPECT_PTR_EQ(test, funcs->nv_funcs.pp_smu.dm, ctx);
+	KUNIT_EXPECT_TRUE(test, funcs->nv_funcs.set_display_count != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->nv_funcs.set_hard_min_dcfclk_by_freq != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->nv_funcs.set_min_deep_sleep_dcfclk != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->nv_funcs.set_voltage_by_freq != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->nv_funcs.set_wm_ranges != NULL);
+	KUNIT_EXPECT_FALSE(test, funcs->nv_funcs.set_pme_wa_enable != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->nv_funcs.set_hard_min_uclk_by_freq != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->nv_funcs.get_maximum_sustainable_clocks != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->nv_funcs.get_uclk_dpm_states != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->nv_funcs.set_pstate_handshake_support != NULL);
+}
+
+/**
+ * dm_test_get_funcs_rn - Test Renoir PP SMU function table setup
+ * @test: KUnit test context
+ *
+ * Verify that DCN 2.1 initializes the Renoir SMU function table.
+ */
+static void dm_test_get_funcs_rn(struct kunit *test)
+{
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu_funcs *funcs = kunit_kzalloc(test, sizeof(*funcs), GFP_KERNEL);
+
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	KUNIT_ASSERT_NOT_NULL(test, funcs);
+
+	ctx->dce_version = DCN_VERSION_2_1;
+
+	dm_pp_get_funcs(ctx, funcs);
+
+	KUNIT_EXPECT_EQ(test, funcs->ctx.ver, PP_SMU_VER_RN);
+	KUNIT_EXPECT_PTR_EQ(test, funcs->rn_funcs.pp_smu.dm, ctx);
+	KUNIT_EXPECT_TRUE(test, funcs->rn_funcs.set_wm_ranges != NULL);
+	KUNIT_EXPECT_TRUE(test, funcs->rn_funcs.get_dpm_clock_table != NULL);
+}
+
+/**
+ * dm_test_get_funcs_unsupported - Test unsupported DCE version handling
+ * @test: KUnit test context
+ *
+ * Verify that unsupported DCE versions do not initialize a PP SMU version or
+ * function table callbacks.
+ */
+static void dm_test_get_funcs_unsupported(struct kunit *test)
+{
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu_funcs *funcs = kunit_kzalloc(test, sizeof(*funcs), GFP_KERNEL);
+
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	KUNIT_ASSERT_NOT_NULL(test, funcs);
+
+	ctx->dce_version = DCE_VERSION_MAX;
+
+	dm_pp_get_funcs(ctx, funcs);
+
+	KUNIT_EXPECT_EQ(test, funcs->ctx.ver, PP_SMU_UNSUPPORTED);
+	KUNIT_EXPECT_FALSE(test, funcs->rv_funcs.set_wm_ranges != NULL);
+}
+
+/* ---- Tests for amdgpu_device-backed entry points ---- */
+
+/**
+ * dm_test_apply_display_requirements_dpm_disabled - Test DPM-disabled path
+ * @test: KUnit test context
+ *
+ * Verify that dm_pp_apply_display_requirements returns true without touching
+ * the display configuration when DPM is disabled.
+ */
+static void dm_test_apply_display_requirements_dpm_disabled(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_display_configuration cfg = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	adev->pm.dpm_enabled = false;
+	ctx->driver_context = adev;
+
+	KUNIT_EXPECT_TRUE(test, dm_pp_apply_display_requirements(ctx, &cfg));
+}
+
+/**
+ * dm_test_apply_clock_for_voltage_invalid_type - Test invalid clock type path
+ * @test: KUnit test context
+ *
+ * Verify that dm_pp_apply_clock_for_voltage_request returns false for a clock
+ * type that does not map to a valid PP clock type, taking the early-return
+ * path before any SMU request is issued.
+ */
+static void dm_test_apply_clock_for_voltage_invalid_type(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_clock_for_voltage_req req = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	ctx->driver_context = adev;
+	req.clk_type = (enum dm_pp_clock_type)0xffff;
+	req.clocks_in_khz = 500000;
+
+	KUNIT_EXPECT_FALSE(test, dm_pp_apply_clock_for_voltage_request(ctx, &req));
+}
+
+/* ---- Tests for build_pm_display_cfg ---- */
+
+/**
+ * dm_test_build_pm_display_cfg_scalar_fields - Test scalar field translation
+ * @test: KUnit test context
+ *
+ * Verify that build_pm_display_cfg copies the pass-through fields and applies
+ * the /10 (10 kHz) scaling, and sets the fixed constants.
+ */
+static void dm_test_build_pm_display_cfg_scalar_fields(struct kunit *test)
+{
+	struct amd_pp_display_configuration *pm =
+		kunit_kzalloc(test, sizeof(*pm), GFP_KERNEL);
+	struct dm_pp_display_configuration *pp =
+		kunit_kzalloc(test, sizeof(*pp), GFP_KERNEL);
+
+	KUNIT_ASSERT_NOT_NULL(test, pm);
+	KUNIT_ASSERT_NOT_NULL(test, pp);
+
+	pp->cpu_cc6_disable = true;
+	pp->cpu_pstate_disable = true;
+	pp->cpu_pstate_separation_time = 7;
+	pp->nb_pstate_switch_disable = true;
+	pp->display_count = 2;
+	pp->min_engine_clock_khz = 300000;
+	pp->min_engine_clock_deep_sleep_khz = 50000;
+	pp->min_memory_clock_khz = 800000;
+	pp->min_dcfclock_khz = 600000;
+	pp->all_displays_in_sync = true;
+	pp->avail_mclk_switch_time_us = 11;
+	pp->disp_clk_khz = 400000;
+	pp->avail_mclk_switch_time_in_disp_active_us = 13;
+	pp->crtc_index = 3;
+	pp->line_time_in_us = 17;
+	pp->disp_configs[0].v_refresh = 60;
+
+	build_pm_display_cfg(pm, pp);
+
+	KUNIT_EXPECT_TRUE(test, pm->cpu_cc6_disable);
+	KUNIT_EXPECT_TRUE(test, pm->cpu_pstate_disable);
+	KUNIT_EXPECT_EQ(test, pm->cpu_pstate_separation_time, 7);
+	KUNIT_EXPECT_TRUE(test, pm->nb_pstate_switch_disable);
+	KUNIT_EXPECT_EQ(test, pm->num_display, 2);
+	KUNIT_EXPECT_EQ(test, pm->num_path_including_non_display, 2);
+	KUNIT_EXPECT_EQ(test, pm->min_core_set_clock, 30000);
+	KUNIT_EXPECT_EQ(test, pm->min_core_set_clock_in_sr, 5000);
+	KUNIT_EXPECT_EQ(test, pm->min_mem_set_clock, 80000);
+	KUNIT_EXPECT_EQ(test, pm->min_dcef_deep_sleep_set_clk, 5000);
+	KUNIT_EXPECT_EQ(test, pm->min_dcef_set_clk, 60000);
+	KUNIT_EXPECT_TRUE(test, pm->multi_monitor_in_sync);
+	KUNIT_EXPECT_EQ(test, pm->min_vblank_time, 11);
+	KUNIT_EXPECT_EQ(test, pm->display_clk, 40000);
+	KUNIT_EXPECT_EQ(test, pm->dce_tolerable_mclk_in_active_latency, 13);
+	KUNIT_EXPECT_EQ(test, pm->crtc_index, 3);
+	KUNIT_EXPECT_EQ(test, pm->line_time_in_us, 17);
+	KUNIT_EXPECT_EQ(test, pm->vrefresh, 60);
+	KUNIT_EXPECT_EQ(test, pm->crossfire_display_index, -1);
+	KUNIT_EXPECT_EQ(test, pm->min_bus_bandwidth, 0);
+}
+
+/**
+ * dm_test_build_pm_display_cfg_per_display - Test per-display translation
+ * @test: KUnit test context
+ *
+ * Verify that build_pm_display_cfg maps each display config, applying the
+ * controller_id = pipe_idx + 1 offset and copying the pixel clock.
+ */
+static void dm_test_build_pm_display_cfg_per_display(struct kunit *test)
+{
+	struct amd_pp_display_configuration *pm =
+		kunit_kzalloc(test, sizeof(*pm), GFP_KERNEL);
+	struct dm_pp_display_configuration *pp =
+		kunit_kzalloc(test, sizeof(*pp), GFP_KERNEL);
+
+	KUNIT_ASSERT_NOT_NULL(test, pm);
+	KUNIT_ASSERT_NOT_NULL(test, pp);
+
+	pp->display_count = 2;
+	pp->disp_configs[0].pipe_idx = 0;
+	pp->disp_configs[0].pixel_clock = 148500;
+	pp->disp_configs[1].pipe_idx = 4;
+	pp->disp_configs[1].pixel_clock = 297000;
+
+	build_pm_display_cfg(pm, pp);
+
+	KUNIT_EXPECT_EQ(test, pm->displays[0].controller_id, 1);
+	KUNIT_EXPECT_EQ(test, pm->displays[0].pixel_clock, 148500);
+	KUNIT_EXPECT_EQ(test, pm->displays[1].controller_id, 5);
+	KUNIT_EXPECT_EQ(test, pm->displays[1].pixel_clock, 297000);
+}
+
+/* ---- Tests for build_wm_clock_ranges_soc15 ---- */
+
+/**
+ * dm_test_build_wm_clock_ranges_dmif - Test reader (DMIF) watermark sets
+ * @test: KUnit test context
+ *
+ * Verify that build_wm_clock_ranges_soc15 copies the reader set count,
+ * maps wm_inst to wm_set_id (clamping instances > 3 to WM_SET_A), and
+ * converts every clock from MHz to kHz (x1000) into the DMIF clock ranges.
+ */
+static void dm_test_build_wm_clock_ranges_dmif(struct kunit *test)
+{
+	struct pp_smu_wm_range_sets *ranges =
+		kunit_kzalloc(test, sizeof(*ranges), GFP_KERNEL);
+	struct dm_pp_wm_sets_with_clock_ranges_soc15 *wm =
+		kunit_kzalloc(test, sizeof(*wm), GFP_KERNEL);
+
+	KUNIT_ASSERT_NOT_NULL(test, ranges);
+	KUNIT_ASSERT_NOT_NULL(test, wm);
+
+	ranges->num_reader_wm_sets = 2;
+	/* set 0: wm_inst within range -> preserved */
+	ranges->reader_wm_sets[0].wm_inst = 2;
+	ranges->reader_wm_sets[0].max_drain_clk_mhz = 600;
+	ranges->reader_wm_sets[0].min_drain_clk_mhz = 300;
+	ranges->reader_wm_sets[0].max_fill_clk_mhz = 800;
+	ranges->reader_wm_sets[0].min_fill_clk_mhz = 400;
+	/* set 1: wm_inst > 3 -> clamped to WM_SET_A */
+	ranges->reader_wm_sets[1].wm_inst = 5;
+	ranges->reader_wm_sets[1].max_drain_clk_mhz = 700;
+	ranges->reader_wm_sets[1].min_drain_clk_mhz = 350;
+	ranges->reader_wm_sets[1].max_fill_clk_mhz = 900;
+	ranges->reader_wm_sets[1].min_fill_clk_mhz = 450;
+
+	build_wm_clock_ranges_soc15(ranges, wm);
+
+	KUNIT_EXPECT_EQ(test, wm->num_wm_dmif_sets, 2U);
+	KUNIT_EXPECT_EQ(test, wm->num_wm_mcif_sets, 0U);
+
+	KUNIT_EXPECT_EQ(test, wm->wm_dmif_clocks_ranges[0].wm_set_id, WM_SET_C);
+	KUNIT_EXPECT_EQ(test, wm->wm_dmif_clocks_ranges[0].wm_max_dcfclk_clk_in_khz, 600000U);
+	KUNIT_EXPECT_EQ(test, wm->wm_dmif_clocks_ranges[0].wm_min_dcfclk_clk_in_khz, 300000U);
+	KUNIT_EXPECT_EQ(test, wm->wm_dmif_clocks_ranges[0].wm_max_mem_clk_in_khz, 800000U);
+	KUNIT_EXPECT_EQ(test, wm->wm_dmif_clocks_ranges[0].wm_min_mem_clk_in_khz, 400000U);
+
+	KUNIT_EXPECT_EQ(test, wm->wm_dmif_clocks_ranges[1].wm_set_id, WM_SET_A);
+	KUNIT_EXPECT_EQ(test, wm->wm_dmif_clocks_ranges[1].wm_max_dcfclk_clk_in_khz, 700000U);
+	KUNIT_EXPECT_EQ(test, wm->wm_dmif_clocks_ranges[1].wm_min_dcfclk_clk_in_khz, 350000U);
+	KUNIT_EXPECT_EQ(test, wm->wm_dmif_clocks_ranges[1].wm_max_mem_clk_in_khz, 900000U);
+	KUNIT_EXPECT_EQ(test, wm->wm_dmif_clocks_ranges[1].wm_min_mem_clk_in_khz, 450000U);
+}
+
+/**
+ * dm_test_build_wm_clock_ranges_mcif - Test writer (MCIF) watermark sets
+ * @test: KUnit test context
+ *
+ * Verify that build_wm_clock_ranges_soc15 copies the writer set count and
+ * maps the writer clocks into the MCIF ranges: fill clocks become socclk
+ * and drain clocks become mem clk, each converted from MHz to kHz.
+ */
+static void dm_test_build_wm_clock_ranges_mcif(struct kunit *test)
+{
+	struct pp_smu_wm_range_sets *ranges =
+		kunit_kzalloc(test, sizeof(*ranges), GFP_KERNEL);
+	struct dm_pp_wm_sets_with_clock_ranges_soc15 *wm =
+		kunit_kzalloc(test, sizeof(*wm), GFP_KERNEL);
+
+	KUNIT_ASSERT_NOT_NULL(test, ranges);
+	KUNIT_ASSERT_NOT_NULL(test, wm);
+
+	ranges->num_writer_wm_sets = 1;
+	ranges->writer_wm_sets[0].wm_inst = 1;
+	ranges->writer_wm_sets[0].max_fill_clk_mhz = 1200;
+	ranges->writer_wm_sets[0].min_fill_clk_mhz = 600;
+	ranges->writer_wm_sets[0].max_drain_clk_mhz = 1000;
+	ranges->writer_wm_sets[0].min_drain_clk_mhz = 500;
+
+	build_wm_clock_ranges_soc15(ranges, wm);
+
+	KUNIT_EXPECT_EQ(test, wm->num_wm_dmif_sets, 0U);
+	KUNIT_EXPECT_EQ(test, wm->num_wm_mcif_sets, 1U);
+
+	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[0].wm_set_id, WM_SET_B);
+	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[0].wm_max_socclk_clk_in_khz, 1200000U);
+	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[0].wm_min_socclk_clk_in_khz, 600000U);
+	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[0].wm_max_mem_clk_in_khz, 1000000U);
+	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[0].wm_min_mem_clk_in_khz, 500000U);
+}
+
+/* ---- Tests for cap_clock_levels_to_validation ---- */
+
+/**
+ * dm_test_cap_clock_levels_engine_caps - Test engine clock level capping
+ * @test: KUnit test context
+ *
+ * Verify that for engine clocks, num_levels is reduced to the index of the
+ * first level whose frequency exceeds the engine validation clock.
+ */
+static void dm_test_cap_clock_levels_engine_caps(struct kunit *test)
+{
+	struct dm_pp_clock_levels clks = { 0 };
+	struct amd_pp_simple_clock_info validation = {
+		.engine_max_clock = 450000,
+		.memory_max_clock = 800000,
+	};
+
+	clks.num_levels = 3;
+	clks.clocks_in_khz[0] = 300000;
+	clks.clocks_in_khz[1] = 400000;
+	clks.clocks_in_khz[2] = 500000;
+
+	cap_clock_levels_to_validation(&clks, DM_PP_CLOCK_TYPE_ENGINE_CLK, &validation);
+
+	KUNIT_EXPECT_EQ(test, clks.num_levels, 2U);
+}
+
+/**
+ * dm_test_cap_clock_levels_engine_first_exceeds - Test floor of one level
+ * @test: KUnit test context
+ *
+ * Verify that when the very first engine clock level already exceeds the
+ * validation clock, num_levels is clamped to 1 rather than 0.
+ */
+static void dm_test_cap_clock_levels_engine_first_exceeds(struct kunit *test)
+{
+	struct dm_pp_clock_levels clks = { 0 };
+	struct amd_pp_simple_clock_info validation = {
+		.engine_max_clock = 100000,
+		.memory_max_clock = 800000,
+	};
+
+	clks.num_levels = 3;
+	clks.clocks_in_khz[0] = 300000;
+	clks.clocks_in_khz[1] = 400000;
+	clks.clocks_in_khz[2] = 500000;
+
+	cap_clock_levels_to_validation(&clks, DM_PP_CLOCK_TYPE_ENGINE_CLK, &validation);
+
+	KUNIT_EXPECT_EQ(test, clks.num_levels, 1U);
+}
+
+/**
+ * dm_test_cap_clock_levels_memory_caps - Test memory clock level capping
+ * @test: KUnit test context
+ *
+ * Verify that for memory clocks, num_levels is reduced based on the memory
+ * validation clock (and is unaffected by the engine validation clock).
+ */
+static void dm_test_cap_clock_levels_memory_caps(struct kunit *test)
+{
+	struct dm_pp_clock_levels clks = { 0 };
+	struct amd_pp_simple_clock_info validation = {
+		.engine_max_clock = 100000,
+		.memory_max_clock = 700000,
+	};
+
+	clks.num_levels = 2;
+	clks.clocks_in_khz[0] = 333000;
+	clks.clocks_in_khz[1] = 800000;
+
+	cap_clock_levels_to_validation(&clks, DM_PP_CLOCK_TYPE_MEMORY_CLK, &validation);
+
+	KUNIT_EXPECT_EQ(test, clks.num_levels, 1U);
+}
+
+/**
+ * dm_test_cap_clock_levels_within_limit - Test no capping when within limit
+ * @test: KUnit test context
+ *
+ * Verify that num_levels is left unchanged when no level exceeds the
+ * validation clock.
+ */
+static void dm_test_cap_clock_levels_within_limit(struct kunit *test)
+{
+	struct dm_pp_clock_levels clks = { 0 };
+	struct amd_pp_simple_clock_info validation = {
+		.engine_max_clock = 999000,
+		.memory_max_clock = 999000,
+	};
+
+	clks.num_levels = 3;
+	clks.clocks_in_khz[0] = 300000;
+	clks.clocks_in_khz[1] = 400000;
+	clks.clocks_in_khz[2] = 500000;
+
+	cap_clock_levels_to_validation(&clks, DM_PP_CLOCK_TYPE_ENGINE_CLK, &validation);
+
+	KUNIT_EXPECT_EQ(test, clks.num_levels, 3U);
+}
+
+/**
+ * dm_test_cap_clock_levels_other_type - Test non-engine/memory types ignored
+ * @test: KUnit test context
+ *
+ * Verify that for clock types other than engine or memory, num_levels is
+ * left unchanged regardless of the validation clocks.
+ */
+static void dm_test_cap_clock_levels_other_type(struct kunit *test)
+{
+	struct dm_pp_clock_levels clks = { 0 };
+	struct amd_pp_simple_clock_info validation = {
+		.engine_max_clock = 1,
+		.memory_max_clock = 1,
+	};
+
+	clks.num_levels = 3;
+	clks.clocks_in_khz[0] = 300000;
+	clks.clocks_in_khz[1] = 400000;
+	clks.clocks_in_khz[2] = 500000;
+
+	cap_clock_levels_to_validation(&clks, DM_PP_CLOCK_TYPE_DISPLAY_CLK, &validation);
+
+	KUNIT_EXPECT_EQ(test, clks.num_levels, 3U);
+}
+
+/* ---- Tests for pp_smu_nv_clock_id_to_pp ---- */
+
+/**
+ * dm_test_nv_clock_id_dispclk - Test DISPCLK id mapping
+ * @test: KUnit test context
+ *
+ * Verify that PP_SMU_NV_DISPCLK maps to amd_pp_disp_clock and returns true.
+ */
+static void dm_test_nv_clock_id_dispclk(struct kunit *test)
+{
+	enum amd_pp_clock_type clock_type = amd_pp_mem_clock;
+
+	KUNIT_EXPECT_TRUE(test, pp_smu_nv_clock_id_to_pp(PP_SMU_NV_DISPCLK, &clock_type));
+	KUNIT_EXPECT_EQ(test, clock_type, amd_pp_disp_clock);
+}
+
+/**
+ * dm_test_nv_clock_id_phyclk - Test PHYCLK id mapping
+ * @test: KUnit test context
+ *
+ * Verify that PP_SMU_NV_PHYCLK maps to amd_pp_phy_clock and returns true.
+ */
+static void dm_test_nv_clock_id_phyclk(struct kunit *test)
+{
+	enum amd_pp_clock_type clock_type = amd_pp_mem_clock;
+
+	KUNIT_EXPECT_TRUE(test, pp_smu_nv_clock_id_to_pp(PP_SMU_NV_PHYCLK, &clock_type));
+	KUNIT_EXPECT_EQ(test, clock_type, amd_pp_phy_clock);
+}
+
+/**
+ * dm_test_nv_clock_id_pixelclk - Test PIXELCLK id mapping
+ * @test: KUnit test context
+ *
+ * Verify that PP_SMU_NV_PIXELCLK maps to amd_pp_pixel_clock and returns true.
+ */
+static void dm_test_nv_clock_id_pixelclk(struct kunit *test)
+{
+	enum amd_pp_clock_type clock_type = amd_pp_mem_clock;
+
+	KUNIT_EXPECT_TRUE(test, pp_smu_nv_clock_id_to_pp(PP_SMU_NV_PIXELCLK, &clock_type));
+	KUNIT_EXPECT_EQ(test, clock_type, amd_pp_pixel_clock);
+}
+
+/**
+ * dm_test_nv_clock_id_invalid - Test unknown id is rejected
+ * @test: KUnit test context
+ *
+ * Verify that an unknown clock id returns false and leaves the output
+ * clock_type untouched, guarding against the previously uninitialized path.
+ */
+static void dm_test_nv_clock_id_invalid(struct kunit *test)
+{
+	enum amd_pp_clock_type clock_type = amd_pp_dcef_clock;
+
+	KUNIT_EXPECT_FALSE(test, pp_smu_nv_clock_id_to_pp((enum pp_smu_nv_clock_id)0xff,
+							  &clock_type));
+	KUNIT_EXPECT_EQ(test, clock_type, amd_pp_dcef_clock);
+}
+
 static struct kunit_case dm_pp_smu_test_cases[] = {
 	/* get_default_clock_levels */
 	KUNIT_CASE(dm_test_default_clock_levels_display),
@@ -227,6 +928,41 @@ static struct kunit_case dm_pp_smu_test_cases[] = {
 	KUNIT_CASE(dm_test_dc_to_pp_clock_type_phyclk),
 	KUNIT_CASE(dm_test_dc_to_pp_clock_type_dppclk),
 	KUNIT_CASE(dm_test_dc_to_pp_clock_type_invalid),
+	/* pp_to_dc_clock_levels */
+	KUNIT_CASE(dm_test_pp_to_dc_clock_levels_within_limit),
+	KUNIT_CASE(dm_test_pp_to_dc_clock_levels_caps_at_max),
+	/* pp_to_dc_clock_levels_with_latency */
+	KUNIT_CASE(dm_test_pp_to_dc_clock_levels_latency_within_limit),
+	KUNIT_CASE(dm_test_pp_to_dc_clock_levels_latency_caps_at_max),
+	/* pp_to_dc_clock_levels_with_voltage */
+	KUNIT_CASE(dm_test_pp_to_dc_clock_levels_voltage_within_limit),
+	KUNIT_CASE(dm_test_pp_to_dc_clock_levels_voltage_caps_at_max),
+	/* dm_pp_get_funcs */
+	KUNIT_CASE(dm_test_get_funcs_rv),
+	KUNIT_CASE(dm_test_get_funcs_rv_101),
+	KUNIT_CASE(dm_test_get_funcs_nv),
+	KUNIT_CASE(dm_test_get_funcs_rn),
+	KUNIT_CASE(dm_test_get_funcs_unsupported),
+	/* amdgpu_device-backed entry points */
+	KUNIT_CASE(dm_test_apply_display_requirements_dpm_disabled),
+	KUNIT_CASE(dm_test_apply_clock_for_voltage_invalid_type),
+	/* build_pm_display_cfg */
+	KUNIT_CASE(dm_test_build_pm_display_cfg_scalar_fields),
+	KUNIT_CASE(dm_test_build_pm_display_cfg_per_display),
+	/* build_wm_clock_ranges_soc15 */
+	KUNIT_CASE(dm_test_build_wm_clock_ranges_dmif),
+	KUNIT_CASE(dm_test_build_wm_clock_ranges_mcif),
+	/* cap_clock_levels_to_validation */
+	KUNIT_CASE(dm_test_cap_clock_levels_engine_caps),
+	KUNIT_CASE(dm_test_cap_clock_levels_engine_first_exceeds),
+	KUNIT_CASE(dm_test_cap_clock_levels_memory_caps),
+	KUNIT_CASE(dm_test_cap_clock_levels_within_limit),
+	KUNIT_CASE(dm_test_cap_clock_levels_other_type),
+	/* pp_smu_nv_clock_id_to_pp */
+	KUNIT_CASE(dm_test_nv_clock_id_dispclk),
+	KUNIT_CASE(dm_test_nv_clock_id_phyclk),
+	KUNIT_CASE(dm_test_nv_clock_id_pixelclk),
+	KUNIT_CASE(dm_test_nv_clock_id_invalid),
 	{}
 };
 
