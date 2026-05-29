@@ -72,7 +72,7 @@ static int allocate_sdma_queue(struct device_queue_manager *dqm,
 
 static int reset_queues_on_hws_hang(struct device_queue_manager *dqm, bool is_sdma);
 static int resume_all_queues_mes(struct device_queue_manager *dqm);
-static int suspend_all_queues_mes(struct device_queue_manager *dqm);
+static int suspend_all_queues_mes(struct device_queue_manager *dqm, struct queue *q);
 static struct queue *find_queue_by_doorbell_offset(struct device_queue_manager *dqm,
 						   u32 doorbell_offset);
 static void set_queue_as_reset(struct device_queue_manager *dqm, struct queue *q,
@@ -312,7 +312,7 @@ static int remove_queue_mes_on_reset_option(struct device_queue_manager *dqm, st
 		return r;
 
 	if (r) {
-		if (!suspend_all_queues_mes(dqm))
+		if (!suspend_all_queues_mes(dqm, q))
 			return resume_all_queues_mes(dqm);
 
 		dev_err(adev->dev, "failed to remove hardware queue from MES, doorbell=0x%x\n",
@@ -444,11 +444,12 @@ int kfd_reset_queue_mes(struct device_queue_manager *dqm, int queue_type,
 	return reset_queue_mes(dqm, q, queue_type, pipe, queue, db);
 }
 
-static int reset_queues_mes(struct device_queue_manager *dqm)
+static int reset_queues_mes(struct device_queue_manager *dqm, struct queue *q)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)dqm->dev->adev;
 	unsigned int num_hung = 0;
 	int r = 0;
+	struct mes_remove_queue_input queue_input;
 
 	if (!amdgpu_mes_queue_reset_by_mes_supported(adev)) {
 		r = -ENOTRECOVERABLE;
@@ -464,7 +465,13 @@ static int reset_queues_mes(struct device_queue_manager *dqm)
 		goto fail;
 	}
 
-	r = amdgpu_gfx_reset_mes_compute(adev, NULL, NULL, NULL, &num_hung, NULL);
+	memset(&queue_input, 0x0, sizeof(struct mes_remove_queue_input));
+	queue_input.doorbell_offset = q->properties.doorbell_off;
+	queue_input.gang_context_addr = q->gang_ctx_gpu_addr;
+	queue_input.remove_queue_after_reset = false;
+	queue_input.xcc_id = ffs(dqm->dev->xcc_mask) - 1;
+	/* pass the known bad queue info to the reset function */
+	r = amdgpu_gfx_reset_mes_compute(adev, NULL, NULL, NULL, &num_hung, &queue_input);
 	if (r)
 		goto fail;
 
@@ -476,7 +483,7 @@ fail:
 	return r;
 }
 
-static int suspend_all_queues_mes(struct device_queue_manager *dqm)
+static int suspend_all_queues_mes(struct device_queue_manager *dqm, struct queue *q)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)dqm->dev->adev;
 	int r = 0;
@@ -485,7 +492,7 @@ static int suspend_all_queues_mes(struct device_queue_manager *dqm)
 		return -EIO;
 
 
-	if (!reset_queues_mes(dqm)) {
+	if (!reset_queues_mes(dqm, q)) {
 		r = 0;
 		goto out;
 	}
@@ -3232,7 +3239,6 @@ int kfd_dqm_suspend_bad_queue_mes(struct kfd_node *knode, u32 pasid, u32 doorbel
 	struct kfd_process_device *pdd = NULL;
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid, &pdd);
 	struct device_queue_manager *dqm = knode->dqm;
-	struct device *dev = dqm->dev->adev->dev;
 	struct qcm_process_device *qpd;
 	struct queue *q = NULL;
 	int ret = 0;
@@ -3247,19 +3253,13 @@ int kfd_dqm_suspend_bad_queue_mes(struct kfd_node *knode, u32 pasid, u32 doorbel
 
 		list_for_each_entry(q, &qpd->queues_list, list) {
 			if (q->doorbell_id == doorbell_id && q->properties.is_active) {
-				/* suspend all queues will save any good queues and mark the rest as bad */
-				suspend_all_queues_mes(dqm);
+				/* suspend_all handles suspend, remove, resume */
+				suspend_all_queues_mes(dqm, q);
 
 				q->properties.is_evicted = true;
 				q->properties.is_active = false;
 				decrement_queue_count(dqm, qpd, q);
 
-				/* this will remove the bad queue and sched a GPU reset if needed */
-				ret = remove_queue_mes(dqm, q, qpd);
-				if (ret)
-					dev_err(dev, "Removing bad queue failed");
-				/* resume the good queues */
-				resume_all_queues_mes(dqm);
 				break;
 			}
 		}
