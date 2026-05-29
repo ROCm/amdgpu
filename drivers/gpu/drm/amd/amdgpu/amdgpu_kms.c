@@ -1559,8 +1559,7 @@ int amdgpu_driver_open_kms(struct drm_device *dev, struct drm_file *file_priv)
 	if (r)
 		goto error_vm;
 
-	mutex_init(&fpriv->bo_list_lock);
-	idr_init_base(&fpriv->bo_list_handles, 1);
+	xa_init_flags(&fpriv->bo_list_handles, XA_FLAGS_ALLOC1);
 	spin_lock_init(&fpriv->sem_handles_lock);
 	idr_init(&fpriv->sem_handles);
 
@@ -1608,8 +1607,8 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 	struct amdgpu_bo_list *list;
 	struct amdgpu_sem *sem;
 	struct amdgpu_bo *pd;
+	unsigned long handle;
 	u32 pasid;
-	int handle;
 
 	if (!fpriv)
 		return;
@@ -1645,11 +1644,9 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 		amdgpu_pasid_free_delayed(amdkcl_ttm_resvp(&pd->tbo), pasid);
 	amdgpu_bo_unref(&pd);
 
-	idr_for_each_entry(&fpriv->bo_list_handles, list, handle)
+	xa_for_each(&fpriv->bo_list_handles, handle, list)
 		amdgpu_bo_list_put(list);
-
-	idr_destroy(&fpriv->bo_list_handles);
-	mutex_destroy(&fpriv->bo_list_lock);
+	xa_destroy(&fpriv->bo_list_handles);
 
 	idr_for_each_entry(&fpriv->sem_handles, sem, handle)
 		amdgpu_sem_destroy(fpriv, handle);
