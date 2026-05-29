@@ -183,36 +183,19 @@ void amdgpu_bo_list_put(struct amdgpu_bo_list *list)
 int amdgpu_bo_create_list_entry_array(struct drm_amdgpu_bo_list_in *in,
 				      struct drm_amdgpu_bo_list_entry **info_param)
 {
-	const uint32_t info_size = sizeof(struct drm_amdgpu_bo_list_entry);
 	const void __user *uptr = u64_to_user_ptr(in->bo_info_ptr);
-	const uint32_t bo_info_size = in->bo_info_size;
 	const uint32_t bo_number = in->bo_number;
 	struct drm_amdgpu_bo_list_entry *info;
 
 	if (bo_number > AMDGPU_BO_LIST_MAX_ENTRIES)
 		return -EINVAL;
 
-	/* copy the handle array from userspace to a kernel buffer */
-	if (likely(info_size == bo_info_size)) {
-		info = vmemdup_array_user(uptr, bo_number, info_size);
-		if (IS_ERR(info))
-			return PTR_ERR(info);
-	} else {
-		const uint32_t bytes = min(bo_info_size, info_size);
-		unsigned i;
+	if (in->bo_info_size != sizeof(struct drm_amdgpu_bo_list_entry))
+		return -EINVAL;
 
-		info = kvmalloc_array(bo_number, info_size, GFP_KERNEL);
-		if (!info)
-			return -ENOMEM;
-
-		memset(info, 0, bo_number * info_size);
-		for (i = 0; i < bo_number; ++i, uptr += bo_info_size) {
-			if (copy_from_user(&info[i], uptr, bytes)) {
-				kvfree(info);
-				return -EFAULT;
-			}
-		}
-	}
+	info = vmemdup_array_user(uptr, bo_number, sizeof(*info));
+	if (IS_ERR(info))
+		return PTR_ERR(info);
 
 	*info_param = info;
 	return 0;
