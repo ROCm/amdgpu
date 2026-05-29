@@ -2244,7 +2244,8 @@ int amdgpu_gfx_reset_mes_compute(struct amdgpu_device *adev,
 				 struct amdgpu_ring *ring,
 				 struct amdgpu_fence *guilty_fence,
 				 struct amdgpu_usermode_queue *uq,
-				 unsigned int *hung_queue_count)
+				 unsigned int *hung_queue_count,
+				 void *faulty_queue_input)
 {
 	struct amdgpu_mes_hung_queue_hqd_info *hqd_info =
 		(struct amdgpu_mes_hung_queue_hqd_info *)
@@ -2252,6 +2253,7 @@ int amdgpu_gfx_reset_mes_compute(struct amdgpu_device *adev,
 	int i, r, pipe, queue, queue_type;
 	unsigned int num_hung = 0;
 	bool use_mmio = adev->gfx.mec.use_mmio_for_reset;
+	struct mes_remove_queue_input *queue_input = (struct mes_remove_queue_input *)faulty_queue_input;
 
 	guard(mutex)(&adev->gfx.mec.reset_mutex);
 	/* stop the drm schedulers for all compute queues */
@@ -2306,6 +2308,20 @@ fence_reset:
 		if (r)
 			goto out;
 	}
+
+	/* MES doesn't detect any hung queue but we have a known bad queue
+	 * and it is not KCQ
+	 */
+	if (!num_hung && queue_input && !ring) {
+		/* MES suspend_all is successful means this bad queue is
+		 * preempted successfuly. Remove it before resume all so it
+		 * doesn't get mapped back
+		 */
+		amdgpu_mes_lock(&adev->mes);
+		r = adev->mes.funcs->remove_hw_queue(&adev->mes, queue_input);
+		amdgpu_mes_unlock(&adev->mes);
+	}
+
 out:
 	/* resume all will enable the non-hung queues */
 	amdgpu_mes_resume(adev, 0);
