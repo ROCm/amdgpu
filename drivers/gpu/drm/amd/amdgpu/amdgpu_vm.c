@@ -232,7 +232,6 @@ static void amdgpu_vm_bo_moved(struct amdgpu_vm_bo_base *vm_bo)
 		vm_bo->moved = false;
 		list_move(&vm_bo->vm_status, &lists->idle);
 	} else {
-		vm_bo->moved = true;
 		list_move(&vm_bo->vm_status, &lists->moved);
 	}
 	amdgpu_vm_bo_unlock_lists(vm_bo);
@@ -608,6 +607,7 @@ int amdgpu_vm_validate(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 			return r;
 
 		vm->update_funcs->map_table(to_amdgpu_bo_vm(bo_base->bo));
+		bo_base->moved = true;
 		amdgpu_vm_bo_moved(bo_base);
 	}
 
@@ -625,6 +625,7 @@ int amdgpu_vm_validate(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		if (r)
 			return r;
 
+		bo_base->moved = true;
 		amdgpu_vm_bo_moved(bo_base);
 	}
 
@@ -645,6 +646,7 @@ restart:
 		if (r)
 			return r;
 
+		bo_base->moved = true;
 		amdgpu_vm_bo_moved(bo_base);
 
 		/* It's a bit inefficient to always jump back to the start, but
@@ -2294,6 +2296,7 @@ void amdgpu_vm_bo_invalidate(struct amdgpu_bo *bo, bool evicted)
 
 		if (bo_base->moved)
 			continue;
+		bo_base->moved = true;
 		amdgpu_vm_bo_moved(bo_base);
 	}
 }
