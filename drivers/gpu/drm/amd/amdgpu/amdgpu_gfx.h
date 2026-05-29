@@ -651,7 +651,8 @@ int amdgpu_gfx_reset_mes_compute(struct amdgpu_device *adev,
 				 struct amdgpu_ring *ring,
 				 struct amdgpu_fence *guilty_fence,
 				 struct amdgpu_usermode_queue *uq,
-				 unsigned int *hung_queue_count);
+				 unsigned int *hung_queue_count,
+				 void *faulty_queue_input);
 void amdgpu_gfx_ras_error_func(struct amdgpu_device *adev,
 		void *ras_error_status,
 		void (*func)(struct amdgpu_device *adev, void *ras_error_status,

@@ -464,7 +464,7 @@ static int reset_queues_mes(struct device_queue_manager *dqm)
 		goto fail;
 	}
 
-	r = amdgpu_gfx_reset_mes_compute(adev, NULL, NULL, NULL, &num_hung);
+	r = amdgpu_gfx_reset_mes_compute(adev, NULL, NULL, NULL, &num_hung, NULL);
 	if (r)
 		goto fail;
 
