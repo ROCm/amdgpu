@@ -739,6 +739,9 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	int partition_mode;
 	int xcp_idx;
 
+	kfd->profiler_process = NULL;
+	mutex_init(&kfd->profiler_lock);
+
 	kfd->mec_fw_version = amdgpu_amdkfd_get_fw_version(kfd->adev,
 			KGD_ENGINE_MEC1);
 	kfd->mec2_fw_version = amdgpu_amdkfd_get_fw_version(kfd->adev,
@@ -938,9 +941,6 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	}
 
 	svm_range_set_max_pages(kfd->adev);
-
-	kfd->profiler_process = NULL;
-	mutex_init(&kfd->profiler_lock);
 
 	kfd->init_complete = true;
 	dev_info(kfd_device, "added device %x:%x\n", kfd->adev->pdev->vendor,
