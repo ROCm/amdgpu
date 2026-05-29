@@ -501,6 +501,8 @@ static ssize_t amdgpu_ras_cper_debugfs_read(struct file *f, char __user *buf,
 	u32 total_cper_num;
 	u64 start_cper_id;
 	u64 cper_offset;
+	size_t chunk_size;
+	size_t total_data_size = 0;
 	bool read_header;
 	int r;
 
@@ -550,30 +552,45 @@ static ssize_t amdgpu_ras_cper_debugfs_read(struct file *f, char __user *buf,
 	if (!data_size)
 		return 0;
 
-	record_req->buf_ptr = (u64)(uintptr_t)data_buf;
-	record_req->buf_size = data_size;
-	record_req->cper_start_id = start_cper_id + cper_offset;
-	record_req->cper_num = total_cper_num - cper_offset;
-	r = amdgpu_ras_mgr_handle_ras_cmd(ring->adev,
-					  RAS_CMD__GET_CPER_RECORD,
-					  record_req, sizeof(struct ras_cmd_cper_record_req),
-					  record_rsp, sizeof(struct ras_cmd_cper_record_rsp));
-	if (r)
-		return r;
-	if (record_rsp->real_data_size > data_size)
-		return -EIO;
+	while (data_size && cper_offset < total_cper_num) {
+		memset(record_req, 0, sizeof(*record_req));
+		memset(record_rsp, 0, sizeof(*record_rsp));
+		chunk_size = min_t(size_t, data_size, RAS_CMD_MAX_CPER_BUF_SZ);
+
+		record_req->buf_ptr = (u64)(uintptr_t)data_buf;
+		record_req->buf_size = chunk_size;
+		record_req->cper_start_id = start_cper_id + cper_offset;
+		record_req->cper_num = total_cper_num - cper_offset;
+		r = amdgpu_ras_mgr_handle_ras_cmd(ring->adev,
+						  RAS_CMD__GET_CPER_RECORD,
+						  record_req,
+						  sizeof(struct ras_cmd_cper_record_req),
+						  record_rsp,
+						  sizeof(struct ras_cmd_cper_record_rsp));
+		if (r)
+			return r;
+
+		if (!record_rsp->real_data_size || !record_rsp->real_cper_num)
+			break;
+		if (record_rsp->real_data_size > data_size)
+			return -EIO;
+
+		data_buf += record_rsp->real_data_size;
+		data_size -= record_rsp->real_data_size;
+		total_data_size += record_rsp->real_data_size;
+		cper_offset += record_rsp->real_cper_num;
+	}
 
 	if (read_header) {
-		ring_header[1] = record_rsp->real_data_size >> 2;
+		ring_header[1] = total_data_size >> 2;
 		ring_header[2] = ring_header[1];
 
 		if (copy_to_user(buf, ring_header, ring_header_size))
 			return -EFAULT;
 	}
 
-	r = read_header ? record_rsp->real_data_size + ring_header_size :
-				record_rsp->real_data_size;
-	*offset = cper_offset + record_rsp->real_cper_num + 1;
+	r = read_header ? total_data_size + ring_header_size : total_data_size;
+	*offset = cper_offset + 1;
 
 	return r;
 }
