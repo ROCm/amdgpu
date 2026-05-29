@@ -65,17 +65,16 @@ struct amdgpu_bo_list {
 
 };
 
-int amdgpu_bo_list_get(struct amdgpu_fpriv *fpriv, u32 id,
-		       struct amdgpu_bo_list **result);
+struct amdgpu_bo_list *amdgpu_bo_list_get(struct amdgpu_fpriv *fpriv, u32 id);
 void amdgpu_bo_list_put(struct amdgpu_bo_list *list);
-int amdgpu_bo_create_list_entry_array(struct drm_amdgpu_bo_list_in *in,
-				      struct drm_amdgpu_bo_list_entry **info_param);
+struct drm_amdgpu_bo_list_entry *
+amdgpu_bo_create_list_entry_array(struct drm_amdgpu_bo_list_in *in);
 
-int amdgpu_bo_list_create(struct amdgpu_device *adev,
-				 struct drm_file *filp,
-				 struct drm_amdgpu_bo_list_entry *info,
-				 size_t num_entries,
-				 struct amdgpu_bo_list **list);
+struct amdgpu_bo_list *
+amdgpu_bo_list_create(struct amdgpu_device *adev,
+		      struct drm_file *filp,
+		      struct drm_amdgpu_bo_list_entry *info,
+		      size_t num_entries);
 
 #define amdgpu_bo_list_for_each_entry(e, list) \
 	for (e = list->entries; \
