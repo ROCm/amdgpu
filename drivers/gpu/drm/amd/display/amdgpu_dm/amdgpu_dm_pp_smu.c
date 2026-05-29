@@ -33,6 +33,8 @@
 #include "amdgpu_dm_irq.h"
 #include "amdgpu_pm.h"
 #include "dm_pp_smu.h"
+#include "amdgpu_dm_kunit_helpers.h"
+#include "amdgpu_dm_pp_smu.h"
 
 bool dm_pp_apply_display_requirements(
 		const struct dc_context *ctx,
@@ -109,7 +111,7 @@ bool dm_pp_apply_display_requirements(
 	return true;
 }
 
-static void get_default_clock_levels(
+STATIC_IFN_KUNIT void get_default_clock_levels(
 		enum dm_pp_clock_type clk_type,
 		struct dm_pp_clock_levels *clks)
 {
@@ -140,8 +142,9 @@ static void get_default_clock_levels(
 		break;
 	}
 }
+EXPORT_IF_KUNIT(get_default_clock_levels);
 
-static enum amd_pp_clock_type dc_to_pp_clock_type(
+STATIC_IFN_KUNIT enum amd_pp_clock_type dc_to_pp_clock_type(
 		enum dm_pp_clock_type dm_pp_clk_type)
 {
 	enum amd_pp_clock_type amd_pp_clk_type = 0;
@@ -182,6 +185,7 @@ static enum amd_pp_clock_type dc_to_pp_clock_type(
 
 	return amd_pp_clk_type;
 }
+EXPORT_IF_KUNIT(dc_to_pp_clock_type);
 
 static void pp_to_dc_clock_levels(
 		const struct amd_pp_clocks *pp_clks,
