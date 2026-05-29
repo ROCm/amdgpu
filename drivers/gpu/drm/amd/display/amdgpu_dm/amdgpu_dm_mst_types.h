@@ -60,6 +60,7 @@ enum mst_msg_ready_type {
 struct amdgpu_device;
 struct amdgpu_display_manager;
 struct amdgpu_dm_connector;
+struct aux_payload;
 struct dc_state;
 struct dc_stream_state;
 struct dm_atomic_state;
@@ -99,5 +100,16 @@ int pre_validate_dsc(struct drm_atomic_commit *state,
 enum dc_status dm_dp_mst_is_port_support_mode(
 	struct amdgpu_dm_connector *aconnector,
 	struct dc_stream_state *stream);
+
+#if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
+void amdgpu_dm_mst_reset_mst_connector_setting(struct amdgpu_dm_connector *aconnector);
+bool retrieve_downstream_port_device(struct amdgpu_dm_connector *aconnector);
+bool retrieve_branch_specific_data(struct amdgpu_dm_connector *aconnector);
+ssize_t dm_dp_aux_transfer_result(ssize_t result,
+				  enum aux_return_code_type operation_result);
+void dm_dp_aux_fill_payload_flags(u8 request, struct aux_payload *payload);
+u8 dm_mst_msg_ready_mask(enum mst_msg_ready_type msg_rdy_type);
+void dm_mst_select_esi_dpcd(u8 dpcd_rev, int *dpcd_addr, u8 *dpcd_bytes_to_read);
+#endif
 
 #endif
