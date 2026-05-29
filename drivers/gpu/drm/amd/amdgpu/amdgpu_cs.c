@@ -893,8 +893,6 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 			return r;
 	}
 
-	mutex_lock(&p->bo_list->bo_list_mutex);
-
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	/* Get userptr backing pages. If pages are updated after registered
@@ -1111,7 +1109,6 @@ error_free_pages:
                kvfree(e->user_pages);
        }
 #endif
-	mutex_unlock(&p->bo_list->bo_list_mutex);
 	return r;
 }
 
@@ -1520,7 +1517,6 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 #else
 	amdgpu_mn_unlock(p->mn);
 #endif
-	mutex_unlock(&p->bo_list->bo_list_mutex);
 	return 0;
 }
 
@@ -1594,27 +1590,24 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 
 	r = amdgpu_cs_patch_jobs(&parser);
 	if (r)
-		goto error_backoff;
+		goto error_fini;
 
 	r = amdgpu_cs_vm_handling(&parser);
 	if (r)
-		goto error_backoff;
+		goto error_fini;
 
 	r = amdgpu_cs_sync_rings(&parser);
 	if (r)
-		goto error_backoff;
+		goto error_fini;
 
 	trace_amdgpu_cs_ibs(&parser);
 
 	r = amdgpu_cs_submit(&parser, data);
 	if (r)
-		goto error_backoff;
+		goto error_fini;
 
 	amdgpu_cs_parser_fini(&parser);
 	return 0;
-
-error_backoff:
-	mutex_unlock(&parser.bo_list->bo_list_mutex);
 
 error_fini:
 	amdgpu_cs_parser_fini(&parser);
