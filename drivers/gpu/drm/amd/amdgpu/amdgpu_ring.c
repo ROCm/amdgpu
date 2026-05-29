@@ -484,7 +484,7 @@ bool amdgpu_ring_soft_recovery(struct amdgpu_ring *ring, unsigned int vmid,
 static ssize_t amdgpu_ras_cper_debugfs_read(struct file *f, char __user *buf,
 					    size_t size, loff_t *offset)
 {
-	const uint8_t ring_header_size = 12;
+	const u8 ring_header_size = 12;
 	struct amdgpu_ring *ring = file_inode(f)->i_private;
 	struct ras_cmd_cper_snapshot_req *snapshot_req __free(kfree) =
 		kzalloc_obj(struct ras_cmd_cper_snapshot_req);
@@ -494,49 +494,86 @@ static ssize_t amdgpu_ras_cper_debugfs_read(struct file *f, char __user *buf,
 		kzalloc_obj(struct ras_cmd_cper_record_req);
 	struct ras_cmd_cper_record_rsp *record_rsp __free(kfree) =
 		kzalloc_obj(struct ras_cmd_cper_record_rsp);
-	uint8_t *ring_header __free(kfree) =
+	u32 *ring_header __free(kfree) =
 		kzalloc(ring_header_size, GFP_KERNEL);
-	uint32_t total_cper_num;
-	uint64_t start_cper_id;
+	char __user *data_buf = buf;
+	size_t data_size = size;
+	u32 total_cper_num;
+	u64 start_cper_id;
+	u64 cper_offset;
+	bool read_header;
 	int r;
 
 	if (!snapshot_req || !snapshot_rsp || !record_req || !record_rsp ||
 	    !ring_header)
 		return -ENOMEM;
 
-	if (!(*offset)) {
+	read_header = !(*offset);
+	cper_offset = read_header ? 0 : *offset - 1;
+
+	if (read_header) {
 		/* Need at least 12 bytes for the header on the first read */
 		if (size < ring_header_size)
 			return -EINVAL;
-
-		if (copy_to_user(buf, ring_header, ring_header_size))
-			return -EFAULT;
-		buf += ring_header_size;
-		size -= ring_header_size;
+		data_buf += ring_header_size;
+		data_size -= ring_header_size;
 	}
 
 	r = amdgpu_ras_mgr_handle_ras_cmd(ring->adev,
 					  RAS_CMD__GET_CPER_SNAPSHOT,
 					  snapshot_req, sizeof(struct ras_cmd_cper_snapshot_req),
 					  snapshot_rsp, sizeof(struct ras_cmd_cper_snapshot_rsp));
-	if (r || !snapshot_rsp->total_cper_num)
+	if (r)
 		return r;
+
+	if (!snapshot_rsp->total_cper_num) {
+		if (!read_header)
+			return 0;
+
+		if (copy_to_user(buf, ring_header, ring_header_size))
+			return -EFAULT;
+
+		*offset = 1;
+		return ring_header_size;
+	}
 
 	start_cper_id = snapshot_rsp->start_cper_id;
 	total_cper_num = snapshot_rsp->total_cper_num;
+	if (read_header && !data_size) {
+		if (copy_to_user(buf, ring_header, ring_header_size))
+			return -EFAULT;
 
-	record_req->buf_ptr = (uint64_t)(uintptr_t)buf;
-	record_req->buf_size = size;
-	record_req->cper_start_id = start_cper_id + *offset;
-	record_req->cper_num = total_cper_num;
-	r = amdgpu_ras_mgr_handle_ras_cmd(ring->adev, RAS_CMD__GET_CPER_RECORD,
+		*offset = cper_offset + 1;
+		return ring_header_size;
+	}
+
+	if (!data_size)
+		return 0;
+
+	record_req->buf_ptr = (u64)(uintptr_t)data_buf;
+	record_req->buf_size = data_size;
+	record_req->cper_start_id = start_cper_id + cper_offset;
+	record_req->cper_num = total_cper_num - cper_offset;
+	r = amdgpu_ras_mgr_handle_ras_cmd(ring->adev,
+					  RAS_CMD__GET_CPER_RECORD,
 					  record_req, sizeof(struct ras_cmd_cper_record_req),
 					  record_rsp, sizeof(struct ras_cmd_cper_record_rsp));
 	if (r)
 		return r;
+	if (record_rsp->real_data_size > data_size)
+		return -EIO;
 
-	r = *offset ? record_rsp->real_data_size : record_rsp->real_data_size + ring_header_size;
-	(*offset) += record_rsp->real_cper_num;
+	if (read_header) {
+		ring_header[1] = record_rsp->real_data_size >> 2;
+		ring_header[2] = ring_header[1];
+
+		if (copy_to_user(buf, ring_header, ring_header_size))
+			return -EFAULT;
+	}
+
+	r = read_header ? record_rsp->real_data_size + ring_header_size :
+				record_rsp->real_data_size;
+	*offset = cper_offset + record_rsp->real_cper_num + 1;
 
 	return r;
 }
