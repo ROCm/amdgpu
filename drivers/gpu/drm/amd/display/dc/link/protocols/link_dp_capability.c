@@ -2243,10 +2243,14 @@ void detect_edp_sink_caps(struct dc_link *link)
 	/*
 	 * ALPM is only valid for eDP v1.4 or higher.
 	 */
-	if (link->dpcd_caps.dpcd_rev.raw >= DP_EDP_14)
+	if (link->dpcd_caps.dpcd_rev.raw >= DP_EDP_14) {
 		core_link_read_dpcd(link, DP_RECEIVER_ALPM_CAP,
 			&link->dpcd_caps.alpm_caps.raw,
 			sizeof(link->dpcd_caps.alpm_caps.raw));
+		core_link_read_dpcd(link, DP_SINK_PSR_ACTIVE_VTOTAL_CONTROL_CAP,
+			&link->dpcd_caps.psr_info.psr_active_vtotal_control_cap,
+			sizeof(link->dpcd_caps.psr_info.psr_active_vtotal_control_cap));
+	}
 
 	/*
 	 * Read REPLAY info
