@@ -198,8 +198,7 @@ struct kfd_topology_device *kfd_create_topology_device(
 
 
 #define sysfs_show_gen_prop(buffer, offs, fmt, ...)		\
-		(offs += snprintf(buffer+offs, PAGE_SIZE-offs,	\
-				  fmt, __VA_ARGS__))
+		(offs += sysfs_emit_at(buffer, offs, fmt, __VA_ARGS__))
 #define sysfs_show_32bit_prop(buffer, offs, name, value) \
 		sysfs_show_gen_prop(buffer, offs, "%s %u\n", name, value)
 #define sysfs_show_64bit_prop(buffer, offs, name, value) \
