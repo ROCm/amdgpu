@@ -444,6 +444,7 @@ struct amdgpu_mes_funcs {
 	(adev)->mes.kiq_hw_fini((adev), (xcc_id))
 
 int amdgpu_mes_init_microcode(struct amdgpu_device *adev, int pipe);
+void amdgpu_mes_validate_fw_version(struct amdgpu_device *adev);
 int amdgpu_mes_init(struct amdgpu_device *adev);
 void amdgpu_mes_fini(struct amdgpu_device *adev);
 

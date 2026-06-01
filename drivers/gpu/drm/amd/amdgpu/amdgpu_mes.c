@@ -840,6 +840,18 @@ out:
 	return r;
 }
 
+void amdgpu_mes_validate_fw_version(struct amdgpu_device *adev)
+{
+	u32 fw_from_ucode = adev->mes.fw_version[AMDGPU_MES_SCHED_PIPE];
+	u32 fw_from_reg = adev->mes.sched_version & AMDGPU_MES_VERSION_MASK;
+
+	if (fw_from_ucode != fw_from_reg)
+		dev_info(adev->dev,
+			 "MES firmware reports incorrect version in ucode binary (0x%x vs 0x%x)\n",
+			 fw_from_ucode, fw_from_reg);
+}
+
+
 bool amdgpu_mes_suspend_resume_all_supported(struct amdgpu_device *adev)
 {
 	uint32_t mes_rev = adev->mes.sched_version & AMDGPU_MES_VERSION_MASK;
