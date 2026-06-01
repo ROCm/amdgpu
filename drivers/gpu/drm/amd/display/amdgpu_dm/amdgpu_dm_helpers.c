@@ -1453,6 +1453,7 @@ EXPORT_IF_KUNIT(get_dsc_max_slices);
 void populate_hdmi_info_from_connector(bool enable_frl, struct drm_hdmi_info *hdmi, struct dc_edid_caps *edid_caps)
 {
 	edid_caps->scdc_present = hdmi->scdc.supported;
+#ifdef HAVE_DRM_HDMI_INFO_MAX_LANES
 	if (enable_frl) {
 		edid_caps->max_frl_rate = get_max_frl_rate(hdmi->max_lanes, hdmi->max_frl_rate_per_lane);
 		edid_caps->frl_dsc_support = hdmi->dsc_cap.v_1p2;
@@ -1468,6 +1469,7 @@ void populate_hdmi_info_from_connector(bool enable_frl, struct drm_hdmi_info *hd
 			edid_caps->frl_dsc_total_chunk_kbytes = hdmi->dsc_cap.total_chunk_kbytes;
 		}
 	}
+#endif /* HAVE_DRM_HDMI_INFO_MAX_LANES */
 }
 EXPORT_IF_KUNIT(populate_hdmi_info_from_connector);
 
