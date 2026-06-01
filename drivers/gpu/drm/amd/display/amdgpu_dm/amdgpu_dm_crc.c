@@ -681,7 +681,7 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name)
 		 */
 		ret = wait_for_completion_interruptible_timeout(
 			&commit->hw_done, 10 * HZ);
-		if (ret < 0)
+		if (ret < 0 && ret != -ERESTARTSYS)
 			goto cleanup;
 
 		if (ret == 0) {
