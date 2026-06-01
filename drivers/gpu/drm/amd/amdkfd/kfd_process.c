@@ -1276,10 +1276,12 @@ static void kfd_process_remove_sysfs(struct kfd_process *p)
 	if (!p->kobj)
 		return;
 
-	sysfs_remove_file(p->kobj, &p->attr_pasid);
-	kobject_del(p->kobj_queues);
-	kobject_put(p->kobj_queues);
-	p->kobj_queues = NULL;
+	if (p->kobj_queues) {
+		sysfs_remove_file(p->kobj, &p->attr_pasid);
+		kobject_del(p->kobj_queues);
+		kobject_put(p->kobj_queues);
+		p->kobj_queues = NULL;
+	}
 
 	for (i = 0; i < p->n_pdds; i++) {
 		pdd = p->pdds[i];
@@ -1287,17 +1289,21 @@ static void kfd_process_remove_sysfs(struct kfd_process *p)
 		sysfs_remove_file(p->kobj, &pdd->attr_vram);
 		sysfs_remove_file(p->kobj, &pdd->attr_sdma);
 
-		sysfs_remove_file(pdd->kobj_stats, &pdd->attr_evict);
-		if (pdd->dev->kfd2kgd->get_cu_occupancy)
-			sysfs_remove_file(pdd->kobj_stats,
-					  &pdd->attr_cu_occupancy);
-		kobject_del(pdd->kobj_stats);
-		kobject_put(pdd->kobj_stats);
-		pdd->kobj_stats = NULL;
+		if (pdd->kobj_stats) {
+			sysfs_remove_file(pdd->kobj_stats, &pdd->attr_evict);
+			if (pdd->dev->kfd2kgd->get_cu_occupancy)
+				sysfs_remove_file(pdd->kobj_stats,
+						  &pdd->attr_cu_occupancy);
+			kobject_del(pdd->kobj_stats);
+			kobject_put(pdd->kobj_stats);
+			pdd->kobj_stats = NULL;
+		}
 	}
 
 	for_each_set_bit(i, p->svms.bitmap_supported, p->n_pdds) {
 		pdd = p->pdds[i];
+		if (!pdd->kobj_counters)
+			continue;
 
 		sysfs_remove_file(pdd->kobj_counters, &pdd->attr_faults);
 		sysfs_remove_file(pdd->kobj_counters, &pdd->attr_page_in);
@@ -1377,6 +1383,13 @@ static void kfd_process_wq_release(struct work_struct *work)
 
 	kfd_debugfs_remove_process(p);
 
+	/*
+	 * Remove the proc/sysfs entries before destroying PDDs. The removal path
+	 * walks the PDD array and sysfs callbacks dereference PDD fields, so the
+	 * backing data must remain valid until sysfs removal has completed.
+	 */
+	kfd_process_remove_sysfs(p);
+
 	kfd_process_kunmap_signal_bo(p);
 	kfd_process_free_outstanding_kfd_bos(p);
 	svm_range_list_fini(p);
@@ -1389,11 +1402,6 @@ static void kfd_process_wq_release(struct work_struct *work)
 	mutex_destroy(&p->mutex);
 
 	put_task_struct(p->lead_thread);
-
-	/* the last step is removing process entries under /sys
-	 * to indicate the process has been terminated.
-	 */
-	kfd_process_remove_sysfs(p);
 
 	kfree(p);
 }
