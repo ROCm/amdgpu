@@ -225,9 +225,9 @@ union hdmi_scdc_test_config_Data {
 };
 
 enum hdmi_frl_borrow_mode {
-	BORROW_MODE_NONE,
-	BORROW_MODE_FROM_ACTIVE,
-	BORROW_MODE_FROM_BLANK
+	HDMI_FRL_BORROW_MODE_NONE,
+	HDMI_FRL_BORROW_MODE_FROM_ACTIVE,
+	HDMI_FRL_BORROW_MODE_FROM_BLANK
 };
 
 enum link_result {
