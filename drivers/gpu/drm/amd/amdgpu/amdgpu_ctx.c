@@ -298,32 +298,20 @@ static ktime_t amdgpu_ctx_fini_entity(struct amdgpu_device *adev,
 	return res;
 }
 
-static int amdgpu_ctx_get_stable_pstate(struct amdgpu_ctx *ctx,
-					u32 *stable_pstate)
+static u32 amdgpu_get_stable_pstate(struct amdgpu_device *adev)
 {
-	struct amdgpu_device *adev = ctx->mgr->adev;
-	enum amd_dpm_forced_level current_level;
-
-	current_level = amdgpu_dpm_get_performance_level(adev);
-
-	switch (current_level) {
+	switch (amdgpu_dpm_get_performance_level(adev)) {
 	case AMD_DPM_FORCED_LEVEL_PROFILE_STANDARD:
-		*stable_pstate = AMDGPU_CTX_STABLE_PSTATE_STANDARD;
-		break;
+		return AMDGPU_CTX_STABLE_PSTATE_STANDARD;
 	case AMD_DPM_FORCED_LEVEL_PROFILE_MIN_SCLK:
-		*stable_pstate = AMDGPU_CTX_STABLE_PSTATE_MIN_SCLK;
-		break;
+		return AMDGPU_CTX_STABLE_PSTATE_MIN_SCLK;
 	case AMD_DPM_FORCED_LEVEL_PROFILE_MIN_MCLK:
-		*stable_pstate = AMDGPU_CTX_STABLE_PSTATE_MIN_MCLK;
-		break;
+		return AMDGPU_CTX_STABLE_PSTATE_MIN_MCLK;
 	case AMD_DPM_FORCED_LEVEL_PROFILE_PEAK:
-		*stable_pstate = AMDGPU_CTX_STABLE_PSTATE_PEAK;
-		break;
+		return AMDGPU_CTX_STABLE_PSTATE_PEAK;
 	default:
-		*stable_pstate = AMDGPU_CTX_STABLE_PSTATE_NONE;
-		break;
+		return AMDGPU_CTX_STABLE_PSTATE_NONE;
 	}
-	return 0;
 }
 
 static int amdgpu_ctx_init(struct amdgpu_ctx_mgr *mgr, int32_t priority,
@@ -359,7 +347,7 @@ static int __amdgpu_ctx_set_stable_pstate(struct amdgpu_ctx *ctx,
 	enum amd_dpm_forced_level level;
 	struct amdgpu_ctx *current_ctx;
 	u32 current_stable_pstate;
-	int r = 0;
+	int r;
 
 	lockdep_assert_held(&adev->pm.stable_pstate_ctx_lock);
 
@@ -387,9 +375,9 @@ static int __amdgpu_ctx_set_stable_pstate(struct amdgpu_ctx *ctx,
 	if (current_ctx && current_ctx != ctx)
 		return -EBUSY;
 
-	r = amdgpu_ctx_get_stable_pstate(ctx, &current_stable_pstate);
-	if (r || current_stable_pstate == stable_pstate)
-		return r;
+	current_stable_pstate = amdgpu_get_stable_pstate(adev);
+	if (current_stable_pstate == stable_pstate)
+		return 0;
 
 	r = amdgpu_dpm_force_performance_level(adev, level);
 	if (r)
@@ -666,7 +654,7 @@ static int amdgpu_ctx_stable_pstate(struct amdgpu_device *adev,
 {
 	struct amdgpu_ctx *ctx;
 	struct amdgpu_ctx_mgr *mgr;
-	int r;
+	int r = 0;
 
 	if (!fpriv)
 		return -EINVAL;
@@ -682,7 +670,7 @@ static int amdgpu_ctx_stable_pstate(struct amdgpu_device *adev,
 	if (set)
 		r = amdgpu_ctx_set_stable_pstate(ctx, *stable_pstate);
 	else
-		r = amdgpu_ctx_get_stable_pstate(ctx, stable_pstate);
+		*stable_pstate = amdgpu_get_stable_pstate(adev);
 
 	mutex_unlock(&mgr->lock);
 	return r;
