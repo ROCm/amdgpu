@@ -4603,8 +4603,8 @@ fail:
 /**
  * dc_update_modified_pix_clock_for_dsc_with_padding() - update pix_clk for dsc with padding
  *
- * @dc_stream_state: Pointer to the stream structure.
- * @dc_crtc_timing: Pointer to the stream dc_crtc_timing structure.
+ * @stream: Pointer to the stream structure.
+ * @timing: Pointer to the stream dc_crtc_timing structure.
  * @dsc_padding_params: Pointer to the DSC padding parameters structure.
  *
  * This function updated the pix_clk for dsc with padding stored in pipe_ctx
