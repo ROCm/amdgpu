@@ -1827,7 +1827,6 @@ INDIRECT_CALLABLE_DECLARE(struct dst_entry *ipv4_dst_check(struct dst_entry *,
 int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	enum skb_drop_reason reason;
-	struct sock *rsk;
 
 	reason = psp_sk_rx_policy_check(sk, skb);
 	if (reason)
@@ -1863,24 +1862,21 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 			return 0;
 		if (nsk != sk) {
 			reason = tcp_child_process(sk, nsk, skb);
-			if (reason) {
-				rsk = nsk;
+			sock_put(nsk);
+			if (reason)
 				goto reset;
-			}
 			return 0;
 		}
 	} else
 		sock_rps_save_rxhash(sk, skb);
 
 	reason = tcp_rcv_state_process(sk, skb);
-	if (reason) {
-		rsk = sk;
+	if (reason)
 		goto reset;
-	}
 	return 0;
 
 reset:
-	tcp_v4_send_reset(rsk, skb, sk_rst_convert_drop_reason(reason));
+	tcp_v4_send_reset(sk, skb, sk_rst_convert_drop_reason(reason));
 discard:
 	sk_skb_reason_drop(sk, skb, reason);
 	/* Be careful here. If this function gets more complicated and
@@ -2193,13 +2189,16 @@ lookup:
 
 				rst_reason = sk_rst_convert_drop_reason(drop_reason);
 				tcp_v4_send_reset(nsk, skb, rst_reason);
+				sock_put(nsk);
 				goto discard_and_relse;
 			}
+			sock_put(nsk);
 			sock_put(sk);
 			return 0;
 		}
 	}
 
+	isn = 0;
 process:
 	if (static_branch_unlikely(&ip4_min_ttl)) {
 		/* min_ttl can be changed concurrently from do_ip_setsockopt() */
@@ -2229,6 +2228,7 @@ process:
 	th = (const struct tcphdr *)skb->data;
 	iph = ip_hdr(skb);
 	tcp_v4_fill_cb(skb, iph, th);
+	TCP_SKB_CB(skb)->tcp_tw_isn = isn;
 
 	skb->dev = NULL;
 
@@ -2315,7 +2315,6 @@ do_time_wait:
 			sk = sk2;
 			tcp_v4_restore_cb(skb);
 			refcounted = false;
-			__this_cpu_write(tcp_tw_isn, isn);
 			goto process;
 		}
 

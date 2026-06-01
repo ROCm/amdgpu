@@ -1572,6 +1572,7 @@ static noinline_for_stack int rtnl_fill_vfinfo(struct sk_buff *skb,
 		port_guid.vf = ivi.vf;
 
 	memcpy(vf_mac.mac, ivi.mac, sizeof(ivi.mac));
+	memset(&vf_broadcast, 0, sizeof(vf_broadcast));
 	memcpy(vf_broadcast.broadcast, dev->broadcast, dev->addr_len);
 	vf_vlan.vlan = ivi.vlan;
 	vf_vlan.qos = ivi.qos;
@@ -6327,8 +6328,9 @@ static int rtnl_stats_get(struct sk_buff *skb, struct nlmsghdr *nlh,
 				  NETLINK_CB(skb).portid, nlh->nlmsg_seq, 0,
 				  0, &filters, &idxattr, &prividx, extack);
 	if (err < 0) {
-		/* -EMSGSIZE implies BUG in if_nlmsg_stats_size */
-		WARN_ON(err == -EMSGSIZE);
+		/* -EMSGSIZE implies BUG in if_nlmsg_stats_size
+		 * or a too big nested attribute.
+		 */
 		kfree_skb(nskb);
 	} else {
 		err = rtnl_unicast(nskb, net, NETLINK_CB(skb).portid);

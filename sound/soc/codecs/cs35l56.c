@@ -867,11 +867,16 @@ static void cs35l56_dsp_work(struct work_struct *work)
 	if (!cs35l56->base.init_done)
 		return;
 
-	pm_runtime_get_sync(cs35l56->base.dev);
+	PM_RUNTIME_ACQUIRE(cs35l56->base.dev, pm);
+	ret = PM_RUNTIME_ACQUIRE_ERR(&pm);
+	if (ret) {
+		dev_err(cs35l56->base.dev, "dsp_work failed to runtime-resume: %d\n", ret);
+		return;
+	}
 
 	ret = cs35l56_read_prot_status(&cs35l56->base, &firmware_missing, &firmware_version);
 	if (ret)
-		goto err;
+		return;
 
 	/* Populate fw file qualifier with the revision and security state */
 	kfree(cs35l56->dsp.fwf_name);
@@ -887,7 +892,7 @@ static void cs35l56_dsp_work(struct work_struct *work)
 	}
 
 	if (!cs35l56->dsp.fwf_name)
-		goto err;
+		return;
 
 	dev_dbg(cs35l56->base.dev, "DSP fwf name: '%s' system name: '%s'\n",
 		cs35l56->dsp.fwf_name, cs35l56->dsp.system_name);
@@ -905,8 +910,6 @@ static void cs35l56_dsp_work(struct work_struct *work)
 		cs35l56_patch(cs35l56, firmware_missing);
 
 	cs35l56_log_tuning(&cs35l56->base, &cs35l56->dsp.cs_dsp);
-err:
-	pm_runtime_put_autosuspend(cs35l56->base.dev);
 }
 
 static struct snd_soc_dapm_context *cs35l56_power_up_for_cal(struct cs35l56_private *cs35l56)
@@ -1956,9 +1959,9 @@ int cs35l56_common_probe(struct cs35l56_private *cs35l56)
 		goto err;
 	}
 
-	ret = devm_snd_soc_register_component(cs35l56->base.dev,
-					      &soc_component_dev_cs35l56,
-					      cs35l56_dai, ARRAY_SIZE(cs35l56_dai));
+	ret = snd_soc_register_component(cs35l56->base.dev,
+					 &soc_component_dev_cs35l56,
+					 cs35l56_dai, ARRAY_SIZE(cs35l56_dai));
 	if (ret < 0) {
 		dev_err_probe(cs35l56->base.dev, ret, "Register codec failed\n");
 		goto err;
@@ -1969,6 +1972,9 @@ int cs35l56_common_probe(struct cs35l56_private *cs35l56)
 err:
 	gpiod_set_value_cansleep(cs35l56->base.reset_gpio, 0);
 	regulator_bulk_disable(ARRAY_SIZE(cs35l56->supplies), cs35l56->supplies);
+
+	if (cs35l56->dsp_wq)
+		destroy_workqueue(cs35l56->dsp_wq);
 
 	return ret;
 }
@@ -2057,6 +2063,8 @@ EXPORT_SYMBOL_NS_GPL(cs35l56_init, "SND_SOC_CS35L56_CORE");
 
 void cs35l56_remove(struct cs35l56_private *cs35l56)
 {
+	snd_soc_unregister_component(cs35l56->base.dev);
+
 	cs35l56->base.init_done = false;
 
 	/*

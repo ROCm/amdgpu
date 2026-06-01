@@ -108,6 +108,9 @@ module_param_named(unrestricted_guest,
 bool __read_mostly enable_ept_ad_bits = 1;
 module_param_named(eptad, enable_ept_ad_bits, bool, 0444);
 
+bool __read_mostly enable_cet = 1;
+module_param_named(cet, enable_cet, bool, 0444);
+
 static bool __read_mostly emulate_invalid_guest_state = true;
 module_param(emulate_invalid_guest_state, bool, 0444);
 
@@ -4476,7 +4479,7 @@ void vmx_set_constant_host_state(struct vcpu_vmx *vmx)
 	 * SSP is reloaded from IA32_PL3_SSP. Check SDM Vol.2A/B Chapter
 	 * 3 and 4 for details.
 	 */
-	if (cpu_has_load_cet_ctrl()) {
+	if (enable_cet) {
 		vmcs_writel(HOST_S_CET, kvm_host.s_cet);
 		vmcs_writel(HOST_SSP, 0);
 		vmcs_writel(HOST_INTR_SSP_TABLE, 0);
@@ -4532,6 +4535,10 @@ static u32 vmx_get_initial_vmentry_ctrl(void)
 	if (vmx_pt_mode_is_system())
 		vmentry_ctrl &= ~(VM_ENTRY_PT_CONCEAL_PIP |
 				  VM_ENTRY_LOAD_IA32_RTIT_CTL);
+
+	if (!enable_cet)
+		vmentry_ctrl &= ~VM_ENTRY_LOAD_CET_STATE;
+
 	/*
 	 * IA32e mode, and loading of EFER and PERF_GLOBAL_CTRL are toggled dynamically.
 	 */
@@ -4545,6 +4552,9 @@ static u32 vmx_get_initial_vmentry_ctrl(void)
 static u32 vmx_get_initial_vmexit_ctrl(void)
 {
 	u32 vmexit_ctrl = vmcs_config.vmexit_ctrl;
+
+	if (!enable_cet)
+		vmexit_ctrl &= ~VM_EXIT_LOAD_CET_STATE;
 
 	/*
 	 * Not used by KVM and never set in vmcs01 or vmcs02, but emulated for
@@ -7029,8 +7039,8 @@ static void vmx_set_rvi(int vector)
 int vmx_sync_pir_to_irr(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vt *vt = to_vt(vcpu);
+	bool max_irr_is_from_pir;
 	int max_irr;
-	bool got_posted_interrupt;
 
 	if (KVM_BUG_ON(!enable_apicv, vcpu->kvm))
 		return -EIO;
@@ -7042,17 +7052,22 @@ int vmx_sync_pir_to_irr(struct kvm_vcpu *vcpu)
 		 * But on x86 this is just a compiler barrier anyway.
 		 */
 		smp_mb__after_atomic();
-		got_posted_interrupt =
-			kvm_apic_update_irr(vcpu, vt->pi_desc.pir, &max_irr);
+		max_irr_is_from_pir = kvm_apic_update_irr(vcpu, vt->pi_desc.pir,
+							  &max_irr);
 	} else {
 		max_irr = kvm_lapic_find_highest_irr(vcpu);
-		got_posted_interrupt = false;
+		max_irr_is_from_pir = false;
 	}
 
 	/*
-	 * Newly recognized interrupts are injected via either virtual interrupt
-	 * delivery (RVI) or KVM_REQ_EVENT.  Virtual interrupt delivery is
-	 * disabled in two cases:
+	 * If APICv is enabled and L2 is not active, then update the Requesting
+	 * Virtual Interrupt (RVI) portion of vmcs01.GUEST_INTR_STATUS with the
+	 * highest priority IRR to deliver the IRQ via Virtual Interrupt
+	 * Delivery.  Note, this is required even if the highest priority IRQ
+	 * was already pending in the IRR, as RVI isn't updated in lockstep with
+	 * the IRR (unlike apic->irr_pending).
+	 *
+	 * For the cases where Virtual Interrupt Delivery can't be used:
 	 *
 	 * 1) If L2 is running and the vCPU has a new pending interrupt.  If L1
 	 * wants to exit on interrupts, KVM_REQ_EVENT is needed to synthesize a
@@ -7063,10 +7078,29 @@ int vmx_sync_pir_to_irr(struct kvm_vcpu *vcpu)
 	 * 2) If APICv is disabled for this vCPU, assigned devices may still
 	 * attempt to post interrupts.  The posted interrupt vector will cause
 	 * a VM-Exit and the subsequent entry will call sync_pir_to_irr.
+	 *
+	 * In both cases, set KVM_REQ_EVENT if and only if the highest priority
+	 * pending IRQ came from the PIR, as setting KVM_REQ_EVENT if any IRQ
+	 * is pending may put the vCPU into an infinite loop, e.g. if the IRQ
+	 * is blocked, then it will stay pending until an IRQ window is opened.
+	 *
+	 * Note!  It's possible that one or more IRQs were moved from the PIR
+	 * to the IRR _without_ max_irr_is_from_pir being true!  I.e. if there
+	 * was a higher priority IRQ already pending in the IRR.  Not setting
+	 * KVM_REQ_EVENT in this case is intentional and safe.  If APICv is
+	 * inactive, or L2 is running with exit-on-interrupt off (in vmcs12),
+	 * i.e. without nested virtual interrupt delivery, then there's no need
+	 * to request an IRQ window as the lower priority IRQ only needs to be
+	 * delivered when the higher priority IRQ is dismissed from the ISR,
+	 * i.e. on the next EOI, and EOIs are always intercepted if APICv is
+	 * disabled or if L2 is running without nested VID.  If L2 is running
+	 * exit-on-interrupt on (in vmcs12), then the higher priority IRQ will
+	 * trigger a nested VM-Exit, at which point KVM will re-evaluate L1's
+	 * pending IRQs.
 	 */
 	if (!is_guest_mode(vcpu) && kvm_vcpu_apicv_active(vcpu))
 		vmx_set_rvi(max_irr);
-	else if (got_posted_interrupt)
+	else if (max_irr_is_from_pir)
 		kvm_make_request(KVM_REQ_EVENT, vcpu);
 
 	return max_irr;
@@ -7082,9 +7116,6 @@ void vmx_load_eoi_exitmap(struct kvm_vcpu *vcpu, u64 *eoi_exit_bitmap)
 	vmcs_write64(EOI_EXIT_BITMAP2, eoi_exit_bitmap[2]);
 	vmcs_write64(EOI_EXIT_BITMAP3, eoi_exit_bitmap[3]);
 }
-
-void vmx_do_interrupt_irqoff(unsigned long entry);
-void vmx_do_nmi_irqoff(void);
 
 static void handle_nm_fault_irqoff(struct kvm_vcpu *vcpu)
 {
@@ -7127,17 +7158,8 @@ static void handle_external_interrupt_irqoff(struct kvm_vcpu *vcpu,
 	    "unexpected VM-Exit interrupt info: 0x%x", intr_info))
 		return;
 
-	/*
-	 * Invoke the kernel's IRQ handler for the vector.  Use the FRED path
-	 * when it's available even if FRED isn't fully enabled, e.g. even if
-	 * FRED isn't supported in hardware, in order to avoid the indirect
-	 * CALL in the non-FRED path.
-	 */
 	kvm_before_interrupt(vcpu, KVM_HANDLING_IRQ);
-	if (IS_ENABLED(CONFIG_X86_FRED))
-		fred_entry_from_kvm(EVENT_TYPE_EXTINT, vector);
-	else
-		vmx_do_interrupt_irqoff(gate_offset((gate_desc *)host_idt_base + vector));
+	x86_entry_from_kvm(EVENT_TYPE_EXTINT, vector);
 	kvm_after_interrupt(vcpu);
 
 	vcpu->arch.at_instruction_boundary = true;
@@ -7447,10 +7469,7 @@ noinstr void vmx_handle_nmi(struct kvm_vcpu *vcpu)
 		return;
 
 	kvm_before_interrupt(vcpu, KVM_HANDLING_NMI);
-	if (cpu_feature_enabled(X86_FEATURE_FRED))
-		fred_entry_from_kvm(EVENT_TYPE_NMI, NMI_VECTOR);
-	else
-		vmx_do_nmi_irqoff();
+	x86_entry_from_kvm(EVENT_TYPE_NMI, NMI_VECTOR);
 	kvm_after_interrupt(vcpu);
 }
 
@@ -8131,7 +8150,7 @@ static __init void vmx_set_cpu_caps(void)
 	 * VMX_BASIC[bit56] == 0, inject #CP at VMX entry with error code
 	 * fails, so disable CET in this case too.
 	 */
-	if (!cpu_has_load_cet_ctrl() || !enable_unrestricted_guest ||
+	if (!enable_cet || !enable_unrestricted_guest ||
 	    !cpu_has_vmx_basic_no_hw_errcode_cc()) {
 		kvm_cpu_cap_clear(X86_FEATURE_SHSTK);
 		kvm_cpu_cap_clear(X86_FEATURE_IBT);
@@ -8605,6 +8624,9 @@ __init int vmx_hardware_setup(void)
 	    !cpu_has_vmx_ept_mt_wb() ||
 	    !cpu_has_vmx_invept_global())
 		enable_ept = 0;
+
+	if (!cpu_has_load_cet_ctrl())
+		enable_cet = 0;
 
 	/* NX support is required for shadow paging. */
 	if (!enable_ept && !boot_cpu_has(X86_FEATURE_NX)) {

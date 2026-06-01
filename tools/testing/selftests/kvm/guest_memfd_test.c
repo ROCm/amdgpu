@@ -14,10 +14,10 @@
 #include <linux/bitmap.h>
 #include <linux/falloc.h>
 #include <linux/sizes.h>
-#include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include "kvm_syscalls.h"
 #include "kvm_util.h"
 #include "numaif.h"
 #include "test_util.h"
@@ -510,7 +510,12 @@ static void test_guest_memfd_guest(void)
 		    "Default VM type should support INIT_SHARED, supported flags = 0x%x",
 		    vm_check_cap(vm, KVM_CAP_GUEST_MEMFD_FLAGS));
 
-	size = vm->page_size;
+	/*
+	 * Use the max of the host or guest page size for all operations, as
+	 * KVM requires guest_memfd files and memslots to be sized to multiples
+	 * of the host page size.
+	 */
+	size = max_t(size_t, vm->page_size, page_size);
 	fd = vm_create_guest_memfd(vm, size, GUEST_MEMFD_FLAG_MMAP |
 					     GUEST_MEMFD_FLAG_INIT_SHARED);
 	vm_set_user_memory_region2(vm, slot, KVM_MEM_GUEST_MEMFD, gpa, size, NULL, fd, 0);
@@ -519,7 +524,7 @@ static void test_guest_memfd_guest(void)
 	memset(mem, 0xaa, size);
 	kvm_munmap(mem, size);
 
-	virt_pg_map(vm, gpa, gpa);
+	virt_map(vm, gpa, gpa, size / vm->page_size);
 	vcpu_args_set(vcpu, 2, gpa, size);
 	vcpu_run(vcpu);
 
