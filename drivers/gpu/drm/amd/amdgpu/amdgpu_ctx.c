@@ -638,6 +638,14 @@ static int amdgpu_ctx_stable_pstate(struct amdgpu_device *adev,
 	if (!ctx)
 		return -EINVAL;
 
+	/*
+	 * The get path is odd in this uapi - it will check whether the context
+	 * id exist, but otherwise does nothing with it. In other words, the
+	 * uapi has historically been implemented as being able to query the
+	 * global device state, as long as the caller supplies a random valid
+	 * context id.
+	 */
+
 	if (set)
 		r = amdgpu_ctx_set_stable_pstate(ctx, *stable_pstate);
 	else
