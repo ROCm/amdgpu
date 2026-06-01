@@ -759,8 +759,6 @@ out:
 	return r;
 }
 
-static void amdgpu_discovery_sysfs_fini(struct amdgpu_device *adev);
-
 void amdgpu_discovery_fini(struct amdgpu_device *adev)
 {
 	if (adev->discovery.ip_top && !adev->discovery.ip_top->standalone_mode)
@@ -1499,7 +1497,7 @@ static void amdgpu_discovery_sysfs_die_free(struct ip_die_entry *ip_die_entry)
 	kobject_put(&ip_die_entry->ip_kset.kobj);
 }
 
-static void amdgpu_discovery_sysfs_fini(struct amdgpu_device *adev)
+void amdgpu_discovery_sysfs_fini(struct amdgpu_device *adev)
 {
 	struct ip_discovery_top *ip_top = adev->discovery.ip_top;
 	struct list_head *el, *tmp;
@@ -1508,6 +1506,7 @@ static void amdgpu_discovery_sysfs_fini(struct amdgpu_device *adev)
 	if (!ip_top)
 		return;
 
+	adev->discovery.ip_top = NULL;
 	die_kset = &ip_top->die_kset;
 	spin_lock(&die_kset->list_lock);
 	list_for_each_prev_safe(el, tmp, &die_kset->list) {

@@ -41,6 +41,7 @@ struct amdgpu_discovery_info {
 	bool reserve_tmr;
 };
 
+void amdgpu_discovery_sysfs_fini(struct amdgpu_device *adev);
 void amdgpu_discovery_fini(struct amdgpu_device *adev);
 int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev);
 
