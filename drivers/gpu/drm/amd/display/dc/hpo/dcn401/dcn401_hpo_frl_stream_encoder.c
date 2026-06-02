@@ -143,8 +143,8 @@ void hpo_enc401_read_state(
 	struct hpo_frl_stream_encoder *enc,
 	struct hpo_frl_stream_encoder_state *state)
 {
-	int pixel_encoding;
-	int color_depth;
+	uint32_t pixel_encoding;
+	uint32_t color_depth;
 //	int odm_combine;
 	struct dcn401_hpo_frl_stream_encoder *enc401 = DCN401_HPO_FRL_STRENC_FROM_HPO_FRL_STRENC(enc);
 
