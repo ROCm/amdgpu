@@ -640,6 +640,7 @@ void amdgpu_dm_ism_init(struct amdgpu_dm_ism *ism,
 	INIT_DELAYED_WORK(&ism->delayed_work, dm_ism_delayed_work_func);
 	INIT_DELAYED_WORK(&ism->sso_delayed_work, dm_ism_sso_delayed_work_func);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_ism_init);
 
 
 void amdgpu_dm_ism_fini(struct amdgpu_dm_ism *ism)
@@ -647,3 +648,4 @@ void amdgpu_dm_ism_fini(struct amdgpu_dm_ism *ism)
 	cancel_delayed_work_sync(&ism->sso_delayed_work);
 	cancel_delayed_work_sync(&ism->delayed_work);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_ism_fini);
