@@ -1155,10 +1155,10 @@ struct dc_debug_options {
 	bool force_vrr;
 	bool force_fva;
 	int max_frl_rate;
-	int  force_frl_rate;
+	unsigned int  force_frl_rate;
 	bool ignore_ffe;
-	int  select_ffe;
-	int  limit_ffe;
+	unsigned int  select_ffe;
+	unsigned int  limit_ffe;
 	bool force_frl_always;
 	bool force_frl_dsc;
 	bool force_frl_max;
