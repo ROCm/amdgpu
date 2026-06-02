@@ -1060,7 +1060,7 @@ static bool is_dtbclk_required(struct dc *dc, struct dc_state *context)
 static enum dcn_zstate_support_state  decide_zstate_support(struct dc *dc, struct dc_state *context)
 {
 	int plane_count;
-	int i;
+	unsigned int i;
 
 	plane_count = 0;
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
