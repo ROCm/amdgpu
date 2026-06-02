@@ -266,7 +266,7 @@ struct dc_hdmi_frl_link_settings {
 };
 
 struct dc_hdmi_frl_flags {
-	int  force_frl_rate;
+	unsigned int force_frl_rate;
 	bool ignore_ffe;
 	int  select_ffe;
 	int  limit_ffe;
