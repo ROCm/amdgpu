@@ -233,6 +233,12 @@ enum dc_edid_status dm_helpers_parse_edid_caps(
 					__func__, connector->name, edid_caps->frl_dsc_10bpc, edid_caps->frl_dsc_12bpc, \
 					edid_caps->frl_dsc_all_bpp, edid_caps->frl_dsc_native_420, edid_caps->frl_dsc_max_slices, \
 					edid_caps->frl_dsc_max_frl_rate, edid_caps->frl_dsc_total_chunk_kbytes);
+		if (aconnector->hdmi_comp_auto) {
+			edid_caps->panel_patch.hdmi_comp_auto = true;
+			link->ctx->dc->debug.force_frl_max = true;
+			link->ctx->dc->debug.force_frl_dsc = true;
+			drm_dbg_driver(connector->dev, "%s: HDMI_FRL [%s] hdmi_comp_auto --> enabled\n", __func__, connector->name);
+		}
 	}
 
 	apply_edid_quirks(link, edid_buf, edid_caps);

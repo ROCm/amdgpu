@@ -905,6 +905,9 @@ struct amdgpu_dm_connector {
 	unsigned int hdmi_hpd_debounce_delay_ms;
 	struct delayed_work hdmi_hpd_debounce_work;
 	struct dc_sink *hdmi_prev_sink;
+
+	/* HDMI compliance automation */
+	bool hdmi_comp_auto;
 };
 
 static inline void amdgpu_dm_set_mst_status(uint8_t *status,
