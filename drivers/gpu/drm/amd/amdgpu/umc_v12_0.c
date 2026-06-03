@@ -197,31 +197,6 @@ static bool umc_v12_0_check_ecc_err_status(struct amdgpu_device *adev,
 	return false;
 }
 
-static uint32_t umc_v12_0_get_die_id(struct amdgpu_device *adev,
-		uint64_t mca_addr, uint64_t retired_page)
-{
-	uint32_t die = 0;
-
-	/* we only calculate die id for nps1 mode right now */
-	die += ((((retired_page >> 12) & 0x1ULL)^
-	    ((retired_page >> 20) & 0x1ULL) ^
-	    ((retired_page >> 27) & 0x1ULL) ^
-	    ((retired_page >> 34) & 0x1ULL) ^
-	    ((retired_page >> 41) & 0x1ULL)) << 0);
-
-	/* the original PA_C4 and PA_R13 may be cleared in retired_page, so
-	 * get them from mca_addr.
-	 */
-	die += ((((retired_page >> 13) & 0x1ULL) ^
-	    ((mca_addr >> 5) & 0x1ULL) ^
-	    ((retired_page >> 28) & 0x1ULL) ^
-	    ((mca_addr >> 23) & 0x1ULL) ^
-	    ((retired_page >> 42) & 0x1ULL)) << 1);
-	die &= 3;
-
-	return die;
-}
-
 static void umc_v12_0_mca_ipid_parse(struct amdgpu_device *adev, uint64_t ipid,
 		uint32_t *did, uint32_t *ch, uint32_t *umc_inst, uint32_t *sid)
 {
@@ -240,7 +215,6 @@ struct amdgpu_umc_ras umc_v12_0_ras = {
 		.hw_ops = NULL,
 	},
 	.check_ecc_err_status = umc_v12_0_check_ecc_err_status,
-	.get_die_id_from_pa = umc_v12_0_get_die_id,
 	.get_retire_flip_bits = umc_v12_0_get_retire_flip_bits,
 	.mca_ipid_parse = umc_v12_0_mca_ipid_parse,
 };

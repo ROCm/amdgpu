@@ -665,7 +665,6 @@ amdgpu_ras_eeprom_append_table(struct amdgpu_ras_eeprom_control *control,
 			       const u32 num)
 {
 	struct amdgpu_ras *con = amdgpu_ras_get_context(to_amdgpu_device(control));
-	struct amdgpu_device *adev = to_amdgpu_device(control);
 	u32 a, b, i;
 	u8 *buf, *pp;
 	int res;
@@ -770,10 +769,7 @@ amdgpu_ras_eeprom_append_table(struct amdgpu_ras_eeprom_control *control,
 		% control->ras_max_record_count;
 
 	/*old asics only save pa to eeprom like before*/
-	if (IP_VERSION_MAJ(amdgpu_ip_version(adev, UMC_HWIP, 0)) < 12)
-		control->ras_num_pa_recs += num;
-	else
-		control->ras_num_mca_recs += num;
+	control->ras_num_pa_recs += num;
 
 	control->ras_num_bad_pages = con->bad_page_num;
 Out:

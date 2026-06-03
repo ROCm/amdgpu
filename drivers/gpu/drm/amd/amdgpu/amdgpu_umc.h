@@ -103,13 +103,6 @@ struct amdgpu_umc_ras {
 					void *ras_error_status);
 	bool (*check_ecc_err_status)(struct amdgpu_device *adev,
 			enum amdgpu_mca_error_type type, void *ras_error_status);
-	int (*convert_ras_err_addr)(struct amdgpu_device *adev,
-			struct ras_err_data *err_data,
-			struct ta_ras_query_address_input *addr_in,
-			struct ta_ras_query_address_output *addr_out,
-			bool dump_addr);
-	uint32_t (*get_die_id_from_pa)(struct amdgpu_device *adev,
-			uint64_t mca_addr, uint64_t retired_page);
 	void (*get_retire_flip_bits)(struct amdgpu_device *adev);
 	void (*mca_ipid_parse)(struct amdgpu_device *adev, uint64_t ipid,
 			uint32_t *did, uint32_t *ch, uint32_t *umc_inst, uint32_t *sid);
@@ -179,10 +172,4 @@ int amdgpu_umc_loop_channels(struct amdgpu_device *adev,
 
 void amdgpu_umc_handle_bad_pages(struct amdgpu_device *adev,
 			void *ras_error_status);
-int amdgpu_umc_pages_in_a_row(struct amdgpu_device *adev,
-			struct ras_err_data *err_data, uint64_t pa_addr);
-int amdgpu_umc_lookup_bad_pages_in_a_row(struct amdgpu_device *adev,
-			uint64_t pa_addr, uint64_t *pfns, int len);
-int amdgpu_umc_pa2mca(struct amdgpu_device *adev,
-		uint64_t pa, uint64_t *mca, enum amdgpu_memory_partition nps);
 #endif
