@@ -1170,7 +1170,7 @@ uint32_t amdgpu_kiq_rreg(struct amdgpu_device *adev, uint32_t reg, uint32_t xcc_
 	BUG_ON(!ring->funcs->emit_rreg);
 
 	spin_lock_irqsave(&kiq->ring_lock, flags);
-	if (amdgpu_device_wb_get(adev, &reg_val_offs)) {
+	if (amdgpu_wb_get(adev, &reg_val_offs)) {
 		pr_err("critical bug! too many kiq readers\n");
 		goto failed_unlock;
 	}
@@ -1213,7 +1213,7 @@ uint32_t amdgpu_kiq_rreg(struct amdgpu_device *adev, uint32_t reg, uint32_t xcc_
 
 	mb();
 	value = adev->wb.wb[reg_val_offs];
-	amdgpu_device_wb_free(adev, reg_val_offs);
+	amdgpu_wb_free(adev, reg_val_offs);
 	return value;
 
 failed_undo:
@@ -1222,7 +1222,7 @@ failed_unlock:
 	spin_unlock_irqrestore(&kiq->ring_lock, flags);
 failed_kiq_read:
 	if (reg_val_offs)
-		amdgpu_device_wb_free(adev, reg_val_offs);
+		amdgpu_wb_free(adev, reg_val_offs);
 	dev_err(adev->dev, "failed to read reg:%x\n", reg);
 	return ~0;
 }

@@ -521,7 +521,7 @@ static int mes_userq_preempt(struct amdgpu_usermode_queue *queue)
 
 	if (queue->state != AMDGPU_USERQ_STATE_MAPPED)
 		return 0;
-	r = amdgpu_device_wb_get(adev, &fence_offset);
+	r = amdgpu_wb_get(adev, &fence_offset);
 	if (r)
 		return r;
 
@@ -549,7 +549,7 @@ static int mes_userq_preempt(struct amdgpu_usermode_queue *queue)
 	r = -ETIMEDOUT;
 
 out:
-	amdgpu_device_wb_free(adev, fence_offset);
+	amdgpu_wb_free(adev, fence_offset);
 	return r;
 }
 

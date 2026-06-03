@@ -183,7 +183,7 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 			 adev->mes.sdma_hqd_mask[0]);
 
 	for (i = 0; i < AMDGPU_MAX_MES_PIPES * num_xcc; i++) {
-		r = amdgpu_device_wb_get(adev, &adev->mes.sch_ctx_offs[i]);
+		r = amdgpu_wb_get(adev, &adev->mes.sch_ctx_offs[i]);
 		if (r) {
 			dev_err(adev->dev,
 				"(%d) ring trail_fence_offs wb alloc failed\n",
@@ -195,7 +195,7 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 		adev->mes.sch_ctx_ptr[i] =
 			(uint64_t *)&adev->wb.wb[adev->mes.sch_ctx_offs[i]];
 
-		r = amdgpu_device_wb_get(adev,
+		r = amdgpu_wb_get(adev,
 				 &adev->mes.query_status_fence_offs[i]);
 		if (r) {
 			dev_err(adev->dev,
@@ -268,9 +268,9 @@ error_doorbell:
 error:
 	for (i = 0; i < AMDGPU_MAX_MES_PIPES * num_xcc; i++) {
 		if (adev->mes.sch_ctx_ptr[i])
-			amdgpu_device_wb_free(adev, adev->mes.sch_ctx_offs[i]);
+			amdgpu_wb_free(adev, adev->mes.sch_ctx_offs[i]);
 		if (adev->mes.query_status_fence_ptr[i])
-			amdgpu_device_wb_free(adev,
+			amdgpu_wb_free(adev,
 				      adev->mes.query_status_fence_offs[i]);
 		if (adev->mes.hung_queue_db_array_gpu_obj[i])
 			amdgpu_bo_free_kernel(&adev->mes.hung_queue_db_array_gpu_obj[i],
@@ -300,9 +300,9 @@ void amdgpu_mes_fini(struct amdgpu_device *adev)
 					 &adev->mes.hung_queue_db_array_gpu_addr[i],
 					 &adev->mes.hung_queue_db_array_cpu_addr[i]);
 		if (adev->mes.sch_ctx_ptr[i])
-			amdgpu_device_wb_free(adev, adev->mes.sch_ctx_offs[i]);
+			amdgpu_wb_free(adev, adev->mes.sch_ctx_offs[i]);
 		if (adev->mes.query_status_fence_ptr[i])
-			amdgpu_device_wb_free(adev,
+			amdgpu_wb_free(adev,
 				      adev->mes.query_status_fence_offs[i]);
 	}
 
@@ -572,7 +572,7 @@ uint32_t amdgpu_mes_rreg(struct amdgpu_device *adev, uint32_t reg,
 	uint64_t read_val_gpu_addr;
 	uint32_t *read_val_ptr;
 
-	if (amdgpu_device_wb_get(adev, &addr_offset)) {
+	if (amdgpu_wb_get(adev, &addr_offset)) {
 		dev_err(adev->dev, "critical bug! too many mes readers\n");
 		goto error;
 	}
@@ -598,7 +598,7 @@ uint32_t amdgpu_mes_rreg(struct amdgpu_device *adev, uint32_t reg,
 
 error:
 	if (addr_offset)
-		amdgpu_device_wb_free(adev, addr_offset);
+		amdgpu_wb_free(adev, addr_offset);
 	return val;
 }
 

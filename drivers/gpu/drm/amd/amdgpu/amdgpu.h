@@ -114,6 +114,7 @@
 #include "amdgpu_reg_state.h"
 #include "amdgpu_userq.h"
 #include "amdgpu_eviction_fence.h"
+#include "amdgpu_wb.h"
 #include "amdgpu_ip.h"
 #include "amdgpu_sa.h"
 #if defined(CONFIG_DRM_AMD_ISP)
@@ -434,73 +435,6 @@ struct amdgpu_fpriv {
 };
 
 int amdgpu_file_to_fpriv(struct file *filp, struct amdgpu_fpriv **fpriv);
-
-/*
- * Writeback
- */
-#define AMDGPU_MAX_WB 1024	/* Reserve at most 1024 WB slots for amdgpu-owned rings. */
-
-/**
- * struct amdgpu_wb - This struct is used for small GPU memory allocation.
- *
- * This struct is used to allocate a small amount of GPU memory that can be
- * used to shadow certain states into the memory. This is especially useful for
- * providing easy CPU access to some states without requiring register access
- * (e.g., if some block is power gated, reading register may be problematic).
- *
- * Note: the term writeback was initially used because many of the amdgpu
- * components had some level of writeback memory, and this struct initially
- * described those components.
- */
-struct amdgpu_wb {
-
-	/**
-	 * @wb_obj:
-	 *
-	 * Buffer Object used for the writeback memory.
-	 */
-	struct amdgpu_bo	*wb_obj;
-
-	/**
-	 * @wb:
-	 *
-	 * Pointer to the first writeback slot. In terms of CPU address
-	 * this value can be accessed directly by using the offset as an index.
-	 * For the GPU address, it is necessary to use gpu_addr and the offset.
-	 */
-	uint32_t		*wb;
-
-	/**
-	 * @gpu_addr:
-	 *
-	 * Writeback base address in the GPU.
-	 */
-	uint64_t		gpu_addr;
-
-	/**
-	 * @num_wb:
-	 *
-	 * Number of writeback slots reserved for amdgpu.
-	 */
-	u32			num_wb;
-
-	/**
-	 * @used:
-	 *
-	 * Track the writeback slot already used.
-	 */
-	unsigned long		used[DIV_ROUND_UP(AMDGPU_MAX_WB, BITS_PER_LONG)];
-
-	/**
-	 * @lock:
-	 *
-	 * Protects read and write of the used field array.
-	 */
-	spinlock_t		lock;
-};
-
-int amdgpu_device_wb_get(struct amdgpu_device *adev, u32 *wb);
-void amdgpu_device_wb_free(struct amdgpu_device *adev, u32 wb);
 
 /*
  * Benchmarking
