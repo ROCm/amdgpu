@@ -874,6 +874,8 @@ static ssize_t amdgpu_get_pp_od_clk_voltage(struct device *dev,
 
 	for (clk_index = 0 ; clk_index < ARRAY_SIZE(od_clocks) ; clk_index++) {
 		amdgpu_dpm_emit_clock_levels(adev, od_clocks[clk_index], buf, &size);
+		if (unlikely(size >= (PAGE_SIZE - 1)))
+			break;
 	}
 
 	if (size == 0)
