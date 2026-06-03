@@ -437,14 +437,6 @@ int amdgpu_file_to_fpriv(struct file *filp, struct amdgpu_fpriv **fpriv);
 int amdgpu_benchmark(struct amdgpu_device *adev, int test_number);
 
 /*
- * ASIC specific register table accessible by UMD
- */
-struct amdgpu_allowed_register_entry {
-	uint32_t reg_offset;
-	bool grbm_indexed;
-};
-
-/*
  * ASIC specific functions.
  */
 struct amdgpu_asic_funcs {
