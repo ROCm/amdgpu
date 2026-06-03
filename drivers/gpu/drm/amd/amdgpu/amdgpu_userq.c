@@ -120,14 +120,9 @@ static void amdgpu_userq_hang_detect_work(struct work_struct *work)
 			     hang_detect_work.work);
 	struct amdgpu_userq_mgr *uq_mgr = queue->userq_mgr;
 	struct amdgpu_device *adev = uq_mgr->adev;
-	const int queue_types[] = {
-		AMDGPU_RING_TYPE_COMPUTE,
-		AMDGPU_RING_TYPE_GFX,
-		AMDGPU_RING_TYPE_SDMA
-	};
-	const int num_queue_types = ARRAY_SIZE(queue_types);
+	const struct amdgpu_userq_funcs *userq_funcs =
+		adev->userq_funcs[queue->queue_type];
 	bool gpu_reset = false;
-	int i, r;
 
 	if (unlikely(adev->debug_disable_gpu_ring_reset)) {
 		dev_err(adev->dev, "userq reset disabled by debug mask\n");
@@ -141,28 +136,15 @@ static void amdgpu_userq_hang_detect_work(struct work_struct *work)
 	if (!amdgpu_gpu_recovery)
 		return;
 
-	/*
-	 * Iterate through all queue types to detect and reset problematic queues
-	 * Process each queue type in the defined order
-	 */
-	for (i = 0; i < num_queue_types; i++) {
-		int ring_type = queue_types[i];
-		const struct amdgpu_userq_funcs *funcs =
-			adev->userq_funcs[ring_type];
-
-		if (!amdgpu_userq_is_reset_type_supported(adev, ring_type,
-							  AMDGPU_RESET_TYPE_PER_QUEUE))
-				continue;
-
-		if (atomic_read(&uq_mgr->userq_count[ring_type]) > 0 &&
-		    funcs && funcs->detect_and_reset) {
-			r = funcs->detect_and_reset(adev, ring_type);
-			if (r) {
-				gpu_reset = true;
-				break;
-			}
-		}
+	if (amdgpu_userq_is_reset_type_supported(adev, queue->queue_type,
+						 AMDGPU_RESET_TYPE_PER_QUEUE)) {
+		int r = userq_funcs->reset(queue);
+		if (r)
+			gpu_reset = true;
+	} else {
+		gpu_reset = true;
 	}
+
 	/*
 	 * Don't schedule the work here! Scheduling or queue work from one reset
 	 * handler to another is illegal if you don't take extra precautions!
