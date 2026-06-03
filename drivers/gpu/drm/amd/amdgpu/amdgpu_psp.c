@@ -3753,6 +3753,9 @@ int amdgpu_psp_get_fw_type(struct amdgpu_firmware_info *ucode,
 	case AMDGPU_UCODE_ID_ISP:
 		*type = GFX_FW_TYPE_ISP;
 		break;
+	case AMDGPU_UCODE_ID_MP5:
+		*type = GFX_FW_TYPE_MP5;
+		break;
 	case AMDGPU_UCODE_ID_MAXIMUM:
 	default:
 		return -EINVAL;
@@ -3804,6 +3807,10 @@ static void psp_print_fw_hdr(struct psp_context *psp,
 		break;
 	case AMDGPU_UCODE_ID_SMC:
 		hdr = (struct common_firmware_header *)adev->pm.fw->data;
+		amdgpu_ucode_print_smc_hdr(hdr);
+		break;
+	case AMDGPU_UCODE_ID_MP5:
+		hdr = (struct common_firmware_header *)adev->pm.mp5_fw->data;
 		amdgpu_ucode_print_smc_hdr(hdr);
 		break;
 	default:

@@ -322,6 +322,7 @@ enum psp_gfx_fw_type {
 	GFX_FW_TYPE_VPE                             = 102,
 	GFX_FW_TYPE_JPEG_RAM                        = 128,  /**< JPEG Command buffer */
 	GFX_FW_TYPE_P2S_TABLE                       = 129,
+	GFX_FW_TYPE_MP5                             = 158,  /* MP5 ucode    */
 	GFX_FW_TYPE_MAX
 };
 

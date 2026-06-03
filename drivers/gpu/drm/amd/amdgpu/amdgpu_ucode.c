@@ -753,6 +753,8 @@ const char *amdgpu_ucode_name(enum AMDGPU_UCODE_ID ucode_id)
 		return "RS64_MEC_P3_STACK";
 	case AMDGPU_UCODE_ID_ISP:
 		return "ISP";
+	case AMDGPU_UCODE_ID_MP5:
+		return "MP5";
 	default:
 		return "UNKNOWN UCODE";
 	}
