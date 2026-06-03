@@ -975,52 +975,6 @@ static int __amdgpu_ras_eeprom_read(struct amdgpu_ras_eeprom_control *control,
 	return res;
 }
 
-int amdgpu_ras_eeprom_read_idx(struct amdgpu_ras_eeprom_control *control,
-			struct eeprom_table_record *record, u32 rec_idx,
-			const u32 num)
-{
-	struct amdgpu_device *adev = to_amdgpu_device(control);
-	uint64_t ts, end_idx;
-	int i, ret;
-	u64 mca, ipid;
-	u32 cu, mem_channel, mcumc_id;
-
-	if (!amdgpu_ras_smu_eeprom_supported(adev))
-		return 0;
-
-	if (!adev->umc.ras || !adev->umc.ras->mca_ipid_parse)
-		return -EOPNOTSUPP;
-
-	end_idx = rec_idx + num;
-	for (i = rec_idx; i < end_idx; i++) {
-		ret = amdgpu_ras_smu_get_badpage_mca_addr(adev, i, &mca);
-		if (ret)
-			return ret;
-
-		ret = amdgpu_ras_smu_get_badpage_ipid(adev, i, &ipid);
-		if (ret)
-			return ret;
-
-		ret = amdgpu_ras_smu_get_timestamp(adev, i, &ts);
-		if (ret)
-			return ret;
-
-		record[i - rec_idx].address = mca;
-		/* retired_page (pa) is unused now */
-		record[i - rec_idx].retired_page = 0x1ULL;
-		record[i - rec_idx].ts = ts;
-		record[i - rec_idx].err_type = AMDGPU_RAS_EEPROM_ERR_NON_RECOVERABLE;
-
-		adev->umc.ras->mca_ipid_parse(adev, ipid,
-			&cu, &mem_channel, &mcumc_id, NULL);
-		record[i - rec_idx].cu = (u8)cu;
-		record[i - rec_idx].mem_channel = (u8)mem_channel;
-		record[i - rec_idx].mcumc_id = (u8)mcumc_id;
-	}
-
-	return 0;
-}
-
 /**
  * amdgpu_ras_eeprom_read -- read EEPROM
  * @control: pointer to control structure
@@ -1041,9 +995,6 @@ int amdgpu_ras_eeprom_read(struct amdgpu_ras_eeprom_control *control,
 	int i, res;
 	u8 *buf, *pp;
 	u32 g0, g1;
-
-	if (amdgpu_ras_smu_eeprom_supported(adev))
-		return amdgpu_ras_eeprom_read_idx(control, record, 0, num);
 
 	if (!__is_ras_eeprom_supported(adev))
 		return 0;
