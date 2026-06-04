@@ -362,6 +362,10 @@ struct kfd2kgd_calls {
 					enum kfd_ioctl_pc_sample_type type,
 					uint64_t intval,
 					uint32_t inst);
+
+	int (*hqd_sdma_get_counter)(struct amdgpu_device *adev,
+				    void *mqd, uint32_t num_sdma_queues_per_eng,
+				    uint64_t *val);
 };
 
 #endif	/* KGD_KFD_INTERFACE_H_INCLUDED */
