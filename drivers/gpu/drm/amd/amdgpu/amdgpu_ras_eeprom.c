@@ -159,6 +159,9 @@
 
 static bool __is_ras_eeprom_supported(struct amdgpu_device *adev)
 {
+	if (amdgpu_sriov_vf(adev))
+		return false;
+
 	switch (amdgpu_ip_version(adev, MP1_HWIP, 0)) {
 	case IP_VERSION(11, 0, 2): /* VEGA20 and ARCTURUS */
 	case IP_VERSION(11, 0, 7): /* Sienna cichlid */
@@ -1973,7 +1976,7 @@ void amdgpu_ras_check_bad_page_status(struct amdgpu_device *adev)
 	struct amdgpu_ras *ras = amdgpu_ras_get_context(adev);
 	struct amdgpu_ras_eeprom_control *control = ras ? &ras->eeprom_control : NULL;
 
-	if (!control || amdgpu_bad_page_threshold == 0)
+	if (!__is_ras_eeprom_supported(adev) || !control || amdgpu_bad_page_threshold == 0)
 		return;
 
 	if (control->ras_num_bad_pages > ras->bad_page_cnt_threshold) {
