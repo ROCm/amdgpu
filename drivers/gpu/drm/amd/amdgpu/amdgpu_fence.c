@@ -842,7 +842,6 @@ amdgpu_ring_find_guilty_fence(struct amdgpu_ring *ring)
 
 	last_seq = amdgpu_fence_read(ring) & ring->fence_drv.num_fences_mask;
 	seq = ring->fence_drv.sync_seq & ring->fence_drv.num_fences_mask;
-	ring->ring_backup_entries_to_copy = 0;
 
 	do {
 		last_seq++;
