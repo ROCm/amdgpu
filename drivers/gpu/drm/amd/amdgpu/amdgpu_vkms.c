@@ -141,7 +141,7 @@ static const struct drm_crtc_funcs amdgpu_vkms_crtc_funcs = {
 #ifndef DRM_CRTC_VBLANK_TIMER_FUNCS
 static void amdgpu_vkms_crtc_atomic_enable(struct drm_crtc *crtc,
 #if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE)
-					   struct drm_atomic_state *state)
+					   struct drm_atomic_commit *state)
 #else
 					   struct drm_crtc_state *state)
 #endif
@@ -151,7 +151,7 @@ static void amdgpu_vkms_crtc_atomic_enable(struct drm_crtc *crtc,
 
 static void amdgpu_vkms_crtc_atomic_disable(struct drm_crtc *crtc,
 #if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE)
-					   struct drm_atomic_state *state)
+					   struct drm_atomic_commit *state)
 #else
 					   struct drm_crtc_state *state)
 #endif
@@ -161,7 +161,7 @@ static void amdgpu_vkms_crtc_atomic_disable(struct drm_crtc *crtc,
 
 static void amdgpu_vkms_crtc_atomic_flush(struct drm_crtc *crtc,
 #if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
-					   struct drm_atomic_state *state)
+					   struct drm_atomic_commit *state)
 #else
 					   struct drm_crtc_state *state)
 #endif
@@ -314,7 +314,7 @@ static int amdgpu_vkms_plane_atomic_check(struct drm_plane *plane,
 #else
 					  struct drm_plane_state *new_plane_state)
 {
-	struct drm_atomic_state *state = new_plane_state->state;
+	struct drm_atomic_commit *state = new_plane_state->state;
 #endif
 	struct drm_crtc_state *crtc_state;
 	int ret;

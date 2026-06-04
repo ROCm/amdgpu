@@ -4,6 +4,18 @@ dnl # drm: Convert connector_helper_funcs->atomic_check to accept drm_atomic_sta
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK], [
 	AC_KERNEL_DO_BACKGROUND([
+		dnl # Try new name (drm_atomic_commit) first
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_modeset_helper_vtables.h>
+			#include <drm/drm_atomic.h>
+		], [
+			struct drm_connector_helper_funcs *p = NULL;
+			p->atomic_check(NULL, (struct drm_atomic_commit*)NULL);
+		], [
+			AC_DEFINE(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE, 1,
+				[drm_connector_helper_funcs->atomic_check() wants struct drm_atomic_state/drm_atomic_commit arg])
+		])
+		dnl # Try old name (drm_atomic_state) for older kernels
 		AC_KERNEL_TRY_COMPILE([
 			#include <drm/drm_modeset_helper_vtables.h>
 			#include <drm/drm_atomic.h>
@@ -12,7 +24,7 @@ AC_DEFUN([AC_AMDGPU_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK], [
 			p->atomic_check(NULL, (struct drm_atomic_state*)NULL);
 		], [
 			AC_DEFINE(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE, 1,
-				[drm_connector_helper_funcs->atomic_check() wants struct drm_atomic_state arg])
+				[drm_connector_helper_funcs->atomic_check() wants struct drm_atomic_state/drm_atomic_commit arg])
 		])
 	])
 ])
@@ -23,6 +35,18 @@ dnl # drm: Pass the full state to connectors atomic functions
 dnl #
 AC_DEFUN([AC_AMDGPU_CONNECTOR_HELPER_FUNCTS_ATOMIC_BEST_ENCODER], [
 	AC_KERNEL_DO_BACKGROUND([
+		dnl # Try new name (drm_atomic_commit) first
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_modeset_helper_vtables.h>
+			#include <drm/drm_atomic.h>
+		], [
+			struct drm_connector_helper_funcs *p = NULL;
+			p->atomic_best_encoder(NULL, (struct drm_atomic_commit*)NULL);
+		], [
+			AC_DEFINE(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_BEST_ENCODER_ARG_DRM_ATOMIC_STATE, 1,
+				[atomic_best_encoder take 2nd arg type of state as struct drm_atomic_state/drm_atomic_commit])
+		])
+		dnl # Try old name (drm_atomic_state) for older kernels
 		AC_KERNEL_TRY_COMPILE([
 			#include <drm/drm_modeset_helper_vtables.h>
 			#include <drm/drm_atomic.h>
@@ -31,7 +55,7 @@ AC_DEFUN([AC_AMDGPU_CONNECTOR_HELPER_FUNCTS_ATOMIC_BEST_ENCODER], [
 			p->atomic_best_encoder(NULL, (struct drm_atomic_state*)NULL);
 		], [
 			AC_DEFINE(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_BEST_ENCODER_ARG_DRM_ATOMIC_STATE, 1,
-				[atomic_best_encoder take 2nd arg type of state as struct drm_atomic_state])
+				[atomic_best_encoder take 2nd arg type of state as struct drm_atomic_state/drm_atomic_commit])
 		])
 	])
 ])

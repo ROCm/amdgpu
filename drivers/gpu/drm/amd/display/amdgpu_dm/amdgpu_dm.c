@@ -8903,7 +8903,7 @@ amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
 #else
 				 struct drm_connector_state *new_con_state)
 {
-	struct drm_atomic_state *state = new_con_state->state;
+	struct drm_atomic_commit *state = new_con_state->state;
 #endif
 	struct drm_connector_state *old_con_state =
 		drm_atomic_get_old_connector_state(state, conn);

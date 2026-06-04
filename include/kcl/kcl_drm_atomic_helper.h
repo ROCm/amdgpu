@@ -45,7 +45,7 @@ void __drm_atomic_helper_crtc_reset(struct drm_crtc *crtc,
 #endif
 
 #ifndef HAVE_DRM_ATOMIC_HELPER_CALC_TIMESTAMPING_CONSTANTS
-void drm_atomic_helper_calc_timestamping_constants(struct drm_atomic_state *state);
+void drm_atomic_helper_calc_timestamping_constants(struct drm_atomic_commit *state);
 #endif
 
 #ifndef HAVE_DRM_ATOMIC_PLANE_ENABLING

@@ -7,6 +7,18 @@ dnl # drm/atomic: Pass the full state to CRTC atomic begin and flush
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK], [
 	AC_KERNEL_DO_BACKGROUND([
+		dnl # Try new name (drm_atomic_commit) first
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_modeset_helper_vtables.h>
+			#include <drm/drm_atomic.h>
+		], [
+			struct drm_crtc_helper_funcs *p = NULL;
+			p->atomic_check(NULL, (struct drm_atomic_commit*)NULL);
+		], [
+			AC_DEFINE(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE, 1,
+				[drm_crtc_helper_funcs->atomic_check()/atomic_flush()/atomic_begin() wants struct drm_atomic_state/drm_atomic_commit arg])
+		])
+		dnl # Try old name (drm_atomic_state) for older kernels
 		AC_KERNEL_TRY_COMPILE([
 			#include <drm/drm_modeset_helper_vtables.h>
 			#include <drm/drm_atomic.h>
@@ -15,7 +27,7 @@ AC_DEFUN([AC_AMDGPU_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK], [
 			p->atomic_check(NULL, (struct drm_atomic_state*)NULL);
 		], [
 			AC_DEFINE(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE, 1,
-				[drm_crtc_helper_funcs->atomic_check()/atomic_flush()/atomic_begin() wants struct drm_atomic_state arg])
+				[drm_crtc_helper_funcs->atomic_check()/atomic_flush()/atomic_begin() wants struct drm_atomic_state/drm_atomic_commit arg])
 		])
 	])
 ])
@@ -26,6 +38,18 @@ dnl # drm/atomic: Pass the full state to CRTC atomic enable/disable
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE], [
 	AC_KERNEL_DO_BACKGROUND([
+		dnl # Try new name (drm_atomic_commit) first
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_modeset_helper_vtables.h>
+			#include <drm/drm_atomic.h>
+		], [
+			struct drm_crtc_helper_funcs *p = NULL;
+			p->atomic_enable(NULL, (struct drm_atomic_commit*)NULL);
+		], [
+			AC_DEFINE(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE, 1,
+				[drm_crtc_helper_funcs->atomic_enable()/atomic_disable() wants struct drm_atomic_state/drm_atomic_commit arg])
+		])
+		dnl # Try old name (drm_atomic_state) for older kernels
 		AC_KERNEL_TRY_COMPILE([
 			#include <drm/drm_modeset_helper_vtables.h>
 			#include <drm/drm_atomic.h>
@@ -34,7 +58,7 @@ AC_DEFUN([AC_AMDGPU_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE], [
 			p->atomic_enable(NULL, (struct drm_atomic_state*)NULL);
 		], [
 			AC_DEFINE(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE, 1,
-				[drm_crtc_helper_funcs->atomic_enable()/atomic_disable() wants struct drm_atomic_state arg])
+				[drm_crtc_helper_funcs->atomic_enable()/atomic_disable() wants struct drm_atomic_state/drm_atomic_commit arg])
 		])
 	])
 ])

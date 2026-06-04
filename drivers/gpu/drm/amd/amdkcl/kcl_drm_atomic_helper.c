@@ -49,7 +49,7 @@ EXPORT_SYMBOL(__drm_atomic_helper_crtc_reset);
  * "Extract drm_atomic_helper_calc_timestamping_constants()"
  *
  */
-void drm_atomic_helper_calc_timestamping_constants(struct drm_atomic_state *state)
+void drm_atomic_helper_calc_timestamping_constants(struct drm_atomic_commit *state)
 {
 	struct drm_crtc_state *new_crtc_state;
 	struct drm_crtc *crtc;
