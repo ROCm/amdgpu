@@ -13,4 +13,5 @@
 #include <kcl/kcl_drm_print.h>
 #include <kcl/kcl_tracepoint.h>
 #include <kcl/kcl_workqueue.h>
+#include <kcl/kcl_timekeeping.h>
 #endif

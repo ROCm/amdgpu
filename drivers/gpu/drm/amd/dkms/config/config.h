@@ -1332,6 +1332,9 @@
 /* usleep_range_state() is available */
 #define HAVE_USLEEP_RANGE_STATE 1
 
+/* us_to_ktime() is available */
+#define HAVE_US_TO_KTIME 1
+
 /* vfs_iocb_iter_read() is available */
 #define HAVE_VFS_IOCB_ITER_READ 1
 
