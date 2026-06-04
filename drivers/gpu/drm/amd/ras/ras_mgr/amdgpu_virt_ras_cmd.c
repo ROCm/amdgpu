@@ -108,15 +108,19 @@ static int amdgpu_virt_ras_remote_ioctl_cmd(struct ras_core_context *ras_core,
 	ret = amdgpu_virt_send_remote_ras_cmd(ras_core->dev,
 				shared_mem.gpa, mem_len);
 	if (!ret) {
-		if (rcmd->cmd_res) {
-			ret = rcmd->cmd_res;
+		uint32_t cmd_res = READ_ONCE(rcmd->cmd_res);
+		uint32_t osz;
+
+		if (cmd_res) {
+			ret = cmd_res;
 			goto out;
 		}
 
-		cmd->cmd_res = rcmd->cmd_res;
-		cmd->output_size = rcmd->output_size;
-		if (rcmd->output_size && (rcmd->output_size <= output_size) && output_data)
-			memcpy(output_data, rcmd->output_buff_raw, rcmd->output_size);
+		osz = READ_ONCE(rcmd->output_size);
+		cmd->cmd_res = cmd_res;
+		cmd->output_size = osz;
+		if (osz && osz <= output_size && output_data)
+			memcpy(output_data, rcmd->output_buff_raw, osz);
 	}
 
 out:
@@ -202,7 +206,7 @@ static bool amdgpu_virt_ras_check_batch_cached(struct ras_cmd_batch_trace_record
 }
 
 static int amdgpu_virt_ras_get_batch_records(struct ras_core_context *ras_core, uint64_t batch_id,
-			struct ras_log_info **trace_arr, uint32_t arr_num,
+			struct ras_log_info *trace_arr, uint32_t arr_num,
 			struct ras_cmd_batch_trace_record_rsp *rsp_cache)
 {
 	struct ras_cmd_batch_trace_record_req req = {
@@ -238,7 +242,8 @@ static int amdgpu_virt_ras_get_batch_records(struct ras_core_context *ras_core, 
 	}
 
 	for (i = 0; i < batch->trace_num && i < arr_num; i++)
-		trace_arr[i] = &rsp->records[batch->offset + i];
+		memcpy(&trace_arr[i],
+			&rsp->records[batch->offset + i], sizeof(*trace_arr));
 
 	return i;
 }
@@ -255,19 +260,22 @@ static int amdgpu_virt_ras_get_cper_records(struct ras_core_context *ras_core,
 		(struct ras_cmd_cper_record_rsp *)cmd->output_buff_raw;
 	struct ras_log_batch_overview *overview = &virt_ras->batch_mgr.batch_overview;
 	struct ras_cmd_batch_trace_record_rsp *rsp_cache = &virt_ras->batch_mgr.batch_trace;
-	struct ras_log_info **trace;
+	struct ras_log_info *trace;
+	uint32_t trace_count = MAX_RECORD_PER_BATCH;
 	uint32_t offset = 0, real_data_len = 0;
 	uint64_t batch_id;
 	uint8_t *out_buf;
 	int ret = 0, i, count;
 
-	if (cmd->input_size != sizeof(struct ras_cmd_cper_record_req))
+	if (cmd->input_size != sizeof(struct ras_cmd_cper_record_req) ||
+		(cmd->output_buf_size < sizeof(*rsp)))
 		return RAS_CMD__ERROR_INVALID_INPUT_SIZE;
 
-	if (!req->buf_size || !req->buf_ptr || !req->cper_num)
+	if (!req->buf_size || !req->buf_ptr || !req->cper_num ||
+	    req->buf_size > RAS_CMD_MAX_CPER_BUF_SZ)
 		return RAS_CMD__ERROR_INVALID_INPUT_DATA;
 
-	trace = kcalloc(MAX_RECORD_PER_BATCH, sizeof(*trace), GFP_KERNEL);
+	trace = kcalloc(trace_count, sizeof(*trace), GFP_KERNEL);
 	if (!trace)
 		return RAS_CMD__ERROR_GENERIC;
 
@@ -284,7 +292,7 @@ static int amdgpu_virt_ras_get_cper_records(struct ras_core_context *ras_core,
 		if (batch_id >= overview->last_batch_id)
 			break;
 		count = amdgpu_virt_ras_get_batch_records(ras_core, batch_id,
-							  trace, MAX_RECORD_PER_BATCH,
+							  trace, trace_count,
 							  rsp_cache);
 		if (count > 0) {
 			ret = ras_cper_generate_cper(ras_core, trace, count,
@@ -470,7 +478,7 @@ int amdgpu_virt_ras_handle_cmd(struct ras_core_context *ras_core,
 
 	cmd->cmd_res = res;
 
-	if (cmd->output_size > cmd->output_buf_size) {
+	if (!res && (cmd->output_size > cmd->output_buf_size)) {
 		RAS_DEV_ERR(ras_core->dev,
 			"Output data size 0x%x exceeds buffer size 0x%x!\n",
 			cmd->output_size, cmd->output_buf_size);

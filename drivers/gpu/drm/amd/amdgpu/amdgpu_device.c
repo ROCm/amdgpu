@@ -1956,6 +1956,19 @@ static void amdgpu_uid_fini(struct amdgpu_device *adev)
 	adev->uid_info = NULL;
 }
 
+static struct pci_dev *amdgpu_device_find_parent(struct amdgpu_device *adev)
+{
+	struct pci_dev *parent = adev->pdev;
+
+	/* skip upstream/downstream switches internal to dGPU */
+	while ((parent = pci_upstream_bridge(parent))) {
+		if (parent->vendor == PCI_VENDOR_ID_ATI)
+			continue;
+	}
+
+	return parent;
+}
+
 /**
  * amdgpu_device_ip_early_init - run early init for hardware IPs
  *
@@ -5991,8 +6004,6 @@ static void amdgpu_device_partner_bandwidth(struct amdgpu_device *adev,
 					    enum pci_bus_speed *speed,
 					    enum pcie_link_width *width)
 {
-	struct pci_dev *parent = adev->pdev;
-
 	if (!speed || !width)
 		return;
 
@@ -6000,13 +6011,11 @@ static void amdgpu_device_partner_bandwidth(struct amdgpu_device *adev,
 	*width = PCIE_LNK_WIDTH_UNKNOWN;
 
 	if (amdgpu_device_pcie_dynamic_switching_supported(adev)) {
-		while ((parent = pci_upstream_bridge(parent))) {
-			/* skip upstream/downstream switches internal to dGPU*/
-			if (parent->vendor == PCI_VENDOR_ID_ATI)
-				continue;
+		struct pci_dev *parent = amdgpu_device_find_parent(adev);
+
+		if (parent) {
 			*speed = pcie_get_speed_cap(parent);
 			*width = pcie_get_width_cap(parent);
-			break;
 		}
 	} else {
 		/* use the current speeds rather than max if switching is not supported */
@@ -6033,22 +6042,15 @@ static void amdgpu_device_gpu_bandwidth(struct amdgpu_device *adev,
 	if (!speed || !width)
 		return;
 
-	parent = pci_upstream_bridge(parent);
-	if (parent && parent->vendor == PCI_VENDOR_ID_ATI) {
-		/* use the upstream/downstream switches internal to dGPU */
+	/* use the device itself */
+	*speed = pcie_get_speed_cap(adev->pdev);
+	*width = pcie_get_width_cap(adev->pdev);
+
+	/* use the link outside the device */
+	parent = amdgpu_device_find_parent(adev);
+	if (parent) {
 		*speed = pcie_get_speed_cap(parent);
 		*width = pcie_get_width_cap(parent);
-		while ((parent = pci_upstream_bridge(parent))) {
-			if (parent->vendor == PCI_VENDOR_ID_ATI) {
-				/* use the upstream/downstream switches internal to dGPU */
-				*speed = pcie_get_speed_cap(parent);
-				*width = pcie_get_width_cap(parent);
-			}
-		}
-	} else {
-		/* use the device itself */
-		*speed = pcie_get_speed_cap(adev->pdev);
-		*width = pcie_get_width_cap(adev->pdev);
 	}
 }
 

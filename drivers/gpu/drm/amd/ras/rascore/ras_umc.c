@@ -391,9 +391,8 @@ static int ras_umc_update_eeprom_ram_data(struct ras_core_context *ras_core,
 			data->space_left--;
 		}
 	} else {
-		memcpy(&data->bps[data->count], bps, sizeof(*data->bps));
-		data->count++;
-		data->space_left--;
+		RAS_DEV_ERR(ras_core->dev, "Failed to convert record to nps pages!");
+		return -EINVAL;
 	}
 
 	return 0;

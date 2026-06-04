@@ -405,12 +405,6 @@ enum clock_type {
 	clock_type_dtbclk,
 };
 
-
-struct state_dependent_clocks {
-	int display_clk_khz;
-	int pixel_clk_khz;
-};
-
 struct clk_mgr_internal {
 	struct clk_mgr base;
 	int smu_ver;
@@ -428,8 +422,6 @@ struct clk_mgr_internal {
 	const struct clk_mgr_registers *regs;
 	const struct clk_mgr_shift *clk_mgr_shift;
 	const struct clk_mgr_mask *clk_mgr_mask;
-
-	struct state_dependent_clocks max_clks_by_state[DM_PP_CLOCKS_MAX_STATES];
 
 	/*TODO: figure out which of the below fields should be here vs in asic specific portion */
 	/* Cache the status of DFS-bypass feature*/
@@ -477,8 +469,6 @@ struct clk_mgr_internal {
 	 */
 	int dprefclk_ss_divider;
 
-	enum dm_pp_clocks_state max_clks_state;
-	enum dm_pp_clocks_state cur_min_clks_state;
 	bool periodic_retraining_disabled;
 
 	unsigned int cur_phyclk_req_table[MAX_LINKS];

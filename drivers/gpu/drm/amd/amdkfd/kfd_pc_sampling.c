@@ -41,9 +41,11 @@
  * 1.5 - Support gfx12_0_0 and gfx12_0_1 Host Trap PC sampling
  * 1.6 - Increase gfx12_0_0 and gfx12_0_1 Host Trap PC sampling lower bound
  * 1.7 - Support gfx9_4_4 Host Trap PC sampling/Stochastic PC sampling
+ * 1.8 - Support gfx12_1_0 Host Trap PC sampling
+ * 1.8 - Support gfx12_1_0 Stochastic PC sampling
  */
 #define KFD_IOCTL_PCS_MAJOR_VERSION	1
-#define KFD_IOCTL_PCS_MINOR_VERSION	7
+#define KFD_IOCTL_PCS_MINOR_VERSION	9
 
 struct supported_pc_sample_info {
 	uint32_t ip_version;
@@ -60,6 +62,10 @@ const struct kfd_pc_sample_info sample_info_stoch_cycle_9_4_3 = {
 	0, 256, (1ULL << 31), KFD_IOCTL_PCS_FLAG_POWER_OF_2,
 	    KFD_IOCTL_PCS_METHOD_STOCHASTIC, KFD_IOCTL_PCS_TYPE_CLOCK_CYCLES };
 
+const struct kfd_pc_sample_info sample_info_stoch_cycle_12_0_0 = {
+	0, 256, (1ULL << 20), KFD_IOCTL_PCS_FLAG_POWER_OF_2,
+	    KFD_IOCTL_PCS_METHOD_STOCHASTIC, KFD_IOCTL_PCS_TYPE_CLOCK_CYCLES };
+
 struct supported_pc_sample_info supported_formats[] = {
 	{ IP_VERSION(9, 4, 2), &sample_info_hosttrap_9_0_0 },
 	{ IP_VERSION(9, 4, 3), &sample_info_hosttrap_9_0_0 },
@@ -70,6 +76,8 @@ struct supported_pc_sample_info supported_formats[] = {
 	{ IP_VERSION(9, 5, 0), &sample_info_stoch_cycle_9_4_3 },
 	{ IP_VERSION(12, 0, 0), &sample_info_hosttrap_12_0_0 },
 	{ IP_VERSION(12, 0, 1), &sample_info_hosttrap_12_0_0 },
+	{ IP_VERSION(12, 1, 0), &sample_info_hosttrap_12_0_0 },
+	{ IP_VERSION(12 ,1, 0), &sample_info_stoch_cycle_12_0_0 },
 };
 
 static int kfd_pc_sample_thread(void *param)

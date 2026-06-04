@@ -1641,6 +1641,20 @@ static int gfx_v9_4_3_xcc_rlc_load_microcode(struct amdgpu_device *adev,
 	return 0;
 }
 
+static void gfx_v9_4_3_xcc_rlc_spm_clk_enable(struct amdgpu_device *adev, bool enable, int xcc_id)
+{
+	uint32_t data = 0;
+
+	data = RREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_CLK_CNTL);
+
+	if (enable)
+		data |= RLC_CLK_CNTL__RLC_SPM_CLK_CNTL_MASK;
+	else
+		data &= (~RLC_CLK_CNTL__RLC_SPM_CLK_CNTL_MASK);
+
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_CLK_CNTL, data);
+}
+
 static int gfx_v9_4_3_xcc_rlc_resume(struct amdgpu_device *adev, int xcc_id)
 {
 	int r;
@@ -1658,6 +1672,8 @@ static int gfx_v9_4_3_xcc_rlc_resume(struct amdgpu_device *adev, int xcc_id)
 	amdgpu_gfx_rlc_enter_safe_mode(adev, xcc_id);
 	/* disable CG */
 	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_CGCG_CGLS_CTRL, 0);
+
+	gfx_v9_4_3_xcc_rlc_spm_clk_enable(adev, true, xcc_id);
 	gfx_v9_4_3_xcc_init_pg(adev, xcc_id);
 	amdgpu_gfx_rlc_exit_safe_mode(adev, xcc_id);
 
@@ -2371,6 +2387,7 @@ static void gfx_v9_4_3_xcc_fini(struct amdgpu_device *adev, int xcc_id)
 	}
 
 	gfx_v9_4_3_xcc_kcq_fini_register(adev, xcc_id);
+	gfx_v9_4_3_xcc_rlc_spm_clk_enable(adev, false, xcc_id);
 	gfx_v9_4_3_xcc_cp_compute_enable(adev, false, xcc_id);
 }
 
@@ -2620,8 +2637,7 @@ static void gfx_v9_4_3_spm_start(struct amdgpu_device *adev, int xcc_id)
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[xcc_id].ring;
 	uint32_t data = 0;
 
-	data = RREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_PERFMON_CNTL);
-	data |= RLC_SPM_PERFMON_CNTL__PERFMON_RING_MODE_MASK;
+	data = RLC_SPM_PERFMON_CNTL__PERFMON_RING_MODE_MASK;
 	gfx_v9_4_3_write_data_to_reg(kiq_ring, 0, false,
 			SOC15_REG_OFFSET(GC, GET_INST(GC, xcc_id), regRLC_SPM_PERFMON_CNTL), data);
 
@@ -2638,20 +2654,12 @@ static void gfx_v9_4_3_spm_start(struct amdgpu_device *adev, int xcc_id)
 
 	gfx_v9_4_3_write_data_to_reg(kiq_ring, 0, false,
 			SOC15_REG_OFFSET(GC, GET_INST(GC, xcc_id), regRLC_SPM_INT_CNTL), 1);
-
-	data = RREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_CLK_CNTL);
-	data |= RLC_CLK_CNTL__RLC_SPM_CLK_CNTL_MASK;
-	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_CLK_CNTL, data);
 }
 
 static void gfx_v9_4_3_spm_stop(struct amdgpu_device *adev, int xcc_id)
 {
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[xcc_id].ring;
 	uint32_t data = 0;
-
-	data = RREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_CLK_CNTL);
-	data &= (~RLC_CLK_CNTL__RLC_SPM_CLK_CNTL_MASK);
-	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_CLK_CNTL, data);
 
 	data = REG_SET_FIELD(0, CP_PERFMON_CNTL, SPM_PERFMON_STATE,
 			CP_PERFMON_STATE_STOP_COUNTING);
@@ -2683,11 +2691,12 @@ static void gfx_v9_4_3_set_spm_perfmon_ring_buf(struct amdgpu_device *adev,
 {
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[xcc_id].ring;
 
-	gfx_v9_4_3_write_data_to_reg(kiq_ring, 0, false, SOC15_REG_OFFSET(GC, 0,
-			regRLC_SPM_PERFMON_RING_BASE_LO), lower_32_bits(gpu_addr));
+	gfx_v9_4_3_write_data_to_reg(kiq_ring, 0, false,
+			SOC15_REG_OFFSET(GC, GET_INST(GC, xcc_id),
+				regRLC_SPM_PERFMON_RING_BASE_LO), lower_32_bits(gpu_addr));
 
 	gfx_v9_4_3_write_data_to_reg(kiq_ring, 0, false,
-			SOC15_REG_OFFSET(GC, 0,
+			SOC15_REG_OFFSET(GC, GET_INST(GC, xcc_id),
 				regRLC_SPM_PERFMON_RING_BASE_HI), upper_32_bits(gpu_addr));
 
 	gfx_v9_4_3_write_data_to_reg(kiq_ring, 0, false,

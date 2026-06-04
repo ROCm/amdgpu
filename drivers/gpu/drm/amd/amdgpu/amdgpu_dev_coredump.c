@@ -586,7 +586,7 @@ void amdgpu_coredump(struct amdgpu_device *adev, bool skip_vram_check,
 	 */
 	adev->coredump = coredump;
 	/* Kick off coredump formatting to a worker thread. */
-	queue_work(system_unbound_wq, &adev->coredump_work);
+	queue_work(system_dfl_wq, &adev->coredump_work);
 
 	drm_info(dev, "AMDGPU device coredump file has been created\n");
 	drm_info(dev, "Check your /sys/class/drm/card%d/device/devcoredump/data\n",

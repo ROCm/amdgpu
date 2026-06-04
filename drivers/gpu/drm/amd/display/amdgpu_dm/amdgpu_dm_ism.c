@@ -383,7 +383,7 @@ static enum amdgpu_dm_ism_event dm_ism_dispatch_power_state(
 		}
 
 		/* Schedule worker */
-		mod_delayed_work(system_unbound_wq, &ism->delayed_work,
+		mod_delayed_work(system_dfl_wq, &ism->delayed_work,
 				 nsecs_to_jiffies(delay_ns));
 
 		break;
@@ -399,14 +399,14 @@ static enum amdgpu_dm_ism_event dm_ism_dispatch_power_state(
 			 * have a negative power impact. Skip idle allow here,
 			 * and let the sso_delayed_work handle it.
 			 */
-			mod_delayed_work(system_unbound_wq,
+			mod_delayed_work(system_dfl_wq,
 					 &ism->sso_delayed_work,
 					 nsecs_to_jiffies(sso_delay_ns));
 		} else {
 			/* Enable idle optimization without SSO */
 			dm_ism_commit_idle_optimization_state(
 				ism, acrtc_state->stream, false, false);
-			mod_delayed_work(system_unbound_wq,
+			mod_delayed_work(system_dfl_wq,
 					 &ism->sso_delayed_work,
 					 nsecs_to_jiffies(sso_delay_ns));
 		}

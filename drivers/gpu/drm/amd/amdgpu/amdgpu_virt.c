@@ -1804,13 +1804,15 @@ amdgpu_virt_write_cpers_to_ring(struct amdgpu_device *adev,
 	struct amd_sriov_ras_cper_dump *cper_dump = NULL;
 	struct cper_hdr *entry = NULL;
 	struct amdgpu_ring *ring = &adev->cper.ring_buf;
-	uint32_t checksum, used_size, i;
+	uint32_t checksum, used_size;
+	u64 remaining, cnt, i;
 	int ret = 0;
 
 	checksum = host_telemetry->header.checksum;
 	used_size = host_telemetry->header.used_size;
 
-	if (used_size > (AMD_SRIOV_MSG_RAS_TELEMETRY_SIZE_KB_V1 << 10))
+	if (used_size < offsetof(struct amd_sriov_ras_cper_dump, buf) ||
+	    used_size > (AMD_SRIOV_MSG_RAS_TELEMETRY_SIZE_KB_V1 << 10))
 		return -EINVAL;
 
 	cper_dump = kmemdup(&host_telemetry->body.cper_dump, used_size, GFP_KERNEL);
@@ -1835,11 +1837,19 @@ amdgpu_virt_write_cpers_to_ring(struct amdgpu_device *adev,
 	}
 
 	entry = (struct cper_hdr *)&cper_dump->buf[0];
+	remaining = (u64)used_size - offsetof(struct amd_sriov_ras_cper_dump, buf);
+	cnt = min_t(u64, cper_dump->count, CPER_MAX_ALLOWED_COUNT);
 
-	for (i = 0; i < cper_dump->count; i++) {
+	for (i = 0; i < cnt; i++) {
+		if (entry->record_length < sizeof(struct cper_hdr) ||
+		    entry->record_length > remaining) {
+			ret = -EINVAL;
+			goto out;
+		}
+
 		amdgpu_cper_ring_write(ring, entry, entry->record_length);
-		entry = (struct cper_hdr *)((char *)entry +
-					    entry->record_length);
+		remaining -= entry->record_length;
+		entry = (struct cper_hdr *)((char *)entry + entry->record_length);
 	}
 
 	if (cper_dump->overflow_count)
