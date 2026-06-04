@@ -22,6 +22,7 @@
 #include "dcn35/dcn35_resource.h"
 #include "dcn321/dcn321_resource.h"
 #include "dcn401/dcn401_resource.h"
+#include "dcn42/dcn42_resource.h"
 #include "dcn42/dcn42_resource_fpu.h"
 
 #include "dcn10/dcn10_ipp.h"
@@ -115,6 +116,23 @@
 #define regAPG8_APG_DBG_GEN_CONTROL_BASE_IDX    2
 #define regAPG9_APG_DBG_GEN_CONTROL             0x38ae
 #define regAPG9_APG_DBG_GEN_CONTROL_BASE_IDX    2
+
+#define regHUBP0_HUBPREQ_DEBUG_DB             0x05f8
+#define regHUBP0_HUBPREQ_DEBUG_DB_BASE_IDX    2
+#define regHUBP0_HUBPREQ_DEBUG                0x05f9
+#define regHUBP0_HUBPREQ_DEBUG_BASE_IDX       2
+#define regHUBP1_HUBPREQ_DEBUG_DB             0x06d4
+#define regHUBP1_HUBPREQ_DEBUG_DB_BASE_IDX    2
+#define regHUBP1_HUBPREQ_DEBUG                0x06d5
+#define regHUBP1_HUBPREQ_DEBUG_BASE_IDX       2
+#define regHUBP2_HUBPREQ_DEBUG_DB             0x07b0
+#define regHUBP2_HUBPREQ_DEBUG_DB_BASE_IDX    2
+#define regHUBP2_HUBPREQ_DEBUG                0x07b1
+#define regHUBP2_HUBPREQ_DEBUG_BASE_IDX       2
+#define regHUBP3_HUBPREQ_DEBUG_DB             0x088c
+#define regHUBP3_HUBPREQ_DEBUG_DB_BASE_IDX    2
+#define regHUBP3_HUBPREQ_DEBUG                0x088d
+#define regHUBP3_HUBPREQ_DEBUG_BASE_IDX       2
 
 enum dcn401_clk_src_array_id {
 	DCN401_CLK_SRC_PLL0,
@@ -461,7 +479,7 @@ static const struct dcn_optc_mask optc_mask = {
 	OPTC_COMMON_MASK_SH_LIST_DCN42B(_MASK)};
 
 #define hubp_regs_init(id) \
-	HUBP_REG_LIST_DCN42B_RI(id)
+	HUBP_REG_LIST_DCN42_RI(id)
 
 static struct dcn_hubp2_registers hubp_regs[4];
 
