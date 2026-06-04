@@ -26,6 +26,7 @@
 #include "dm_services.h"
 #include "core_types.h"
 #include "dce_aux.h"
+#include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
 #include "dm_event_log.h"
 #include "dm_helpers.h"
