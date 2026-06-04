@@ -78,20 +78,16 @@ void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm,
 			caps->caps_valid = false;
 		}
 	}
-
-	if (!caps->caps_valid) {
-		caps->min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
-		caps->max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
-		caps->caps_valid = true;
-	}
 #else
 	if (caps->aux_support)
 		return;
-
-	caps->min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
-	caps->max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
-	caps->caps_valid = true;
 #endif
+	if (!caps->caps_valid) {
+		caps->min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+		caps->max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
+		caps->ac_level = caps->dc_level = 50;
+		caps->caps_valid = true;
+	}
 }
 EXPORT_IF_KUNIT(amdgpu_dm_update_backlight_caps);
 
