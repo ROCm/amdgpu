@@ -40,7 +40,7 @@ bool amdgpu_dm_psr_set_event(struct amdgpu_display_manager *dm,
 		struct dc_stream_state *stream, bool set_event,	enum psr_event event,
 		bool wait_for_disable);
 
-#ifdef CONFIG_DRM_AMD_DC_KUNIT_TEST
+#if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 void amdgpu_dm_psr_fill_caps(struct dc_link *link, struct psr_caps *caps);
 #endif
 

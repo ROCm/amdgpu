@@ -471,7 +471,6 @@ static ssize_t kfd_sysfs_counters_show(struct kobject *kobj,
 	return 0;
 }
 
-#ifdef HAVE_STRUCT_XARRAY
 static ssize_t kfd_sysfs_ais_show(struct kobject *kobj,
 				       struct attribute *attr, char *buf)
 {
@@ -490,7 +489,6 @@ static ssize_t kfd_sysfs_ais_show(struct kobject *kobj,
 	}
 	return 0;
 }
-#endif
 
 static const struct sysfs_ops procfs_queue_ops = {
 	.show = kfd_procfs_queue_show,
@@ -518,7 +516,6 @@ static const struct kobj_type sysfs_counters_type = {
 	.release = kfd_procfs_kobj_release,
 };
 
-#ifdef HAVE_STRUCT_XARRAY
 static const struct sysfs_ops sysfs_ais_ops = {
 	.show = kfd_sysfs_ais_show,
 };
@@ -527,7 +524,6 @@ static const struct kobj_type sysfs_ais_type = {
 	.sysfs_ops = &sysfs_ais_ops,
 	.release = kfd_procfs_kobj_release,
 };
-#endif
 
 int kfd_procfs_add_queue(struct queue *q)
 {
@@ -693,7 +689,6 @@ static void kfd_procfs_add_sysfs_files(struct kfd_process *p)
 	}
 }
 
-#ifdef HAVE_STRUCT_XARRAY
 static void kfd_procfs_add_sysfs_ais(struct kfd_process *p)
 {
 	int ret = 0;
@@ -730,7 +725,6 @@ static void kfd_procfs_add_sysfs_ais(struct kfd_process *p)
 		}
 	}
 }
-#endif
 
 void kfd_procfs_del_queue(struct queue *q)
 {
@@ -939,9 +933,7 @@ int kfd_create_process_sysfs(struct kfd_process *process)
 	kfd_procfs_add_sysfs_stats(process);
 	kfd_procfs_add_sysfs_files(process);
 	kfd_procfs_add_sysfs_counters(process);
-#ifdef HAVE_STRUCT_XARRAY
-        kfd_procfs_add_sysfs_ais(process);
-#endif
+	kfd_procfs_add_sysfs_ais(process);
 
 	return 0;
 }
@@ -1283,7 +1275,7 @@ static void kfd_process_remove_sysfs(struct kfd_process *p)
 		kobject_put(pdd->kobj_counters);
 		pdd->kobj_counters = NULL;
 	}
-#ifdef HAVE_STRUCT_XARRAY
+
 	for (i = 0; i < p->n_pdds; i++) {
 		pdd = p->pdds[i];
 		struct ais_counter_entry *counter;
@@ -1305,7 +1297,6 @@ static void kfd_process_remove_sysfs(struct kfd_process *p)
 		kobject_del(pdd->kobj_ais);
 		kobject_put(pdd->kobj_ais);
 	}
-#endif
 
 	kobject_del(p->kobj);
 	kobject_put(p->kobj);
@@ -1865,9 +1856,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_node *dev,
 	pdd->user_gpu_id = dev->id;
 	atomic64_set(&pdd->evict_duration_counter, 0);
 	kfd_spm_init_process_device(pdd);
-#ifdef HAVE_STRUCT_XARRAY
 	xa_init(&pdd->ais_counters_xa);
-#endif
 
 	p->pdds[p->n_pdds++] = pdd;
 	if (kfd_dbg_is_per_vmid_supported(pdd->dev))

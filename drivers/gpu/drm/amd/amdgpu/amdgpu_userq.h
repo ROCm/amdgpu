@@ -48,11 +48,6 @@ struct amdgpu_userq_obj {
 	struct amdgpu_bo *obj;
 };
 
-struct amdgpu_userq_va_cursor {
-	u64			gpu_addr;
-	struct list_head	list;
-};
-
 struct amdgpu_usermode_queue {
 	int			queue_type;
 	enum amdgpu_userq_state state;
@@ -66,7 +61,6 @@ struct amdgpu_usermode_queue {
 	struct amdgpu_userq_obj	db_obj;
 	struct amdgpu_userq_obj fw_obj;
 	struct amdgpu_userq_obj wptr_obj;
-#ifdef HAVE_STRUCT_XARRAY
 	/**
 	 * @fence_drv_lock: Protecting @fence_drv_xa.
 	 */
@@ -79,10 +73,6 @@ struct amdgpu_usermode_queue {
 	 * Dropped on the next signaled dma_fence or queue destruction.
 	 */
 	struct xarray		fence_drv_xa;
-#else
-	struct idr		fence_drv_idr;
-	spinlock_t		fence_drv_lock;
-#endif
 	struct amdgpu_userq_fence_driver *fence_drv;
 	struct dma_fence	*last_fence;
 	u32			xcp_id;
@@ -97,7 +87,17 @@ struct amdgpu_usermode_queue {
 	struct delayed_work	hang_detect_work;
 	struct kref		refcount;
 
-	struct list_head	userq_va_list;
+	union {
+		struct {
+			u64 queue_rb;
+			u64 wptr;
+			u64 rptr;
+			u64 eop;
+			u64 shadow;
+			u64 csa;
+		} va;
+		u64 va_array[6];
+	} userq_vas;
 };
 
 struct amdgpu_userq_funcs {
@@ -178,7 +178,8 @@ void amdgpu_userq_process_fence_irq(struct amdgpu_device *adev, u32 doorbell);
 
 int amdgpu_userq_input_va_validate(struct amdgpu_device *adev,
 				   struct amdgpu_usermode_queue *queue,
-				   u64 addr, u64 expected_size);
+				   u64 addr, u64 expected_size, u64 *va_out);
+
 void amdgpu_userq_gem_va_unmap_validate(struct amdgpu_device *adev,
 					struct amdgpu_bo_va_mapping *mapping,
 					uint64_t saddr);

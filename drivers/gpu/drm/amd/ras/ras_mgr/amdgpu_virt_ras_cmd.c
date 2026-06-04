@@ -271,8 +271,7 @@ static int amdgpu_virt_ras_get_cper_records(struct ras_core_context *ras_core,
 		(cmd->output_buf_size < sizeof(*rsp)))
 		return RAS_CMD__ERROR_INVALID_INPUT_SIZE;
 
-	if (!req->buf_size || !req->buf_ptr || !req->cper_num ||
-	    req->buf_size > RAS_CMD_MAX_CPER_BUF_SZ)
+	if (!req->buf_size || !req->buf_ptr || !req->cper_num)
 		return RAS_CMD__ERROR_INVALID_INPUT_DATA;
 
 	trace = kcalloc(trace_count, sizeof(*trace), GFP_KERNEL);

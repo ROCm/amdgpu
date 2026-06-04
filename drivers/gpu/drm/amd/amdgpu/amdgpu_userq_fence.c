@@ -97,16 +97,11 @@ free_fence_drv:
 	return r;
 }
 
-#ifdef HAVE_STRUCT_XARRAY
 static void amdgpu_userq_walk_and_drop_fence_drv(struct xarray *xa)
-#else
-static void amdgpu_userq_walk_and_drop_fence_drv(struct idr *idr, spinlock_t *idr_lock)
-#endif
 {
 	struct amdgpu_userq_fence_driver *fence_drv;
 	unsigned long index;
 
-#ifdef HAVE_STRUCT_XARRAY
 	if (xa_empty(xa))
 		return;
 
@@ -117,18 +112,6 @@ static void amdgpu_userq_walk_and_drop_fence_drv(struct idr *idr, spinlock_t *id
 	}
 
 	xa_unlock(xa);
-#else
-	if (idr_is_empty(idr))
-		return;
-
-	spin_lock(idr_lock);
-	idr_for_each_entry(idr, fence_drv, index) {
-		idr_remove(idr, index);
-		amdgpu_userq_fence_driver_put(fence_drv);
-	}
-
-	spin_unlock(idr_lock);
-#endif
 }
 
 void
@@ -136,17 +119,10 @@ amdgpu_userq_fence_driver_free(struct amdgpu_usermode_queue *userq)
 {
 	dma_fence_put(userq->last_fence);
 	userq->last_fence = NULL;
-#ifdef HAVE_STRUCT_XARRAY
 	amdgpu_userq_walk_and_drop_fence_drv(&userq->fence_drv_xa);
 	xa_destroy(&userq->fence_drv_xa);
 	mutex_destroy(&userq->fence_drv_lock);
-#else
-	unsigned long flags;
-	amdgpu_userq_walk_and_drop_fence_drv(&userq->fence_drv_idr, &userq->fence_drv_lock);
-	spin_lock_irqsave(&userq->fence_drv_lock, flags);
-	idr_destroy(&userq->fence_drv_idr);
-	spin_unlock_irqrestore(&userq->fence_drv_lock, flags);
-#endif
+
 	/* Drop the queue's ownership reference to fence_drv explicitly */
 	amdgpu_userq_fence_driver_put(userq->fence_drv);
 }
@@ -885,19 +861,11 @@ amdgpu_userq_wait_return_fence_info(struct drm_file *filp,
 		 * Otherwise, we would gather those references until we don't
 		 * have any more space left and crash.
 		 */
-#ifdef HAVE_STRUCT_XARRAY
 		mutex_lock(&waitq->fence_drv_lock);
 		r = xa_alloc(&waitq->fence_drv_xa, &index, fence_drv,
 			     xa_limit_32b, GFP_KERNEL);
 		mutex_unlock(&waitq->fence_drv_lock);
 		if (r)
-#else
-		spin_lock(&waitq->fence_drv_lock);
-		r = idr_alloc(&waitq->fence_drv_idr, fence_drv, 0, 0, GFP_KERNEL);
-		index = r;
-		spin_unlock(&waitq->fence_drv_lock);
-		if (r < 0)
-#endif
 			goto put_waitq;
 
 		amdgpu_userq_fence_driver_get(fence_drv);

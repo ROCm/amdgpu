@@ -28,7 +28,6 @@
 
 #include <linux/dma-fence-array.h>
 #include <linux/interval_tree_generic.h>
-#include <linux/idr.h>
 #include <linux/dma-buf.h>
 
 #include <drm/amdgpu_drm.h>
@@ -266,12 +265,23 @@ static void amdgpu_vm_bo_idle(struct amdgpu_vm_bo_base *vm_bo)
  */
 static void amdgpu_vm_bo_reset_state_machine(struct amdgpu_vm *vm)
 {
+	struct amdgpu_vm_bo_base *vm_bo, *tmp;
+
+	/*
+	 * Don't use list splice here, we need the special handling for the root
+	 * PD and set the moved flag appropriately.
+	 */
 	amdgpu_vm_assert_locked(vm);
-	list_splice_init(&vm->kernel.idle, &vm->kernel.moved);
-	list_splice_init(&vm->always_valid.idle, &vm->always_valid.moved);
+	list_for_each_entry_safe(vm_bo, tmp, &vm->kernel.idle, vm_status)
+		amdgpu_vm_bo_moved(vm_bo);
+	list_for_each_entry_safe(vm_bo, tmp, &vm->always_valid.idle, vm_status)
+		amdgpu_vm_bo_moved(vm_bo);
 
 	spin_lock(&vm->individual_lock);
-	list_splice_init(&vm->individual.idle, &vm->individual.moved);
+	list_for_each_entry_safe(vm_bo, tmp, &vm->individual.idle, vm_status) {
+		vm_bo->moved = true;
+		list_move(&vm_bo->vm_status, &vm->individual.moved);
+	}
 	spin_unlock(&vm->individual_lock);
 }
 
@@ -1627,6 +1637,7 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 {
 	struct amdgpu_bo_va *bo_va, *tmp;
 	struct dma_resv *resv;
+	struct amdgpu_bo *bo;
 	bool clear, unlock;
 	int r;
 
@@ -1642,11 +1653,13 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 	while (!list_empty(&vm->individual.moved)) {
 		bo_va = list_first_entry(&vm->individual.moved,
 					 typeof(*bo_va), base.vm_status);
-		resv = bo_va->base.bo->tbo.base.resv;
+		bo = bo_va->base.bo;
+		resv = bo->tbo.base.resv;
 		spin_unlock(&vm->individual_lock);
 
 		/* Try to reserve the BO to avoid clearing its ptes */
-		if (!adev->debug_vm && dma_resv_trylock(resv)) {
+		if (!adev->debug_vm && !amdgpu_ttm_tt_get_usermm(bo->tbo.ttm) &&
+		    dma_resv_trylock(resv)) {
 			clear = false;
 			unlock = true;
 		/* The caller is already holding the reservation lock */
@@ -2475,15 +2488,9 @@ amdgpu_vm_get_vm_from_pasid(struct amdgpu_device *adev, u32 pasid)
 	struct amdgpu_vm *vm;
 	unsigned long flags;
 
-#ifdef HAVE_STRUCT_XARRAY
 	xa_lock_irqsave(&adev->vm_manager.pasids, flags);
 	vm = xa_load(&adev->vm_manager.pasids, pasid);
 	xa_unlock_irqrestore(&adev->vm_manager.pasids, flags);
-#else
-	spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
-	vm = idr_find(&adev->vm_manager.pasid_idr, pasid);
-	spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
-#endif
 
 	return vm;
 }
@@ -2887,12 +2894,7 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 	adev->vm_manager.vm_update_mode = 0;
 #endif
 
-#ifdef HAVE_STRUCT_XARRAY
 	xa_init_flags(&adev->vm_manager.pasids, XA_FLAGS_LOCK_IRQ);
-#else
-	idr_init(&adev->vm_manager.pasid_idr);
-	spin_lock_init(&adev->vm_manager.pasid_lock);
-#endif
 }
 
 /**
@@ -2904,13 +2906,8 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
  */
 void amdgpu_vm_manager_fini(struct amdgpu_device *adev)
 {
-#ifdef HAVE_STRUCT_XARRAY
 	WARN_ON(!xa_empty(&adev->vm_manager.pasids));
 	xa_destroy(&adev->vm_manager.pasids);
-#else
-	WARN_ON(!idr_is_empty(&adev->vm_manager.pasid_idr));
-	idr_destroy(&adev->vm_manager.pasid_idr);
-#endif
 
 	amdgpu_vmid_mgr_fini(adev);
 	amdgpu_pasid_mgr_cleanup();
@@ -3170,13 +3167,8 @@ void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
 	struct amdgpu_vm *vm;
 	unsigned long flags;
 
-#ifdef HAVE_STRUCT_XARRAY
 	xa_lock_irqsave(&adev->vm_manager.pasids, flags);
 	vm = xa_load(&adev->vm_manager.pasids, pasid);
-#else
-	spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
-	vm = idr_find(&adev->vm_manager.pasid_idr, pasid);
-#endif
 
 	/* Don't update the fault cache if status is 0.  In the multiple
 	 * fault case, subsequent faults will return a 0 status which is
@@ -3210,11 +3202,7 @@ void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
 			WARN_ONCE(1, "Invalid vmhub %u\n", vmhub);
 		}
 	}
-#ifdef HAVE_STRUCT_XARRAY
 	xa_unlock_irqrestore(&adev->vm_manager.pasids, flags);
-#else
-	spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
-#endif
 }
 
 void amdgpu_vm_print_task_info(struct amdgpu_device *adev,
