@@ -31,4 +31,11 @@ static inline u64 ktime_get_boottime_ns(void)
 extern u64 jiffies64_to_msecs(u64 j);
 #endif
 
+#ifndef HAVE_US_TO_KTIME
+static inline ktime_t us_to_ktime(u64 us)
+{
+	return us * NSEC_PER_USEC;
+}
+#endif
+
 #endif
