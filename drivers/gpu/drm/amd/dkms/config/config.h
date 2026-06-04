@@ -285,12 +285,12 @@
 /* drm_connector_for_each_possible_encoder() wants 2 arguments */
 #define HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS 1
 
-/* atomic_best_encoder take 2nd arg type of state as struct drm_atomic_state
-   */
+/* atomic_best_encoder take 2nd arg type of state as struct
+   drm_atomic_state/drm_atomic_commit */
 #define HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_BEST_ENCODER_ARG_DRM_ATOMIC_STATE 1
 
-/* drm_connector_helper_funcs->atomic_check() wants struct drm_atomic_state
-   arg */
+/* drm_connector_helper_funcs->atomic_check() wants struct
+   drm_atomic_state/drm_atomic_commit arg */
 #define HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE 1
 
 /* .mode_valid need a const drm_display_mode argument */
@@ -324,11 +324,11 @@
 #define HAVE_DRM_CONNECT_ATTACH_COLORSPACE_PROPERTY 1
 
 /* drm_crtc_helper_funcs->atomic_check()/atomic_flush()/atomic_begin() wants
-   struct drm_atomic_state arg */
+   struct drm_atomic_state/drm_atomic_commit arg */
 #define HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE 1
 
 /* drm_crtc_helper_funcs->atomic_enable()/atomic_disable() wants struct
-   drm_atomic_state arg */
+   drm_atomic_state/drm_atomic_commit arg */
 #define HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE 1
 
 /* drm_crtc_helper_mode_valid_fixed() is available */
@@ -1246,10 +1246,14 @@
 /* struct dma_fence_chain is available */
 #define HAVE_STRUCT_DMA_FENCE_CHAIN 1
 
-/* struct drm_connector_state->duplicated is available */
+/* struct drm_atomic_state has been renamed to struct drm_atomic_commit */
+#define HAVE_STRUCT_DRM_ATOMIC_COMMIT 1
+
+/* struct drm_atomic_state/drm_atomic_commit->duplicated is available */
 #define HAVE_STRUCT_DRM_ATOMIC_STATE_DUPLICATED 1
 
-/* struct drm_atomic_state->plane_color_pipeline is available */
+/* struct drm_atomic_state/drm_atomic_commit->plane_color_pipeline is
+   available */
 #define HAVE_STRUCT_DRM_ATOMIC_STATE_PLANE_COLOR_PIPELINE 1
 
 /* struct drm_color_lut32 is available */
@@ -1282,8 +1286,8 @@
 /* drm_plane_helper_funcs->atomic_async_check() have three arguments */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK_THREE_ARGUMENTS 1
 
-/* drm_plane_helper_funcs->atomic_check() second param wants drm_atomic_state
-   arg */
+/* drm_plane_helper_funcs->atomic_check() second param wants
+   drm_atomic_state/drm_atomic_commit arg */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS 1
 
 /* struct drm_plane_helper_funcs->get_scanout_buffer is available */

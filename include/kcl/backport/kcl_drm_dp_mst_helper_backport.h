@@ -22,6 +22,7 @@
 #ifndef _KCL_DRM_DP_MST_HELPER_BACKPORT_H_
 #define _KCL_DRM_DP_MST_HELPER_BACKPORT_H_
 
+#include <kcl/kcl_drm_atomic_commit.h>
 #include <drm/display/drm_dp_mst_helper.h>
 
 /* Copied from drivers/gpu/drm/drm_dp_mst_topology.c and modified for KCL */
@@ -47,7 +48,7 @@ int _kcl_drm_dp_calc_pbn_mode(int clock, int bpp, bool dsc)
 #if !defined(HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS)
 #if !defined(HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS)
 static inline
-int _kcl_drm_dp_atomic_find_vcpi_slots(struct drm_atomic_state *state,
+int _kcl_drm_dp_atomic_find_vcpi_slots(struct drm_atomic_commit *state,
 				  struct drm_dp_mst_topology_mgr *mgr,
 				  struct drm_dp_mst_port *port, int pbn,
 				  int pbn_div)
@@ -71,7 +72,7 @@ int _kcl_drm_dp_atomic_find_vcpi_slots(struct drm_atomic_state *state,
 #endif /* HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS */
 
 static inline
-int _kcl_drm_dp_atomic_find_time_slots(struct drm_atomic_state *state,
+int _kcl_drm_dp_atomic_find_time_slots(struct drm_atomic_commit *state,
 				  struct drm_dp_mst_topology_mgr *mgr,
 				  struct drm_dp_mst_port *port, int pbn,
 				  int pbn_div)
@@ -84,7 +85,7 @@ int _kcl_drm_dp_atomic_find_time_slots(struct drm_atomic_state *state,
 #if !defined(HAVE_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS)
 #ifdef HAVE_DRM_DP_ATOMIC_RELEASE_VCPI_SLOTS_MST_PORT
 static inline
-int _kcl_drm_dp_atomic_release_time_slots(struct drm_atomic_state *state,
+int _kcl_drm_dp_atomic_release_time_slots(struct drm_atomic_commit *state,
                                   struct drm_dp_mst_topology_mgr *mgr,
                                   struct drm_dp_mst_port *port)
 {
