@@ -2718,11 +2718,10 @@ static int ips_status_show(struct seq_file *m, void *unused)
 		rcg_count = ips_fw->rcg_exit_count;
 		ips1_count = ips_fw->ips1_exit_count;
 		ips2_count = ips_fw->ips2_exit_count;
-		seq_printf(m, "exit counts: rcg=%u ips1=%u ips2=%u",
+		seq_printf(m, "exit counts: rcg=%u ips1=%u ips2=%u\n",
 			   rcg_count,
 			   ips1_count,
 			   ips2_count);
-		seq_puts(m, "\n");
 	}
 	return 0;
 }
