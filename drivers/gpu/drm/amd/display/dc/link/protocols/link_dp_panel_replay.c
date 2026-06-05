@@ -119,7 +119,11 @@ static bool dp_setup_panel_replay(struct dc_link *link, const struct dc_stream_s
 	if (!dp_pr_get_panel_inst(dc, link, &panel_inst))
 		return false;
 
-	replay_context.aux_inst = link->ddc->ddc_pin->hw_info.ddc_channel;
+	if (dc->config.dp_connector_no_native_i2c && link->no_ddc_pin) {
+		replay_context.aux_inst = (enum channel_id) link->aux_hw_inst;
+	} else {
+		replay_context.aux_inst = link->ddc->ddc_pin->hw_info.ddc_channel;
+	}
 	replay_context.digbe_inst = link->link_enc->transmitter;
 	replay_context.digfe_inst = link->link_enc->preferred_engine;
 
