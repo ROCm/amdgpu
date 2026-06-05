@@ -1740,11 +1740,13 @@ int amdgpu_debugfs_regs_init(struct amdgpu_device *adev)
 	struct dentry *ent, *root = minor->debugfs_root;
 	unsigned int i;
 
+#ifdef HAVE_SECURITY_LOCKED_DOWN
 	if (security_locked_down(LOCKDOWN_PCI_ACCESS)) {
 		drm_info(adev_to_drm(adev),
 			 "amdgpu: HW debugfs nodes disabled (kernel lockdown)\n");
 		return 0;
 	}
+#endif
 
 	for (i = 0; i < ARRAY_SIZE(debugfs_regs); i++) {
 		ent = debugfs_create_file(debugfs_regs_names[i],
