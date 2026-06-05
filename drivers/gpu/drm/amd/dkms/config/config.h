@@ -1045,9 +1045,6 @@
 /* Define to 1 if you have the <linux/stdarg.h> header file. */
 #define HAVE_LINUX_STDARG_H 1
 
-/* list_bulk_move_tail() is available */
-#define HAVE_LIST_BULK_MOVE_TAIL 1
-
 /* Define to 1 if you have the <linux/string_choices.h> header file. */
 #define HAVE_LINUX_STRING_CHOICES_H 1
 
@@ -1211,7 +1208,7 @@
 #define HAVE_SG_ALLOC_TABLE_FROM_PAGES_SEGMENT 1
 
 /* shmem_file_setup() takes vma_flags_t arg */
-/* #undef HAVE_SHMEM_FILE_SETUP_VMA_FLAGS */
+#define HAVE_SHMEM_FILE_SETUP_VMA_FLAGS 1
 
 /* shmem_read_folio() is available */
 #define HAVE_SHMEM_READ_FOLIO 1
