@@ -154,6 +154,9 @@
 /* dma_buf->dynamic_mapping is not available */
 /* #undef HAVE_DMA_BUF_OPS_LEGACY */
 
+/* dma_fence_array_create() has 5 args */
+/* #undef HAVE_DMA_FENCE_ARRAY_CREATE_5ARGS */
+
 /* dma_fence_array_first() is available */
 #define HAVE_DMA_FENCE_ARRAY_FIRST 1
 

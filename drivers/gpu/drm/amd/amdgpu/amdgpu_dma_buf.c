@@ -117,8 +117,7 @@ __dma_resv_make_exclusive(struct dma_resv *obj)
 		struct dma_fence_array *array;
 
 		array = dma_fence_array_create(count, fences,
-					       dma_fence_context_alloc(1), 0,
-					       false);
+					       dma_fence_context_alloc(1), 0);
 		if (!array)
 			goto err_fences_put;
 
