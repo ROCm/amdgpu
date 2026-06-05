@@ -1989,10 +1989,10 @@ static ssize_t amdgpu_gfx_get_compute_reset_mask(struct device *dev,
 	return amdgpu_show_reset_mask(buf, adev->gfx.compute_supported_reset);
 }
 
-int amdgpu_gfx_mes_reset_queue(struct amdgpu_ring *ring,
-			       unsigned int vmid,
-			       struct amdgpu_fence *timedout_fence,
-			       bool use_mmio)
+static int amdgpu_gfx_mes_reset_queue_start(struct amdgpu_ring *ring,
+					     unsigned int vmid,
+					     struct amdgpu_fence *timedout_fence,
+					     bool use_mmio)
 {
 	struct amdgpu_device *adev = ring->adev;
 	bool reinit_queue;
@@ -2026,7 +2026,20 @@ int amdgpu_gfx_mes_reset_queue(struct amdgpu_ring *ring,
 			return r;
 		}
 	}
+	return 0;
+}
 
+int amdgpu_gfx_mes_reset_queue(struct amdgpu_ring *ring,
+			       unsigned int vmid,
+			       struct amdgpu_fence *timedout_fence,
+			       bool use_mmio)
+{
+	int r;
+
+	r = amdgpu_gfx_mes_reset_queue_start(ring, vmid, timedout_fence,
+					      use_mmio);
+	if (r)
+		return r;
 	return amdgpu_ring_reset_helper_end(ring, timedout_fence);
 }
 
@@ -2216,24 +2229,37 @@ static void amdgpu_gfx_reset_stop_compute_scheds(struct amdgpu_device *adev,
 	}
 }
 
+/*
+ * Match the MES-reported hung doorbell against a compute ring and run
+ * the reset. On hit, the matched ring and its guilty fence are returned
+ * via *out_ring / *out_fence so the caller can defer reset end until
+ * after MES has resumed all gangs.
+ */
 static int amdgpu_gfx_reset_mes_kcq(struct amdgpu_device *adev,
 				    struct amdgpu_ring *guilty_ring,
-				    unsigned int db)
+				    unsigned int db,
+				    struct amdgpu_ring **out_ring,
+				    struct amdgpu_fence **out_fence)
 {
 	bool use_mmio = adev->gfx.mec.use_mmio_for_reset;
 	struct amdgpu_fence *fence;
 	struct amdgpu_ring *ring;
 	int i, r;
 
+	*out_ring = NULL;
+	*out_fence = NULL;
 	for (i = 0; i < adev->gfx.num_compute_rings; i++) {
 		ring = &adev->gfx.compute_ring[i];
 		if (ring == guilty_ring)
 			continue;
 		if (ring->doorbell_index == db) {
 			fence = amdgpu_ring_find_guilty_fence(ring);
-			r = amdgpu_gfx_mes_reset_queue(ring, 0, fence, use_mmio);
+			r = amdgpu_gfx_mes_reset_queue_start(ring, 0, fence,
+							      use_mmio);
 			if (r)
 				return r;
+			*out_ring = ring;
+			*out_fence = fence;
 			break;
 		}
 	}
@@ -2254,6 +2280,8 @@ int amdgpu_gfx_reset_mes_compute(struct amdgpu_device *adev,
 	unsigned int num_hung = 0;
 	bool use_mmio = adev->gfx.mec.use_mmio_for_reset;
 	struct mes_remove_queue_input *queue_input = (struct mes_remove_queue_input *)faulty_queue_input;
+	struct amdgpu_gfx_deferred_entry deferred_end[AMDGPU_MAX_COMPUTE_RINGS + 1];
+	int n_deferred = 0;
 
 	guard(mutex)(&adev->gfx.mec.reset_mutex);
 	/* stop the drm schedulers for all compute queues */
@@ -2278,9 +2306,13 @@ int amdgpu_gfx_reset_mes_compute(struct amdgpu_device *adev,
 fence_reset:
 	/* reset the queue this came from if specified */
 	if (ring) {
-		r = amdgpu_gfx_mes_reset_queue(ring, 0, guilty_fence, use_mmio);
+		r = amdgpu_gfx_mes_reset_queue_start(ring, 0, guilty_fence,
+						      use_mmio);
 		if (r)
 			goto out;
+		deferred_end[n_deferred].ring = ring;
+		deferred_end[n_deferred].fence = guilty_fence;
+		n_deferred++;
 	}
 	if (uq) {
 		r = mes_userq_reset(uq);
@@ -2288,15 +2320,24 @@ fence_reset:
 			goto out;
 	}
 	for (i = 0; i < num_hung; i++) {
+		struct amdgpu_ring *hr = NULL;
+		struct amdgpu_fence *hf = NULL;
+
 		pipe = hqd_info[i].pipe_index;
 		queue = hqd_info[i].queue_index;
 		queue_type = hqd_info[i].queue_type;
 
 		/* reset any KCQs */
 		r = amdgpu_gfx_reset_mes_kcq(adev, ring,
-					     adev->gfx.mec.mes_hung_db_array[i]);
+					     adev->gfx.mec.mes_hung_db_array[i],
+					     &hr, &hf);
 		if (r)
 			goto out;
+		if (hr) {
+			deferred_end[n_deferred].ring = hr;
+			deferred_end[n_deferred].fence = hf;
+			n_deferred++;
+		}
 		/* reset any KFD queues */
 		r = amdgpu_amdkfd_reset_mes_queue(adev, 0, queue_type, pipe, queue,
 						  adev->gfx.mec.mes_hung_db_array[i]);
@@ -2325,6 +2366,17 @@ fence_reset:
 out:
 	/* resume all will enable the non-hung queues */
 	amdgpu_mes_resume(adev, 0);
+
+	/* Now CP is running again — replay backed-up commands and ring
+	 * doorbells on each reset queue.
+	 */
+	for (i = 0; i < n_deferred; i++) {
+		int er = amdgpu_ring_reset_helper_end(deferred_end[i].ring,
+						      deferred_end[i].fence);
+		if (er && !r)
+			r = er;
+	}
+
 	if (!r)
 		amdgpu_gfx_reset_start_compute_scheds(adev, ring);
 

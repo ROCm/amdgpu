@@ -560,6 +560,11 @@ struct amdgpu_gfx {
 	bool				disable_uq;
 };
 
+struct amdgpu_gfx_deferred_entry {
+	struct amdgpu_ring	*ring;
+	struct amdgpu_fence	*fence;
+};
+
 struct amdgpu_gfx_ras_reg_entry {
 	struct amdgpu_ras_err_status_reg_entry reg_entry;
 	enum amdgpu_gfx_ras_mem_id_type mem_id_type;
