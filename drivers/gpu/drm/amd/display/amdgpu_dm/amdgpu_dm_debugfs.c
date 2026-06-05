@@ -615,7 +615,7 @@ static int dp_lttpr_status_show(struct seq_file *m, void *unused)
 		break;
 	}
 
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 	return 0;
 }
 
@@ -1090,7 +1090,7 @@ static int psr_capability_show(struct seq_file *m, void *data)
 	seq_printf(m, "Driver support: %s", str_yes_no(link->psr_settings.psr_feature_enabled));
 	if (link->psr_settings.psr_version)
 		seq_printf(m, " [0x%02x]", link->psr_settings.psr_version);
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 
 	return 0;
 }
@@ -1275,7 +1275,7 @@ static int hdcp_sink_capability_show(struct seq_file *m, void *data)
 	if (!hdcp_cap && !hdcp2_cap)
 		seq_printf(m, "%s ", "None");
 
-	seq_puts(m, "\n");
+	seq_putc(m, '\n');
 
 	return 0;
 }
