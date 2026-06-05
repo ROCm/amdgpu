@@ -110,8 +110,8 @@ static void dm_test_backlight_caps_non_aux_sets_defaults(struct kunit *test)
 	amdgpu_dm_update_backlight_caps(dm, 0);
 
 	KUNIT_EXPECT_TRUE(test, caps->caps_valid);
-	KUNIT_EXPECT_EQ(test, caps->min_input_signal, 12);
-	KUNIT_EXPECT_EQ(test, caps->max_input_signal, 255);
+	KUNIT_EXPECT_EQ(test, caps->min_input_signal, AMDGPU_DM_DEFAULT_MIN_BACKLIGHT);
+	KUNIT_EXPECT_EQ(test, caps->max_input_signal, AMDGPU_DM_DEFAULT_MAX_BACKLIGHT);
 }
 #endif
 
@@ -141,13 +141,13 @@ static void dm_test_brightness_range_pwm(struct kunit *test)
 	unsigned int min, max;
 
 	caps.aux_support = false;
-	caps.min_input_signal = 12;
-	caps.max_input_signal = 255;
+	caps.min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 
 	KUNIT_EXPECT_EQ(test, get_brightness_range(&caps, &min, &max), 1);
-	/* 0x101 * 12 = 3084, 0x101 * 255 = 65535 */
-	KUNIT_EXPECT_EQ(test, min, 0x101U * 12);
-	KUNIT_EXPECT_EQ(test, max, 0x101U * 255);
+	/* 0x101 * AMDGPU_DM_DEFAULT_MIN_BACKLIGHT, 0x101 * AMDGPU_DM_DEFAULT_MAX_BACKLIGHT */
+	KUNIT_EXPECT_EQ(test, min, 0x101U * AMDGPU_DM_DEFAULT_MIN_BACKLIGHT);
+	KUNIT_EXPECT_EQ(test, max, 0x101U * AMDGPU_DM_DEFAULT_MAX_BACKLIGHT);
 }
 
 /**
@@ -195,10 +195,10 @@ static void dm_test_brightness_to_user_below_min(struct kunit *test)
 	struct amdgpu_dm_backlight_caps caps = {};
 
 	caps.aux_support = false;
-	caps.min_input_signal = 12;
-	caps.max_input_signal = 255;
+	caps.min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 
-	/* brightness < min (0x101*12 = 3084), should return 0 */
+	/* brightness < min (0x101*AMDGPU_DM_DEFAULT_MIN_BACKLIGHT), should return 0 */
 	KUNIT_EXPECT_EQ(test, convert_brightness_to_user(&caps, 100), 0U);
 }
 
@@ -212,8 +212,8 @@ static void dm_test_brightness_to_user_at_max(struct kunit *test)
 	unsigned int min, max;
 
 	caps.aux_support = false;
-	caps.min_input_signal = 12;
-	caps.max_input_signal = 255;
+	caps.min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 
 	get_brightness_range(&caps, &min, &max);
 
@@ -231,8 +231,8 @@ static void dm_test_brightness_to_user_at_min(struct kunit *test)
 	unsigned int min, max;
 
 	caps.aux_support = false;
-	caps.min_input_signal = 12;
-	caps.max_input_signal = 255;
+	caps.min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 
 	get_brightness_range(&caps, &min, &max);
 
@@ -251,8 +251,8 @@ static void dm_test_brightness_to_user_midpoint_pwm(struct kunit *test)
 	u64 expected;
 
 	caps.aux_support = false;
-	caps.min_input_signal = 12;
-	caps.max_input_signal = 255;
+	caps.min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 
 	get_brightness_range(&caps, &min, &max);
 
@@ -286,8 +286,8 @@ static void dm_test_brightness_from_user_zero(struct kunit *test)
 	unsigned int min, max;
 
 	caps.aux_support = false;
-	caps.min_input_signal = 12;
-	caps.max_input_signal = 255;
+	caps.min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 	/* no custom curve */
 	caps.data_points = 0;
 
@@ -307,8 +307,8 @@ static void dm_test_brightness_from_user_max(struct kunit *test)
 	unsigned int min, max;
 
 	caps.aux_support = false;
-	caps.min_input_signal = 12;
-	caps.max_input_signal = 255;
+	caps.min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 	caps.data_points = 0;
 
 	get_brightness_range(&caps, &min, &max);
@@ -403,7 +403,7 @@ static void dm_test_custom_brightness_exact_match(struct kunit *test)
 
 	caps.aux_support = false;
 	caps.min_input_signal = 0;
-	caps.max_input_signal = 255;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 	caps.data_points = 3;
 	caps.luminance_data[0].input_signal = 50;
 	caps.luminance_data[0].luminance = 20;
@@ -453,7 +453,7 @@ static void dm_test_custom_brightness_below_first(struct kunit *test)
 
 	caps.aux_support = false;
 	caps.min_input_signal = 0;
-	caps.max_input_signal = 255;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 	caps.data_points = 2;
 	caps.luminance_data[0].input_signal = 100;
 	caps.luminance_data[0].luminance = 40;
@@ -498,7 +498,7 @@ static void dm_test_custom_brightness_interpolation(struct kunit *test)
 
 	caps.aux_support = false;
 	caps.min_input_signal = 0;
-	caps.max_input_signal = 255;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 	caps.data_points = 2;
 	caps.luminance_data[0].input_signal = 50;
 	caps.luminance_data[0].luminance = 20;
@@ -539,7 +539,7 @@ static void dm_test_custom_brightness_above_last(struct kunit *test)
 
 	caps.aux_support = false;
 	caps.min_input_signal = 0;
-	caps.max_input_signal = 255;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 	caps.data_points = 2;
 	caps.luminance_data[0].input_signal = 50;
 	caps.luminance_data[0].luminance = 20;
@@ -580,7 +580,7 @@ static void dm_test_custom_brightness_single_data_point(struct kunit *test)
 
 	caps.aux_support = false;
 	caps.min_input_signal = 0;
-	caps.max_input_signal = 255;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 	caps.data_points = 1;
 	caps.luminance_data[0].input_signal = 128;
 	caps.luminance_data[0].luminance = 50;
@@ -616,7 +616,7 @@ static void dm_test_custom_brightness_lower_lum_zero(struct kunit *test)
 
 	caps.aux_support = false;
 	caps.min_input_signal = 0;
-	caps.max_input_signal = 255;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 	caps.data_points = 2;
 	caps.luminance_data[0].input_signal = 50;
 	caps.luminance_data[0].luminance = 0;	/* zero lower luminance */
@@ -650,8 +650,8 @@ static void dm_test_brightness_to_user_above_max(struct kunit *test)
 	unsigned int min, max, result;
 
 	caps.aux_support = false;
-	caps.min_input_signal = 12;
-	caps.max_input_signal = 255;
+	caps.min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 
 	get_brightness_range(&caps, &min, &max);
 
@@ -672,8 +672,8 @@ static void dm_test_brightness_from_user_midrange(struct kunit *test)
 	u32 result;
 
 	caps.aux_support = false;
-	caps.min_input_signal = 12;
-	caps.max_input_signal = 255;
+	caps.min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 	caps.data_points = 0;
 
 	get_brightness_range(&caps, &min, &max);
@@ -700,7 +700,7 @@ static void dm_test_brightness_from_user_with_curve(struct kunit *test)
 
 	caps.aux_support = false;
 	caps.min_input_signal = 0;
-	caps.max_input_signal = 255;
+	caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 	caps.data_points = 2;
 	caps.luminance_data[0].input_signal = 50;
 	caps.luminance_data[0].luminance = 20;

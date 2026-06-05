@@ -49,11 +49,6 @@
 #include "amd_shared.h"
 #include "amdgpu_dm_kunit_helpers.h"
 
-#define AMDGPU_DM_DEFAULT_MIN_BACKLIGHT 12
-#define AMDGPU_DM_DEFAULT_MAX_BACKLIGHT 255
-#define AMDGPU_DM_MIN_SPREAD ((AMDGPU_DM_DEFAULT_MAX_BACKLIGHT - AMDGPU_DM_DEFAULT_MIN_BACKLIGHT) / 2)
-#define AUX_BL_DEFAULT_TRANSITION_TIME_MS 50
-
 void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm,
 				     int bl_idx)
 {
