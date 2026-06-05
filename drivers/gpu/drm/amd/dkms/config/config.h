@@ -1210,6 +1210,9 @@
 /* Reporting reservation_ww_class missing */
 /* #undef HAVE_RESERVATION_WW_CLASS_BUG */
 
+/* security_locked_down(LOCKDOWN_PCI_ACCESS) is available */
+#define HAVE_SECURITY_LOCKED_DOWN 1
+
 /* sg_alloc_table_from_pages_segment() is available */
 #define HAVE_SG_ALLOC_TABLE_FROM_PAGES_SEGMENT 1
 
