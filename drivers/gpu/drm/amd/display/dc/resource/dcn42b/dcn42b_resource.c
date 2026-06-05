@@ -1016,9 +1016,9 @@ static struct hubp *dcn42b_hubp_create(
 }
 static const struct dc_panel_config dcn42b_panel_config_defaults = {
 	.psr = {
-		.disable_psr = true,
+		.disable_psr = false,
 		.disallow_psrsu = true,
-		.disallow_replay = true,
+		.disallow_replay = false,
 	},
 	.ilr = {
 		.optimize_edp_link_rate = true,
