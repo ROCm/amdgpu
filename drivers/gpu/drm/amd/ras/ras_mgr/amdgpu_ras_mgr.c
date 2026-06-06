@@ -142,6 +142,21 @@ static int amdgpu_ras_mgr_init_eeprom_config(struct amdgpu_device *adev,
 	return 0;
 }
 
+static bool amdgpu_ras_mgr_eeprom_is_supported(struct amdgpu_device *adev)
+{
+	if (amdgpu_sriov_vf(adev))
+		return false;
+
+	switch (amdgpu_ip_version(adev, MP1_HWIP, 0)) {
+	case IP_VERSION(13, 0, 6):
+	case IP_VERSION(13, 0, 12):
+	case IP_VERSION(13, 0, 14):
+		return (adev->gmc.is_app_apu) ? false : true;
+	default:
+		return false;
+	}
+}
+
 static int amdgpu_ras_mgr_init_mp1_config(struct amdgpu_device *adev,
 		struct ras_core_config *config)
 {
@@ -266,7 +281,8 @@ static struct ras_core_context *amdgpu_ras_mgr_create_ras_core(struct amdgpu_dev
 		init_config.aca_ip_version = IP_VERSION(1, 0, 0);
 
 	init_config.sys_fn = &amdgpu_ras_sys_fn;
-	init_config.ras_eeprom_supported = true;
+	init_config.ras_eeprom_supported =
+		amdgpu_ras_mgr_eeprom_is_supported(adev);
 	init_config.poison_supported =
 		amdgpu_ras_is_poison_mode_supported(adev);
 
