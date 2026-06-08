@@ -269,37 +269,26 @@ void dccg42_trigger_dio_fifo_resync(struct dccg *dccg)
 
 static void dccg42_init(struct dccg *dccg)
 {
-	int otg_inst;
-	struct dcn_dccg *dccg_dcn = TO_DCN_DCCG(dccg);
+	unsigned int i;
+	struct resource_pool *res_pool = dccg->ctx->dc->res_pool;
 
 	/* Set HPO stream encoder to use refclk to avoid case where PHY is
 	 * disabled and SYMCLK32 for HPO SE is sourced from PHYD32CLK which
 	 * will cause DCN to hang.
 	 */
-	for (otg_inst = 0; otg_inst < 4; otg_inst++)
-		dccg35_disable_symclk32_se(dccg, otg_inst);
+	for (i = 0; i < res_pool->hpo_dp_stream_enc_count; i++)
+		dccg35_disable_symclk32_se(dccg, i);
 
 	if (dccg->ctx->dc->debug.root_clock_optimization.bits.symclk32_le) {
-		dccg401_disable_symclk32_le(dccg, 0);
-		dccg401_disable_symclk32_le(dccg, 1);
-		dccg401_disable_symclk32_le(dccg, 2);
-		dccg401_disable_symclk32_le(dccg, 3);
+		for (i = 0; i < res_pool->hpo_dp_link_enc_count; i++)
+			dccg401_disable_symclk32_le(dccg, i);
 	}
 
 	if (dccg->ctx->dc->debug.root_clock_optimization.bits.dpstream) {
-		dccg401_disable_dpstreamclk(dccg, 0);
-		dccg401_disable_dpstreamclk(dccg, 1);
-		dccg401_disable_dpstreamclk(dccg, 2);
-		dccg401_disable_dpstreamclk(dccg, 3);
+		for (i = 0; i < res_pool->hpo_dp_stream_enc_count; i++)
+			dccg401_disable_dpstreamclk(dccg, i);
 	}
-	if (!dccg->ctx->dc->debug.root_clock_optimization.bits.physymclk) {
-		REG_UPDATE_5(DCCG_GATE_DISABLE_CNTL2,
-			PHYASYMCLK_ROOT_GATE_DISABLE, 1,
-			PHYBSYMCLK_ROOT_GATE_DISABLE, 1,
-			PHYCSYMCLK_ROOT_GATE_DISABLE, 1,
-			PHYDSYMCLK_ROOT_GATE_DISABLE, 1,
-			PHYESYMCLK_ROOT_GATE_DISABLE, 1);
-	}
+
 	dccg42_disable_hdmistreamclk(dccg);
 	if (dccg->ctx->dc->debug.root_clock_optimization.bits.hdmichar)
 		dccg42_disable_hdmicharclk(dccg, 0);
