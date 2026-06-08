@@ -33,6 +33,7 @@
 #include "amdgpu_ucode.h"
 #include "amdgpu_psp.h"
 #include "amdgpu_smu.h"
+#include "amdgpu_video_codecs.h"
 #include "atom.h"
 #include "amd_pcie.h"
 

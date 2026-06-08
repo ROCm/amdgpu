@@ -46,6 +46,7 @@
 #include "amdgpu_reset.h"
 #include "amd_pcie.h"
 #include "amdgpu_userq.h"
+#include "amdgpu_video_codecs.h"
 
 void amdgpu_unregister_gpu_instance(struct amdgpu_device *adev)
 {

@@ -29,6 +29,7 @@
 #include "gfxhub_v12_1.h"
 #include "sdma_v7_1.h"
 #include "gfx_v12_1.h"
+#include "amdgpu_video_codecs.h"
 
 #include "gc/gc_12_1_0_offset.h"
 #include "gc/gc_12_1_0_sh_mask.h"
