@@ -181,6 +181,12 @@ uint32_t link_bw_kbps_from_raw_frl_link_rate_data(uint8_t bw)
 		return 40000000;
 	case 0b110:
 		return 48000000;
+	case 0b111:
+		return 64000000;
+	case 0b1000:
+		return 80000000;
+	case 0b1001:
+		return 96000000;
 	}
 
 	return 0;
