@@ -477,7 +477,11 @@ static int reset_queues_mes(struct device_queue_manager *dqm, struct queue *q)
 		goto fail;
 
 	dqm->detect_hang_count = num_hung;
-	kfd_signal_reset_event(dqm->dev);
+	/* When MES doesn't detect any queue hang, no reset happens. Don't signal reset
+	 * event.
+	 */
+	if (dqm->detect_hang_count)
+		kfd_signal_reset_event(dqm->dev);
 
 fail:
 	dqm->detect_hang_count = 0;
