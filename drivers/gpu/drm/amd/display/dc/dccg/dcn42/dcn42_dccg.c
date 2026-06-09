@@ -77,7 +77,7 @@ void dccg42_otg_drop_pixel(struct dccg *dccg,
 	}
 }
 
-void dccg42_enable_global_fgcg(struct dccg *dccg, bool value)
+void dccg42_enable_global_fgcg(struct dccg *dccg, bool enable)
 {
 	struct dcn_dccg *dccg_dcn = TO_DCN_DCCG(dccg);
 
@@ -85,9 +85,18 @@ void dccg42_enable_global_fgcg(struct dccg *dccg, bool value)
 	 * Fine grain control via bit2 of debug flag.
 	 */
 	if (dccg->ctx->dc->debug.disable_clock_gate || (dccg->ctx->dc->debug.iommu_mismatch_temp_wka & 0x4))
-		value = false;
+		enable = false;
 
-	REG_UPDATE(DCCG_GLOBAL_FGCG_REP_CNTL, DCCG_GLOBAL_FGCG_REP_DIS, !value);
+	REG_UPDATE(DCCG_GLOBAL_FGCG_REP_CNTL, DCCG_GLOBAL_FGCG_REP_DIS, !enable);
+}
+
+bool dccg42_get_global_fgcg_status(struct dccg *dccg)
+{
+	struct dcn_dccg *dccg_dcn = TO_DCN_DCCG(dccg);
+	uint32_t disabled = 0;
+
+	REG_GET(DCCG_GLOBAL_FGCG_REP_CNTL, DCCG_GLOBAL_FGCG_REP_DIS, &disabled);
+	return disabled & 0x1;
 }
 
 void dccg42_set_physymclk(
@@ -339,7 +348,8 @@ static const struct dccg_funcs dccg42_funcs = {
 	.dccg_root_gate_disable_control = dccg35_root_gate_disable_control,
 	.dccg_read_reg_state = dccg31_read_reg_state,
 	.dccg_enable_global_fgcg = dccg42_enable_global_fgcg,
-	.allow_clock_gating = dccg2_allow_clock_gating
+	.allow_clock_gating = dccg2_allow_clock_gating,
+	.dccg_get_global_fgcg_status = dccg42_get_global_fgcg_status,
 };
 
 struct dccg *dccg42_create(
