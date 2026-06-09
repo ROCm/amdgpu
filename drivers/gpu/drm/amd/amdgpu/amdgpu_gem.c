@@ -930,7 +930,7 @@ amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
 		goto error;
 
 	if (vm->is_compute_context) {
-		if (bo_va->last_pt_update)
+		if (bo_va && bo_va->last_pt_update)
 			r = dma_fence_wait(bo_va->last_pt_update, true);
 		if (!r && vm->last_update)
 			r = dma_fence_wait(vm->last_update, true);
