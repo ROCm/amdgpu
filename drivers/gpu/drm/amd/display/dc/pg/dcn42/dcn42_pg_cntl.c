@@ -96,11 +96,6 @@ void pg_cntl42_dsc_pg_control(struct pg_cntl *pg_cntl, unsigned int dsc_inst, bo
 	struct dcn42_global_fgcg_rep_state fgcg_rep_state = {0};
 	bool block_enabled;
 
-	/*need to enable dscclk regardless DSC_PG*/
-	if (pg_cntl->ctx->dc->res_pool->dccg->funcs->enable_dsc && power_on)
-		pg_cntl->ctx->dc->res_pool->dccg->funcs->enable_dsc(
-				pg_cntl->ctx->dc->res_pool->dccg, dsc_inst);
-
     bool skip_pg = pg_cntl->ctx->dc->debug.ignore_pg ||
 			pg_cntl->ctx->dc->debug.disable_dsc_power_gate ||
 			pg_cntl->ctx->dc->idle_optimizations_allowed;
@@ -167,12 +162,6 @@ void pg_cntl42_dsc_pg_control(struct pg_cntl *pg_cntl, unsigned int dsc_inst, bo
 
 	if (dsc_inst < MAX_PIPES)
 		pg_cntl->pg_pipe_res_enable[PG_DSC][dsc_inst] = power_on;
-
-	if (pg_cntl->ctx->dc->res_pool->dccg->funcs->disable_dsc && !power_on) {
-		/*this is to disable dscclk*/
-		pg_cntl->ctx->dc->res_pool->dccg->funcs->disable_dsc(
-			pg_cntl->ctx->dc->res_pool->dccg, dsc_inst);
-	}
 }
 
 static bool pg_cntl42_hubp_dpp_pg_status(struct pg_cntl *pg_cntl, unsigned int hubp_dpp_inst)
