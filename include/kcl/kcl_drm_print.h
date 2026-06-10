@@ -222,4 +222,28 @@ enum drm_debug_category {
 #define drm_err_ratelimited(drm, fmt, ...)				\
 	__drm_printk((drm), err, _ratelimited, "*ERROR* " fmt, ##__VA_ARGS__)
 #endif
+
+/*
+ * NULL-safe devcoredump printer. See kcl_drm_print.c for the rationale.
+ * drm_coredump_printer() is redirected to _kcl_drm_coredump_printer() in
+ * backport/kcl_drm_print.h so amdgpu always uses these NULL-safe variants
+ * instead of the host drm.ko's (possibly NULL-unsafe) implementation.
+ */
+void _kcl_drm_puts_coredump(struct drm_printer *p, const char *str);
+void _kcl_drm_printfn_coredump(struct drm_printer *p, struct va_format *vaf);
+
+static inline struct drm_printer
+_kcl_drm_coredump_printer(struct drm_print_iterator *iter)
+{
+	struct drm_printer p = {
+		.printfn = _kcl_drm_printfn_coredump,
+		.puts = _kcl_drm_puts_coredump,
+		.arg = iter,
+	};
+
+	/* Set the internal offset of the iterator to zero */
+	iter->offset = 0;
+
+	return p;
+}
 #endif
