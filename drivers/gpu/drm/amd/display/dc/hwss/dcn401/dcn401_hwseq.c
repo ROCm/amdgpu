@@ -321,7 +321,7 @@ void dcn401_init_hw(struct dc *dc)
 			user_level = link->panel_cntl->stored_backlight_registers.USER_LEVEL;
 		}
 
-		if (link->ctx->dc->config.dp_connector_no_native_i2c && link->no_ddc_pin) {
+		if (link->force_to_use_aux) {
 			struct graphics_object_i2c_info i2c_info;
 			struct ddc *ddc_pin;
 			struct gpio_ddc_hw_info hw_info;

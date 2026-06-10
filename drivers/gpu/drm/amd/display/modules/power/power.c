@@ -483,12 +483,7 @@ bool mod_power_notify_mode_change(struct mod_power *mod_power,
 	link = dc_stream_get_link(stream);
 
 	if (link != NULL && dc_get_edp_link_panel_inst(dc, link, &panel_inst)) {
-		if (link->ctx->dc->config.dp_connector_no_native_i2c && link->no_ddc_pin) {
-			aux_inst = (uint8_t)link->aux_hw_inst;
-		} else {
-			ASSERT(link->ddc->ddc_pin->hw_info.ddc_channel <= 0xFF);
-			aux_inst = (uint8_t)link->ddc->ddc_pin->hw_info.ddc_channel;
-		}
+		aux_inst = link->dc->link_srv->get_ddc_aux_inst(link);
 
 		mod_power_update_backlight_on_mode_change(core_power, link, panel_inst, aux_inst, is_hdr);
 

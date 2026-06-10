@@ -529,7 +529,7 @@ static uint32_t dce_aux_configure_timeout(struct ddc_service *ddc,
 	uint32_t prev_timeout_val = 0;
 	struct ddc *ddc_pin = ddc->ddc_pin;
 
-	if (ddc->ctx->dc->config.dp_connector_no_native_i2c && ddc->link->no_ddc_pin)
+	if (ddc->link->force_to_use_aux)
 		return dce_aux_configure_timeout_without_ddc_pin(ddc, timeout_in_us);
 
 	struct dce_aux *aux_engine = ddc->ctx->dc->res_pool->engines[ddc_pin->pin_data->en];
@@ -652,7 +652,7 @@ int dce_aux_transfer_raw(struct ddc_service *ddc,
 		struct aux_payload *payload,
 		enum aux_return_code_type *operation_result)
 {
-	if (ddc->ctx->dc->config.dp_connector_no_native_i2c && ddc->link->no_ddc_pin) {
+	if (ddc->link->force_to_use_aux) {
 		/* Check whether aux to be processed via dmub or dcn directly */
 		if (ddc->ctx->dc->debug.enable_dmub_aux_for_legacy_ddc) {
 			return dce_aux_transfer_dmub_raw(ddc, payload, operation_result);
@@ -795,7 +795,7 @@ int dce_aux_transfer_dmub_raw(struct ddc_service *ddc,
 		release_engine(aux_engine);
 	}
 
-	if (ddc->ctx->dc->config.dp_connector_no_native_i2c && ddc->link->no_ddc_pin) {
+	if (ddc->link->force_to_use_aux) {
 		struct dce_aux *aux_engine = ddc->ctx->dc->res_pool->engines[ddc->link->aux_hw_inst];
 
 		if (!acquire_aux_engine_without_ddc_pin(aux_engine, ddc_pin)) {
@@ -893,7 +893,7 @@ bool dce_aux_transfer_with_retries(struct ddc_service *ddc,
 		aux110 = FROM_AUX_ENGINE(aux_engine);
 	}
 
-	if (ddc->ctx->dc->config.dp_connector_no_native_i2c && ddc->link->no_ddc_pin) {
+	if (ddc->link->force_to_use_aux) {
 		aux_engine = ddc->ctx->dc->res_pool->engines[ddc->link->aux_hw_inst];
 		aux110 = FROM_AUX_ENGINE(aux_engine);
 	}

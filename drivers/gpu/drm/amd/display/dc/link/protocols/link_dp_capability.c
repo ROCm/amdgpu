@@ -2584,7 +2584,7 @@ bool dp_is_sink_present(struct dc_link *link)
 	/* We can't perform the step below for ASICs with no Native
 	 * I2C signaling support on DP connectors, so skip it.
 	 */
-	if (link->ctx->dc->config.dp_connector_no_native_i2c && link->no_ddc_pin)
+	if (link->force_to_use_aux)
 		return present;
 
 	ddc = get_ddc_pin(link->ddc);

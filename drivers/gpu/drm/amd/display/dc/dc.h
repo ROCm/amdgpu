@@ -1848,6 +1848,10 @@ struct dc_scratch_space {
 	 * of ddc_pin to know which aux instance is associated with link.
 	 */
 	bool no_ddc_pin;
+	/** When set, forces all native I2C communication on this DP connector
+	 *  to use the I2C-over-AUX protocol instead of native I2C signaling.
+	 */
+	bool force_to_use_aux;
 	enum gpio_ddc_line aux_hw_inst;
 
 	enum gpio_ddc_line ddc_hw_inst;
