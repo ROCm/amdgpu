@@ -60,4 +60,15 @@ struct drm_printer _kcl_drm_dbg_printer(struct drm_device *drm,
 #define drm_dbg_printer _kcl_drm_dbg_printer
 #endif
 
+/*
+ * Route drm_coredump_printer() through the NULL-safe KCL implementation so
+ * amdgpu's two-pass devcoredump (which sizes the output by running the
+ * printer with a NULL buffer) does not crash on kernels whose drm.ko lacks
+ * the NULL-data guard (pre-v6.12, commit 53369581dc0c). This behavioural
+ * difference cannot be detected by configure tests, so the redirect is
+ * unconditional; on newer kernels it is behaviourally identical.
+ */
+#undef drm_coredump_printer
+#define drm_coredump_printer _kcl_drm_coredump_printer
+
 #endif
