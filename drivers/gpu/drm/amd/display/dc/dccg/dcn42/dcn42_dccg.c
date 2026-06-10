@@ -292,6 +292,12 @@ static void dccg42_init(struct dccg *dccg)
 	dccg42_disable_hdmistreamclk(dccg);
 	if (dccg->ctx->dc->debug.root_clock_optimization.bits.hdmichar)
 		dccg42_disable_hdmicharclk(dccg, 0);
+
+	if (dccg->ctx->dc->debug.root_clock_optimization.bits.dpp) {
+		for (i = 0; i < res_pool->pipe_count; i++) {
+			dccg35_dpp_root_clock_control(dccg, i, true);
+		}
+	}
 }
 
 
