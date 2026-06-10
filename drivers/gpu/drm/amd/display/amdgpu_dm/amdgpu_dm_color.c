@@ -1644,8 +1644,10 @@ __set_dm_plane_colorop_shaper(struct drm_plane_state *plane_state,
 			      struct drm_colorop *colorop)
 {
 	struct drm_colorop *old_colorop;
-	struct drm_colorop_state *colorop_state = NULL, *new_colorop_state;
+	struct drm_colorop_state *new_colorop_state;
+	struct drm_colorop_state *tf_state = NULL, *lut_state = NULL;
 	struct drm_atomic_commit *state = plane_state->state;
+	struct drm_colorop *lut_colorop;
 	enum dc_transfer_func_predefined default_tf = TRANSFER_FUNCTION_LINEAR;
 	struct dc_transfer_func *tf = &dc_plane_state->cm.shaper_func;
 	const struct drm_color_lut32 *shaper_lut;
@@ -1654,20 +1656,35 @@ __set_dm_plane_colorop_shaper(struct drm_plane_state *plane_state,
 	u32 shaper_size;
 	int i = 0, ret = 0;
 
-	/* 1D Curve - SHAPER TF */
+	/* 1D Curve - SHAPER TF: find state */
 	old_colorop = colorop;
 	for_each_new_colorop_in_state(state, colorop, new_colorop_state, i) {
 		if (new_colorop_state->colorop == old_colorop &&
 		    (BIT(new_colorop_state->curve_1d_type) & amdgpu_dm_supported_shaper_tfs)) {
-			colorop_state = new_colorop_state;
+			tf_state = new_colorop_state;
 			break;
 		}
 	}
 
-	if (colorop_state && !colorop_state->bypass) {
-		drm_dbg(dev, "Shaper TF colorop with ID: %d\n", colorop->base.id);
+	/* 1D LUT - SHAPER LUT: find state */
+	lut_colorop = old_colorop->next;
+	if (!lut_colorop) {
+		drm_dbg(dev, "no Shaper LUT colorop found\n");
+		return -EINVAL;
+	}
+
+	for_each_new_colorop_in_state(state, colorop, new_colorop_state, i) {
+		if (new_colorop_state->colorop == lut_colorop &&
+		    new_colorop_state->colorop->type == DRM_COLOROP_1D_LUT) {
+			lut_state = new_colorop_state;
+			break;
+		}
+	}
+
+	if (tf_state && !tf_state->bypass) {
+		drm_dbg(dev, "Shaper TF colorop with ID: %d\n", old_colorop->base.id);
 		tf->type = TF_TYPE_DISTRIBUTED_POINTS;
-		tf->tf = default_tf = amdgpu_colorop_tf_to_dc_tf(colorop_state->curve_1d_type);
+		tf->tf = default_tf = amdgpu_colorop_tf_to_dc_tf(tf_state->curve_1d_type);
 		tf->sdr_ref_white_level = SDR_WHITE_LEVEL_INIT_VALUE;
 		ret = __set_output_tf(tf, 0, 0, false);
 		if (ret)
@@ -1675,32 +1692,16 @@ __set_dm_plane_colorop_shaper(struct drm_plane_state *plane_state,
 		enabled = true;
 	}
 
-	/* 1D LUT - SHAPER LUT */
-	colorop = old_colorop->next;
-	if (!colorop) {
-		drm_dbg(dev, "no Shaper LUT colorop found\n");
-		return -EINVAL;
-	}
-
-	old_colorop = colorop;
-	for_each_new_colorop_in_state(state, colorop, new_colorop_state, i) {
-		if (new_colorop_state->colorop == old_colorop &&
-		    new_colorop_state->colorop->type == DRM_COLOROP_1D_LUT) {
-			colorop_state = new_colorop_state;
-			break;
-		}
-	}
-
-	if (colorop_state && !colorop_state->bypass) {
-		drm_dbg(dev, "Shaper LUT colorop with ID: %d\n", colorop->base.id);
+	if (lut_state && !lut_state->bypass) {
+		drm_dbg(dev, "Shaper LUT colorop with ID: %d\n", lut_colorop->base.id);
 		tf->type = TF_TYPE_DISTRIBUTED_POINTS;
 		tf->tf = default_tf;
 		tf->sdr_ref_white_level = SDR_WHITE_LEVEL_INIT_VALUE;
-		shaper_lut = __extract_blob_lut32(colorop_state->data, &shaper_size);
+		shaper_lut = __extract_blob_lut32(lut_state->data, &shaper_size);
 		shaper_size = shaper_lut != NULL ? shaper_size : 0;
 
 		/* Custom LUT size must be the same as supported size */
-		if (shaper_size == colorop->size) {
+		if (shaper_size == lut_colorop->size) {
 			ret = __set_output_tf_32(tf, shaper_lut, shaper_size, false);
 			if (ret)
 				return ret;
@@ -1816,8 +1817,10 @@ __set_dm_plane_colorop_blend(struct drm_plane_state *plane_state,
 			     struct drm_colorop *colorop)
 {
 	struct drm_colorop *old_colorop;
-	struct drm_colorop_state *colorop_state = NULL, *new_colorop_state;
+	struct drm_colorop_state *new_colorop_state;
+	struct drm_colorop_state *tf_state = NULL, *lut_state = NULL;
 	struct drm_atomic_commit *state = plane_state->state;
+	struct drm_colorop *lut_colorop;
 	enum dc_transfer_func_predefined default_tf = TRANSFER_FUNCTION_LINEAR;
 	struct dc_transfer_func *tf = &dc_plane_state->cm.blend_func;
 	const struct drm_color_lut32 *blend_lut = NULL;
@@ -1827,52 +1830,51 @@ __set_dm_plane_colorop_blend(struct drm_plane_state *plane_state,
 
 	dc_plane_state->cm.flags.bits.blend_enable = 0;
 
-	/* 1D Curve - BLND TF */
+	/* 1D Curve - BLND TF: find state */
 	old_colorop = colorop;
 	for_each_new_colorop_in_state(state, colorop, new_colorop_state, i) {
 		if (new_colorop_state->colorop == old_colorop &&
 		    (BIT(new_colorop_state->curve_1d_type) & amdgpu_dm_supported_blnd_tfs)) {
-			colorop_state = new_colorop_state;
+			tf_state = new_colorop_state;
 			break;
 		}
 	}
 
-	if (colorop_state && !colorop_state->bypass) {
-		drm_dbg(dev, "Blend TF colorop with ID: %d\n", colorop->base.id);
+	/* 1D LUT - BLND LUT: find state */
+	lut_colorop = old_colorop->next;
+	if (!lut_colorop) {
+		drm_dbg(dev, "no Blend LUT colorop found\n");
+		return -EINVAL;
+	}
+
+	for_each_new_colorop_in_state(state, colorop, new_colorop_state, i) {
+		if (new_colorop_state->colorop == lut_colorop &&
+		    new_colorop_state->colorop->type == DRM_COLOROP_1D_LUT) {
+			lut_state = new_colorop_state;
+			break;
+		}
+	}
+
+	if (tf_state && !tf_state->bypass) {
+		drm_dbg(dev, "Blend TF colorop with ID: %d\n", old_colorop->base.id);
 		tf->type = TF_TYPE_DISTRIBUTED_POINTS;
-		tf->tf = default_tf = amdgpu_colorop_tf_to_dc_tf(colorop_state->curve_1d_type);
+		tf->tf = default_tf = amdgpu_colorop_tf_to_dc_tf(tf_state->curve_1d_type);
 		tf->sdr_ref_white_level = SDR_WHITE_LEVEL_INIT_VALUE;
 		dc_plane_state->cm.flags.bits.blend_enable = 1;
 		__set_input_tf_32(NULL, tf, blend_lut, blend_size);
 	}
 
-	/* 1D Curve - BLND LUT */
-	colorop = old_colorop->next;
-	if (!colorop) {
-		drm_dbg(dev, "no Blend LUT colorop found\n");
-		return -EINVAL;
-	}
-
-	old_colorop = colorop;
-	for_each_new_colorop_in_state(state, colorop, new_colorop_state, i) {
-		if (new_colorop_state->colorop == old_colorop &&
-		    new_colorop_state->colorop->type == DRM_COLOROP_1D_LUT) {
-			colorop_state = new_colorop_state;
-			break;
-		}
-	}
-
-	if (colorop_state && !colorop_state->bypass) {
-		drm_dbg(dev, "Blend LUT colorop with ID: %d\n", colorop->base.id);
+	if (lut_state && !lut_state->bypass) {
+		drm_dbg(dev, "Blend LUT colorop with ID: %d\n", lut_colorop->base.id);
 		tf->type = TF_TYPE_DISTRIBUTED_POINTS;
 		tf->tf = default_tf;
 		tf->sdr_ref_white_level = SDR_WHITE_LEVEL_INIT_VALUE;
 		dc_plane_state->cm.flags.bits.blend_enable = 1;
-		blend_lut = __extract_blob_lut32(colorop_state->data, &blend_size);
+		blend_lut = __extract_blob_lut32(lut_state->data, &blend_size);
 		blend_size = blend_lut != NULL ? blend_size : 0;
 
 		/* Custom LUT size must be the same as supported size */
-		if (blend_size == colorop->size)
+		if (blend_size == lut_colorop->size)
 			__set_input_tf_32(NULL, tf, blend_lut, blend_size);
 	}
 
