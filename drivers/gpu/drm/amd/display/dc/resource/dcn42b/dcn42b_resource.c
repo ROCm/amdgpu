@@ -253,10 +253,10 @@ static struct bios_registers bios_regs;
 static struct dce110_clk_src_regs clk_src_regs[5];
 
 static const struct dce110_clk_src_shift cs_shift = {
-	CS_COMMON_MASK_SH_LIST_DCN3_2(__SHIFT)
+	CS_COMMON_MASK_SH_LIST_DCN4_0_1(__SHIFT)
 };
 static const struct dce110_clk_src_mask cs_mask = {
-	CS_COMMON_MASK_SH_LIST_DCN3_2(_MASK)
+	CS_COMMON_MASK_SH_LIST_DCN4_0_1(_MASK)
 };
 #define abm_regs_init(id) \
 	ABM_DCN42B_REG_LIST_RI(id)
@@ -801,7 +801,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 		}
 	},
 	.seamless_boot_odm_combine = DML_FAIL_SOURCE_PIXEL_FORMAT,
-	.enable_z9_disable_interface = false, /* Allow support for the PMFW interface for disable Z9*/
+	.enable_z9_disable_interface = true, /* Allow support for the PMFW interface for disable Z9*/
 	.minimum_z8_residency_time = 1, /* Always allow when other conditions are met */
 	.support_eDP1_5 = true,
 	.use_max_lb = true,
@@ -823,7 +823,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.disable_timeout = true,
 	.min_disp_clk_khz = 50000,
 	.static_screen_wait_frames = 2,
-	.disable_z10 = true,
+	.disable_z10 = false,
 	.ignore_pg = true,
 	.disable_stutter_for_wm_program = true,
 	.min_deep_sleep_dcfclk_khz = 8000,
