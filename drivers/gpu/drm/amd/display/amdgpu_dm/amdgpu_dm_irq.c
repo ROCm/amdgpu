@@ -1426,12 +1426,14 @@ static void handle_hpd_rx_irq(void *param)
 	struct dc_link *dc_link = aconnector->dc_link;
 	bool is_mst_root_connector = aconnector->mst_mgr.mst_state;
 	bool result = false;
+	enum dc_connection_type new_connection_type = dc_connection_none;
 	struct amdgpu_device *adev = drm_to_adev(dev);
 	union hpd_irq_data hpd_irq_data;
 	bool link_loss = false;
 	bool has_left_work = false;
 	int idx = dc_link->link_index;
 	struct hpd_rx_irq_offload_work_queue *offload_wq = &adev->dm.hpd_rx_offload_wq[idx];
+	struct dc *dc = aconnector->dc_link->ctx->dc;
 
 	memset(&hpd_irq_data, 0, sizeof(hpd_irq_data));
 
@@ -1500,7 +1502,44 @@ static void handle_hpd_rx_irq(void *param)
 out:
 	if (result && !is_mst_root_connector) {
 		/* Downstream Port status changed. */
-		handle_hpd_irq_helper(aconnector, DETECT_REASON_HPDRX);
+		if (!dc_link_detect_connection_type(dc_link, &new_connection_type))
+			drm_err(adev_to_drm(adev), "KMS: Failed to detect connector\n");
+
+		if (aconnector->base.force && new_connection_type == dc_connection_none) {
+			amdgpu_dm_emulated_link_detect(dc_link);
+
+			if (aconnector->fake_enable)
+				aconnector->fake_enable = false;
+
+			amdgpu_dm_update_connector_after_detect(aconnector);
+
+
+			drm_modeset_lock_all(dev);
+			dm_restore_drm_connector_state(dev, connector);
+			drm_modeset_unlock_all(dev);
+
+			drm_kms_helper_connector_hotplug_event(connector);
+		} else {
+			bool ret = false;
+
+			mutex_lock(&adev->dm.dc_lock);
+			dc_exit_ips_for_hw_access(dc);
+			ret = dc_link_detect(dc_link, DETECT_REASON_HPDRX);
+			mutex_unlock(&adev->dm.dc_lock);
+
+			if (ret) {
+				if (aconnector->fake_enable)
+					aconnector->fake_enable = false;
+
+				amdgpu_dm_update_connector_after_detect(aconnector);
+
+				drm_modeset_lock_all(dev);
+				dm_restore_drm_connector_state(dev, connector);
+				drm_modeset_unlock_all(dev);
+
+				drm_kms_helper_connector_hotplug_event(connector);
+			}
+		}
 	}
 	if (hpd_irq_data.bytes.device_service_irq.bits.CP_IRQ) {
 		if (adev->dm.hdcp_workqueue)
