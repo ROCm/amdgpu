@@ -1160,6 +1160,7 @@ struct amdgpu_device {
 	bool                            debug_vm_userptr;
 	bool                            debug_disable_ce_logs;
 	bool                            debug_enable_ce_cs;
+	bool                            debug_hibernation_thaw_resume_gpu;
 
 	/* Protection for the following isolation structure */
 	struct mutex                    enforce_isolation_mutex;
