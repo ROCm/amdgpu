@@ -2053,7 +2053,6 @@ static bool dcn315_resource_construct(
 	if (dc->config.forceHBR2CP2520)
 		dc->caps.force_dp_tps4_for_cp2520 = false;
 	dc->caps.hdmi_hpo = true;
-	dc->config.skip_frl_pretraining = true;
 	dc->caps.dp_hpo = true;
 	dc->caps.dp_hdmi21_pcon_support = true;
 	dc->caps.edp_dsc_support = true;

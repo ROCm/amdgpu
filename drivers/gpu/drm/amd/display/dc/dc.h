@@ -591,7 +591,6 @@ struct dc_config {
 	bool enable_mipi_converter_optimization;
 	bool enable_frl;
 	bool force_hdmi21_frl_enc_enable;
-	bool skip_frl_pretraining;
 	bool use_default_clock_table;
 	bool force_bios_enable_lttpr;
 	uint8_t force_bios_fixed_vs;

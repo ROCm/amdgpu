@@ -933,7 +933,7 @@ static bool should_verify_link_capability_destructively(struct dc_link *link,
 		destrictive = true;
 		if (is_hdmi_frl_in_use(link)) {
 			destrictive = false;
-		} else if (link->dc->config.skip_frl_pretraining) {
+		} else if (link->local_sink->edid_caps.panel_patch.skip_frl_pre_training) {
 			for (i = 0; i < MAX_PIPES; i++) {
 				if (pipes[i].stream != NULL &&
 					pipes[i].stream->link == link) {
