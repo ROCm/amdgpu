@@ -63,9 +63,6 @@ struct kfd_event {
 	spinlock_t lock;
 	wait_queue_head_t wq; /* List of event waiters. */
 
-	/* Only for signal events. */
-	uint64_t __user *user_signal_address;
-
 	/* type specific data */
 	union {
 		struct kfd_hsa_memory_exception_data memory_exception_data;

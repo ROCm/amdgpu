@@ -55,43 +55,11 @@ struct kfd_event_waiter {
  */
 struct kfd_signal_page {
 	uint64_t *kernel_address;
-	uint64_t __user *user_address;
-	bool need_to_free_pages;
 };
 
 static uint64_t *page_slots(struct kfd_signal_page *page)
 {
 	return page->kernel_address;
-}
-
-static struct kfd_signal_page *allocate_signal_page(struct kfd_process *p)
-{
-	void *backing_store;
-	struct kfd_signal_page *page;
-
-	page = kzalloc_obj(*page);
-	if (!page)
-		return NULL;
-
-	backing_store = (void *) __get_free_pages(GFP_KERNEL,
-					get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
-	if (!backing_store)
-		goto fail_alloc_signal_store;
-
-	/* Initialize all events to unsignaled */
-	memset(backing_store, (uint8_t) UNSIGNALED_EVENT_SLOT,
-	       KFD_SIGNAL_EVENT_LIMIT * 8);
-
-	page->kernel_address = backing_store;
-	page->need_to_free_pages = true;
-	pr_debug("Allocated new event signal page at %p, for process %p\n",
-			page, p);
-
-	return page;
-
-fail_alloc_signal_store:
-	kfree(page);
-	return NULL;
 }
 
 static int allocate_event_notification_slot(struct kfd_process *p,
@@ -100,13 +68,13 @@ static int allocate_event_notification_slot(struct kfd_process *p,
 {
 	int id;
 
-	if (!p->signal_page) {
-		p->signal_page = allocate_signal_page(p);
-		if (!p->signal_page)
-			return -ENOMEM;
-		/* Oldest user mode expects 256 event slots */
-		p->signal_mapped_size = 256*8;
-	}
+	/*
+	 * The signal page is allocated in user mode and mapped to the kernel
+	 * via the event_page_offset of the create event IOCTL. Without it no
+	 * signal events can be created.
+	 */
+	if (!p->signal_page)
+		return -ENOMEM;
 
 	if (restore_id) {
 		id = idr_alloc(&p->event_idr, ev, *restore_id, *restore_id + 1,
@@ -212,10 +180,8 @@ static int create_signal_event(struct file *devkfd, struct kfd_process *p,
 
 	p->signal_event_count++;
 
-	ev->user_signal_address = &p->signal_page->user_address[ev->event_id];
-	pr_debug("Signal event number %zu created with id %d, address %p\n",
-			p->signal_event_count, ev->event_id,
-			ev->user_signal_address);
+	pr_debug("Signal event number %zu created with id %d\n",
+			p->signal_event_count, ev->event_id);
 
 	return 0;
 }
@@ -303,12 +269,7 @@ static void shutdown_signal_page(struct kfd_process *p)
 {
 	struct kfd_signal_page *page = p->signal_page;
 
-	if (page) {
-		if (page->need_to_free_pages)
-			free_pages((unsigned long)page->kernel_address,
-				   get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
-		kfree(page);
-	}
+	kfree(page);
 }
 
 void kfd_event_free_process(struct kfd_process *p)
