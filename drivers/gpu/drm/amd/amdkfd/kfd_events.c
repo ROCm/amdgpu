@@ -1071,51 +1071,6 @@ out:
 	return ret;
 }
 
-int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
-{
-	unsigned long pfn;
-	struct kfd_signal_page *page;
-	int ret;
-
-	/* check required size doesn't exceed the allocated size */
-	if (get_order(KFD_SIGNAL_EVENT_LIMIT * 8) <
-			get_order(vma->vm_end - vma->vm_start)) {
-		pr_err("Event page mmap requested illegal size\n");
-		return -EINVAL;
-	}
-
-	page = p->signal_page;
-	if (!page) {
-		/* Probably KFD bug, but mmap is user-accessible. */
-		pr_debug("Signal page could not be found\n");
-		return -EINVAL;
-	}
-
-	pfn = __pa(page->kernel_address);
-	pfn >>= PAGE_SHIFT;
-
-	vm_flags_set(vma, VM_IO | VM_DONTCOPY | VM_DONTEXPAND | VM_NORESERVE
-		       | VM_DONTDUMP | VM_PFNMAP);
-
-	pr_debug("Mapping signal page\n");
-	pr_debug("     start user address  == 0x%08lx\n", vma->vm_start);
-	pr_debug("     end user address    == 0x%08lx\n", vma->vm_end);
-	pr_debug("     pfn                 == 0x%016lX\n", pfn);
-	pr_debug("     vm_flags            == 0x%08lX\n", vma->vm_flags);
-	pr_debug("     size                == 0x%08lX\n",
-			vma->vm_end - vma->vm_start);
-
-	page->user_address = (uint64_t __user *)vma->vm_start;
-
-	/* mapping the page to user process */
-	ret = remap_pfn_range(vma, vma->vm_start, pfn,
-			vma->vm_end - vma->vm_start, vma->vm_page_prot);
-	if (!ret)
-		p->signal_mapped_size = vma->vm_end - vma->vm_start;
-
-	return ret;
-}
-
 /*
  * Assumes that p is not going away.
  */
