@@ -95,11 +95,35 @@ static int amdgpu_ras_mgr_init_aca_config(struct amdgpu_device *adev,
 	return 0;
 }
 
+static uint64_t amdgpu_ras_mgr_reserved_vram_size(struct amdgpu_device *adev)
+{
+	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
+	uint64_t reserved_pages_in_bytes = 0;
+
+	if (!con || (adev->flags & AMD_IS_APU))
+		return 0;
+
+	switch (amdgpu_ip_version(adev, MP0_HWIP, 0)) {
+	case IP_VERSION(13, 0, 6):
+	case IP_VERSION(13, 0, 12):
+		reserved_pages_in_bytes = RAS_RESERVED_VRAM_SIZE_DEFAULT;
+		break;
+	case IP_VERSION(13, 0, 14):
+		reserved_pages_in_bytes = (RAS_RESERVED_VRAM_SIZE_DEFAULT << 1);
+		break;
+	default:
+		break;
+	}
+	return reserved_pages_in_bytes;
+}
+
 static int amdgpu_ras_mgr_init_eeprom_config(struct amdgpu_device *adev,
 		struct ras_core_config *config)
 {
 	struct ras_eeprom_config *eeprom_cfg = &config->eeprom_cfg;
+	uint64_t ras_reserved_vram_size;
 
+	ras_reserved_vram_size = amdgpu_ras_mgr_reserved_vram_size(adev);
 	eeprom_cfg->eeprom_sys_fn = &amdgpu_ras_eeprom_i2c_sys_func;
 	eeprom_cfg->eeprom_i2c_adapter = adev->pm.ras_eeprom_i2c_bus;
 	if (eeprom_cfg->eeprom_i2c_adapter) {
@@ -133,7 +157,7 @@ static int amdgpu_ras_mgr_init_eeprom_config(struct amdgpu_device *adev,
 			div64_u64(adev->gmc.mc_vram_size, TYPICAL_ECC_BAD_PAGE_RATE);
 	else if (amdgpu_bad_page_threshold == WARN_NONSTOP_OVER_THRESHOLD)
 		eeprom_cfg->eeprom_record_threshold_count =
-				COUNT_BAD_PAGE_THRESHOLD(RAS_RESERVED_VRAM_SIZE_DEFAULT);
+				COUNT_BAD_PAGE_THRESHOLD(ras_reserved_vram_size);
 	else
 		eeprom_cfg->eeprom_record_threshold_count = amdgpu_bad_page_threshold;
 
