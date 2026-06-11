@@ -1964,6 +1964,7 @@ static struct pci_dev *amdgpu_device_find_parent(struct amdgpu_device *adev)
 	while ((parent = pci_upstream_bridge(parent))) {
 		if (parent->vendor == PCI_VENDOR_ID_ATI)
 			continue;
+		break;
 	}
 
 	return parent;

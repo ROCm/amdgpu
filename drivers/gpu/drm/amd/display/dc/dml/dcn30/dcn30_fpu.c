@@ -33,6 +33,8 @@
 #include "display_mode_vba_30.h"
 #include "dcn30_fpu.h"
 
+#include "../dml1_frl_cap_chk.h"
+
 #define REG(reg)\
 	optc1->tg_regs->reg
 
@@ -131,6 +133,7 @@ struct _vcs_dpi_soc_bounding_box_st dcn3_0_soc = {
 				.phyclk_mhz = 300.0,
 				.phyclk_d18_mhz = 667.0,
 				.dscclk_mhz = 405.6,
+				.dtbclk_mhz = 1217.0,
 			},
 		},
 
@@ -740,4 +743,128 @@ void patch_dcn30_soc_bounding_box(struct dc *dc, struct _vcs_dpi_soc_bounding_bo
 				dcn3_0_soc.sr_exit_time_us = bb_info.dram_sr_exit_latency_100ns * 10;
 		}
 	}
+}
+
+#undef DC_LOGGER
+#define DC_LOGGER \
+		enc3->base.ctx->logger
+
+#define hdmi_frl_print(str, ...) {DC_LOG_HDMI_FRL(str, ##__VA_ARGS__); }
+
+#define DEBUG_FRL_CAP_CHK 1
+
+void hpo_fpu_enc3_validate_hdmi_frl_output_link(struct hpo_frl_stream_encoder *enc,
+						struct dc_hdmi_frl_link_settings *frl_link_settings,
+						struct frl_cap_chk_params *frl_params,
+						const struct dc_crtc_timing *timing,
+						unsigned int dsc_max_rate)
+{
+	(void)enc;
+	dc_assert_fp_enabled();
+
+	switch (frl_link_settings->frl_link_rate) {
+	case HDMI_FRL_LINK_RATE_3GBPS:
+		frl_params->r_bit_nominal = 3.0e9;
+		break;
+	case HDMI_FRL_LINK_RATE_6GBPS:
+	case HDMI_FRL_LINK_RATE_6GBPS_4LANE:
+		frl_params->r_bit_nominal = 6.0e9;
+		break;
+	case HDMI_FRL_LINK_RATE_8GBPS:
+		frl_params->r_bit_nominal = 8.0e9;
+		break;
+	case HDMI_FRL_LINK_RATE_10GBPS:
+	default:
+		frl_params->r_bit_nominal = 10.0e9;
+		break;
+	case HDMI_FRL_LINK_RATE_12GBPS:
+		frl_params->r_bit_nominal = 12.0e9;
+		break;
+	}
+
+	if (timing->flags.DSC &&
+			(unsigned int)frl_link_settings->frl_link_rate > dsc_max_rate) {
+		if (dsc_max_rate < HDMI_FRL_LINK_RATE_6GBPS_4LANE) {
+			frl_params->lanes = 3;
+		} else {
+			frl_params->lanes = 4;
+		}
+
+		switch (dsc_max_rate) {
+		case HDMI_FRL_LINK_RATE_3GBPS:
+			frl_params->r_bit_nominal = 3.0e9;
+			break;
+		case HDMI_FRL_LINK_RATE_6GBPS:
+		case HDMI_FRL_LINK_RATE_6GBPS_4LANE:
+			frl_params->r_bit_nominal = 6.0e9;
+			break;
+		case HDMI_FRL_LINK_RATE_8GBPS:
+			frl_params->r_bit_nominal = 8.0e9;
+			break;
+		case HDMI_FRL_LINK_RATE_10GBPS:
+		default:
+			frl_params->r_bit_nominal = 10.0e9;
+			break;
+		case HDMI_FRL_LINK_RATE_12GBPS:
+			frl_params->r_bit_nominal = 12.0e9;
+			break;
+		}
+	}
+
+	if (timing->flags.DSC && timing->rid > 0)
+		frl_params->is_ovt = true;
+
+	frl_params->f_pixel_clock_nominal = (double)timing->pix_clk_100hz * 100;
+	frl_params->h_active = timing->h_addressable + timing->h_border_left + timing->h_border_right;
+	frl_params->h_blank = timing->h_total - frl_params->h_active;
+	frl_params->vic = timing->vic;
+}
+
+void hpo_fpu_enc3_validate_hdmi_frl_output_timing(
+		const struct dc_crtc_timing *timing,
+		const struct audio_check *audio,
+		struct frl_cap_chk_params *frl_params)
+{
+	dc_assert_fp_enabled();
+
+	if (timing->flags.DSC) {
+		frl_params->compressed = true;
+		frl_params->slices = timing->dsc_cfg.num_slices_h;
+		frl_params->slice_width = (frl_params->h_active + frl_params->slices - 1) / frl_params->slices;
+		// If YCBCR420 slice width must be even
+		if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR420 && frl_params->slice_width % 2 != 0)
+			frl_params->slice_width++;
+		frl_params->bpp_target = timing->dsc_cfg.bits_per_pixel / 16.0;
+	} else {
+		frl_params->compressed = false;
+	}
+
+	frl_params->audio_packet_type = audio->audio_packet_type;
+	frl_params->f_audio = audio->max_audiosample_rate;
+	frl_params->acat = audio->acat;
+}
+
+enum frl_cap_chk_result frl_fpu_cap_chk_common(struct hpo_frl_stream_encoder *enc,
+					       struct frl_cap_chk_intermediates *inter,
+					       struct frl_cap_chk_params *params)
+{
+	(void)enc;
+	return dml1_frl_cap_chk_common(inter, params);
+}
+
+
+enum frl_cap_chk_result frl_fpu_cap_chk_uncompressed(struct hpo_frl_stream_encoder *enc,
+						     struct frl_cap_chk_params *params,
+						     struct frl_cap_chk_intermediates *inter)
+{
+	(void)enc;
+	return dml1_frl_cap_chk_uncompressed(params, inter);
+}
+
+enum frl_cap_chk_result frl_fpu_cap_chk_compressed(struct hpo_frl_stream_encoder *enc,
+						   struct frl_cap_chk_params *params,
+						   struct frl_cap_chk_intermediates *inter)
+{
+	(void)enc;
+	return dml1_frl_cap_chk_compressed(params, inter);
 }

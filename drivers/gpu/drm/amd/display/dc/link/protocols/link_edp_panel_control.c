@@ -788,7 +788,10 @@ bool edp_setup_psr(struct dc_link *link,
 		}
 	}
 
-	psr_context->channel = link->ddc->ddc_pin->hw_info.ddc_channel;
+	if (dc->config.dp_connector_no_native_i2c && link->no_ddc_pin)
+		psr_context->channel = (enum channel_id)link->aux_hw_inst;
+	else
+		psr_context->channel = link->ddc->ddc_pin->hw_info.ddc_channel;
 	psr_context->transmitterId = link->link_enc->transmitter;
 	psr_context->engineId = link->link_enc->preferred_engine;
 
@@ -1052,6 +1055,8 @@ bool edp_setup_freesync_replay(struct dc_link *link, const struct dc_stream_stat
 		replay_config.bits.FREESYNC_PANEL_REPLAY_MODE = 1;
 		replay_config.bits.TIMING_DESYNC_ERROR_VERIFICATION = 0;
 		replay_config.bits.STATE_TRANSITION_ERROR_DETECTION = 1;
+		replay_config.bits.FRAME_SKIPPING_ERROR_DETECTION = 1;
+		replay_config.bits.FRAME_SKIPPING_ENABLE = 1;
 		dm_helpers_dp_write_dpcd(link->ctx, link,
 			DP_SINK_PR_ENABLE_AND_CONFIGURATION,
 			(uint8_t *)&(replay_config.raw), sizeof(uint8_t));

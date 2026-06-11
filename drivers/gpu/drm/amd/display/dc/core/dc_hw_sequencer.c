@@ -1614,6 +1614,9 @@ void hwss_execute_sequence(struct dc *dc,
 		case STREAM_ENC_UPDATE_HDMI_INFO_PACKETS:
 			hwss_stream_enc_update_hdmi_info_packets(params);
 			break;
+		case HPO_FRL_STREAM_ENC_UPDATE_HDMI_INFO_PACKETS:
+			hwss_hpo_frl_stream_enc_update_hdmi_info_packets(params);
+			break;
 		case HPO_DP_STREAM_ENC_UPDATE_DP_INFO_PACKETS_SDP_LINE_NUM:
 			hwss_hpo_dp_stream_enc_update_dp_info_packets_sdp_line_num(params);
 			break;
@@ -1637,6 +1640,9 @@ void hwss_execute_sequence(struct dc *dc,
 			break;
 		case STREAM_ENC_DP_SET_DSC_PPS_INFO_PACKET:
 			hwss_stream_enc_dp_set_dsc_pps_info_packet(params);
+			break;
+		case HPO_FRL_STREAM_ENC_SET_DSC_CONFIG:
+			hwss_hpo_frl_stream_enc_set_dsc_config(params);
 			break;
 		case DP_TRACE_SOURCE_SEQUENCE:
 			hwss_dp_trace_source_sequence(params);
@@ -3641,6 +3647,15 @@ void hwss_stream_enc_update_hdmi_info_packets(union block_sequence_params *param
 			&params->stream_enc_update_hdmi_info_packets_params.pipe_ctx->stream_res.encoder_info_frame);
 }
 
+void hwss_hpo_frl_stream_enc_update_hdmi_info_packets(union block_sequence_params *params)
+{
+	if (params->hpo_frl_stream_enc_update_hdmi_info_packets_params.pipe_ctx->stream_res.hpo_frl_stream_enc &&
+	    params->hpo_frl_stream_enc_update_hdmi_info_packets_params.pipe_ctx->stream_res.hpo_frl_stream_enc->funcs->update_hdmi_info_packets)
+		params->hpo_frl_stream_enc_update_hdmi_info_packets_params.pipe_ctx->stream_res.hpo_frl_stream_enc->funcs->update_hdmi_info_packets(
+			params->hpo_frl_stream_enc_update_hdmi_info_packets_params.pipe_ctx->stream_res.hpo_frl_stream_enc,
+			&params->hpo_frl_stream_enc_update_hdmi_info_packets_params.pipe_ctx->stream_res.encoder_info_frame);
+}
+
 void hwss_hpo_dp_stream_enc_update_dp_info_packets_sdp_line_num(union block_sequence_params *params)
 {
 	if (params->hpo_dp_stream_enc_update_dp_info_packets_sdp_line_num_params.pipe_ctx->stream_res.hpo_dp_stream_enc &&
@@ -3719,6 +3734,16 @@ void hwss_stream_enc_dp_set_dsc_pps_info_packet(union block_sequence_params *par
 			params->stream_enc_dp_set_dsc_pps_info_packet_params.immediate_update,
 			params->stream_enc_dp_set_dsc_pps_info_packet_params.dsc_packed_pps,
 			params->stream_enc_dp_set_dsc_pps_info_packet_params.pps_sdp_stream);
+}
+
+void hwss_hpo_frl_stream_enc_set_dsc_config(union block_sequence_params *params)
+{
+	if (params->hpo_frl_stream_enc_set_dsc_config_params.hpo_frl_stream_enc &&
+	    params->hpo_frl_stream_enc_set_dsc_config_params.hpo_frl_stream_enc->funcs->hdmi_frl_set_dsc_config)
+		params->hpo_frl_stream_enc_set_dsc_config_params.hpo_frl_stream_enc->funcs->hdmi_frl_set_dsc_config(
+			params->hpo_frl_stream_enc_set_dsc_config_params.hpo_frl_stream_enc,
+			(struct dc_crtc_timing *)params->hpo_frl_stream_enc_set_dsc_config_params.timing,
+			params->hpo_frl_stream_enc_set_dsc_config_params.dsc_packed_pps);
 }
 
 void hwss_set_dmdata_attributes(union block_sequence_params *params)
@@ -4864,6 +4889,16 @@ void hwss_add_stream_enc_update_hdmi_info_packets(struct block_sequence_state *s
 	}
 }
 
+void hwss_add_hpo_frl_stream_enc_update_hdmi_info_packets(struct block_sequence_state *seq_state,
+		struct pipe_ctx *pipe_ctx)
+{
+	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
+		seq_state->steps[*seq_state->num_steps].func = HPO_FRL_STREAM_ENC_UPDATE_HDMI_INFO_PACKETS;
+		seq_state->steps[*seq_state->num_steps].params.hpo_frl_stream_enc_update_hdmi_info_packets_params.pipe_ctx = pipe_ctx;
+		(*seq_state->num_steps)++;
+	}
+}
+
 void hwss_add_hpo_dp_stream_enc_update_dp_info_packets_sdp_line_num(struct block_sequence_state *seq_state,
 		struct pipe_ctx *pipe_ctx)
 {
@@ -4958,6 +4993,20 @@ void hwss_add_stream_enc_dp_set_dsc_pps_info_packet(struct block_sequence_state 
 		seq_state->steps[*seq_state->num_steps].params.stream_enc_dp_set_dsc_pps_info_packet_params.immediate_update = immediate_update;
 		seq_state->steps[*seq_state->num_steps].params.stream_enc_dp_set_dsc_pps_info_packet_params.dsc_packed_pps = dsc_packed_pps;
 		seq_state->steps[*seq_state->num_steps].params.stream_enc_dp_set_dsc_pps_info_packet_params.pps_sdp_stream = pps_sdp_stream;
+		(*seq_state->num_steps)++;
+	}
+}
+
+void hwss_add_hpo_frl_stream_enc_set_dsc_config(struct block_sequence_state *seq_state,
+		struct hpo_frl_stream_encoder *hpo_frl_stream_enc,
+		const struct dc_crtc_timing *timing,
+		uint8_t *dsc_packed_pps)
+{
+	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
+		seq_state->steps[*seq_state->num_steps].func = HPO_FRL_STREAM_ENC_SET_DSC_CONFIG;
+		seq_state->steps[*seq_state->num_steps].params.hpo_frl_stream_enc_set_dsc_config_params.hpo_frl_stream_enc = hpo_frl_stream_enc;
+		seq_state->steps[*seq_state->num_steps].params.hpo_frl_stream_enc_set_dsc_config_params.timing = timing;
+		seq_state->steps[*seq_state->num_steps].params.hpo_frl_stream_enc_set_dsc_config_params.dsc_packed_pps = dsc_packed_pps;
 		(*seq_state->num_steps)++;
 	}
 }

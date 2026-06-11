@@ -29,6 +29,8 @@
 #include "display_mode_vba_31.h"
 #include "../dml_inline_defs.h"
 
+#include "../dml1_frl_cap_chk.h"
+
 /*
  * NOTE:
  *   This file is gcc-parsable HW gospel, coming straight from HW engineers.
@@ -356,6 +358,17 @@ static void CalculateUrgentBurstFactor(
 		double *UrgentBurstFactorLuma,
 		double *UrgentBurstFactorChroma,
 		bool *NotEnoughUrgentLatencyHiding);
+
+static double RequiredDTBCLK(
+		bool DSCEnable,
+		double PixelClock,
+		enum output_format_class OutputFormat,
+		double OutputBPP,
+		int DSCSlices,
+		int HTotal,
+		int HActive,
+		int AudioRate,
+		int AudioLayoutSingle);
 
 static void UseMinimumDCFCLK(
 		struct display_mode_lib *mode_lib,
@@ -695,6 +708,8 @@ static unsigned int dscceComputeDelay(
 		pixelsPerClock = 1;
 	else if (pixelFormat == dm_n422)
 		pixelsPerClock = 2;
+	else if (Output == dm_hdmifrl)
+		pixelsPerClock = 2;
 	// #all other modes operate at 1 pixel per clock
 	else
 		pixelsPerClock = 1;
@@ -715,6 +730,8 @@ static unsigned int dscceComputeDelay(
 
 	//422 mode has an additional cycle of delay
 	if (pixelFormat == dm_420 || pixelFormat == dm_444 || pixelFormat == dm_n422)
+		s = 0;
+	else if (Output == dm_hdmifrl)
 		s = 0;
 	else
 		s = 1;
@@ -768,6 +785,25 @@ static unsigned int dscComputeDelay(enum output_format_class pixelFormat, enum o
 		//   sft
 		Delay = Delay + 1;
 	} else if (pixelFormat == dm_n422) {
+		//   sfr
+		Delay = Delay + 2;
+		//   dsccif
+		Delay = Delay + 1;
+		//   dscc - input deserializer
+		Delay = Delay + 5;
+		//  dscc - input cdc fifo
+		Delay = Delay + 25;
+		//   dscc - cdc uncertainty
+		Delay = Delay + 2;
+		//   dscc - output cdc fifo
+		Delay = Delay + 10;
+		//   dscc - cdc uncertainty
+		Delay = Delay + 2;
+		//   dscc - output serializer
+		Delay = Delay + 1;
+		//   sft
+		Delay = Delay + 1;
+	} else if (Output == dm_hdmifrl && pixelFormat != dm_444) {
 		//   sfr
 		Delay = Delay + 2;
 		//   dsccif
@@ -2243,6 +2279,8 @@ static void DISPCLKDPPCLKDCFCLKDeepSleepPrefetchParametersWatermarksAndPerforman
 				v->DSCFormatFactor = 1;
 			else if (v->OutputFormat[k] == dm_n422)
 				v->DSCFormatFactor = 2;
+			else if (v->Output[k] == dm_hdmifrl)
+				v->DSCFormatFactor = 2;
 			else
 				v->DSCFormatFactor = 1;
 			if (v->ODMCombineEnabled[k] == dm_odm_combine_mode_4to1)
@@ -3615,19 +3653,41 @@ static double TruncToValidBPP(
 	int NonDSCBPP1;
 	int NonDSCBPP2;
 
+	enum frl_cap_chk_result hdmifrlresult = FRL_CAP_CHK_OK;
+	struct frl_cap_chk_params hdmifrlparams = { 0 };
+	struct frl_cap_chk_intermediates hdmifrlinter = { 0 };
+
+	hdmifrlparams.lanes = Lanes;
+	hdmifrlparams.f_pixel_clock_nominal = PixelClock * 1000000;
+	hdmifrlparams.r_bit_nominal = LinkBitRate * 1000000;
+	hdmifrlparams.layout = AudioLayout;
+	hdmifrlparams.f_audio = AudioRate * 1000;
+	hdmifrlparams.h_active = HActive;
+	hdmifrlparams.h_blank = HTotal - HActive;
+	hdmifrlparams.compressed = DSCEnable;
+	hdmifrlparams.slices = DSCSlices;
+	hdmifrlparams.slice_width = (int)dml_ceil((double) HActive / DSCSlices, 1.0);
+	hdmifrlparams.bpp_target = DesiredBPP;
+
 	if (Format == dm_420) {
 		NonDSCBPP0 = 12;
 		NonDSCBPP1 = 15;
 		NonDSCBPP2 = 18;
 		MinDSCBPP = 6;
 		MaxDSCBPP = 1.5 * DSCInputBitPerComponent - 1.0 / 16;
+		hdmifrlparams.pixel_encoding = HDMI_FRL_PIXEL_ENCODING_420;
+		hdmifrlparams.bpc = (int)(DesiredBPP * 2 / 3);
 	} else if (Format == dm_444) {
 		NonDSCBPP0 = 24;
 		NonDSCBPP1 = 30;
 		NonDSCBPP2 = 36;
 		MinDSCBPP = 8;
 		MaxDSCBPP = 3 * DSCInputBitPerComponent - 1.0 / 16;
+		hdmifrlparams.pixel_encoding = HDMI_FRL_PIXEL_ENCODING_444;
+	    hdmifrlparams.bpc = (int)(DesiredBPP / 3);
 	} else {
+		hdmifrlparams.pixel_encoding = HDMI_FRL_PIXEL_ENCODING_422;
+	    hdmifrlparams.bpc = (int)(DesiredBPP / 2);
 
 		NonDSCBPP0 = 16;
 		NonDSCBPP1 = 20;
@@ -3636,12 +3696,22 @@ static double TruncToValidBPP(
 		if (Format == dm_n422) {
 			MinDSCBPP = 7;
 			MaxDSCBPP = 2 * DSCInputBitPerComponent - 1.0 / 16.0;
+		} else if (Output == dm_hdmifrl) {
+			MinDSCBPP = 7;
+			MaxDSCBPP = 2 * DSCInputBitPerComponent - 1.0 / 16.0;
 		} else {
 			MinDSCBPP = 8;
 			MaxDSCBPP = 3 * DSCInputBitPerComponent - 1.0 / 16.0;
 		}
 	}
 
+	if (Output == dm_hdmifrl) {
+		hdmifrlresult = dml1_frl_cap_chk_inter(&hdmifrlparams, &hdmifrlinter);
+		MaxLinkBPP = (1 - hdmifrlinter.overhead_max)
+				* dml_min(
+						hdmifrlinter.r_frl_char_min * 16 * Lanes / hdmifrlinter.f_pixel_clock_max + 24 * TB_BORROWED_MAX / HActive,
+						(hdmifrlinter.r_frl_char_min * 16 * Lanes / hdmifrlinter.f_pixel_clock_max * HTotal - 16 * hdmifrlinter.blank_audio_min) / HActive);
+	} else
 	if (DSCEnable && Output == dm_dp) {
 		MaxLinkBPP = LinkBitRate / 10 * 8 * Lanes / PixelClock * (1 - 2.4 / 100);
 	} else {
@@ -3677,6 +3747,8 @@ static double TruncToValidBPP(
 	} else {
 		if (!((DSCEnable == false && (DesiredBPP == NonDSCBPP2 || DesiredBPP == NonDSCBPP1 || DesiredBPP <= NonDSCBPP0))
 				|| (DSCEnable && DesiredBPP >= MinDSCBPP && DesiredBPP <= MaxDSCBPP))) {
+			return BPP_INVALID;
+		} else if ((Output == dm_hdmifrl && hdmifrlresult != FRL_CAP_CHK_OK) || (Output != dm_hdmifrl && MaxLinkBPP < DesiredBPP)) {
 			return BPP_INVALID;
 		} else {
 			return DesiredBPP;
@@ -4105,6 +4177,7 @@ void dml31_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 
 				if (v->ODMCombinePolicy == dm_odm_combine_policy_none
 						|| !(v->Output[k] == dm_dp ||
+						     v->Output[k] == dm_hdmifrl ||
 						     v->Output[k] == dm_dp2p0 ||
 						     v->Output[k] == dm_edp)) {
 					v->ODMCombineEnablePerState[i][k] = dm_odm_combine_mode_disabled;
@@ -4529,6 +4602,131 @@ void dml31_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 							// v->OutputTypeAndRatePerState[i][k] = v->Output[k] & " HBR3"
 						}
 					}
+				} else if (v->Output[k] == dm_hdmifrl) {
+					if (v->DSCEnable[k] == true) {
+						v->RequiresDSC[i][k] = true;
+						v->LinkDSCEnable = true;
+						v->RequiresFEC[i][k] = true;
+					} else {
+						v->RequiresDSC[i][k] = false;
+						v->LinkDSCEnable = false;
+						v->RequiresFEC[i][k] = false;
+					}
+					v->Outbpp = BPP_INVALID;
+					if (v->PHYCLKD18PerState[i] >= 3000.0 / 18) {
+						v->Outbpp = TruncToValidBPP(
+								3000,
+								3,
+								v->HTotal[k],
+								v->HActive[k],
+								v->PixelClockBackEnd[k],
+								v->ForcedOutputLinkBPP[k],
+								v->LinkDSCEnable,
+								v->Output[k],
+								v->OutputFormat[k],
+								v->DSCInputBitPerComponent[k],
+								v->NumberOfDSCSlices[k],
+								v->AudioSampleRate[k],
+								v->AudioSampleLayout[k],
+								v->ODMCombineEnablePerState[i][k]);
+						v->OutputBppPerState[i][k] = v->Outbpp;
+						//v->OutputTypeAndRatePerState[i][k] = v->Output[k] & "3x3";
+					}
+					if (v->Outbpp == BPP_INVALID && v->PHYCLKD18PerState[i] >= 6000.0 / 18) {
+						v->Outbpp = TruncToValidBPP(
+								6000,
+								3,
+								v->HTotal[k],
+								v->HActive[k],
+								v->PixelClockBackEnd[k],
+								v->ForcedOutputLinkBPP[k],
+								v->LinkDSCEnable,
+								v->Output[k],
+								v->OutputFormat[k],
+								v->DSCInputBitPerComponent[k],
+								v->NumberOfDSCSlices[k],
+								v->AudioSampleRate[k],
+								v->AudioSampleLayout[k],
+								v->ODMCombineEnablePerState[i][k]);
+						v->OutputBppPerState[i][k] = v->Outbpp;
+						//v->OutputTypeAndRatePerState[i][k] = v->Output[k] & "6x3";
+					}
+					if (v->Outbpp == BPP_INVALID && v->PHYCLKD18PerState[i] >= 6000.0 / 18) {
+						v->Outbpp = TruncToValidBPP(
+								6000,
+								4,
+								v->HTotal[k],
+								v->HActive[k],
+								v->PixelClockBackEnd[k],
+								v->ForcedOutputLinkBPP[k],
+								v->LinkDSCEnable,
+								v->Output[k],
+								v->OutputFormat[k],
+								v->DSCInputBitPerComponent[k],
+								v->NumberOfDSCSlices[k],
+								v->AudioSampleRate[k],
+								v->AudioSampleLayout[k],
+								v->ODMCombineEnablePerState[i][k]);
+						v->OutputBppPerState[i][k] = v->Outbpp;
+						//v->OutputTypeAndRatePerState[i][k] = v->Output[k] & "6x4";
+					}
+					if (v->Outbpp == BPP_INVALID && v->PHYCLKD18PerState[i] >= 8000.0 / 18) {
+						v->Outbpp = TruncToValidBPP(
+								8000,
+								4,
+								v->HTotal[k],
+								v->HActive[k],
+								v->PixelClockBackEnd[k],
+								v->ForcedOutputLinkBPP[k],
+								v->LinkDSCEnable,
+								v->Output[k],
+								v->OutputFormat[k],
+								v->DSCInputBitPerComponent[k],
+								v->NumberOfDSCSlices[k],
+								v->AudioSampleRate[k],
+								v->AudioSampleLayout[k],
+								v->ODMCombineEnablePerState[i][k]);
+						v->OutputBppPerState[i][k] = v->Outbpp;
+						//v->OutputTypeAndRatePerState(i, k) = v->Output[k] & "8x4";
+					}
+					if (v->Outbpp == BPP_INVALID && v->PHYCLKD18PerState[i] >= 10000.0 / 18) {
+						v->Outbpp = TruncToValidBPP(
+								10000,
+								4,
+								v->HTotal[k],
+								v->HActive[k],
+								v->PixelClockBackEnd[k],
+								v->ForcedOutputLinkBPP[k],
+								v->LinkDSCEnable,
+								v->Output[k],
+								v->OutputFormat[k],
+								v->DSCInputBitPerComponent[k],
+								v->NumberOfDSCSlices[k],
+								v->AudioSampleRate[k],
+								v->AudioSampleLayout[k],
+								v->ODMCombineEnablePerState[i][k]);
+						v->OutputBppPerState[i][k] = v->Outbpp;
+						//v->OutputTypeAndRatePerState[i][k] = v->Output[k] & "10x4";
+					}
+					if (v->Outbpp == BPP_INVALID && v->PHYCLKD18PerState[i] >= 12000.0 / 18) {
+						v->Outbpp = TruncToValidBPP(
+								12000,
+								4,
+								v->HTotal[k],
+								v->HActive[k],
+								v->PixelClockBackEnd[k],
+								v->ForcedOutputLinkBPP[k],
+								v->LinkDSCEnable,
+								v->Output[k],
+								v->OutputFormat[k],
+								v->DSCInputBitPerComponent[k],
+								v->NumberOfDSCSlices[k],
+								v->AudioSampleRate[k],
+								v->AudioSampleLayout[k],
+								v->ODMCombineEnablePerState[i][k]);
+						v->OutputBppPerState[i][k] = v->Outbpp;
+						//v->OutputTypeAndRatePerState[i][k] = v->Output[k] & "12x4";
+					}
 				}
 			} else {
 				v->OutputBppPerState[i][k] = 0;
@@ -4542,6 +4740,7 @@ void dml31_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 			if (v->BlendingAndTiming[k] == k
 					&& (v->Output[k] == dm_dp ||
 					    v->Output[k] == dm_edp ||
+					    v->Output[k] == dm_hdmifrl ||
 					    v->Output[k] == dm_hdmi) && v->OutputBppPerState[i][k] == 0) {
 				v->LinkCapacitySupport[i] = false;
 			}
@@ -4553,6 +4752,7 @@ void dml31_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 		if (v->BlendingAndTiming[k] == k
 				&& (v->Output[k] == dm_dp ||
 				    v->Output[k] == dm_edp ||
+				    v->Output[k] == dm_hdmifrl ||
 				    v->Output[k] == dm_hdmi)) {
 			if (v->OutputFormat[k] == dm_420 && v->Interlace[k] == 1 && v->ProgressiveToInterlaceUnitInOPP == true) {
 				P2IWith420 = true;
@@ -4565,10 +4765,30 @@ void dml31_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 	}
 
 	for (i = 0; i < v->soc.num_states; ++i) {
+		v->DTBCLKRequiredMoreThanSupported[i] = false;
+		for (k = 0; k < v->NumberOfActivePlanes; ++k) {
+			if (v->BlendingAndTiming[k] == k && v->Output[k] == dm_hdmifrl
+					&& RequiredDTBCLK(
+							v->RequiresDSC[i][k],
+							v->PixelClockBackEnd[k],
+							v->OutputFormat[k],
+							v->OutputBppPerState[i][k],
+							v->NumberOfDSCSlices[k],
+							v->HTotal[k],
+							v->HActive[k],
+							v->AudioSampleRate[k],
+							v->AudioSampleLayout[k]) > v->DTBCLKPerState[i]) {
+				v->DTBCLKRequiredMoreThanSupported[i] = true;
+			}
+		}
+	}
+
+	for (i = 0; i < v->soc.num_states; ++i) {
 		v->ODMCombine4To1SupportCheckOK[i] = true;
 		for (k = 0; k < v->NumberOfActivePlanes; ++k) {
 			if (v->BlendingAndTiming[k] == k && v->ODMCombineEnablePerState[i][k] == dm_odm_combine_mode_4to1
 					&& (v->ODMCombine4To1Supported == false || v->Output[k] == dm_dp || v->Output[k] == dm_edp
+							|| (v->Output[k] == dm_hdmifrl && v->DSCEnable[k] == false)
 							|| v->Output[k] == dm_hdmi)) {
 				v->ODMCombine4To1SupportCheckOK[i] = false;
 			}
@@ -7053,6 +7273,29 @@ static double CalculateUrgentLatency(
 		ret = ret + UrgentLatencyAdjustmentFabricClockComponent * (UrgentLatencyAdjustmentFabricClockReference / FabricClock - 1);
 	}
 	return ret;
+}
+
+static double RequiredDTBCLK(
+		bool DSCEnable,
+		double PixelClock,
+		enum output_format_class OutputFormat,
+		double OutputBPP,
+		int DSCSlices,
+		int HTotal,
+		int HActive,
+		int AudioRate,
+		int AudioLayout)
+{
+	if (DSCEnable != true) {
+		return dml_max(PixelClock / 4.0 * OutputBPP / 24.0, 25.0);
+	} else {
+		double PixelWordRate = PixelClock / (OutputFormat == dm_444 ? 1 : 2);
+		double HCActive = dml_ceil(DSCSlices * dml_ceil(OutputBPP * dml_ceil(HActive / DSCSlices, 1) / 8.0, 1) / 3.0, 1);
+		double HCBlank = 64 + 32 * dml_ceil(AudioRate * (AudioLayout == 1 ? 1.0 : 0.25) * HTotal / (PixelClock * 1000), 1);
+		double AverageTribyteRate = PixelWordRate * (HCActive + HCBlank) / HTotal;
+		double HActiveTribyteRate = PixelWordRate * HCActive / HActive;
+		return dml_max4(PixelWordRate / 4.0, AverageTribyteRate / 4.0, HActiveTribyteRate / 4.0, 25.0) * 1.002;
+	}
 }
 
 static noinline_for_stack void UseMinimumDCFCLK(

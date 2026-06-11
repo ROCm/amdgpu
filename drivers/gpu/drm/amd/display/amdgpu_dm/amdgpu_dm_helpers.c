@@ -217,8 +217,15 @@ enum dc_edid_status dm_helpers_parse_edid_caps(
 			(struct edid *) edid->raw_edid);
 #endif
 
-	if (edid_caps->edid_hdmi)
-		populate_hdmi_info_from_connector(&connector->display_info.hdmi, edid_caps);
+	if (edid_caps->edid_hdmi) {
+		populate_hdmi_info_from_connector(link->dc->config.enable_frl, &connector->display_info.hdmi, edid_caps);
+		drm_dbg_driver(connector->dev, "%s: HDMI_FRL [%s] max_frl_rate %d\n", __func__, connector->name, edid_caps->max_frl_rate);
+		if (edid_caps->frl_dsc_support)
+			drm_dbg_driver(connector->dev, "%s: HDMI_FRL_DSC [%s] frl_dsc_10bpc %d, frl_dsc_12bpc %d, frl_dsc_all_bpp %d, frl_dsc_native_420 %d, frl_dsc_max_slices %d, frl_dsc_max_frl_rate %d, frl_dsc_total_chunk_kbytes %d\n",
+					__func__, connector->name, edid_caps->frl_dsc_10bpc, edid_caps->frl_dsc_12bpc, \
+					edid_caps->frl_dsc_all_bpp, edid_caps->frl_dsc_native_420, edid_caps->frl_dsc_max_slices, \
+					edid_caps->frl_dsc_max_frl_rate, edid_caps->frl_dsc_total_chunk_kbytes);
+	}
 
 	apply_edid_quirks(dev, edid_buf, edid_caps);
 
@@ -1306,9 +1313,72 @@ dm_helpers_read_vbios_hardcoded_edid(struct dc_link *link, struct amdgpu_dm_conn
 	return edid;
 }
 
-void populate_hdmi_info_from_connector(struct drm_hdmi_info *hdmi, struct dc_edid_caps *edid_caps)
+static uint8_t get_max_frl_rate(uint8_t max_lanes, uint8_t max_rate_per_lane)
+{
+	uint8_t max_frl_rate;
+
+	if ((max_lanes == 3) && (max_rate_per_lane == 3))
+		max_frl_rate = 1;
+	else if ((max_lanes == 3) && (max_rate_per_lane == 6))
+		max_frl_rate = 2;
+	else if ((max_lanes == 4) && (max_rate_per_lane == 6))
+		max_frl_rate = 3;
+	else if ((max_lanes == 4) && (max_rate_per_lane == 8))
+		max_frl_rate = 4;
+	else if ((max_lanes == 4) && (max_rate_per_lane == 10))
+		max_frl_rate = 5;
+	else if ((max_lanes == 4) && (max_rate_per_lane == 12))
+		max_frl_rate = 6;
+	else
+		max_frl_rate = 0;
+
+	return max_frl_rate;
+}
+
+static uint8_t get_dsc_max_slices(uint8_t max_slices, int clk_per_slice)
+{
+	uint8_t dsc_max_slices;
+
+	if ((max_slices == 1) && (clk_per_slice == 340))
+		dsc_max_slices = 1;
+	else if ((max_slices == 2) && (clk_per_slice == 340))
+		dsc_max_slices = 2;
+	else if ((max_slices == 4) && (clk_per_slice == 340))
+		dsc_max_slices = 3;
+	else if ((max_slices == 8) && (clk_per_slice == 340))
+		dsc_max_slices = 4;
+	else if ((max_slices == 8) && (clk_per_slice == 400))
+		dsc_max_slices = 5;
+	else if ((max_slices == 12) && (clk_per_slice == 400))
+		dsc_max_slices = 6;
+	else if ((max_slices == 16) && (clk_per_slice == 400))
+		dsc_max_slices = 7;
+	else
+		dsc_max_slices = 0;
+
+	return dsc_max_slices;
+}
+
+void populate_hdmi_info_from_connector(bool enable_frl, struct drm_hdmi_info *hdmi, struct dc_edid_caps *edid_caps)
 {
 	edid_caps->scdc_present = hdmi->scdc.supported;
+#ifdef HAVE_DRM_HDMI_INFO_MAX_LANES
+	if (enable_frl) {
+		edid_caps->max_frl_rate = get_max_frl_rate(hdmi->max_lanes, hdmi->max_frl_rate_per_lane);
+		edid_caps->frl_dsc_support = hdmi->dsc_cap.v_1p2;
+		if (edid_caps->frl_dsc_support) {
+			if (hdmi->dsc_cap.bpc_supported == 10)
+				edid_caps->frl_dsc_10bpc = true;
+			else if (hdmi->dsc_cap.bpc_supported == 12)
+				edid_caps->frl_dsc_12bpc = true;
+			edid_caps->frl_dsc_all_bpp = hdmi->dsc_cap.all_bpp;
+			edid_caps->frl_dsc_native_420 = hdmi->dsc_cap.native_420;
+			edid_caps->frl_dsc_max_slices = get_dsc_max_slices(hdmi->dsc_cap.max_slices, hdmi->dsc_cap.clk_per_slice);
+			edid_caps->frl_dsc_max_frl_rate = get_max_frl_rate(hdmi->dsc_cap.max_lanes, hdmi->dsc_cap.max_frl_rate_per_lane);
+			edid_caps->frl_dsc_total_chunk_kbytes = hdmi->dsc_cap.total_chunk_kbytes;
+		}
+	}
+#endif /* HAVE_DRM_HDMI_INFO_MAX_LANES */
 }
 
 enum dc_edid_status dm_helpers_read_local_edid(

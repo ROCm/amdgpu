@@ -261,7 +261,37 @@ enum dentist_divider_range {
 	CLK_SF(CLK8_CLK3_DS_CNTL, CLK3_ALLOW_DS, mask_sh), \
 	CLK_SF(CLK8_CLK4_DS_CNTL, CLK4_ALLOW_DS, mask_sh), \
 
+#define CLK_REG_LIST_DCN42B()	  \
+	SR(DENTIST_DISPCLK_CNTL), \
+	CLK_SR_DCN42B(CLK5_CLK_TICK_CNT_CONFIG_REG), \
+	CLK_SR_DCN42B(CLK5_CLK0_CURRENT_CNT), \
+	CLK_SR_DCN42B(CLK5_CLK1_CURRENT_CNT), \
+	CLK_SR_DCN42B(CLK5_CLK2_CURRENT_CNT), \
+	CLK_SR_DCN42B(CLK5_CLK3_CURRENT_CNT), \
+	CLK_SR_DCN42B(CLK5_CLK0_DS_CNTL), \
+	CLK_SR_DCN42B(CLK5_CLK1_DS_CNTL), \
+	CLK_SR_DCN42B(CLK5_CLK2_DS_CNTL), \
+	CLK_SR_DCN42B(CLK5_CLK3_DS_CNTL), \
+	CLK_SR_DCN42B(CLK5_CLK0_BYPASS_CNTL), \
+	CLK_SR_DCN42B(CLK5_CLK1_BYPASS_CNTL), \
+	CLK_SR_DCN42B(CLK5_CLK2_BYPASS_CNTL), \
+	CLK_SR_DCN42B(CLK5_CLK3_BYPASS_CNTL)
 
+#define CLK_COMMON_MASK_SH_LIST_DCN42B(mask_sh) \
+	CLK_COMMON_MASK_SH_LIST_DCN20_BASE(mask_sh),\
+	CLK_SF(CLK5_CLK_TICK_CNT_CONFIG_REG, TIMER_THRESHOLD, mask_sh), \
+	CLK_SF(CLK5_CLK0_BYPASS_CNTL, CLK0_BYPASS_SEL, mask_sh), \
+	CLK_SF(CLK5_CLK1_BYPASS_CNTL, CLK1_BYPASS_SEL, mask_sh), \
+	CLK_SF(CLK5_CLK2_BYPASS_CNTL, CLK2_BYPASS_SEL, mask_sh), \
+	CLK_SF(CLK5_CLK3_BYPASS_CNTL, CLK3_BYPASS_SEL, mask_sh), \
+	CLK_SF(CLK5_CLK0_DS_CNTL, CLK0_DS_DIV_ID, mask_sh), \
+	CLK_SF(CLK5_CLK1_DS_CNTL, CLK1_DS_DIV_ID, mask_sh), \
+	CLK_SF(CLK5_CLK2_DS_CNTL, CLK2_DS_DIV_ID, mask_sh), \
+	CLK_SF(CLK5_CLK3_DS_CNTL, CLK3_DS_DIV_ID, mask_sh), \
+	CLK_SF(CLK5_CLK0_DS_CNTL, CLK0_ALLOW_DS, mask_sh), \
+	CLK_SF(CLK5_CLK1_DS_CNTL, CLK1_ALLOW_DS, mask_sh), \
+	CLK_SF(CLK5_CLK2_DS_CNTL, CLK2_ALLOW_DS, mask_sh), \
+	CLK_SF(CLK5_CLK3_DS_CNTL, CLK3_ALLOW_DS, mask_sh)
 
 #define CLK_REG_FIELD_LIST(type) \
 	type DPREFCLK_SRC_SEL; \
@@ -375,6 +405,7 @@ struct clk_mgr_registers {
 	uint32_t CLK5_spll_field_8;
 	uint32_t CLK6_spll_field_8;
 	CLK42_REG_LIST(8, uint32_t)
+	CLK42_REG_LIST(5, uint32_t)
 };
 
 struct clk_mgr_shift {
@@ -476,6 +507,17 @@ struct clk_mgr_internal {
 	bool smu_present;
 	void *wm_range_table;
 	long long wm_range_table_addr;
+
+	/**
+	 * @dal_init_table:
+	 *
+	 * GPU-accessible DRAM buffer for the DAL init table transferred
+	 * from PMFW via DALSMC_MSG_TransferTableSmu2Dram(TABLE_DAL_INIT).
+	 * Contains all static PMFW data needed at init: DPM clock tables,
+	 * UTM QoS parameters, and memory configuration.
+	 */
+	const void *dal_init_table;
+	long long dal_init_table_addr;
 
 	bool dpm_present;
 	bool pme_trigger_pending;

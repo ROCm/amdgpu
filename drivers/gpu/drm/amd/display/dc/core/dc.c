@@ -1487,7 +1487,7 @@ static void disable_vbios_mode_if_required(
 					}
 				}
 
-				dc->res_pool->dp_clock_source->funcs->get_pixel_clk_frequency_100hz(
+				dc->res_pool->dp_clock_source->funcs->get_dp_dto_frequency_100hz(
 					dc->res_pool->dp_clock_source,
 					tg_inst, &pix_clk_100hz);
 
@@ -2004,7 +2004,7 @@ bool dc_validate_boot_timing(const struct dc *dc,
 		uint32_t numOdmPipes = 1;
 		uint32_t id_src[4] = {0};
 
-		dc->res_pool->dp_clock_source->funcs->get_pixel_clk_frequency_100hz(
+		dc->res_pool->dp_clock_source->funcs->get_dp_dto_frequency_100hz(
 			dc->res_pool->dp_clock_source,
 			tg_inst, &pix_clk_100hz);
 
@@ -3922,21 +3922,29 @@ static void add_update_info_frame_sequence(
 {
 	bool is_hdmi_tmds;
 	bool is_dp;
+	bool is_hdmi_frl;
 
 	if (!pipe_ctx || !pipe_ctx->stream)
 		return;
 
-	if (pipe_ctx->stream_res.stream_enc == NULL)
+	if (pipe_ctx->stream_res.stream_enc == NULL &&
+			pipe_ctx->stream_res.hpo_frl_stream_enc == NULL)
 		return;
 
 	is_hdmi_tmds = dc_is_hdmi_tmds_signal(pipe_ctx->stream->signal);
 	is_dp = dc_is_dp_signal(pipe_ctx->stream->signal);
 
-	if (!is_hdmi_tmds && !is_dp)
+	is_hdmi_frl = dc_is_hdmi_frl_signal(pipe_ctx->stream->signal);
+	if (!is_hdmi_tmds && !is_dp && !is_hdmi_frl)
 		return;
 
 	if (is_hdmi_tmds) {
 		hwss_add_stream_enc_update_hdmi_info_packets(seq_state, pipe_ctx);
+		return;
+	}
+
+	if (is_hdmi_frl) {
+		hwss_add_hpo_frl_stream_enc_update_hdmi_info_packets(seq_state, pipe_ctx);
 		return;
 	}
 
@@ -4051,6 +4059,12 @@ static void add_link_update_dsc_config_sequence(
 				hwss_add_stream_enc_dp_set_dsc_pps_info_packet(seq_state,
 					pipe_ctx->stream_res.stream_enc,
 					true, dsc_packed_pps, false);
+		}
+		else if (dc_is_hdmi_frl_signal(stream->signal)) {
+			hwss_add_hpo_frl_stream_enc_set_dsc_config(seq_state,
+				pipe_ctx->stream_res.hpo_frl_stream_enc,
+				&stream->timing,
+				dsc_packed_pps);
 		}
 	}
 }
@@ -7478,6 +7492,20 @@ bool dc_capture_register_software_state(struct dc *dc, struct dc_register_softwa
 			state->dccg.symclk32_le_enable[i] = 0; /* Default: disabled */
 		}
 
+		/* Check for active HPO usage that affects symclk32_le */
+		for (unsigned int pipe_idx = 0; pipe_idx < MAX_PIPES && pipe_idx < dc->res_pool->pipe_count; pipe_idx++) {
+			struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[pipe_idx];
+			if (!pipe_ctx->stream)
+				continue;
+
+			/* HPO FRL (HDMI FRL) streams use symclk32_le */
+			if (pipe_ctx->stream_res.hpo_frl_stream_enc && pipe_ctx->link_res.hpo_frl_link_enc) {
+				int hpo_le_inst = pipe_ctx->link_res.hpo_frl_link_enc->inst;
+				if (hpo_le_inst >= 0 && hpo_le_inst < 2) {
+					state->dccg.symclk32_le_enable[hpo_le_inst] = 1;
+				}
+			}
+		}
 	}
 
 	/* Capture essential DSC configuration for underflow analysis */

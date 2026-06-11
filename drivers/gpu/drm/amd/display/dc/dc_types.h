@@ -77,6 +77,7 @@ struct dc_perf_trace {
 };
 
 #define NUM_PIXEL_FORMATS 10
+#define DTBCLK_LIMIT 2920
 
 enum tiling_mode {
 	TILING_MODE_INVALID,
@@ -174,6 +175,14 @@ struct dc_panel_patch {
 	unsigned int max_dsc_target_bpp_limit;
 	unsigned int embedded_tiled_slave;
 	unsigned int disable_fams;
+	unsigned int hdmi_spe_handling;
+	unsigned int block_420_Freesync;
+	unsigned int block_10g;
+	unsigned int hdmi_comp_manual;
+	unsigned int hdmi_comp_auto;
+	unsigned int force_frl;
+	unsigned int vsdb_rcc_wa;
+	unsigned int delay_hdmi_link_training;
 	unsigned int skip_avmute;
 	unsigned int skip_audio_sab_check;
 	unsigned int mst_start_top_delay;
@@ -220,6 +229,17 @@ struct dc_edid_caps {
 	bool rr_capable;
 	bool scdc_present;
 	bool analog;
+
+	/*HDMI 2.1 caps*/
+	uint8_t max_frl_rate;
+	bool frl_dsc_support;
+	bool frl_dsc_10bpc;
+	bool frl_dsc_12bpc;
+	bool frl_dsc_all_bpp;
+	bool frl_dsc_native_420;
+	uint8_t frl_dsc_max_slices;
+	uint8_t frl_dsc_max_frl_rate;
+	uint8_t frl_dsc_total_chunk_kbytes;
 
 	struct dc_panel_patch panel_patch;
 };
@@ -545,6 +565,7 @@ struct audio_info {
 struct audio_check {
 	unsigned int audio_packet_type;
 	unsigned int max_audiosample_rate;
+	unsigned int max_channel_count;
 	unsigned int acat;
 };
 enum dc_infoframe_type {
@@ -929,6 +950,9 @@ struct dsc_dec_dpcd_caps {
 	uint32_t branch_overall_throughput_0_mps; /* In MPs */
 	uint32_t branch_overall_throughput_1_mps; /* In MPs */
 	uint32_t branch_max_line_width;
+	bool is_frl; /* Decoded format */
+	bool is_vic_all_bpp;
+	uint32_t total_chunk_kbytes;
 	bool is_dp; /* Decoded format */
 };
 

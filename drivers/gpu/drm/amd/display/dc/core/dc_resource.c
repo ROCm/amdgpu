@@ -79,6 +79,7 @@
 #include "dcn36/dcn36_resource.h"
 #include "dcn401/dcn401_resource.h"
 #include "dcn42/dcn42_resource.h"
+#include "dcn42b/dcn42b_resource.h"
 #if defined(CONFIG_DRM_AMD_DC_FP)
 #include "dc_spl_translate.h"
 #endif
@@ -96,6 +97,8 @@
 #define DC_LOGGER \
 	dc->ctx->logger
 #define DC_LOGGER_INIT(logger)
+#include "link/hwss/link_hwss_hpo_frl.h"
+#include "dml/dml1_frl_cap_chk.h"
 #include "dml2_0/dml2_wrapper.h"
 
 #define UNABLE_TO_SPLIT -1
@@ -243,6 +246,8 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 		break;
 	case AMDGPU_FAMILY_GC_11_5_0:
 		dc_version = DCN_VERSION_3_5;
+		if (ASICREV_IS_DCN4A_SOC_VAR_B(asic_id.hw_internal_rev))
+			dc_version = DCN_VERSION_4_2B;
 		if (ASICREV_IS_GC_11_0_4(asic_id.hw_internal_rev))
 			dc_version = DCN_VERSION_3_51;
 		if (ASICREV_IS_DCN36(asic_id.hw_internal_rev))
@@ -375,6 +380,9 @@ struct resource_pool *dc_create_resource_pool(struct dc  *dc,
 	case DCN_VERSION_4_2:
 		res_pool = dcn42_create_resource_pool(init_data, dc);
 		break;
+	case DCN_VERSION_4_2B:
+		res_pool = dcn42b_create_resource_pool(init_data, dc);
+		break;
 #endif /* CONFIG_DRM_AMD_DC_FP */
 	default:
 		break;
@@ -497,6 +505,25 @@ bool resource_construct(
 		}
 	}
 
+	pool->hpo_frl_stream_enc_count = 0;
+	if (create_funcs->create_hpo_frl_stream_encoder) {
+		for (i = 0; i < (unsigned int)caps->num_hpo_frl; i++) {
+			pool->hpo_frl_stream_enc[i] = create_funcs->create_hpo_frl_stream_encoder(i+ENGINE_ID_HPO_0, ctx);
+			if (pool->hpo_frl_stream_enc[i] == NULL)
+				DC_ERR("DC: failed to create HPO FRL stream encoder!\n");
+			pool->hpo_frl_stream_enc_count++;
+
+		}
+	}
+	pool->hpo_frl_link_enc_count = 0;
+	if (create_funcs->create_hpo_frl_link_encoder) {
+		for (i = 0; i < (unsigned int)caps->num_hpo_frl; i++) {
+			pool->hpo_frl_link_enc[i] = create_funcs->create_hpo_frl_link_encoder(i+ENGINE_ID_HPO_0, ctx);
+			if (pool->hpo_frl_link_enc[i] == NULL)
+				DC_ERR("DC: failed to create HPO FRL link encoder!\n");
+			pool->hpo_frl_link_enc_count++;
+		}
+	}
 	pool->hpo_dp_stream_enc_count = 0;
 	if (create_funcs->create_hpo_dp_stream_encoder) {
 		for (i = 0; i < (unsigned int)caps->num_hpo_dp_stream_encoder; i++) {
@@ -2648,6 +2675,164 @@ static void update_stream_engine_usage(
 	}
 }
 
+static void update_hpo_frl_stream_engine_usage(
+		struct resource_context *res_ctx,
+		const struct resource_pool *pool,
+		struct hpo_frl_stream_encoder *hpo_frl_stream_enc,
+		bool acquired)
+{
+	unsigned int i;
+
+	for (i = 0; i < pool->hpo_frl_stream_enc_count; i++) {
+		if (pool->hpo_frl_stream_enc[i] == hpo_frl_stream_enc)
+			res_ctx->is_hpo_frl_stream_enc_acquired[i] = acquired;
+	}
+}
+
+static struct hpo_frl_stream_encoder *find_first_free_match_hpo_frl_stream_enc_for_link(
+		struct resource_context *res_ctx,
+		const struct resource_pool *pool,
+		struct dc_stream_state *stream)
+{
+	(void)stream;
+	unsigned int i;
+
+	for (i = 0; i < pool->hpo_frl_stream_enc_count; i++) {
+		if (!res_ctx->is_hpo_frl_stream_enc_acquired[i] &&
+				pool->hpo_frl_stream_enc[i]) {
+
+			return pool->hpo_frl_stream_enc[i];
+		}
+	}
+
+	return NULL;
+}
+
+static inline int find_acquired_hpo_frl_link_enc_for_link(
+		const struct resource_context *res_ctx,
+		const struct dc_link *link)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(res_ctx->hpo_frl_link_enc_to_link_idx); i++)
+		if (res_ctx->hpo_frl_link_enc_ref_cnts[i] > 0 &&
+				res_ctx->hpo_frl_link_enc_to_link_idx[i] == link->link_index)
+			return i;
+
+	return -1;
+}
+
+static inline int find_free_hpo_frl_link_enc(const struct resource_context *res_ctx,
+		const struct resource_pool *pool)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(res_ctx->hpo_frl_link_enc_ref_cnts); i++)
+		if (res_ctx->hpo_frl_link_enc_ref_cnts[i] == 0)
+			break;
+
+	return (i < ARRAY_SIZE(res_ctx->hpo_frl_link_enc_ref_cnts) &&
+			i < pool->hpo_frl_link_enc_count) ? (int)i : -1;
+}
+
+static inline void acquire_hpo_frl_link_enc(
+		struct resource_context *res_ctx,
+		unsigned int link_index,
+		int enc_index)
+{
+	res_ctx->hpo_frl_link_enc_to_link_idx[enc_index] = link_index;
+	res_ctx->hpo_frl_link_enc_ref_cnts[enc_index] = 1;
+}
+
+static inline void retain_hpo_frl_link_enc(
+		struct resource_context *res_ctx,
+		int enc_index)
+{
+	res_ctx->hpo_frl_link_enc_ref_cnts[enc_index]++;
+}
+
+static inline void release_hpo_frl_link_enc(
+		struct resource_context *res_ctx,
+		int enc_index)
+{
+	ASSERT(res_ctx->hpo_frl_link_enc_ref_cnts[enc_index] > 0);
+	res_ctx->hpo_frl_link_enc_ref_cnts[enc_index]--;
+}
+
+static bool add_hpo_frl_link_enc_to_ctx(struct resource_context *res_ctx,
+		const struct resource_pool *pool,
+		struct pipe_ctx *pipe_ctx,
+		struct dc_stream_state *stream)
+{
+	int enc_index;
+
+	enc_index = find_acquired_hpo_frl_link_enc_for_link(res_ctx, stream->link);
+
+	if (enc_index >= 0) {
+		retain_hpo_frl_link_enc(res_ctx, enc_index);
+	} else {
+		enc_index = find_free_hpo_frl_link_enc(res_ctx, pool);
+		if (enc_index >= 0)
+			acquire_hpo_frl_link_enc(res_ctx, stream->link->link_index, enc_index);
+	}
+
+	if (enc_index >= 0)
+		pipe_ctx->link_res.hpo_frl_link_enc = pool->hpo_frl_link_enc[enc_index];
+
+	return pipe_ctx->link_res.hpo_frl_link_enc != NULL;
+}
+
+static void remove_hpo_frl_link_enc_from_ctx(struct resource_context *res_ctx,
+		struct pipe_ctx *pipe_ctx,
+		struct dc_stream_state *stream)
+{
+	int enc_index;
+
+	enc_index = find_acquired_hpo_frl_link_enc_for_link(res_ctx, stream->link);
+
+	if (enc_index >= 0) {
+		release_hpo_frl_link_enc(res_ctx, enc_index);
+		pipe_ctx->link_res.hpo_frl_link_enc = NULL;
+	}
+}
+
+static struct hpo_frl_link_encoder *get_temp_hpo_frl_link_enc(
+		const struct resource_context *res_ctx,
+		const struct resource_pool *const pool,
+		const struct dc_link *link)
+{
+	struct hpo_frl_link_encoder *hpo_frl_link_enc = NULL;
+	int enc_index;
+
+	enc_index = find_acquired_hpo_frl_link_enc_for_link(res_ctx, link);
+
+	if (enc_index < 0)
+		enc_index = find_free_hpo_frl_link_enc(res_ctx, pool);
+
+	if (enc_index >= 0)
+		hpo_frl_link_enc = pool->hpo_frl_link_enc[enc_index];
+
+	return hpo_frl_link_enc;
+}
+
+bool get_temp_frl_link_res(struct dc_link *link,
+		struct link_resource *link_res)
+{
+	const struct dc *dc  = link->dc;
+	const struct resource_context *res_ctx = &dc->current_state->res_ctx;
+
+	memset(link_res, 0, sizeof(*link_res));
+	link_res->hpo_frl_link_enc = get_temp_hpo_frl_link_enc(res_ctx, dc->res_pool, link);
+	if (!link_res->hpo_frl_link_enc)
+		return false;
+
+	link_res->dio_link_enc = get_temp_dio_link_enc(res_ctx,
+			dc->res_pool, link);
+	if (!link_res->dio_link_enc)
+		return false;
+
+	return true;
+}
 static void update_hpo_dp_stream_engine_usage(
 		struct resource_context *res_ctx,
 		const struct resource_pool *pool,
@@ -2970,6 +3155,15 @@ void resource_remove_otg_master_for_stream_output(struct dc_state *context,
 			otg_master->stream_res.stream_enc,
 			false);
 
+	if (dc_is_hdmi_frl_signal(stream->signal)) {
+		update_hpo_frl_stream_engine_usage(
+			&context->res_ctx, pool,
+			otg_master->stream_res.hpo_frl_stream_enc,
+			false);
+		remove_hpo_frl_link_enc_from_ctx(
+			&context->res_ctx, otg_master, stream);
+		remove_dio_link_enc_from_ctx(&context->res_ctx, otg_master, stream);
+	}
 	if (stream->ctx->dc->link_srv->dp_is_128b_132b_signal(otg_master)) {
 		update_hpo_dp_stream_engine_usage(
 			&context->res_ctx, pool,
@@ -4017,6 +4211,33 @@ enum dc_status resource_map_pool_resources(
 		pipe_ctx->stream_res.stream_enc,
 		true);
 
+	if (dc_is_hdmi_frl_signal(stream->signal)) {
+		is_dio_encoder = false;
+		pipe_ctx->stream_res.hpo_frl_stream_enc =
+			find_first_free_match_hpo_frl_stream_enc_for_link(
+				&context->res_ctx, pool, stream);
+
+		if (!pipe_ctx->stream_res.hpo_frl_stream_enc)
+			if (stream->timing.pix_clk_100hz < 6000000)
+				stream->signal = SIGNAL_TYPE_HDMI_TYPE_A;
+			else
+				return DC_NO_STREAM_ENC_RESOURCE;
+		else {
+			update_hpo_frl_stream_engine_usage(
+				&context->res_ctx, pool,
+				pipe_ctx->stream_res.hpo_frl_stream_enc,
+				true);
+			pipe_ctx->link_res.hpo_frl_link_enc =
+				pipe_ctx->stream->link->hpo_frl_link_enc;
+			if (!pipe_ctx->link_res.hpo_frl_link_enc) {
+				if (!add_hpo_frl_link_enc_to_ctx(&context->res_ctx, pool, pipe_ctx, stream))
+					return DC_NO_LINK_ENC_RESOURCE;
+			}
+			if (!add_dio_link_enc_to_ctx(dc, context, pool, pipe_ctx, stream))
+				return DC_NO_LINK_ENC_RESOURCE;
+		}
+	}
+
 	/* Allocate DP HPO Stream Encoder based on signal, hw capabilities
 	 * and link settings
 	 */
@@ -4082,6 +4303,8 @@ enum dc_status resource_map_pool_resources(
 		if (context->streams[i] == stream) {
 			context->stream_status[i].primary_otg_inst = pipe_ctx->stream_res.tg->inst;
 			context->stream_status[i].stream_enc_inst = pipe_ctx->stream_res.stream_enc->stream_enc_inst;
+			if (pipe_ctx->stream_res.hpo_frl_stream_enc != NULL)
+				context->stream_status[i].stream_enc_inst = pipe_ctx->stream_res.hpo_frl_stream_enc->stream_enc_inst;
 			context->stream_status[i].audio_inst =
 				pipe_ctx->stream_res.audio ? pipe_ctx->stream_res.audio->inst : -1;
 
@@ -4377,6 +4600,38 @@ fail:
 }
 
 #if defined(CONFIG_DRM_AMD_DC_FP)
+/**
+ * dc_update_modified_pix_clock_for_dsc_with_padding() - update pix_clk for dsc with padding
+ *
+ * @stream: Pointer to the stream structure.
+ * @timing: Pointer to the stream dc_crtc_timing structure.
+ * @dsc_padding_params: Pointer to the DSC padding parameters structure.
+ *
+ * This function updated the pix_clk for dsc with padding stored in pipe_ctx
+ * such that the OTG h_active time fits withing the expected compressed active
+ * time calculated according to HDMI spec. H_total is then increased to
+ * maintain the same OTG line time as before the increased pix_clk.
+ */
+static void dc_update_modified_pix_clock_for_dsc_with_padding(const struct dc_stream_state *stream,
+		const struct dc_crtc_timing *timing, struct dsc_padding_params *dsc_padding_params)
+{
+	DC_FP_START();
+	frl_modified_pix_clock_for_dsc_padding(stream->link->frl_verified_link_cap.borrow_params.hc_active_target,
+	stream->link->frl_verified_link_cap.borrow_params.hc_blank_target,
+	stream->link->frl_verified_link_cap.frl_num_lanes,
+	timing->pix_clk_100hz,
+	stream->link->frl_verified_link_cap.frl_link_rate,
+	timing->h_addressable,
+	timing->h_border_left,
+	timing->h_border_right,
+	timing->h_total,
+	(timing->h_addressable + dsc_padding_params->dsc_hactive_padding),
+	&dsc_padding_params->dsc_pix_clk_100hz,
+	&dsc_padding_params->dsc_htotal_padding);
+	DC_FP_END();
+
+	dsc_padding_params->dsc_htotal_padding = dsc_padding_params->dsc_htotal_padding - timing->h_total;
+}
 #endif /* CONFIG_DRM_AMD_DC_FP */
 
 /**
@@ -4403,6 +4658,30 @@ static void calculate_timing_params_for_dsc_with_padding(struct pipe_ctx *pipe_c
 	if (stream)
 		pipe_ctx->dsc_padding_params.dsc_pix_clk_100hz = stream->timing.pix_clk_100hz;
 
+#if defined(CONFIG_DRM_AMD_DC_FP)
+	uint32_t hactive;
+	uint32_t ceil_slice_width;
+	if (stream && stream->timing.flags.DSC) {
+		hactive = stream->timing.h_addressable + stream->timing.h_border_left + stream->timing.h_border_right;
+
+		/* Assume if determined slices does not divide Hactive evenly, Hborrow is needed for padding*/
+		if (hactive % stream->timing.dsc_cfg.num_slices_h != 0) {
+			ceil_slice_width = (hactive / stream->timing.dsc_cfg.num_slices_h) + 1;
+
+			/* If YCBCR420 slice width must be even */
+			if (stream->timing.pixel_encoding == PIXEL_ENCODING_YCBCR420 && ceil_slice_width % 2 != 0)
+				ceil_slice_width++;
+
+			pipe_ctx->dsc_padding_params.dsc_hactive_padding =
+				(uint8_t)(ceil_slice_width * stream->timing.dsc_cfg.num_slices_h - hactive);
+
+			if (stream->timing.h_total - hactive - pipe_ctx->dsc_padding_params.dsc_hactive_padding < 32)
+				pipe_ctx->dsc_padding_params.dsc_hactive_padding = 0;
+
+			dc_update_modified_pix_clock_for_dsc_with_padding(stream, &stream->timing, &pipe_ctx->dsc_padding_params);
+		}
+	}
+#endif
 }
 
 /**
@@ -4926,6 +5205,9 @@ void resource_build_info_frame(struct pipe_ctx *pipe_ctx)
 
 		set_hdr_static_info_packet(&info->hdrsmd, pipe_ctx->stream);
 
+		if (dc_is_hdmi_frl_signal(signal)) {
+			/* TODO: additional packets for HDMI 2.1 */
+		}
 	} else if (dc_is_dp_signal(signal)) {
 		set_vsc_info_packet(&info->vsc, pipe_ctx->stream);
 
@@ -5023,6 +5305,8 @@ bool pipe_need_reprogram(
 	if (pipe_ctx_old->stream_res.dsc != pipe_ctx->stream_res.dsc)
 		return true;
 
+	if (pipe_ctx_old->stream_res.hpo_frl_stream_enc != pipe_ctx->stream_res.hpo_frl_stream_enc)
+		return true;
 	if (pipe_ctx_old->stream_res.hpo_dp_stream_enc != pipe_ctx->stream_res.hpo_dp_stream_enc)
 		return true;
 	if (pipe_ctx_old->link_res.hpo_dp_link_enc != pipe_ctx->link_res.hpo_dp_link_enc)
@@ -5291,10 +5575,13 @@ void get_audio_check(struct audio_info *aud_modes,
 		audio_chk->audio_packet_type = 0x2;/*audio sample packet AP = .25 for layout0, 1 for layout1*/
 
 		audio_chk->max_audiosample_rate = 0;
+		audio_chk->max_channel_count = 0;
 		for (i = 0; i < aud_modes->mode_count; i++) {
 			max_sample_rate = get_max_audio_sample_rate(&aud_modes->modes[i]);
 			if (audio_chk->max_audiosample_rate < max_sample_rate)
 				audio_chk->max_audiosample_rate = max_sample_rate;
+			if (audio_chk->max_channel_count < aud_modes->modes[i].channel_count)
+				audio_chk->max_channel_count = aud_modes->modes[i].channel_count;
 			/*dts takes the same as type 2: AP = 0.25*/
 		}
 		/*check which one take more bandwidth*/
@@ -5506,6 +5793,8 @@ const struct link_hwss *get_link_hwss(const struct dc_link *link,
 		 */
 		return (requires_fixed_vs_pe_retimer_hpo_link_hwss(link) ?
 				get_hpo_fixed_vs_pe_retimer_dp_link_hwss() : get_hpo_dp_link_hwss());
+	else if (can_use_hpo_frl_link_hwss(link, link_res))
+		return get_hpo_frl_link_hwss();
 	else if (can_use_dpia_link_hwss(link, link_res))
 		return get_dpia_link_hwss();
 	else if (can_use_dio_link_hwss(link, link_res))
@@ -5729,6 +6018,12 @@ bool resource_is_hpo_acquired(struct dc_state *context)
 
 	for (i = 0; i < MAX_HPO_DP2_ENCODERS; i++) {
 		if (context->res_ctx.is_hpo_dp_stream_enc_acquired[i]) {
+			return true;
+		}
+	}
+
+	for (i = 0; i < MAX_HDMI_FRL_ENCODERS; i++) {
+		if (context->res_ctx.is_hpo_frl_stream_enc_acquired[i]) {
 			return true;
 		}
 	}

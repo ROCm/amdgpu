@@ -119,11 +119,6 @@ static int amdgpu_ras_inject_error(struct ras_core_context *ras_core,
 	amdgpu_ras_trigger_error_prepare(ras_core, req);
 	ret = rascore_handle_cmd(ras_core, cmd, data);
 	amdgpu_ras_trigger_error_end(ras_core, req);
-	if (ret) {
-		RAS_DEV_ERR(adev, "ras inject block %u failed %d\n", req->block_id, ret);
-		ret = RAS_CMD__ERROR_ACCESS_DENIED;
-	}
-
 
 	return ret;
 }
@@ -288,5 +283,5 @@ int amdgpu_ras_submit_cmd(struct ras_core_context *ras_core, struct ras_cmd_ctx 
 		return RAS_CMD__SUCCESS_EXEED_BUFFER;
 	}
 
-	return RAS_CMD__SUCCESS;
+	return res;
 }
