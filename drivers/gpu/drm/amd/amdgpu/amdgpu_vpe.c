@@ -312,6 +312,7 @@ static int vpe_early_init(struct amdgpu_ip_block *ip_block)
 		vpe->collaborate_mode = true;
 		break;
 	case IP_VERSION(2, 0, 0):
+	case IP_VERSION(2, 2, 0):
 		vpe_v2_0_set_funcs(vpe);
 		break;
 	default:
