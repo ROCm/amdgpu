@@ -4145,7 +4145,8 @@ static int kfd_mmap(struct file *filep, struct vm_area_struct *vma)
 		return kfd_doorbell_mmap(dev, process, vma);
 
 	case KFD_MMAP_TYPE_EVENTS:
-		return kfd_event_mmap(process, vma);
+		pr_warn("KFD_MMAP_TYPE_EVENTS is no longer supported\n");
+		return -EINVAL;
 
 	case KFD_MMAP_TYPE_RESERVED_MEM:
 		pr_warn("KFD_MMAP_TYPE_RESERVED_MEM is no longer supported\n");
