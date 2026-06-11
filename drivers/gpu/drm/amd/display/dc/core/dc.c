@@ -4129,8 +4129,6 @@ static void commit_planes_do_stream_update_sequence(struct dc *dc,
 {
 	int j;
 	struct block_sequence_state seq_state = { .steps = block_sequence, .num_steps = num_steps };
-	struct dsc_config dsc_cfgs[MAX_PIPES];
-	struct dsc_optc_config dsc_optc_cfgs[MAX_PIPES];
 	unsigned int dsc_cfg_index = 0;
 	*num_steps = 0; // Initialize to 0
 
@@ -4202,11 +4200,13 @@ static void commit_planes_do_stream_update_sequence(struct dc *dc,
 
 			if (stream_update->dsc_config)
 				if (dsc_cfg_index < MAX_PIPES) {
+					struct dsc_config dsc_cfg;
+					struct dsc_optc_config dsc_optc_cfg;
+
 					add_link_update_dsc_config_sequence(&seq_state,
 						pipe_ctx,
-						&dsc_cfgs[dsc_cfg_index],
-						&dsc_optc_cfgs[dsc_cfg_index]);
-					dsc_cfg_index++;
+						&dsc_cfg,
+						&dsc_optc_cfg);
 				}
 
 			if (stream_update->mst_bw_update) {
