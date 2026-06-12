@@ -53,4 +53,9 @@ int amdgpu_discovery_get_gc_major_minor_version(struct amdgpu_device *adev,
 
 void amdgpu_discovery_dump(struct amdgpu_device *adev, struct drm_printer *p);
 
+/* Early sysfs functions for persistent ip_discovery export */
+int amdgpu_discovery_sysfs_early_init(struct amdgpu_device *adev,
+				       struct pci_dev *pdev);
+void amdgpu_discovery_sysfs_early_fini(struct pci_dev *pdev);
+
 #endif /* __AMDGPU_DISCOVERY__ */
