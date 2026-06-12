@@ -142,6 +142,12 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
     AC_KERNEL_CHECK_HEADERS([drm/drm_client_event.h])
 
     dnl #
+    dnl # v6.17-rc6-1100-g74afeb812850
+    dnl # drm/vblank: Add vblank timer
+    dnl #
+    AC_KERNEL_CHECK_HEADERS([drm/drm_vblank_helper.h])
+
+    dnl #
     dnl # drm: Add color operation
     dnl #
     AC_KERNEL_CHECK_HEADERS([drm/drm_colorop.h])
