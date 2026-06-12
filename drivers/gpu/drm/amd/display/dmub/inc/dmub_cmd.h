@@ -246,14 +246,14 @@
  * OS/FW agnostic memcpy
  */
 #ifndef dmub_memcpy
-#define dmub_memcpy(dest, source, bytes) memcpy((dest), (source), (bytes))
+#define dmub_memcpy(dest, source, bytes) ((void)memcpy((dest), (source), (bytes)))
 #endif
 
 /**
  * OS/FW agnostic memset
  */
 #ifndef dmub_memset
-#define dmub_memset(dest, val, bytes) memset((dest), (val), (bytes))
+#define dmub_memset(dest, val, bytes) ((void)memset((dest), (val), (bytes)))
 #endif
 
 /**
@@ -1702,6 +1702,17 @@ enum dmub_gpint_command {
 	 * ARGS: 1 - Power off
 	 */
 	DMUB_GPINT__PANEL_POWER_OFF_SEQ = 138,
+	/**
+	 * DESC: Gets panel polarity bias.
+	 * ARGS: 0 - Get panel polarity bias
+	 */
+	DMUB_GPINT__PANEL_POLARITY_GET_BIAS = 139,
+	/**
+	 * DESC: Enables panel polarity.
+	 * ARGS: 0 - Disable panel polarity
+	 *       1 - Enable panel polarity
+	 */
+	DMUB_GPINT__PANEL_POLARITY_DEBUG_ENABLE = 140,
 };
 
 /**
@@ -1955,6 +1966,11 @@ enum dmub_cmd_type {
 	 * Command type use for boot time crc commands.
 	 */
 	DMUB_CMD__BOOT_TIME_CRC = 96,
+
+	/**
+	 * Command type use for all Panel Polarity commands.
+	 */
+	DMUB_CMD__PANEL_POLARITY = 97,
 
 	/**
 	 * Command type use for VBIOS shared commands.
@@ -4363,6 +4379,15 @@ enum dmub_cmd_replay_type {
 	 * Set Replay General command.
 	 */
 	DMUB_CMD__REPLAY_SET_GENERAL_CMD = 16,
+};
+
+/*
+ * Panel Polarity sub-types
+ */
+enum dmub_cmd_panel_polarity_type {
+	DMUB_CMD__PANEL_POLARITY_ENABLE = 0,
+	DMUB_CMD__PANEL_POLARITY_GET_BIAS = 1,
+	DMUB_CMD__PANEL_POLARITY_RESET = 2,
 };
 
 /*
@@ -7031,6 +7056,80 @@ struct dmub_cmd_pr_enable_data {
 	uint8_t pad[2];
 };
 
+struct dmub_cmd_panel_polarity_enable_data {
+	/**
+	 * Panel Polarity enable or disable.
+	 */
+	uint8_t enable;
+	/**
+	 * OTG instance
+	 */
+	uint8_t otg_inst;
+	/**
+	 * @pad: Align structure to 4 byte boundary.
+	 */
+	uint8_t pad[2];
+};
+
+struct dmub_cmd_panel_polarity_reset_data {
+	/**
+	 * OTG instance
+	 */
+	uint8_t otg_inst;
+	/**
+	 * @pad: Align structure to 4 byte boundary.
+	 */
+	uint8_t pad[3];
+};
+
+struct dmub_cmd_panel_polarity_get_bias_input {
+	/**
+	 * OTG instance
+	 */
+	uint8_t otg_inst;
+	uint8_t pad[3];
+};
+
+struct dmub_cmd_panel_polarity_get_bias_output {
+	/**
+	 * Accumulated Polarity Bias
+	 */
+	int32_t accumulated_bias;
+};
+
+struct dmub_rb_cmd_panel_polarity_enable {
+	/**
+	 * Command header.
+	 */
+	struct dmub_cmd_header header;
+
+	struct dmub_cmd_panel_polarity_enable_data data;
+};
+
+
+struct dmub_rb_cmd_panel_polarity_get_bias {
+	/**
+	 * Command header.
+	 */
+	struct dmub_cmd_header header;
+
+	union dmub_cmd_panel_polarity_get_bias_data {
+		struct dmub_cmd_panel_polarity_get_bias_input input; /**< Input */
+		struct dmub_cmd_panel_polarity_get_bias_output output; /**< Output */
+		uint32_t output_raw; /**< Raw data output */
+	} data;
+};
+
+struct dmub_rb_cmd_panel_polarity_reset {
+	/**
+	 * Command header.
+	 */
+	struct dmub_cmd_header header;
+
+	struct dmub_cmd_panel_polarity_reset_data data;
+};
+
+
 /**
  * Definition of a DMUB_CMD__PR_ENABLE command.
  * Panel Replay enable/disable is controlled using action in data.
@@ -7646,6 +7745,7 @@ union dmub_rb_cmd {
 	struct dmub_rb_cmd_pr_update_state pr_update_state;
 
 	struct dmub_rb_cmd_pr_general_cmd pr_general_cmd;
+
 	/**
 	 * Definition of a DMUB_CMD__IHC command.
 	 */
@@ -7654,6 +7754,13 @@ union dmub_rb_cmd {
 	 * Definition of a DMUB_CMD__BOOT_TIME_CRC_INIT command.
 	 */
 	struct dmub_rb_cmd_boot_time_crc_init boot_time_crc_init;
+
+	/**
+	 * Definition of a DMUB_CMD__PANEL_POLARITY_ENABLE command.
+	 */
+	struct dmub_rb_cmd_panel_polarity_enable panel_polarity_enable;
+	struct dmub_rb_cmd_panel_polarity_get_bias panel_polarity_get_bias;
+	struct dmub_rb_cmd_panel_polarity_reset panel_polarity_reset;
 };
 
 /**
