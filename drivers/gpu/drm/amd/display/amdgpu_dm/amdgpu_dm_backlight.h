@@ -26,6 +26,8 @@
 
 struct amdgpu_display_manager;
 struct amdgpu_dm_connector;
+struct backlight_device;
+struct backlight_properties;
 struct drm_connector;
 struct attribute_group;
 
@@ -56,6 +58,12 @@ u32 convert_brightness_from_user(const struct amdgpu_dm_backlight_caps *caps,
 				 uint32_t brightness);
 u32 convert_brightness_to_user(const struct amdgpu_dm_backlight_caps *caps,
 			       uint32_t brightness);
+int amdgpu_dm_backlight_get_device_index(struct amdgpu_display_manager *dm,
+					 struct backlight_device *bd);
+void amdgpu_dm_backlight_fill_props(const struct amdgpu_dm_backlight_caps *caps,
+				    bool is_system_supplied,
+				    bool custom_curve_enabled,
+				    struct backlight_properties *props);
 uint amdgpu_dm_get_dc_debug_mask(void);
 void amdgpu_dm_set_dc_debug_mask(uint val);
 int amdgpu_dm_get_abm_level_param(void);

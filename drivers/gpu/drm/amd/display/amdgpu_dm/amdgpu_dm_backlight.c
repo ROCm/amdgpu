@@ -236,6 +236,21 @@ static struct dc_stream_state *dm_find_stream_with_link(
 	return NULL;
 }
 
+STATIC_IFN_KUNIT
+int amdgpu_dm_backlight_get_device_index(struct amdgpu_display_manager *dm,
+					 struct backlight_device *bd)
+{
+	int i;
+
+	for (i = 0; i < dm->num_of_edps; i++) {
+		if (bd == dm->backlight_dev[i])
+			return i;
+	}
+
+	return 0;
+}
+EXPORT_IF_KUNIT(amdgpu_dm_backlight_get_device_index);
+
 void amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 				   int bl_idx,
 				   u32 user_brightness)
@@ -335,14 +350,8 @@ void amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 {
 	struct amdgpu_display_manager *dm = bl_get_data(bd);
-	int i;
+	int i = amdgpu_dm_backlight_get_device_index(dm, bd);
 
-	for (i = 0; i < dm->num_of_edps; i++) {
-		if (bd == dm->backlight_dev[i])
-			break;
-	}
-	if (i >= AMDGPU_DM_MAX_NUM_EDP)
-		i = 0;
 	amdgpu_dm_backlight_set_level(dm, i, bd->props.brightness);
 
 	return 0;
@@ -377,14 +386,8 @@ static u32 amdgpu_dm_backlight_get_level(struct amdgpu_display_manager *dm,
 static int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
 {
 	struct amdgpu_display_manager *dm = bl_get_data(bd);
-	int i;
+	int i = amdgpu_dm_backlight_get_device_index(dm, bd);
 
-	for (i = 0; i < dm->num_of_edps; i++) {
-		if (bd == dm->backlight_dev[i])
-			break;
-	}
-	if (i >= AMDGPU_DM_MAX_NUM_EDP)
-		i = 0;
 	return amdgpu_dm_backlight_get_level(dm, i);
 }
 
@@ -394,6 +397,35 @@ static const struct backlight_ops amdgpu_dm_backlight_ops = {
 	.update_status	= amdgpu_dm_backlight_update_status,
 };
 
+STATIC_IFN_KUNIT
+void amdgpu_dm_backlight_fill_props(const struct amdgpu_dm_backlight_caps *caps,
+				    bool is_system_supplied,
+				    bool custom_curve_enabled,
+				    struct backlight_properties *props)
+{
+	unsigned int min, max;
+
+	if (get_brightness_range(caps, &min, &max)) {
+		if (is_system_supplied)
+			props->brightness = DIV_ROUND_CLOSEST((max - min) * caps->ac_level,
+							       100);
+		else
+			props->brightness = DIV_ROUND_CLOSEST((max - min) * caps->dc_level,
+							       100);
+		props->max_brightness = max - min;
+	} else {
+		props->brightness = MAX_BACKLIGHT_LEVEL;
+		props->max_brightness = MAX_BACKLIGHT_LEVEL;
+	}
+
+	if (caps && caps->data_points && custom_curve_enabled)
+		props->scale = BACKLIGHT_SCALE_NON_LINEAR;
+	else
+		props->scale = BACKLIGHT_SCALE_LINEAR;
+	props->type = BACKLIGHT_RAW;
+}
+EXPORT_IF_KUNIT(amdgpu_dm_backlight_fill_props);
+
 void
 amdgpu_dm_register_backlight_device(struct amdgpu_dm_connector *aconnector)
 {
@@ -402,7 +434,6 @@ amdgpu_dm_register_backlight_device(struct amdgpu_dm_connector *aconnector)
 	struct backlight_properties props = { 0 };
 	struct amdgpu_dm_backlight_caps *caps;
 	char bl_name[16];
-	int min, max;
 	int real_brightness;
 	int init_brightness;
 
@@ -419,26 +450,17 @@ amdgpu_dm_register_backlight_device(struct amdgpu_dm_connector *aconnector)
 #endif
 
 	caps = &dm->backlight_caps[aconnector->bl_idx];
-	if (get_brightness_range(caps, &min, &max)) {
-		if (power_supply_is_system_supplied() > 0)
-			props.brightness = DIV_ROUND_CLOSEST((max - min) * caps->ac_level, 100);
-		else
-			props.brightness = DIV_ROUND_CLOSEST((max - min) * caps->dc_level, 100);
-		/* min is zero, so max needs to be adjusted */
-		props.max_brightness = max - min;
-		drm_dbg(drm, "Backlight caps: min: %d, max: %d, ac %d, dc %d\n", min, max,
-			caps->ac_level, caps->dc_level);
-	} else
-		props.brightness = props.max_brightness = MAX_BACKLIGHT_LEVEL;
+	amdgpu_dm_backlight_fill_props(caps, power_supply_is_system_supplied() > 0,
+				       !(amdgpu_dc_debug_mask &
+					 DC_DISABLE_CUSTOM_BRIGHTNESS_CURVE),
+				       &props);
+	drm_dbg(drm, "Backlight caps: max_brightness: %d, ac %d, dc %d\n",
+		props.max_brightness, caps->ac_level, caps->dc_level);
 
 	init_brightness = props.brightness;
 
-	if (caps->data_points && !(amdgpu_dc_debug_mask & DC_DISABLE_CUSTOM_BRIGHTNESS_CURVE)) {
+	if (props.scale == BACKLIGHT_SCALE_NON_LINEAR)
 		drm_info(drm, "Using custom brightness curve\n");
-		props.scale = BACKLIGHT_SCALE_NON_LINEAR;
-	} else
-		props.scale = BACKLIGHT_SCALE_LINEAR;
-	props.type = BACKLIGHT_RAW;
 
 	snprintf(bl_name, sizeof(bl_name), "amdgpu_bl%d",
 		 drm->primary->index + aconnector->bl_idx);

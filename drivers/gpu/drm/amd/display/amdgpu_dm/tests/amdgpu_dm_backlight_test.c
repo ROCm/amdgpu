@@ -6,6 +6,7 @@
  */
 
 #include <kunit/test.h>
+#include <linux/backlight.h>
 
 #include "dc.h"
 #include "amdgpu.h"
@@ -13,6 +14,7 @@
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_backlight.h"
 #include "amd_shared.h"
+#include "dc/inc/hw/panel_cntl.h"
 
 struct dm_backlight_connector_fixture {
 	struct amdgpu_device *adev;
@@ -45,6 +47,51 @@ static void setup_test_connector(struct kunit *test,
 	fixture->aconnector->dc_link = fixture->link;
 	fixture->aconnector->base.dev = &fixture->adev->ddev;
 	fixture->link->connector_signal = signal;
+}
+
+/* Tests for amdgpu_dm_backlight_get_device_index() */
+
+/**
+ * dm_test_backlight_device_index_matches_second - Test matching second backlight device
+ * @test: The KUnit test context
+ */
+static void dm_test_backlight_device_index_matches_second(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct backlight_device *bd0;
+	struct backlight_device *bd1;
+
+	bd0 = kunit_kzalloc(test, sizeof(*bd0), GFP_KERNEL);
+	bd1 = kunit_kzalloc(test, sizeof(*bd1), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, bd0);
+	KUNIT_ASSERT_NOT_NULL(test, bd1);
+
+	dm->num_of_edps = 2;
+	dm->backlight_dev[0] = bd0;
+	dm->backlight_dev[1] = bd1;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_backlight_get_device_index(dm, bd1), 1);
+}
+
+/**
+ * dm_test_backlight_device_index_missing_fallback - Test missing backlight device fallback
+ * @test: The KUnit test context
+ */
+static void dm_test_backlight_device_index_missing_fallback(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct backlight_device *known_bd;
+	struct backlight_device *unknown_bd;
+
+	known_bd = kunit_kzalloc(test, sizeof(*known_bd), GFP_KERNEL);
+	unknown_bd = kunit_kzalloc(test, sizeof(*unknown_bd), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, known_bd);
+	KUNIT_ASSERT_NOT_NULL(test, unknown_bd);
+
+	dm->num_of_edps = 1;
+	dm->backlight_dev[0] = known_bd;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_backlight_get_device_index(dm, unknown_bd), 0);
 }
 
 /* Tests for amdgpu_dm_update_backlight_caps() */
@@ -740,6 +787,75 @@ static void dm_test_brightness_range_zero_signals(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, max, 0U);
 }
 
+/* Tests for amdgpu_dm_backlight_fill_props() */
+
+/**
+ * dm_test_backlight_fill_props_ac_linear - Test AC brightness and linear scale
+ * @test: The KUnit test context
+ */
+static void dm_test_backlight_fill_props_ac_linear(struct kunit *test)
+{
+	struct backlight_properties props = {};
+	struct amdgpu_dm_backlight_caps caps = {};
+	unsigned int min, max;
+
+	caps.min_input_signal = 12;
+	caps.max_input_signal = 255;
+	caps.ac_level = 40;
+	caps.dc_level = 20;
+
+	get_brightness_range(&caps, &min, &max);
+	amdgpu_dm_backlight_fill_props(&caps, true, false, &props);
+
+	KUNIT_EXPECT_EQ(test, props.brightness,
+			 DIV_ROUND_CLOSEST((max - min) * caps.ac_level, 100));
+	KUNIT_EXPECT_EQ(test, props.max_brightness, max - min);
+	KUNIT_EXPECT_EQ(test, props.scale, BACKLIGHT_SCALE_LINEAR);
+	KUNIT_EXPECT_EQ(test, props.type, BACKLIGHT_RAW);
+}
+
+/**
+ * dm_test_backlight_fill_props_dc_nonlinear - Test DC brightness and non-linear scale
+ * @test: The KUnit test context
+ */
+static void dm_test_backlight_fill_props_dc_nonlinear(struct kunit *test)
+{
+	struct backlight_properties props = {};
+	struct amdgpu_dm_backlight_caps caps = {};
+	unsigned int min, max;
+
+	caps.min_input_signal = 12;
+	caps.max_input_signal = 255;
+	caps.ac_level = 40;
+	caps.dc_level = 20;
+	caps.data_points = 2;
+
+	get_brightness_range(&caps, &min, &max);
+	amdgpu_dm_backlight_fill_props(&caps, false, true, &props);
+
+	KUNIT_EXPECT_EQ(test, props.brightness,
+			 DIV_ROUND_CLOSEST((max - min) * caps.dc_level, 100));
+	KUNIT_EXPECT_EQ(test, props.max_brightness, max - min);
+	KUNIT_EXPECT_EQ(test, props.scale, BACKLIGHT_SCALE_NON_LINEAR);
+	KUNIT_EXPECT_EQ(test, props.type, BACKLIGHT_RAW);
+}
+
+/**
+ * dm_test_backlight_fill_props_default_range - Test default properties without caps
+ * @test: The KUnit test context
+ */
+static void dm_test_backlight_fill_props_default_range(struct kunit *test)
+{
+	struct backlight_properties props = {};
+
+	amdgpu_dm_backlight_fill_props(NULL, false, true, &props);
+
+	KUNIT_EXPECT_EQ(test, props.brightness, MAX_BACKLIGHT_LEVEL);
+	KUNIT_EXPECT_EQ(test, props.max_brightness, MAX_BACKLIGHT_LEVEL);
+	KUNIT_EXPECT_EQ(test, props.scale, BACKLIGHT_SCALE_LINEAR);
+	KUNIT_EXPECT_EQ(test, props.type, BACKLIGHT_RAW);
+}
+
 /* Tests for amdgpu_dm_update_connector_ext_caps() */
 
 /**
@@ -1062,6 +1178,9 @@ static void dm_test_setup_backlight_device_oled_success(struct kunit *test)
 }
 
 static struct kunit_case dm_backlight_test_cases[] = {
+	/* amdgpu_dm_backlight_get_device_index */
+	KUNIT_CASE(dm_test_backlight_device_index_matches_second),
+	KUNIT_CASE(dm_test_backlight_device_index_missing_fallback),
 	KUNIT_CASE(dm_test_backlight_caps_valid_short_circuit),
 #if !defined(CONFIG_ACPI)
 	KUNIT_CASE(dm_test_backlight_caps_aux_support_noop),
@@ -1095,6 +1214,10 @@ static struct kunit_case dm_backlight_test_cases[] = {
 	KUNIT_CASE(dm_test_brightness_from_user_midrange),
 	KUNIT_CASE(dm_test_brightness_from_user_with_curve),
 	KUNIT_CASE(dm_test_brightness_range_zero_signals),
+	/* amdgpu_dm_backlight_fill_props */
+	KUNIT_CASE(dm_test_backlight_fill_props_ac_linear),
+	KUNIT_CASE(dm_test_backlight_fill_props_dc_nonlinear),
+	KUNIT_CASE(dm_test_backlight_fill_props_default_range),
 	/* amdgpu_dm_update_connector_ext_caps */
 	KUNIT_CASE(dm_test_update_connector_ext_caps_negative_bl_idx),
 	KUNIT_CASE(dm_test_update_connector_ext_caps_non_edp),
