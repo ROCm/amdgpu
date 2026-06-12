@@ -247,6 +247,7 @@ static const char *hw_id_names[HW_ID_MAX] = {
 	[XGBE_HWID]		= "XGBE",
 	[MP0_HWID]		= "MP0",
 	[VPE_HWID]		= "VPE",
+	[UMSCH_HWID]		= "UMSCH",
 	[ATU_HWID]		= "ATU",
 	[AIGC_HWID]		= "AIGC",
 };
@@ -279,6 +280,7 @@ static int hw_id_map[MAX_HWIP] = {
 	[DCI_HWIP]	= DCI_HWID,
 	[PCIE_HWIP]	= PCIE_HWID,
 	[VPE_HWIP]	= VPE_HWID,
+	[UMSCH_HWIP]	= UMSCH_HWID,
 	[ISP_HWIP]	= ISP_HWID,
 	[ATU_HWIP]	= ATU_HWID,
 };
@@ -2862,7 +2864,12 @@ static int amdgpu_discovery_set_mm_ip_blocks(struct amdgpu_device *adev)
 			return -EINVAL;
 		}
 	} else {
-		switch (amdgpu_ip_version(adev, UVD_HWIP, 0)) {
+		uint32_t vcn_version = amdgpu_ip_version(adev, UVD_HWIP, 0);
+
+		/* no VCN discovered; nothing to add */
+		if (!vcn_version)
+			return 0;
+		switch (vcn_version) {
 		case IP_VERSION(1, 0, 0):
 		case IP_VERSION(1, 0, 1):
 			amdgpu_device_ip_block_add(adev, &vcn_v1_0_ip_block);
@@ -2930,7 +2937,7 @@ static int amdgpu_discovery_set_mm_ip_blocks(struct amdgpu_device *adev)
 		default:
 			dev_err(adev->dev,
 				"Failed to add vcn/jpeg ip block(UVD_HWIP:0x%x)\n",
-				amdgpu_ip_version(adev, UVD_HWIP, 0));
+				vcn_version);
 			return -EINVAL;
 		}
 	}

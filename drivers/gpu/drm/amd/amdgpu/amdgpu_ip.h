@@ -68,6 +68,7 @@ enum amd_hw_ip_block_type {
 	ISP_HWIP,
 	ATU_HWIP,
 	AIGC_HWIP,
+	UMSCH_HWIP,
 	MAX_HWIP
 };
 
