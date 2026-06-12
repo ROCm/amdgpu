@@ -1180,6 +1180,7 @@ int amdgpu_userq_mgr_init(struct amdgpu_userq_mgr *userq_mgr, struct drm_file *f
 	xa_init_flags(&userq_mgr->userq_xa, XA_FLAGS_ALLOC);
 	userq_mgr->adev = adev;
 	userq_mgr->file = file_priv;
+	mutex_init(&userq_mgr->proc_ctx_lock);
 
 	INIT_DELAYED_WORK(&userq_mgr->resume_work, amdgpu_userq_restore_worker);
 	INIT_WORK(&userq_mgr->reset_work, amdgpu_userq_mgr_reset_work);
@@ -1233,6 +1234,11 @@ void amdgpu_userq_mgr_fini(struct amdgpu_userq_mgr *userq_mgr)
 	 */
 	cancel_work_sync(&userq_mgr->reset_work);
 
+	amdgpu_bo_free_kernel(&userq_mgr->proc_ctx_obj.obj,
+			      &userq_mgr->proc_ctx_obj.gpu_addr,
+			      &userq_mgr->proc_ctx_obj.cpu_ptr);
+
+	mutex_destroy(&userq_mgr->proc_ctx_lock);
 	mutex_destroy(&userq_mgr->userq_mutex);
 }
 
