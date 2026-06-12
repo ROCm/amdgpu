@@ -46,22 +46,6 @@ struct kfd_event_waiter {
 	bool event_age_enabled;  /* set to true when last_event_age is non-zero */
 };
 
-/*
- * Each signal event needs a 64-bit signal slot where the signaler will write
- * a 1 before sending an interrupt. (This is needed because some interrupts
- * do not contain enough spare data bits to identify an event.)
- * We get whole pages and map them to the process VA.
- * Individual signal events use their event_id as slot index.
- */
-struct kfd_signal_page {
-	uint64_t *kernel_address;
-};
-
-static uint64_t *page_slots(struct kfd_signal_page *page)
-{
-	return page->kernel_address;
-}
-
 static int allocate_event_notification_slot(struct kfd_process *p,
 					    struct kfd_event *ev,
 					    const int *restore_id)
@@ -93,7 +77,7 @@ static int allocate_event_notification_slot(struct kfd_process *p,
 		return id;
 
 	ev->event_id = id;
-	page_slots(p->signal_page)[id] = UNSIGNALED_EVENT_SLOT;
+	p->signal_page[id] = UNSIGNALED_EVENT_SLOT;
 
 	return 0;
 }
@@ -139,7 +123,7 @@ static struct kfd_event *lookup_signaled_event_by_partial_id(
 	 */
 	if (bits > 31 || (1U << bits) >= KFD_SIGNAL_EVENT_LIMIT) {
 		if (signal_mailbox_updated &&
-		    page_slots(p->signal_page)[id] == UNSIGNALED_EVENT_SLOT)
+		    p->signal_page[id] == UNSIGNALED_EVENT_SLOT)
 			return NULL;
 
 		return idr_find(&p->event_idr, id);
@@ -149,7 +133,7 @@ static struct kfd_event *lookup_signaled_event_by_partial_id(
 	 * and find the first one that has signaled.
 	 */
 	for (ev = NULL; id < KFD_SIGNAL_EVENT_LIMIT && !ev; id += 1U << bits) {
-		if (page_slots(p->signal_page)[id] == UNSIGNALED_EVENT_SLOT)
+		if (p->signal_page[id] == UNSIGNALED_EVENT_SLOT)
 			continue;
 
 		ev = idr_find(&p->event_idr, id);
@@ -261,21 +245,9 @@ static void destroy_events(struct kfd_process *p)
 	mutex_destroy(&p->event_mutex);
 }
 
-/*
- * We assume that the process is being destroyed and there is no need to
- * unmap the pages or keep bookkeeping data in order.
- */
-static void shutdown_signal_page(struct kfd_process *p)
-{
-	struct kfd_signal_page *page = p->signal_page;
-
-	kfree(page);
-}
-
 void kfd_event_free_process(struct kfd_process *p)
 {
 	destroy_events(p);
-	shutdown_signal_page(p);
 }
 
 static bool event_can_be_gpu_signaled(const struct kfd_event *ev)
@@ -292,8 +264,6 @@ static bool event_can_be_cpu_signaled(const struct kfd_event *ev)
 static int kfd_event_page_set(struct kfd_process *p, void *kernel_address,
 		       uint64_t size, uint64_t user_handle)
 {
-	struct kfd_signal_page *page;
-
 	if (p->signal_page)
 		return -EBUSY;
 
@@ -303,17 +273,11 @@ static int kfd_event_page_set(struct kfd_process *p, void *kernel_address,
 		return -EINVAL;
 	}
 
-	page = kzalloc_obj(*page);
-	if (!page)
-		return -ENOMEM;
-
 	/* Initialize all events to unsignaled */
 	memset(kernel_address, (uint8_t) UNSIGNALED_EVENT_SLOT,
 	       KFD_SIGNAL_EVENT_LIMIT * 8);
 
-	page->kernel_address = kernel_address;
-
-	p->signal_page = page;
+	p->signal_page = kernel_address;
 	p->signal_mapped_size = size;
 	p->signal_handle = user_handle;
 	return 0;
@@ -681,7 +645,7 @@ unlock_rcu:
 
 static void acknowledge_signal(struct kfd_process *p, struct kfd_event *ev)
 {
-	WRITE_ONCE(page_slots(p->signal_page)[ev->event_id], UNSIGNALED_EVENT_SLOT);
+	WRITE_ONCE(p->signal_page[ev->event_id], UNSIGNALED_EVENT_SLOT);
 }
 
 static void set_event_from_interrupt(struct kfd_process *p,
@@ -724,7 +688,7 @@ void kfd_signal_event_interrupt(u32 pasid, uint32_t partial_id,
 		 * in the interrupt payload was invalid and do an
 		 * exhaustive search of signaled events.
 		 */
-		uint64_t *slots = page_slots(p->signal_page);
+		uint64_t *slots = p->signal_page;
 		uint32_t id;
 
 		if (valid_id_bits)

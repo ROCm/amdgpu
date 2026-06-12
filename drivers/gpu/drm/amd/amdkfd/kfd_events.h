@@ -49,7 +49,6 @@
 #define UNSIGNALED_EVENT_SLOT ((uint64_t)-1)
 
 struct kfd_event_waiter;
-struct signal_page;
 
 struct kfd_event {
 	u32 event_id;
