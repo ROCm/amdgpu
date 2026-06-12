@@ -3702,8 +3702,8 @@ static void dm_test_dcn10_register_irq_handlers_zero_crtc(struct kunit *test)
  * dm_test_dcn10_register_irq_handlers_one_crtc - Test DCN10 with 1 CRTC
  * @test: The KUnit test context
  *
- * Exercises the VSTARTUP, VUPDATE, and PFLIP for-loop bodies with a
- * fake IRQ service.
+ * Exercises the VUPDATE_NO_LOCK for-loop bodies with a fake IRQ service, and
+ * that it's the only one populated (other than VLINE0, for secure display).
  */
 static void dm_test_dcn10_register_irq_handlers_one_crtc(struct kunit *test)
 {
@@ -3723,18 +3723,16 @@ static void dm_test_dcn10_register_irq_handlers_one_crtc(struct kunit *test)
 
 	KUNIT_EXPECT_EQ(test, amdgpu_dm_dcn10_register_irq_handlers(adev), 0);
 
-	/* Verify VBLANK params were populated */
-	KUNIT_EXPECT_EQ(test, (int)adev->dm.vblank_params[0].irq_src,
-			(int)DC_IRQ_SOURCE_VBLANK1);
-	KUNIT_EXPECT_PTR_EQ(test, adev->dm.vblank_params[0].adev, adev);
+	/* Verify VBLANK params were *not* populated */
+	KUNIT_EXPECT_EQ(test, (int)adev->dm.vblank_params[0].irq_src, 0);
+	KUNIT_EXPECT_NULL(test, adev->dm.vblank_params[0].adev);
 
 	/* Verify VUPDATE params were populated */
 	KUNIT_EXPECT_EQ(test, (int)adev->dm.vupdate_params[0].irq_src,
 			(int)DC_IRQ_SOURCE_VUPDATE1);
 
-	/* Verify PFLIP params were populated */
-	KUNIT_EXPECT_EQ(test, (int)adev->dm.pflip_params[0].irq_src,
-			(int)DC_IRQ_SOURCE_PFLIP1);
+	/* Verify PFLIP params were *not* populated */
+	KUNIT_EXPECT_EQ(test, (int)adev->dm.pflip_params[0].irq_src, 0);
 
 	amdgpu_dm_irq_fini(adev);
 }
