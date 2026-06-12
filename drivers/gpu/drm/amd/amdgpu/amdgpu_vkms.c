@@ -5,9 +5,7 @@
 #include <drm/drm_encoder.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_vblank.h>
-#ifdef DRM_CRTC_VBLANK_TIMER_FUNCS
 #include <drm/drm_vblank_helper.h>
-#endif
 
 #include "amdgpu.h"
 #ifdef CONFIG_DRM_AMDGPU_SI
