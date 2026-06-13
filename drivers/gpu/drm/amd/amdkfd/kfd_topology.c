@@ -2092,6 +2092,11 @@ static void kfd_topology_set_capabilities(struct kfd_topology_device *dev)
 	} else {
 		dev->node_props.debug_prop |= HSA_DBG_WATCH_ADDR_MASK_LO_BIT_GFX10 |
 					HSA_DBG_WATCH_ADDR_MASK_HI_BIT;
+		/* gfx11 dGPU */
+		if (KFD_GC_VERSION(dev->gpu) == IP_VERSION(11, 0, 0) ||
+		    KFD_GC_VERSION(dev->gpu) == IP_VERSION(11, 0, 2) ||
+		    KFD_GC_VERSION(dev->gpu) == IP_VERSION(11, 0, 3))
+			dev->node_props.capability |= HSA_CAP_PER_QUEUE_RESET_SUPPORTED;
 
 		if (KFD_GC_VERSION(dev->gpu) >= IP_VERSION(12, 0, 0))
 			dev->node_props.capability |=
