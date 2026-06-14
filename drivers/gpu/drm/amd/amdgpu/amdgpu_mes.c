@@ -864,12 +864,13 @@ bool amdgpu_mes_suspend_resume_all_supported(struct amdgpu_device *adev)
 
 bool amdgpu_mes_queue_reset_by_mes_supported(struct amdgpu_device *adev)
 {
-	return (amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(12, 1, 0) &&
-			(adev->mes.sched_version & AMDGPU_MES_VERSION_MASK) >= 0x73) ||
-		(IP_VERSION_MAJ(amdgpu_ip_version(adev, GC_HWIP, 0)) == 11 &&
-			(adev->mes.sched_version & AMDGPU_MES_VERSION_MASK) >= 0x8c) ||
-		(amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(12, 0, 0) &&
-			(adev->mes.sched_version & AMDGPU_MES_VERSION_MASK) >= 0x8d);
+	u32 ip_maj = IP_VERSION_MAJ(amdgpu_ip_version(adev, GC_HWIP, 0));
+	u32 ip_min = IP_VERSION_MIN(amdgpu_ip_version(adev, GC_HWIP, 0));
+	u32 mes_sched = adev->mes.sched_version & AMDGPU_MES_VERSION_MASK;
+
+	return (ip_maj == 11 && mes_sched >= 0x8c) ||
+		((ip_maj == 12 && ip_min == 0) && mes_sched >= 0x8d) ||
+		((ip_maj == 12 && ip_min == 1) && mes_sched >= 0x73);
 }
 
 /* Fix me -- node_id is used to identify the correct MES instances in the future */
