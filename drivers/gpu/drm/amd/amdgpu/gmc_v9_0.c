@@ -2023,11 +2023,19 @@ static int gmc_v9_0_sw_init(struct amdgpu_ip_block *ip_block)
 	 * The first KFD VMID is 8 for GPUs with graphics, 3 for
 	 * compute-only GPUs. On compute-only GPUs that leaves 2 VMIDs
 	 * for video processing.
+	 *
+	 * If kernel queues are disabled, allow KFD to use all vmids.
 	 */
-	adev->vm_manager.first_kfd_vmid =
-		(amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 1) ||
-		 amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 2) ||
-		 amdgpu_is_multi_aid(adev)) ?
+	if (adev->gfx.disable_kq &&
+	    adev->jpeg.disable_kq &&
+	    adev->vcn.disable_kq &&
+	    adev->sdma.no_user_submission)
+		adev->vm_manager.first_kfd_vmid = 1;
+	else
+		adev->vm_manager.first_kfd_vmid =
+			(amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 1) ||
+			 amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 2) ||
+			 amdgpu_is_multi_aid(adev)) ?
 			3 :
 			8;
 
