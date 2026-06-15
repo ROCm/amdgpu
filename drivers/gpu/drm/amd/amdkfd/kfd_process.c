@@ -196,15 +196,13 @@ static void kfd_sdma_activity_worker(struct work_struct *work)
 	list_for_each_entry(sdma_q, &sdma_q_list.list, list) {
 		val = 0;
 
-		if (KFD_GC_VERSION(dqm->dev) <= IP_VERSION(9, 4, 2))
-			ret = read_sdma_queue_counter(sdma_q->rptr, &val);
-		else
-			ret = dqm->dev->kfd2kgd->hqd_sdma_get_counter ?
-			      dqm->dev->kfd2kgd->hqd_sdma_get_counter(
+		if (dqm->dev->kfd2kgd->hqd_sdma_get_counter)
+			ret = dqm->dev->kfd2kgd->hqd_sdma_get_counter(
 					dqm->dev->adev, sdma_q->mqd,
 					dqm->dev->kfd->device_info.num_sdma_queues_per_engine,
-					&val) :
-			      -EOPNOTSUPP;
+					&val);
+		else
+			ret = read_sdma_queue_counter(sdma_q->rptr, &val);
 
 		if (ret) {
 			pr_debug("Failed to read SDMA queue active counter for queue id: %d",
