@@ -2086,7 +2086,8 @@ static void kfd_topology_set_capabilities(struct kfd_topology_device *dev)
 			dev->node_props.capability |=
 				HSA_CAP_TRAP_DEBUG_PRECISE_MEMORY_OPERATIONS_SUPPORTED;
 
-		if (!amdgpu_sriov_vf(dev->gpu->adev))
+		if (KFD_GC_VERSION(dev->gpu) >= IP_VERSION(9, 4, 3) &&
+		    !amdgpu_sriov_vf(dev->gpu->adev))
 			dev->node_props.capability |= HSA_CAP_PER_QUEUE_RESET_SUPPORTED;
 
 	} else {
