@@ -453,10 +453,6 @@ enum dmub_ips_disable_type dm_get_default_ips_mode(
 	case IP_VERSION(3, 5, 1):
 		ret =  DMUB_IPS_RCG_IN_ACTIVE_IPS2_IN_OFF;
 		break;
-	case IP_VERSION(4, 2, 0):
-	case IP_VERSION(4, 2, 1):
-		ret =  DMUB_IPS_ENABLE;
-		break;
 	default:
 		/* ASICs older than DCN35 do not have IPSs */
 		if (amdgpu_ip_version(adev, DCE_HWIP, 0) < IP_VERSION(3, 5, 0))

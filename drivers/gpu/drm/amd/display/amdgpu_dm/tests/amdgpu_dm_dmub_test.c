@@ -351,23 +351,6 @@ static void dm_test_get_default_ips_mode_dcn36(struct kunit *test)
 }
 
 /**
- * dm_test_get_default_ips_mode_dcn42 - Test Get default ips mode dcn42
- * @test: The KUnit test context
- */
-static void dm_test_get_default_ips_mode_dcn42(struct kunit *test)
-{
-	struct amdgpu_device *adev;
-
-	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
-
-	adev->ip_versions[DCE_HWIP][0] = IP_VERSION(4, 2, 0);
-
-	KUNIT_EXPECT_EQ(test, dm_get_default_ips_mode(adev),
-			DMUB_IPS_DISABLE_ALL);
-}
-
-/**
  * dm_test_get_default_ips_mode_older_than_dcn35 - Test Get default ips mode older than dcn35
  * @test: The KUnit test context
  */
@@ -572,7 +555,6 @@ static struct kunit_case amdgpu_dm_dmub_tests[] = {
 	KUNIT_CASE(dm_test_get_default_ips_mode_dcn35),
 	KUNIT_CASE(dm_test_get_default_ips_mode_dcn351),
 	KUNIT_CASE(dm_test_get_default_ips_mode_dcn36),
-	KUNIT_CASE(dm_test_get_default_ips_mode_dcn42),
 	KUNIT_CASE(dm_test_get_default_ips_mode_older_than_dcn35),
 	KUNIT_CASE(dm_test_get_default_ips_mode_newer_default),
 	/* dm_dmub_hw_init() */
