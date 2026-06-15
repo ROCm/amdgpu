@@ -298,7 +298,8 @@ static int sdma_v3_0_init_microcode(struct amdgpu_device *adev)
 	case CHIP_STONEY:
 		chip_name = "stoney";
 		break;
-	default: BUG();
+	default:
+		return -EINVAL;
 	}
 
 	for (i = 0; i < adev->sdma.num_instances; i++) {
