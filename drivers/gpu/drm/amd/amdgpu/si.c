@@ -2218,7 +2218,7 @@ static void si_init_golden_registers(struct amdgpu_device *adev)
 
 
 	default:
-		BUG();
+		break;
 	}
 }
 
@@ -2735,7 +2735,7 @@ int si_set_ip_blocks(struct amdgpu_device *adev)
 			amdgpu_device_ip_block_add(adev, &amdgpu_vkms_ip_block);
 		break;
 	default:
-		BUG();
+		break;
 	}
 	return 0;
 }
