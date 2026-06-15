@@ -138,7 +138,7 @@ static int sdma_v2_4_init_microcode(struct amdgpu_device *adev)
 		chip_name = "topaz";
 		break;
 	default:
-		BUG();
+		return -EINVAL;
 	}
 
 	for (i = 0; i < adev->sdma.num_instances; i++) {
