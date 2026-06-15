@@ -76,10 +76,9 @@ static uint32_t amdgpu_cgs_read_ind_register(struct cgs_device *cgs_device,
 		DRM_ERROR("audio endpt register access not implemented.\n");
 		return 0;
 	default:
-		BUG();
+		WARN(1, "Invalid indirect register space");
+		return 0;
 	}
-	WARN(1, "Invalid indirect register space");
-	return 0;
 }
 
 static void amdgpu_cgs_write_ind_register(struct cgs_device *cgs_device,
@@ -104,9 +103,8 @@ static void amdgpu_cgs_write_ind_register(struct cgs_device *cgs_device,
 		DRM_ERROR("audio endpt register access not implemented.\n");
 		return;
 	default:
-		BUG();
+		WARN(1, "Invalid indirect register space");
 	}
-	WARN(1, "Invalid indirect register space");
 }
 
 static uint32_t fw_type_convert(struct cgs_device *cgs_device, uint32_t fw_type)
