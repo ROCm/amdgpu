@@ -16,6 +16,9 @@
 #include <drm/drm_modes.h>
 #include <drm/drm_writeback.h>
 
+#include "dc.h"
+#include "amdgpu.h"
+#include "amdgpu_dm.h"
 #include "amdgpu_dm_wb.h"
 
 
@@ -66,6 +69,23 @@ static struct drm_connector_state *alloc_test_conn_state(struct kunit *test,
 	conn_state->writeback_job = job;
 
 	return conn_state;
+}
+
+static struct amdgpu_device *alloc_test_adev(struct kunit *test)
+{
+	struct drm_device *drm;
+	struct device *dev;
+
+	dev = drm_kunit_helper_alloc_device(test);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
+
+	drm = __drm_kunit_helper_alloc_drm_device(test, dev,
+						   sizeof(struct amdgpu_device),
+						   offsetof(struct amdgpu_device, ddev),
+						   DRIVER_MODESET | DRIVER_ATOMIC);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
+
+	return drm_to_adev(drm);
 }
 
 /* Tests for amdgpu_dm_wb_encoder_atomic_check */
@@ -310,6 +330,54 @@ static void dm_test_wb_get_modes_bounded_by_max(struct kunit *test)
 	}
 }
 
+/* Tests for amdgpu_dm_wb_connector_init using DRM mock */
+
+/**
+ * dm_test_wb_connector_init_success - Verify writeback connector initialization
+ * @test: KUnit test context
+ *
+ * Uses a DRM mock device embedded in struct amdgpu_device to verify that
+ * amdgpu_dm_wb_connector_init() initializes the writeback connector, stores
+ * the DC link, installs connector state through reset, and wires the expected
+ * DRM callbacks.
+ */
+static void dm_test_wb_connector_init_success(struct kunit *test)
+{
+	struct amdgpu_dm_wb_connector *wbcon;
+	struct amdgpu_display_manager *dm;
+	struct amdgpu_device *adev;
+	struct dc_link *link;
+	struct dc *dc;
+	int ret;
+
+	adev = alloc_test_adev(test);
+	adev->mode_info.num_crtc = 1;
+	dm = &adev->dm;
+	dm->adev = adev;
+
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+
+	dc->links[0] = link;
+	dm->dc = dc;
+
+	wbcon = kunit_kzalloc(test, sizeof(*wbcon), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, wbcon);
+
+	ret = amdgpu_dm_wb_connector_init(dm, wbcon, 0);
+
+	KUNIT_EXPECT_EQ(test, ret, 0);
+	KUNIT_EXPECT_PTR_EQ(test, wbcon->link, link);
+	KUNIT_EXPECT_TRUE(test, wbcon->base.base.funcs != NULL);
+	KUNIT_EXPECT_TRUE(test, wbcon->base.base.helper_private != NULL);
+	KUNIT_EXPECT_TRUE(test, wbcon->base.base.state != NULL);
+	KUNIT_EXPECT_TRUE(test, wbcon->base.encoder.funcs != NULL);
+	KUNIT_EXPECT_EQ(test, wbcon->base.encoder.possible_crtcs, 0x1);
+}
+
 static struct kunit_case dm_wb_test_cases[] = {
 	/* amdgpu_dm_wb_encoder_atomic_check */
 	KUNIT_CASE(dm_test_wb_atomic_check_no_job),
@@ -322,6 +390,8 @@ static struct kunit_case dm_wb_test_cases[] = {
 	/* amdgpu_dm_wb_connector_get_modes */
 	KUNIT_CASE(dm_test_wb_get_modes_returns_modes),
 	KUNIT_CASE(dm_test_wb_get_modes_bounded_by_max),
+	/* amdgpu_dm_wb_connector_init */
+	KUNIT_CASE(dm_test_wb_connector_init_success),
 	{}
 };
 
