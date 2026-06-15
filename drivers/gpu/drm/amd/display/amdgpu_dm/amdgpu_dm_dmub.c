@@ -124,11 +124,11 @@ bool dm_register_dmub_notify_callback(struct amdgpu_device *adev,
 				      dmub_notify_interrupt_callback_t callback,
 				      bool dmub_int_thread_offload)
 {
-	if (callback != NULL && type < ARRAY_SIZE(adev->dm.dmub_thread_offload)) {
-		adev->dm.dmub_callback[type] = callback;
-		adev->dm.dmub_thread_offload[type] = dmub_int_thread_offload;
-	} else
+	if (!callback || type >= ARRAY_SIZE(adev->dm.dmub_thread_offload))
 		return false;
+
+	adev->dm.dmub_callback[type] = callback;
+	adev->dm.dmub_thread_offload[type] = dmub_int_thread_offload;
 
 	return true;
 }
