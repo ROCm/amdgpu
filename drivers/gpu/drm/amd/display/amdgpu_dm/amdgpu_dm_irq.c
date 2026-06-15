@@ -188,7 +188,7 @@ static struct list_head *remove_irq_handler(struct amdgpu_device *adev,
 
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 
-	if (handler_removed == false) {
+	if (!handler_removed) {
 		/* Not necessarily an error - caller may not
 		 * know the context.
 		 */
@@ -326,7 +326,7 @@ void *amdgpu_dm_irq_register_interrupt(struct amdgpu_device *adev,
 	unsigned long irq_table_flags;
 	enum dc_irq_source irq_source;
 
-	if (false == validate_irq_registration_params(int_params, ih))
+	if (!validate_irq_registration_params(int_params, ih))
 		return DAL_INVALID_IRQ_HANDLER_IDX;
 
 	handler_data = kzalloc_obj(*handler_data);
@@ -392,7 +392,7 @@ void amdgpu_dm_irq_unregister_interrupt(struct amdgpu_device *adev,
 	struct dc_interrupt_params int_params;
 	int i;
 
-	if (false == validate_irq_unregistration_params(irq_source, ih))
+	if (!validate_irq_unregistration_params(irq_source, ih))
 		return;
 
 	memset(&int_params, 0, sizeof(int_params));
@@ -2188,7 +2188,7 @@ static void dm_dmub_outbox1_low_irq(void *interrupt_params)
 					dmub_notification_type_str(notify.type));
 				continue;
 			}
-			if (dm->dmub_thread_offload[notify.type] == true) {
+			if (dm->dmub_thread_offload[notify.type]) {
 				dmub_hpd_wrk = kzalloc(sizeof(*dmub_hpd_wrk), GFP_ATOMIC);
 				if (!dmub_hpd_wrk) {
 					drm_err(adev_to_drm(adev), "Failed to allocate dmub_hpd_wrk");

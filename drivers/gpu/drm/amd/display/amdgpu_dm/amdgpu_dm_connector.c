@@ -479,7 +479,7 @@ void amdgpu_dm_update_connector_after_detect(
 	struct drm_device *dev = connector->dev;
 
 	/* MST handled by drm_mst framework */
-	if (aconnector->mst_mgr.mst_state == true)
+	if (aconnector->mst_mgr.mst_state)
 		return;
 
 	sink = aconnector->dc_link->local_sink;
