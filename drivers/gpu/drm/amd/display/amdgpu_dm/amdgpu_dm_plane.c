@@ -1932,7 +1932,9 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	.format_mod_supported = amdgpu_dm_plane_format_mod_supported,
 #endif
+#ifdef HAVE_DRM_PLANE_FUNCS_FORMAT_MOD_SUPPORTED_ASYNC
 	.format_mod_supported_async = amdgpu_dm_plane_format_mod_supported,
+#endif
 #ifdef AMD_PRIVATE_COLOR
 	.atomic_set_property = dm_atomic_plane_set_property,
 	.atomic_get_property = dm_atomic_plane_get_property,

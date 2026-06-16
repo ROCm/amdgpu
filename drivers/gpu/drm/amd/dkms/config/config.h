@@ -772,6 +772,9 @@
 /* drm_plane->color_pipeline_property is available */
 #define HAVE_DRM_PLANE_COLOR_PIPELINE_PROPERTY 1
 
+/* drm_plane_funcs->format_mod_supported_async is available */
+#define HAVE_DRM_PLANE_FUNCS_FORMAT_MOD_SUPPORTED_ASYNC 1
+
 /* drm_plane_helper_destroy() is available */
 #define HAVE_DRM_PLANE_HELPER_DESTROY 1
 
