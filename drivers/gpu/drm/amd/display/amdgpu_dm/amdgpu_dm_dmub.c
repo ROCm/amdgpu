@@ -798,12 +798,26 @@ int amdgpu_dm_process_dmub_aux_transfer_sync(
 		payload->reply[0] = (adev->dm.dmub_notify->aux_reply.command >> 4) & 0xF;
 
 	/*write req may receive a byte indicating partially written number as well*/
-	if (p_notify->aux_reply.length)
-		memcpy(payload->data, p_notify->aux_reply.data,
-				p_notify->aux_reply.length);
+	if (p_notify->aux_reply.length && payload->data) {
+		/* Bound the reply to the scratch buffer it was read into. */
+		ret = min((uint32_t)p_notify->aux_reply.length,
+			  (uint32_t)sizeof(p_notify->aux_reply.data));
 
-	/* success */
-	ret = p_notify->aux_reply.length;
+		/*
+		 * During a write-status-update retry the caller zeroes
+		 * payload->length while still expecting the partial-write
+		 * status byte in payload->data (see dce_aux_transfer_with_retries),
+		 * so only clamp to payload->length for regular transfers.
+		 */
+		if (!payload->write_status_update)
+			ret = min(ret, payload->length);
+
+		memcpy(payload->data, p_notify->aux_reply.data, ret);
+	} else {
+		/* success */
+		ret = p_notify->aux_reply.length;
+	}
+
 	*operation_result = p_notify->result;
 out:
 	reinit_completion(&adev->dm.dmub_aux_transfer_done);
