@@ -184,12 +184,19 @@ static void dm_test_fill_blending_coverage_alpha_format(struct kunit *test)
  */
 static void dm_test_fill_blending_global_alpha(struct kunit *test)
 {
+	struct amdgpu_device *adev;
+	struct drm_plane plane = {0};
 	struct drm_plane_state state = { 0 };
 	bool per_pixel_alpha;
 	bool pre_multiplied_alpha;
 	bool global_alpha;
 	int global_alpha_value;
 
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+
+	plane.dev = &adev->ddev;
+	state.plane = &plane;
 	state.pixel_blend_mode = DRM_MODE_BLEND_PIXEL_NONE;
 	state.alpha = 0x8000;
 
