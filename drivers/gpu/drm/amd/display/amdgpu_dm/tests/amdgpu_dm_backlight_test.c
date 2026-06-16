@@ -1026,6 +1026,7 @@ static void dm_test_should_create_sysfs_no_backlight_index(struct kunit *test)
 	amdgpu_dm_set_abm_level_param(-1);
 	setup_test_connector(test, &fixture, -1, SIGNAL_TYPE_EDP);
 	fixture.aconnector->base.connector_type = DRM_MODE_CONNECTOR_eDP;
+	fixture.link->panel_type = PANEL_TYPE_LCD;
 
 	KUNIT_EXPECT_TRUE(test, amdgpu_dm_should_create_sysfs(fixture.aconnector));
 
@@ -1063,6 +1064,7 @@ static void dm_test_should_create_sysfs_pwm_backlight(struct kunit *test)
 	amdgpu_dm_set_abm_level_param(-1);
 	setup_test_connector(test, &fixture, 0, SIGNAL_TYPE_EDP);
 	fixture.aconnector->base.connector_type = DRM_MODE_CONNECTOR_eDP;
+	fixture.link->panel_type = PANEL_TYPE_LCD;
 	fixture.adev->dm.backlight_caps[0].aux_support = false;
 
 	KUNIT_EXPECT_TRUE(test, amdgpu_dm_should_create_sysfs(fixture.aconnector));
@@ -1147,11 +1149,13 @@ static void dm_test_setup_backlight_device_oled_success(struct kunit *test)
 	struct dm_backlight_connector_fixture fixture = {};
 	struct amdgpu_display_manager *dm;
 	int saved_backlight = amdgpu_dm_get_backlight_param();
+	int saved_abm_level = amdgpu_dm_get_abm_level_param();
 
 	amdgpu_dm_set_backlight_param(-1);
+	/* Skip ABM property attach (requires full DRM object setup) */
+	amdgpu_dm_set_abm_level_param(0);
 	setup_test_connector(test, &fixture, -1, SIGNAL_TYPE_EDP);
 	fixture.link->type = dc_connection_single;
-	/* OLED panel avoids the ABM property attach path */
 	fixture.link->dpcd_sink_ext_caps.bits.oled = 1;
 	dm = &fixture.adev->dm;
 	dm->adev = fixture.adev;
@@ -1166,6 +1170,7 @@ static void dm_test_setup_backlight_device_oled_success(struct kunit *test)
 	KUNIT_EXPECT_TRUE(test, dm->backlight_caps[0].aux_support);
 
 	amdgpu_dm_set_backlight_param(saved_backlight);
+	amdgpu_dm_set_abm_level_param(saved_abm_level);
 }
 
 static struct kunit_case dm_backlight_test_cases[] = {
