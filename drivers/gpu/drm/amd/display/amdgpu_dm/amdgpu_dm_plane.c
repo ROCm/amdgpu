@@ -148,8 +148,18 @@ void amdgpu_dm_plane_fill_blending_from_plane_state(const struct drm_plane_state
 	}
 
 	if (plane_state->alpha < 0xffff) {
+		struct amdgpu_device *adev = drm_to_adev(plane_state->plane->dev);
 		*global_alpha = true;
-		*global_alpha_value = plane_state->alpha >> 8;
+		/*
+		 * DCN 4.2 uses a 12-bit MPCC_GLOBAL_ALPHA field, while
+		 * other ASICs use an 8-bit field. The DRM plane alpha is
+		 * 16-bit, so scale it down to the width the hardware expects.
+		 */
+		if (amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 2, 0))
+			*global_alpha_value = plane_state->alpha >> 4;
+		else
+			*global_alpha_value = plane_state->alpha >> 8;
+
 	}
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_fill_blending_from_plane_state);
