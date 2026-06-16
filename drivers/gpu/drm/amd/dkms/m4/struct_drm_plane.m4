@@ -34,7 +34,26 @@ AC_DEFUN([AC_AMDGPU_DRM_PLANE_STATE_COLOR_MGMT_CHANGED], [
 	])
 ])
 
+dnl #
+dnl # drm: Introduce IN_FORMATS_ASYNC plane property
+dnl # v6.19-3092-gab97fcd81bc2
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_PLANE_FUNCS_FORMAT_MOD_SUPPORTED_ASYNC], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_plane.h>
+		],[
+			struct drm_plane_funcs *funcs = NULL;
+			funcs->format_mod_supported_async = NULL;
+		],[
+			AC_DEFINE(HAVE_DRM_PLANE_FUNCS_FORMAT_MOD_SUPPORTED_ASYNC, 1,
+				[drm_plane_funcs->format_mod_supported_async is available])
+		])
+	])
+])
+
 AC_DEFUN([AC_AMDGPU_STRUCT_DRM_PLANE], [
 	AC_AMDGPU_DRM_PLANE_COLOR_PIPELINE_PROPERTY
 	AC_AMDGPU_DRM_PLANE_STATE_COLOR_MGMT_CHANGED
+	AC_AMDGPU_DRM_PLANE_FUNCS_FORMAT_MOD_SUPPORTED_ASYNC
 ])
