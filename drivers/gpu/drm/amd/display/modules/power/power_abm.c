@@ -716,8 +716,9 @@ void mod_power_update_backlight_on_mode_change(
 {
     struct set_backlight_level_params backlight_level_params = { 0 };
 
-		if (link->dpcd_sink_ext_caps.bits.hdr_aux_backlight_control == 1 ||
-			link->dpcd_sink_ext_caps.bits.sdr_aux_backlight_control == 1)
+		if ((link->dpcd_sink_ext_caps.bits.hdr_aux_backlight_control == 1 ||
+			link->dpcd_sink_ext_caps.bits.sdr_aux_backlight_control == 1) &&
+			link->backlight_control_type == BACKLIGHT_CONTROL_AMD_AUX)
 			dc_link_set_backlight_level_nits(link, core_power->bl_state[panel_inst].isHDR,
 				core_power->bl_state[panel_inst].backlight_millinit, 0);
 
@@ -745,6 +746,11 @@ static bool set_backlight_millinits_aux(struct core_power *core_power,
 		return true;
 
 	link = dc_stream_get_link(stream);
+
+	// only use internal backlight control if dmub capabilities are not present
+	if (link->backlight_control_type == BACKLIGHT_CONTROL_VESA_AUX &&
+		link->dc->caps.dmub_caps.aux_backlight_support)
+		return true;
 
 	return dc_link_set_backlight_level_nits(link, core_power->bl_state[inst].isHDR,
 			backlight_millinits, transition_time_millisec);

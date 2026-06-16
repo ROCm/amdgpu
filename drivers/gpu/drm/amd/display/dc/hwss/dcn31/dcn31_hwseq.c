@@ -718,6 +718,34 @@ static void dmub_abm_set_backlight(struct dc_context *dc,
 	dc_wake_and_execute_dmub_cmd(dc, &cmd, DM_DMUB_WAIT_TYPE_WAIT);
 }
 
+static bool dmub_cacp_set_backlight(struct dc_context *dc,
+	struct set_backlight_level_params *backlight_level_params,
+	unsigned int panel_inst)
+{
+	union dmub_rb_cmd cmd;
+
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.cacp_set_backlight.header.type = DMUB_CMD__CACP;
+	cmd.cacp_set_backlight.header.sub_type = DMUB_CMD__CACP_SET_BACKLIGHT;
+	cmd.cacp_set_backlight.cacp_set_backlight_data.aux_inst = backlight_level_params->aux_inst;
+	cmd.cacp_set_backlight.cacp_set_backlight_data.frame_ramp = backlight_level_params->frame_ramp;
+	cmd.cacp_set_backlight.cacp_set_backlight_data.backlight_user_level =
+		backlight_level_params->backlight_pwm_u16_16;
+	cmd.cacp_set_backlight.cacp_set_backlight_data.backlight_control_type =
+		(enum dmub_backlight_control_type)backlight_level_params->control_type;
+	cmd.cacp_set_backlight.cacp_set_backlight_data.min_luminance = backlight_level_params->min_luminance;
+	cmd.cacp_set_backlight.cacp_set_backlight_data.max_luminance = backlight_level_params->max_luminance;
+	cmd.cacp_set_backlight.cacp_set_backlight_data.min_backlight_pwm = backlight_level_params->min_backlight_pwm;
+	cmd.cacp_set_backlight.cacp_set_backlight_data.max_backlight_pwm = backlight_level_params->max_backlight_pwm;
+	cmd.cacp_set_backlight.cacp_set_backlight_data.version = DMUB_CMD_CACP_CONTROL_VERSION_1;
+	cmd.cacp_set_backlight.cacp_set_backlight_data.panel_mask = (0x01 << panel_inst);
+	cmd.cacp_set_backlight.header.payload_bytes = sizeof(struct dmub_cmd_cacp_set_backlight_data);
+
+	dc_wake_and_execute_dmub_cmd(dc, &cmd, DM_DMUB_WAIT_TYPE_WAIT);
+
+	return true;
+}
+
 bool dcn31_set_backlight_level(struct pipe_ctx *pipe_ctx,
 	struct set_backlight_level_params *backlight_level_params)
 {
@@ -745,8 +773,19 @@ bool dcn31_set_backlight_level(struct pipe_ctx *pipe_ctx,
 			panel_cntl->inst,
 			panel_cntl->pwrseq_inst);
 
-	if (backlight_level_params->control_type != BACKLIGHT_CONTROL_AMD_AUX)
+	if (link && link->panel_type == PANEL_TYPE_OLED) {
+		/* For OLED panel with AMD AUX, skip set backlight call */
+		if (backlight_level_params->control_type == BACKLIGHT_CONTROL_VESA_AUX)
+			dmub_cacp_set_backlight(dc, backlight_level_params, panel_cntl->inst);
+	} else if (link && link->panel_type == PANEL_TYPE_MINILED) {
+		/* For MiniLED panel we need to check if CACP or ABM is being used */
+		if (link->panel_config.cacp.cacp_supported)
+			dmub_cacp_set_backlight(dc, backlight_level_params, panel_cntl->inst);
+		else
+			dmub_abm_set_backlight(dc, backlight_level_params, panel_cntl->inst);
+	} else {
 		dmub_abm_set_backlight(dc, backlight_level_params, panel_cntl->inst);
+	}
 
 	return true;
 }

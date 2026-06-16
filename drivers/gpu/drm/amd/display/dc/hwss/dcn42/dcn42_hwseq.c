@@ -281,6 +281,8 @@ void dcn42_init_hw(struct dc *dc)
 		dc->caps.dmub_caps.psr = dc->ctx->dmub_srv->dmub->feature_caps.psr;
 		dc->caps.dmub_caps.mclk_sw = dc->ctx->dmub_srv->dmub->feature_caps.fw_assisted_mclk_switch_ver > 0;
 		dc->caps.dmub_caps.fams_ver = dc->ctx->dmub_srv->dmub->feature_caps.fw_assisted_mclk_switch_ver;
+		dc->caps.dmub_caps.aux_backlight_support =
+			dc->ctx->dmub_srv->dmub->feature_caps.abm_aux_backlight_support;
 
 		/* sw and fw FAMS versions must match for support */
 		dc->debug.fams2_config.bits.enable &=
