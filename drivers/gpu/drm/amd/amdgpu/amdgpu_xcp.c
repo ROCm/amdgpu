@@ -476,7 +476,8 @@ void amdgpu_xcp_release_sched(struct amdgpu_device *adev,
 	sched = entity->entity.rq->sched;
 	if (drm_sched_wqueue_ready(sched)) {
 		ring = to_amdgpu_ring(entity->entity.rq->sched);
-		atomic_dec(&adev->xcp_mgr->xcp[ring->xcp_id].ref_cnt);
+		if (ring->xcp_id < MAX_XCP)
+			atomic_dec(&adev->xcp_mgr->xcp[ring->xcp_id].ref_cnt);
 	}
 }
 
