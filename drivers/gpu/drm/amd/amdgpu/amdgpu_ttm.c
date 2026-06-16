@@ -138,7 +138,6 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 		return;
 
 	case TTM_PL_VRAM:
-	case AMDGPU_PL_DGMA:
 		if (!adev->mman.buffer_funcs_enabled) {
 			/* Move to system memory */
 			amdgpu_bo_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_CPU);
@@ -165,7 +164,6 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 		}
 		break;
 	case TTM_PL_TT:
-	case AMDGPU_PL_DGMA_IMPORT:
 	case AMDGPU_PL_PREEMPT:
 	default:
 		amdgpu_bo_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_CPU);
@@ -560,9 +558,6 @@ static int amdgpu_bo_move(struct ttm_buffer_object *bo, bool evict,
 		ttm_bo_move_null(bo, new_mem);
 		return 0;
 	}
-	if (old_mem->mem_type == AMDGPU_GEM_DOMAIN_DGMA ||
-	    old_mem->mem_type == AMDGPU_GEM_DOMAIN_DGMA_IMPORT)
-		return -EINVAL;
 
 	if (old_mem->mem_type == TTM_PL_SYSTEM &&
 	    (new_mem->mem_type == TTM_PL_TT ||
@@ -666,10 +661,7 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_device *bdev,
 	case AMDGPU_PL_PREEMPT:
 		break;
 	case TTM_PL_VRAM:
-	case AMDGPU_PL_DGMA:
-		mem->bus.offset = (mem->start << PAGE_SHIFT) +
-				amdgpu_ttm_domain_start(adev, mem->mem_type) -
-				amdgpu_ttm_domain_start(adev, TTM_PL_VRAM);
+		mem->bus.offset = mem->start << PAGE_SHIFT;
 
 		if (adev->mman.aper_base_kaddr &&
 		    mem->placement & TTM_PL_FLAG_CONTIGUOUS)
@@ -691,17 +683,6 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_device *bdev,
 		mem->bus.is_iomem = true;
 		mem->bus.caching = ttm_uncached;
 		break;
-	case AMDGPU_PL_DGMA_IMPORT:
-	{
-		struct amdgpu_bo *abo;
-
-		abo = ttm_to_amdgpu_bo(mem->bo);
-		mem->bus.addr = abo->dgma_addr;
-		mem->bus.offset = abo->dgma_import_base;
-		mem->bus.is_iomem = true;
-		mem->bus.caching = ttm_write_combined;
-		break;
-	}
 	default:
 		return -EINVAL;
 	}
@@ -713,10 +694,6 @@ static unsigned long amdgpu_ttm_io_mem_pfn(struct ttm_buffer_object *bo,
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->bdev);
 	struct amdgpu_res_cursor cursor;
-
-	if (bo->resource->mem_type == AMDGPU_PL_DGMA ||
-			bo->resource->mem_type == AMDGPU_PL_DGMA_IMPORT)
-		return (bo->resource->bus.offset >> PAGE_SHIFT) + page_offset;
 
 	amdgpu_res_first(bo->resource, (u64)page_offset << PAGE_SHIFT, 0,
 			 &cursor);
@@ -745,12 +722,6 @@ uint64_t amdgpu_ttm_domain_start(struct amdgpu_device *adev, uint32_t type)
 		return adev->gmc.gart_start;
 	case TTM_PL_VRAM:
 		return adev->gmc.vram_start;
-	case AMDGPU_PL_DGMA:
-		if (adev->direct_gma.dgma_bo)
-			return amdgpu_bo_gpu_offset(adev->direct_gma.dgma_bo);
-		fallthrough;
-	case AMDGPU_PL_DGMA_IMPORT:
-		return 0;
 	}
 
 	return 0;
@@ -1738,9 +1709,6 @@ uint64_t amdgpu_ttm_tt_pte_flags(struct amdgpu_device *adev, struct ttm_tt *ttm,
 {
 	uint64_t flags = amdgpu_ttm_tt_pde_flags(ttm, mem);
 
-	if (mem && mem->mem_type == AMDGPU_PL_DGMA_IMPORT)
-		flags |= AMDGPU_PTE_SYSTEM;
-
 	flags |= adev->gart.gart_pte_flags;
 	flags |= AMDGPU_PTE_READABLE;
 
@@ -2165,93 +2133,6 @@ static void amdgpu_ttm_training_data_block_init(struct amdgpu_device *adev)
 			ctx->c2p_train_data_offset);
 }
 
-static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
-{
-	struct amdgpu_bo *abo;
-	struct amdgpu_bo_param bp;
-	unsigned long size;
-	int r;
-
-	if (amdgpu_direct_gma_size == 0)
-		return 0;
-
-	size = (unsigned long)amdgpu_direct_gma_size << 20;
-
-	memset(&bp, 0, sizeof(bp));
-	bp.size = size;
-	bp.byte_align = PAGE_SIZE;
-	bp.domain = AMDGPU_GEM_DOMAIN_VRAM;
-	bp.flags = AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED | AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
-						AMDGPU_GEM_CREATE_TOP_DOWN;
-	bp.type = ttm_bo_type_kernel;
-	bp.resv = NULL;
-	bp.bo_ptr_size = sizeof(struct amdgpu_bo);
-
-	/* reserve in visible vram */
-	r = amdgpu_bo_create(adev, &bp, &abo);
-	if (unlikely(r))
-		goto error_out;
-
-	r = amdgpu_bo_reserve(abo, false);
-	if (unlikely(r))
-		goto error_free;
-
-	r = amdgpu_bo_pin(abo, AMDGPU_GEM_DOMAIN_VRAM);
-	amdgpu_bo_unreserve(abo);
-	if (unlikely(r))
-		goto error_free;
-
-	adev->direct_gma.dgma_bo = abo;
-
-	/* reserve in gtt */
-	atomic64_add(size, &adev->gart_pin_size);
-	r = ttm_range_man_init(&adev->mman.bdev, AMDGPU_PL_DGMA,
-					  false, size >> PAGE_SHIFT);
-	if (unlikely(r))
-		goto error_put_node;
-
-	r = ttm_range_man_init(&adev->mman.bdev, AMDGPU_PL_DGMA_IMPORT,
-					  false, size >> PAGE_SHIFT);
-	if (unlikely(r))
-		goto error_release_mm;
-
-	DRM_INFO("%dMB VRAM/GTT reserved for Direct GMA\n", amdgpu_direct_gma_size);
-	return 0;
-
-error_release_mm:
-	ttm_range_man_fini(&adev->mman.bdev, AMDGPU_PL_DGMA);
-
-error_put_node:
-	atomic64_sub(size, &adev->gart_pin_size);
-error_free:
-	amdgpu_bo_unref(&abo);
-
-error_out:
-	amdgpu_direct_gma_size = 0;
-	memset(&adev->direct_gma, 0, sizeof(adev->direct_gma));
-	DRM_ERROR("Fail to enable Direct GMA\n");
-	return r;
-}
-
-static void amdgpu_direct_gma_fini(struct amdgpu_device *adev)
-{
-	int r;
-
-	if (amdgpu_direct_gma_size == 0)
-		return;
-
-	ttm_range_man_fini(&adev->mman.bdev, AMDGPU_PL_DGMA_IMPORT);
-	ttm_range_man_fini(&adev->mman.bdev, AMDGPU_PL_DGMA);
-
-	r = amdgpu_bo_reserve(adev->direct_gma.dgma_bo, false);
-	if (r == 0) {
-		amdgpu_bo_unpin(adev->direct_gma.dgma_bo);
-		amdgpu_bo_unreserve(adev->direct_gma.dgma_bo);
-	}
-	amdgpu_bo_unref(&adev->direct_gma.dgma_bo);
-	atomic64_sub((u64)amdgpu_direct_gma_size << 20, &adev->gart_pin_size);
-}
-
 static int amdgpu_ttm_pools_init(struct amdgpu_device *adev)
 {
 	int i;
@@ -2532,8 +2413,6 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 
 		gtt_size = configured_size;
 	}
-	/* reserve for DGMA import domain */
-	gtt_size -= (uint64_t)amdgpu_direct_gma_size << 20;
 
 	/* Initialize GTT memory pool */
 	r = amdgpu_gtt_mgr_init(adev, gtt_size);
@@ -2544,7 +2423,6 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	dev_info(adev->dev, " %uM of GTT memory ready.\n",
 		 (unsigned int)(gtt_size / (1024 * 1024)));
 
-	amdgpu_direct_gma_init(adev);
 	if (adev->flags & AMD_IS_APU) {
 		if (adev->gmc.real_vram_size < gtt_size)
 			adev->apu_prefer_gtt = true;
@@ -2650,7 +2528,6 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 	}
 
 	drain_workqueue(adev->mman.bdev.wq);
-	amdgpu_direct_gma_fini(adev);
 	if (!adev->gmc.is_app_apu)
 		amdgpu_vram_mgr_fini(adev);
 	amdgpu_gtt_mgr_fini(adev);
@@ -3142,31 +3019,7 @@ static int amdgpu_ttm_page_pool_show(struct seq_file *m, void *unused)
 	return ttm_pool_debugfs(&adev->mman.bdev.pool, m);
 }
 
-static int amdgpu_mm_dgma_table_show(struct seq_file *m, void *unused)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *)m->private;
-	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
-							    AMDGPU_PL_DGMA);
-	struct drm_printer p = drm_seq_file_printer(m);
-
-	man->func->debug(man, &p);
-	return 0;
-}
-
-static int amdgpu_mm_dgma_import_table_show(struct seq_file *m, void *unused)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *)m->private;
-	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
-							    AMDGPU_PL_DGMA_IMPORT);
-	struct drm_printer p = drm_seq_file_printer(m);
-
-	man->func->debug(man, &p);
-	return 0;
-}
-
 DEFINE_SHOW_ATTRIBUTE(amdgpu_ttm_page_pool);
-DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_dgma_table);
-DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_dgma_import_table);
 
 /*
  * amdgpu_ttm_vram_read - Linear read access to VRAM
@@ -3393,12 +3246,5 @@ void amdgpu_ttm_debugfs_init(struct amdgpu_device *adev)
 	ttm_resource_manager_create_debugfs(ttm_manager_type(&adev->mman.bdev,
 							     AMDGPU_PL_OA),
 					    root, "amdgpu_oa_mm");
-
-	if (amdgpu_direct_gma_size) {
-		debugfs_create_file("amdgpu_dgma_mm", 0444, root, adev,
-			    &amdgpu_mm_dgma_table_fops);
-		debugfs_create_file("amdgpu_dgma_import_mm", 0444, root, adev,
-			    &amdgpu_mm_dgma_import_table_fops);
-	}
 #endif
 }
