@@ -1066,11 +1066,6 @@ int of_gpiochip_add(struct gpio_chip *chip)
 
 	of_node_get(np);
 
-	for_each_available_child_of_node_scoped(np, child) {
-		if (of_property_read_bool(child, "gpio-hog"))
-			of_node_set_flag(child, OF_POPULATED);
-	}
-
 	return ret;
 }
 

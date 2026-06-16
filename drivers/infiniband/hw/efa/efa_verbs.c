@@ -613,7 +613,8 @@ err_remove_mmap:
 }
 
 static int efa_qp_validate_cap(struct efa_dev *dev,
-			       struct ib_qp_init_attr *init_attr)
+			       struct ib_qp_init_attr *init_attr,
+			       u32 sq_ring_size)
 {
 	if (init_attr->cap.max_send_wr > dev->dev_attr.max_sq_depth) {
 		ibdev_dbg(&dev->ibdev,
@@ -622,6 +623,14 @@ static int efa_qp_validate_cap(struct efa_dev *dev,
 			  dev->dev_attr.max_sq_depth);
 		return -EINVAL;
 	}
+
+	if (sq_ring_size > dev->dev_attr.max_llq_size) {
+		ibdev_dbg(&dev->ibdev,
+			  "qp: requested sq ring size[%u] exceeds the max[%u]\n",
+			  sq_ring_size, dev->dev_attr.max_llq_size);
+		return -EINVAL;
+	}
+
 	if (init_attr->cap.max_recv_wr > dev->dev_attr.max_rq_depth) {
 		ibdev_dbg(&dev->ibdev,
 			  "qp: requested receive wr[%u] exceeds the max[%u]\n",
@@ -691,14 +700,6 @@ int efa_create_qp(struct ib_qp *ibqp, struct ib_qp_init_attr *init_attr,
 	ucontext = rdma_udata_to_drv_context(udata, struct efa_ucontext,
 					     ibucontext);
 
-	err = efa_qp_validate_cap(dev, init_attr);
-	if (err)
-		goto err_out;
-
-	err = efa_qp_validate_attr(dev, init_attr);
-	if (err)
-		goto err_out;
-
 	err = ib_copy_validate_udata_in_cm(udata, cmd, driver_qp_type, 0);
 	if (err)
 		goto err_out;
@@ -719,6 +720,14 @@ int efa_create_qp(struct ib_qp *ibqp, struct ib_qp_init_attr *init_attr,
 		err = -EOPNOTSUPP;
 		goto err_out;
 	}
+
+	err = efa_qp_validate_cap(dev, init_attr, cmd.sq_ring_size);
+	if (err)
+		goto err_out;
+
+	err = efa_qp_validate_attr(dev, init_attr);
+	if (err)
+		goto err_out;
 
 	create_qp_params.uarn = ucontext->uarn;
 	create_qp_params.pd = to_epd(ibqp->pd)->pdn;

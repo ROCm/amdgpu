@@ -472,7 +472,9 @@ static inline void dw_spi_abort(struct spi_controller *ctlr)
 	if (dws->dma_mapped)
 		dws->dma_ops->dma_stop(dws);
 
+	disable_irq(dws->irq);
 	dw_spi_reset_chip(dws);
+	enable_irq(dws->irq);
 }
 
 static void dw_spi_handle_err(struct spi_controller *ctlr,

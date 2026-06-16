@@ -1428,7 +1428,7 @@ ssize_t store_energy_performance_preference(struct cpufreq_policy *policy,
 			epp = cpudata->epp_default_dc;
 	}
 
-	if (cpudata->policy == CPUFREQ_POLICY_PERFORMANCE) {
+	if (epp > 0 && cpudata->policy == CPUFREQ_POLICY_PERFORMANCE) {
 		pr_debug("EPP cannot be set under performance policy\n");
 		return -EBUSY;
 	}

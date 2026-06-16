@@ -405,7 +405,9 @@ impl I2cAdapter {
 
         // SAFETY: `adapter` is non-null and points to a live `i2c_adapter`.
         // `I2cAdapter` is #[repr(transparent)], so this cast is valid.
-        Ok(unsafe { (&*adapter.as_ptr().cast::<I2cAdapter<device::Normal>>()).into() })
+        // `i2c_get_adapter` returned the adapter with an incremented refcount, which we pass to
+        // the `ARef`.
+        Ok(unsafe { ARef::from_raw(adapter.cast::<I2cAdapter<device::Normal>>()) })
     }
 }
 

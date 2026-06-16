@@ -830,7 +830,7 @@ static void drm_atomic_colorop_print_state(struct drm_printer *p,
 	case DRM_COLOROP_1D_LUT:
 		drm_printf_indent(p, 1, "size=%d\n", colorop->size);
 		drm_printf_indent(p, 1, "interpolation=%s\n",
-				  drm_get_colorop_lut1d_interpolation_name(colorop->lut1d_interpolation));
+				  drm_get_colorop_lut1d_interpolation_name(state->lut1d_interpolation));
 		drm_printf_indent(p, 1, "data blob id=%d\n", state->data ? state->data->base.id : 0);
 		break;
 	case DRM_COLOROP_CTM_3X4:
@@ -842,7 +842,7 @@ static void drm_atomic_colorop_print_state(struct drm_printer *p,
 	case DRM_COLOROP_3D_LUT:
 		drm_printf_indent(p, 1, "size=%d\n", colorop->size);
 		drm_printf_indent(p, 1, "interpolation=%s\n",
-				  drm_get_colorop_lut3d_interpolation_name(colorop->lut3d_interpolation));
+				  drm_get_colorop_lut3d_interpolation_name(state->lut3d_interpolation));
 		drm_printf_indent(p, 1, "data blob id=%d\n", state->data ? state->data->base.id : 0);
 		break;
 	default:

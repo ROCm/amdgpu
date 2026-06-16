@@ -1571,53 +1571,49 @@ static u8 npc_map2cn20k_flag(u8 flag)
 	return 0xff;
 }
 
+static void npc_cn20k_translate_action_flags(struct npc_kpu_profile_action *act)
+{
+	u8 ltype, val;
+
+	if (act->lid != NPC_LID_LC)
+		return;
+
+	ltype = act->ltype;
+	if (ltype != NPC_LT_LC_IP &&
+	    ltype != NPC_LT_LC_IP6 &&
+	    ltype != NPC_LT_LC_IP_OPT &&
+	    ltype != NPC_LT_LC_IP6_EXT)
+		return;
+
+	switch (act->flags) {
+	case NPC_F_LC_U_IP_FRAG:
+	case NPC_F_LC_U_IP6_FRAG:
+	case NPC_F_LC_L_6TO4:
+	case NPC_F_LC_L_MPLS_IN_IP:
+	case NPC_F_LC_L_IP6_TUN_IP6:
+	case NPC_F_LC_L_IP6_MPLS_IN_IP:
+		val = npc_map2cn20k_flag(act->flags);
+		if (val != 0xFF)
+			act->flags = val;
+		break;
+	default:
+		break;
+	}
+}
+
 void
 npc_cn20k_update_action_entries_n_flags(struct rvu *rvu,
 					struct npc_kpu_profile_adapter *pfl)
 {
 	struct npc_kpu_profile_action *action;
-	int entries, ltype;
-	u8 flags, val;
+	int entries;
 
 	for (int i = 0; i < pfl->kpus; i++) {
 		action = pfl->kpu[i].action;
 		entries = pfl->kpu[i].action_entries;
 
-		for (int j = 0; j < entries; j++) {
-			if (action[j].lid != NPC_LID_LC)
-				continue;
-
-			ltype = action[j].ltype;
-
-			if (ltype != NPC_LT_LC_IP &&
-			    ltype != NPC_LT_LC_IP6 &&
-			    ltype != NPC_LT_LC_IP_OPT &&
-			    ltype != NPC_LT_LC_IP6_EXT)
-				continue;
-
-			flags = action[j].flags;
-
-			switch (flags) {
-			case NPC_F_LC_U_IP_FRAG:
-			case NPC_F_LC_U_IP6_FRAG:
-			case NPC_F_LC_L_6TO4:
-			case NPC_F_LC_L_MPLS_IN_IP:
-			case NPC_F_LC_L_IP6_TUN_IP6:
-			case NPC_F_LC_L_IP6_MPLS_IN_IP:
-				val = npc_map2cn20k_flag(flags);
-				if (val == 0xFF) {
-					dev_err(rvu->dev,
-						"%s: Error to get flag value\n",
-						__func__);
-					return;
-				}
-
-				action[j].flags = val;
-				break;
-			default:
-				break;
-			}
-		}
+		for (int j = 0; j < entries; j++)
+			npc_cn20k_translate_action_flags(&action[j]);
 	}
 }
 
@@ -1709,9 +1705,9 @@ int npc_cn20k_apply_custom_kpu(struct rvu *rvu,
 		for (entry = 0; entry < entries; entry++) {
 			profile->kpu[kpu].cam[entry] = cam[entry];
 			profile->kpu[kpu].action[entry] = action[entry];
+			npc_cn20k_translate_action_flags(&profile->kpu[kpu].action[entry]);
 		}
 	}
-	npc_cn20k_update_action_entries_n_flags(rvu, profile);
 
 	return 0;
 }

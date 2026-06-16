@@ -235,17 +235,6 @@ static void set_unaligned_access_static_branches(void)
 	modify_unaligned_access_branches(&fast_and_online, num_online_cpus());
 }
 
-static int __init lock_and_set_unaligned_access_static_branch(void)
-{
-	cpus_read_lock();
-	set_unaligned_access_static_branches();
-	cpus_read_unlock();
-
-	return 0;
-}
-
-arch_initcall_sync(lock_and_set_unaligned_access_static_branch);
-
 static int riscv_online_cpu(unsigned int cpu)
 {
 	int ret = cpu_online_unaligned_access_init(cpu);
@@ -439,6 +428,10 @@ static int __init check_unaligned_access_all_cpus(void)
 				  riscv_online_cpu, riscv_offline_cpu);
 	cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN, "riscv:online",
 				  riscv_online_cpu_vec, NULL);
+
+	cpus_read_lock();
+	set_unaligned_access_static_branches();
+	cpus_read_unlock();
 
 	return 0;
 }
