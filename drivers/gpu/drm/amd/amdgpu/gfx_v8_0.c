@@ -4875,14 +4875,12 @@ static int gfx_v8_0_hw_fini(struct amdgpu_ip_block *ip_block)
 	}
 
 	amdgpu_gfx_rlc_enter_safe_mode(adev, 0);
-	if (!gfx_v8_0_wait_for_idle(ip_block))
-		gfx_v8_0_cp_enable(adev, false);
-	else
+	if (!amdgpu_in_reset(adev) && gfx_v8_0_wait_for_idle(ip_block))
 		pr_err("cp is busy, skip halt cp\n");
-	if (!gfx_v8_0_wait_for_rlc_idle(adev))
-		adev->gfx.rlc.funcs->stop(adev);
-	else
-		pr_err("rlc is busy, skip halt rlc\n");
+	if (!amdgpu_in_reset(adev) && gfx_v8_0_wait_for_rlc_idle(adev))
+		pr_err("rlc is busy\n");
+	gfx_v8_0_cp_enable(adev, false);
+	adev->gfx.rlc.funcs->stop(adev);
 	amdgpu_gfx_rlc_exit_safe_mode(adev, 0);
 
 	return 0;
