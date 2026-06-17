@@ -2358,9 +2358,14 @@ fence_reset:
 		 * preempted successfuly. Remove it before resume all so it
 		 * doesn't get mapped back
 		 */
+		if (!down_read_trylock(&adev->reset_domain->sem)) {
+			r = -EIO;
+			goto out;
+		}
 		amdgpu_mes_lock(&adev->mes);
 		r = adev->mes.funcs->remove_hw_queue(&adev->mes, queue_input);
 		amdgpu_mes_unlock(&adev->mes);
+		up_read(&adev->reset_domain->sem);
 	}
 
 out:
