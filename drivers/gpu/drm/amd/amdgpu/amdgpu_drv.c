@@ -2272,7 +2272,7 @@ static void amdgpu_init_debug_options(struct amdgpu_device *adev)
 	}
 
 	if (amdgpu_debug_mask & AMDGPU_DEBUG_DISABLE_GPU_SOFT_RECOVERY) {
-		pr_info("debug: soft reset for GPU recovery disabled\n");
+		pr_info("debug: soft recovery disabled\n");
 		adev->debug_disable_soft_recovery = true;
 	}
 
