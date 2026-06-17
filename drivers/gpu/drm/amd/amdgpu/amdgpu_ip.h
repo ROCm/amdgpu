@@ -85,6 +85,9 @@ enum amd_hw_ip_block_type {
 #define IP_VERSION_SUBREV(ver) ((ver) & 0xF)
 #define IP_VERSION_MAJ_MIN_REV(ver) ((ver) >> 8)
 
+struct amdgpu_ring;
+struct amdgpu_fence;
+
 struct amdgpu_ip_map_info {
 	/* Map of logical to actual dev instances/mask */
 	uint32_t dev_inst[MAX_HWIP][HWIP_MAX_INSTANCE];
@@ -151,5 +154,7 @@ bool amdgpu_device_ip_is_hw(struct amdgpu_device *adev,
 			    enum amd_ip_block_type block_type);
 bool amdgpu_device_ip_is_valid(struct amdgpu_device *adev,
 			       enum amd_ip_block_type block_type);
+int amdgpu_device_ip_soft_reset(struct amdgpu_ring *guilty_ring,
+				struct amdgpu_fence *guilty_fence);
 
 #endif /* __AMDGPU_IP_H__ */

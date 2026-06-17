@@ -308,6 +308,7 @@ extern uint amdgpu_hdmi_hpd_debounce_delay_ms;
 #define AMDGPU_RESET_TYPE_SOFT_RECOVERY (1 << 1) /* soft recovery, eg. kill shaders */
 #define AMDGPU_RESET_TYPE_PER_QUEUE (1 << 2) /* per queue */
 #define AMDGPU_RESET_TYPE_PER_PIPE (1 << 3) /* per pipe */
+#define AMDGPU_RESET_TYPE_IP_BLOCK_SOFT_RESET (1 << 4) /* soft-resets an IP block */
 
 /* max cursor sizes (in pixels) */
 #define CIK_CURSOR_WIDTH 128
@@ -1112,6 +1113,7 @@ struct amdgpu_device {
 	bool                            debug_disable_ce_logs;
 	bool                            debug_enable_ce_cs;
 	bool                            debug_hibernation_thaw_resume_gpu;
+	bool                            debug_disable_ip_block_soft_reset;
 
 	/* Protection for the following isolation structure */
 	struct mutex                    enforce_isolation_mutex;

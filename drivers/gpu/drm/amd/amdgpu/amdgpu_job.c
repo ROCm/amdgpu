@@ -151,6 +151,17 @@ static enum drm_gpu_sched_stat amdgpu_job_timedout(struct drm_sched_job *s_job)
 		dev_err(adev->dev, "Ring %s reset failed\n", ring->sched.name);
 	}
 
+	/* Attempt an IP block soft reset, if supported. */
+	if (amdgpu_gpu_recovery &&
+	    amdgpu_ring_is_reset_type_supported(ring, AMDGPU_RESET_TYPE_IP_BLOCK_SOFT_RESET)) {
+		r = amdgpu_device_ip_soft_reset(ring, job->hw_fence);
+		if (!r) {
+			atomic_inc(&ring->adev->gpu_reset_counter);
+			drm_dev_wedged_event(adev_to_drm(adev), DRM_WEDGE_RECOVERY_NONE, info);
+			goto exit;
+		}
+	}
+
 	if (dma_fence_get_status(&s_job->s_fence->finished) == 0)
 		dma_fence_set_error(&s_job->s_fence->finished, -ETIME);
 

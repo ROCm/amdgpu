@@ -147,6 +147,7 @@ enum AMDGPU_DEBUG_MASK {
 	AMDGPU_DEBUG_DISABLE_RAS_CE_LOG = BIT(9),
 	AMDGPU_DEBUG_ENABLE_CE_CS = BIT(10),
 	AMDGPU_DEBUG_HIBERNATION_THAW_RESUME_GPU = BIT(11),
+	AMDGPU_DEBUG_DISABLE_IP_BLOCK_SOFT_RESET = BIT(12),
 };
 
 unsigned int amdgpu_vram_limit = UINT_MAX;
@@ -2317,6 +2318,11 @@ static void amdgpu_init_debug_options(struct amdgpu_device *adev)
 	if (amdgpu_debug_mask & AMDGPU_DEBUG_HIBERNATION_THAW_RESUME_GPU) {
 		pr_info("debug: resume gpu in thaw() of hibernation\n");
 		adev->debug_hibernation_thaw_resume_gpu = true;
+	}
+
+	if (amdgpu_debug_mask & AMDGPU_DEBUG_DISABLE_IP_BLOCK_SOFT_RESET) {
+		pr_info("debug: IP block soft reset disabled\n");
+		adev->debug_disable_ip_block_soft_reset = true;
 	}
 }
 
