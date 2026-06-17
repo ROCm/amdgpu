@@ -72,11 +72,11 @@ static int allocate_sdma_queue(struct device_queue_manager *dqm,
 				struct queue *q, const uint32_t *restore_sdma_id);
 
 static int reset_queues_on_hws_hang(struct device_queue_manager *dqm, bool is_sdma);
-static int recover_bad_queue_mes(struct device_queue_manager *dqm, struct queue *q);
 static struct queue *find_queue_by_doorbell_offset(struct device_queue_manager *dqm,
 						   u32 doorbell_offset);
 static void set_queue_as_reset(struct device_queue_manager *dqm, struct queue *q,
 			       struct qcm_process_device *qpd);
+static int reset_queues_mes(struct device_queue_manager *dqm, struct queue *q);
 
 static inline
 enum KFD_MQD_TYPE get_mqd_type_from_queue_type(enum kfd_queue_type type)
@@ -333,11 +333,12 @@ static int remove_queue_mes_on_reset_option(struct device_queue_manager *dqm, st
 	amdgpu_mes_unlock(&adev->mes);
 	up_read(&adev->reset_domain->sem);
 
+	/* If is_for_reset set, it is a mes internal cleanup */
 	if (!r || is_for_reset)
 		return r;
 
-	/* remove_hw_queue failed. try to recover */
-	r = recover_bad_queue_mes(dqm, q);
+	/* remove_hw_queue failure indicates a queue hang. reset the queue */
+	r = reset_queues_mes(dqm, q);
 	if (r && amdgpu_gpu_recovery) {
 		dev_err(adev->dev, "failed to remove queue from MES, doorbell=0x%x\n",
 			q->properties.doorbell_off);
@@ -485,20 +486,6 @@ static int reset_queues_mes(struct device_queue_manager *dqm, struct queue *q)
 
 fail:
 	dqm->detect_hang_count = 0;
-	return r;
-}
-
-static int recover_bad_queue_mes(struct device_queue_manager *dqm, struct queue *q)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *)dqm->dev->adev;
-	int r = 0;
-
-	if (!down_read_trylock(&adev->reset_domain->sem))
-		return -EIO;
-
-	r = reset_queues_mes(dqm, q);
-
-	up_read(&adev->reset_domain->sem);
 	return r;
 }
 
@@ -3273,7 +3260,7 @@ int kfd_dqm_suspend_bad_queue_mes(struct kfd_node *knode, u32 pasid, u32 doorbel
 
 		list_for_each_entry(q, &qpd->queues_list, list) {
 			if (q->doorbell_id == doorbell_id && q->properties.is_active) {
-				recover_bad_queue_mes(dqm, q);
+				reset_queues_mes(dqm, q);
 				q->properties.is_evicted = true;
 				q->properties.is_active = false;
 				decrement_queue_count(dqm, qpd, q);
