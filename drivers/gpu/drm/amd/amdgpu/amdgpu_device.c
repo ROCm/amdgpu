@@ -3723,10 +3723,6 @@ static void amdgpu_device_sys_interface_fini(struct amdgpu_device *adev)
 		amdgpu_pm_sysfs_fini(adev);
 	if (adev->ucode_sysfs_en)
 		amdgpu_ucode_sysfs_fini(adev);
-
-	amdgpu_discovery_sysfs_fini(adev);
-	amdgpu_preempt_mgr_sysfs_fini(adev);
-
 	amdgpu_device_attr_sysfs_fini(adev);
 	amdgpu_fru_sysfs_fini(adev);
 
@@ -4275,7 +4271,6 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 
 	if (adev->mman.initialized)
 		drain_workqueue(adev->mman.bdev.wq);
-
 	adev->shutdown = true;
 
 	unregister_pm_notifier(&adev->pm_nb);
