@@ -4898,52 +4898,12 @@ static int gfx_v8_0_resume(struct amdgpu_ip_block *ip_block)
 	return gfx_v8_0_hw_init(ip_block);
 }
 
-static int gfx_v8_0_pre_soft_reset(struct amdgpu_ip_block *ip_block)
-{
-	struct amdgpu_device *adev = ip_block->adev;
-	u32 grbm_soft_reset = 0;
-
-	if ((!adev->gfx.grbm_soft_reset) &&
-	    (!adev->gfx.srbm_soft_reset))
-		return 0;
-
-	grbm_soft_reset = adev->gfx.grbm_soft_reset;
-
-	/* stop the rlc */
-	adev->gfx.rlc.funcs->stop(adev);
-
-	if (REG_GET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET, SOFT_RESET_CP) ||
-	    REG_GET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET, SOFT_RESET_GFX))
-		/* Disable GFX parsing/prefetching */
-		gfx_v8_0_cp_gfx_enable(adev, false);
-
-	if (REG_GET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET, SOFT_RESET_CP) ||
-	    REG_GET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET, SOFT_RESET_CPF) ||
-	    REG_GET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET, SOFT_RESET_CPC) ||
-	    REG_GET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET, SOFT_RESET_CPG)) {
-		int i;
-
-		for (i = 0; i < adev->gfx.num_compute_rings; i++) {
-			struct amdgpu_ring *ring = &adev->gfx.compute_ring[i];
-
-			mutex_lock(&adev->srbm_mutex);
-			vi_srbm_select(adev, ring->me, ring->pipe, ring->queue, 0);
-			gfx_v8_0_deactivate_hqd(adev, 2);
-			vi_srbm_select(adev, 0, 0, 0, 0);
-			mutex_unlock(&adev->srbm_mutex);
-		}
-		/* Disable MEC parsing/prefetching */
-		gfx_v8_0_cp_compute_enable(adev, false);
-	}
-
-	return 0;
-}
-
 static int gfx_v8_0_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
 	u32 grbm_soft_reset = 0, srbm_soft_reset = 0;
 	u32 tmp;
+	int i;
 
 	if ((!adev->gfx.grbm_soft_reset) &&
 	    (!adev->gfx.srbm_soft_reset))
@@ -4951,6 +4911,16 @@ static int gfx_v8_0_soft_reset(struct amdgpu_ip_block *ip_block)
 
 	grbm_soft_reset = adev->gfx.grbm_soft_reset;
 	srbm_soft_reset = adev->gfx.srbm_soft_reset;
+
+	for (i = 0; i < adev->gfx.num_compute_rings; i++) {
+		struct amdgpu_ring *ring = &adev->gfx.compute_ring[i];
+
+		mutex_lock(&adev->srbm_mutex);
+		vi_srbm_select(adev, ring->me, ring->pipe, ring->queue, 0);
+		gfx_v8_0_deactivate_hqd(adev, 2);
+		vi_srbm_select(adev, 0, 0, 0, 0);
+		mutex_unlock(&adev->srbm_mutex);
+	}
 
 	if (grbm_soft_reset || srbm_soft_reset) {
 		tmp = RREG32(mmGMCON_DEBUG);
@@ -4997,47 +4967,6 @@ static int gfx_v8_0_soft_reset(struct amdgpu_ip_block *ip_block)
 
 	/* Wait a little for things to settle down */
 	udelay(50);
-
-	return 0;
-}
-
-static int gfx_v8_0_post_soft_reset(struct amdgpu_ip_block *ip_block)
-{
-	struct amdgpu_device *adev = ip_block->adev;
-	u32 grbm_soft_reset = 0;
-
-	if ((!adev->gfx.grbm_soft_reset) &&
-	    (!adev->gfx.srbm_soft_reset))
-		return 0;
-
-	grbm_soft_reset = adev->gfx.grbm_soft_reset;
-
-	if (REG_GET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET, SOFT_RESET_CP) ||
-	    REG_GET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET, SOFT_RESET_CPF) ||
-	    REG_GET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET, SOFT_RESET_CPC) ||
-	    REG_GET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET, SOFT_RESET_CPG)) {
-		int i;
-
-		for (i = 0; i < adev->gfx.num_compute_rings; i++) {
-			struct amdgpu_ring *ring = &adev->gfx.compute_ring[i];
-
-			mutex_lock(&adev->srbm_mutex);
-			vi_srbm_select(adev, ring->me, ring->pipe, ring->queue, 0);
-			gfx_v8_0_deactivate_hqd(adev, 2);
-			vi_srbm_select(adev, 0, 0, 0, 0);
-			mutex_unlock(&adev->srbm_mutex);
-		}
-		gfx_v8_0_kiq_resume(adev);
-		gfx_v8_0_kcq_resume(adev);
-	}
-
-	if (REG_GET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET, SOFT_RESET_CP) ||
-	    REG_GET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET, SOFT_RESET_GFX))
-		gfx_v8_0_cp_gfx_resume(adev);
-
-	gfx_v8_0_cp_test_all_rings(adev);
-
-	adev->gfx.rlc.funcs->start(adev);
 
 	return 0;
 }
@@ -6924,9 +6853,7 @@ static const struct amd_ip_funcs gfx_v8_0_ip_funcs = {
 	.resume = gfx_v8_0_resume,
 	.is_idle = gfx_v8_0_is_idle,
 	.wait_for_idle = gfx_v8_0_wait_for_idle,
-	.pre_soft_reset = gfx_v8_0_pre_soft_reset,
 	.soft_reset = gfx_v8_0_soft_reset,
-	.post_soft_reset = gfx_v8_0_post_soft_reset,
 	.set_clockgating_state = gfx_v8_0_set_clockgating_state,
 	.set_powergating_state = gfx_v8_0_set_powergating_state,
 	.get_clockgating_state = gfx_v8_0_get_clockgating_state,

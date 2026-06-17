@@ -5256,14 +5256,12 @@ static int gfx_v11_0_soft_reset(struct amdgpu_ip_block *ip_block)
 
 	amdgpu_gfx_rlc_exit_safe_mode(adev, 0);
 
-	return gfx_v11_0_cp_resume(adev);
-}
+	r = gfx_v11_0_cp_resume(adev);
+	if (r)
+		return r;
 
-static int gfx_v11_0_post_soft_reset(struct amdgpu_ip_block *ip_block)
-{
-	struct amdgpu_device *adev = ip_block->adev;
 	/**
-	 * GFX soft reset will impact MES, need resume MES when do GFX soft reset
+	 * GFX soft reset impacts MES, resume MES after GFX soft reset is finished
 	 */
 	return amdgpu_mes_resume(adev, 0);
 }
@@ -7017,7 +7015,6 @@ static const struct amd_ip_funcs gfx_v11_0_ip_funcs = {
 	.is_idle = gfx_v11_0_is_idle,
 	.wait_for_idle = gfx_v11_0_wait_for_idle,
 	.soft_reset = gfx_v11_0_soft_reset,
-	.post_soft_reset = gfx_v11_0_post_soft_reset,
 	.set_clockgating_state = gfx_v11_0_set_clockgating_state,
 	.set_powergating_state = gfx_v11_0_set_powergating_state,
 	.get_clockgating_state = gfx_v11_0_get_clockgating_state,

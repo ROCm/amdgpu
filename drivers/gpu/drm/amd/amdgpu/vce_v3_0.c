@@ -662,31 +662,6 @@ static int vce_v3_0_soft_reset(struct amdgpu_ip_block *ip_block)
 	return 0;
 }
 
-static int vce_v3_0_pre_soft_reset(struct amdgpu_ip_block *ip_block)
-{
-	struct amdgpu_device *adev = ip_block->adev;
-
-	if (!adev->vce.srbm_soft_reset)
-		return 0;
-
-	mdelay(5);
-
-	return vce_v3_0_suspend(ip_block);
-}
-
-
-static int vce_v3_0_post_soft_reset(struct amdgpu_ip_block *ip_block)
-{
-	struct amdgpu_device *adev = ip_block->adev;
-
-	if (!adev->vce.srbm_soft_reset)
-		return 0;
-
-	mdelay(5);
-
-	return vce_v3_0_resume(ip_block);
-}
-
 static int vce_v3_0_set_interrupt_state(struct amdgpu_device *adev,
 					struct amdgpu_irq_src *source,
 					unsigned type,
@@ -868,9 +843,7 @@ static const struct amd_ip_funcs vce_v3_0_ip_funcs = {
 	.resume = vce_v3_0_resume,
 	.is_idle = vce_v3_0_is_idle,
 	.wait_for_idle = vce_v3_0_wait_for_idle,
-	.pre_soft_reset = vce_v3_0_pre_soft_reset,
 	.soft_reset = vce_v3_0_soft_reset,
-	.post_soft_reset = vce_v3_0_post_soft_reset,
 	.set_clockgating_state = vce_v3_0_set_clockgating_state,
 	.set_powergating_state = vce_v3_0_set_powergating_state,
 	.get_clockgating_state = vce_v3_0_get_clockgating_state,
