@@ -1399,6 +1399,86 @@ Out:
 }
 
 static ssize_t
+amdgpu_ras_debugfs_table_read_uniras(struct amdgpu_device *adev,
+				     char __user *buf,
+				     size_t size, loff_t *pos)
+{
+	struct amdgpu_ras_mgr *ras_mgr = amdgpu_ras_mgr_get_context(adev);
+	struct ras_core_context *ras_core = ras_mgr ? ras_mgr->ras_core : NULL;
+	struct eeprom_umc_record *records = NULL;
+	struct ras_eeprom_control *control;
+	size_t bufsz, len = 0;
+	u32 num_recs;
+	char *kbuf;
+	ssize_t res;
+	int i;
+
+	if (!ras_core)
+		return 0;
+
+	/* pmfw manages eeprom data by itself */
+	if (ras_fw_eeprom_supported(ras_core))
+		return 0;
+
+	control = &ras_core->ras_eeprom;
+	num_recs = ras_eeprom_get_record_count(ras_core);
+
+	bufsz = strlen(tbl_hdr_str) + tbl_hdr_fmt_size +
+		strlen(rec_hdr_str) + (size_t)rec_hdr_fmt_size * num_recs + 1;
+
+	kbuf = kvmalloc(bufsz, GFP_KERNEL);
+	if (!kbuf)
+		return -ENOMEM;
+
+	if (num_recs) {
+		records = kvcalloc(num_recs, sizeof(*records), GFP_KERNEL);
+		if (!records) {
+			res = -ENOMEM;
+			goto out;
+		}
+
+		res = ras_eeprom_read(ras_core, records, num_recs);
+		if (res)
+			goto out;
+	}
+
+	len += scnprintf(kbuf + len, bufsz - len, "%s", tbl_hdr_str);
+	len += scnprintf(kbuf + len, bufsz - len, tbl_hdr_fmt,
+				 control->tbl_hdr.header,
+				 control->tbl_hdr.version,
+				 control->tbl_hdr.first_rec_offset,
+				 control->tbl_hdr.tbl_size,
+				 control->tbl_hdr.checksum);
+	len += scnprintf(kbuf + len, bufsz - len, "%s", rec_hdr_str);
+
+	for (i = 0; i < num_recs; i++) {
+		u32 ai = RAS_RI_TO_AI(control, i);
+		int et = records[i].err_type;
+		const char *ets = (et >= 0 && et < AMDGPU_RAS_EEPROM_ERR_COUNT) ?
+				  record_err_type_str[et] : "na";
+
+		len += scnprintf(kbuf + len, bufsz - len, rec_hdr_fmt,
+				 i,
+				 RAS_INDEX_TO_OFFSET(control, ai),
+				 ets,
+				 records[i].bank,
+				 records[i].ts,
+				 records[i].offset,
+				 records[i].mem_channel,
+				 records[i].mcumc_id,
+				 records[i].retired_row_pfn);
+	}
+
+	res = simple_read_from_buffer(buf, size, pos, kbuf, len);
+
+out:
+	kvfree(records);
+	kvfree(kbuf);
+
+	return res;
+}
+
+static ssize_t
 amdgpu_ras_debugfs_eeprom_table_read(struct file *f, char __user *buf,
 				     size_t size, loff_t *pos)
 {
@@ -1410,6 +1490,10 @@ amdgpu_ras_debugfs_eeprom_table_read(struct file *f, char __user *buf,
 
 	if (!size)
 		return size;
+
+	if (amdgpu_uniras_enabled(adev))
+		return amdgpu_ras_debugfs_table_read_uniras(adev, buf,
+						    size, pos);
 
 	if (!ras || !control) {
 		res = snprintf(data, sizeof(data), "Not supported\n");
