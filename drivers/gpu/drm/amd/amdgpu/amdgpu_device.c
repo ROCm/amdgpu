@@ -4778,161 +4778,6 @@ exit:
 }
 
 /**
- * amdgpu_device_ip_check_soft_reset - did soft reset succeed
- *
- * @adev: amdgpu_device pointer
- *
- * The list of all the hardware IPs that make up the asic is walked and
- * the check_soft_reset callbacks are run.  check_soft_reset determines
- * if the asic is still hung or not.
- * Returns true if any of the IPs are still in a hung state, false if not.
- */
-static bool amdgpu_device_ip_check_soft_reset(struct amdgpu_device *adev)
-{
-	int i;
-	bool asic_hang = false;
-
-	if (amdgpu_sriov_vf(adev))
-		return true;
-
-	if (amdgpu_asic_need_full_reset(adev))
-		return true;
-
-	for (i = 0; i < adev->num_ip_blocks; i++) {
-		if (!adev->ip_blocks[i].status.valid)
-			continue;
-		if (adev->ip_blocks[i].version->funcs->check_soft_reset)
-			adev->ip_blocks[i].status.hang =
-				adev->ip_blocks[i].version->funcs->check_soft_reset(
-					&adev->ip_blocks[i]);
-		if (adev->ip_blocks[i].status.hang) {
-			dev_info(adev->dev, "IP block:%s is hung!\n", adev->ip_blocks[i].version->funcs->name);
-			asic_hang = true;
-		}
-	}
-	return asic_hang;
-}
-
-/**
- * amdgpu_device_ip_pre_soft_reset - prepare for soft reset
- *
- * @adev: amdgpu_device pointer
- *
- * The list of all the hardware IPs that make up the asic is walked and the
- * pre_soft_reset callbacks are run if the block is hung.  pre_soft_reset
- * handles any IP specific hardware or software state changes that are
- * necessary for a soft reset to succeed.
- * Returns 0 on success, negative error code on failure.
- */
-static int amdgpu_device_ip_pre_soft_reset(struct amdgpu_device *adev)
-{
-	int i, r = 0;
-
-	for (i = 0; i < adev->num_ip_blocks; i++) {
-		if (!adev->ip_blocks[i].status.valid)
-			continue;
-		if (adev->ip_blocks[i].status.hang &&
-		    adev->ip_blocks[i].version->funcs->pre_soft_reset) {
-			r = adev->ip_blocks[i].version->funcs->pre_soft_reset(&adev->ip_blocks[i]);
-			if (r)
-				return r;
-		}
-	}
-
-	return 0;
-}
-
-/**
- * amdgpu_device_ip_need_full_reset - check if a full asic reset is needed
- *
- * @adev: amdgpu_device pointer
- *
- * Some hardware IPs cannot be soft reset.  If they are hung, a full gpu
- * reset is necessary to recover.
- * Returns true if a full asic reset is required, false if not.
- */
-static bool amdgpu_device_ip_need_full_reset(struct amdgpu_device *adev)
-{
-	int i;
-
-	if (amdgpu_asic_need_full_reset(adev))
-		return true;
-
-	for (i = 0; i < adev->num_ip_blocks; i++) {
-		if (!adev->ip_blocks[i].status.valid)
-			continue;
-		if ((adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_GMC) ||
-		    (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_SMC) ||
-		    (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_ACP) ||
-		    (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_DCE) ||
-		     adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_PSP) {
-			if (adev->ip_blocks[i].status.hang) {
-				dev_info(adev->dev, "Some block need full reset!\n");
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-/**
- * amdgpu_device_ip_soft_reset - do a soft reset
- *
- * @adev: amdgpu_device pointer
- *
- * The list of all the hardware IPs that make up the asic is walked and the
- * soft_reset callbacks are run if the block is hung.  soft_reset handles any
- * IP specific hardware or software state changes that are necessary to soft
- * reset the IP.
- * Returns 0 on success, negative error code on failure.
- */
-static int amdgpu_device_ip_soft_reset(struct amdgpu_device *adev)
-{
-	int i, r = 0;
-
-	for (i = 0; i < adev->num_ip_blocks; i++) {
-		if (!adev->ip_blocks[i].status.valid)
-			continue;
-		if (adev->ip_blocks[i].status.hang &&
-		    adev->ip_blocks[i].version->funcs->soft_reset) {
-			r = adev->ip_blocks[i].version->funcs->soft_reset(&adev->ip_blocks[i]);
-			if (r)
-				return r;
-		}
-	}
-
-	return 0;
-}
-
-/**
- * amdgpu_device_ip_post_soft_reset - clean up from soft reset
- *
- * @adev: amdgpu_device pointer
- *
- * The list of all the hardware IPs that make up the asic is walked and the
- * post_soft_reset callbacks are run if the asic was hung.  post_soft_reset
- * handles any IP specific hardware or software state changes that are
- * necessary after the IP has been soft reset.
- * Returns 0 on success, negative error code on failure.
- */
-static int amdgpu_device_ip_post_soft_reset(struct amdgpu_device *adev)
-{
-	int i, r = 0;
-
-	for (i = 0; i < adev->num_ip_blocks; i++) {
-		if (!adev->ip_blocks[i].status.valid)
-			continue;
-		if (adev->ip_blocks[i].status.hang &&
-		    adev->ip_blocks[i].version->funcs->post_soft_reset)
-			r = adev->ip_blocks[i].version->funcs->post_soft_reset(&adev->ip_blocks[i]);
-		if (r)
-			return r;
-	}
-
-	return 0;
-}
-
-/**
  * amdgpu_device_reset_sriov - reset ASIC for SR-IOV vf
  *
  * @adev: amdgpu_device pointer
@@ -5223,20 +5068,7 @@ int amdgpu_device_pre_asic_reset(struct amdgpu_device *adev,
 
 	/* Don't suspend on bare metal if we are not going to HW reset the ASIC */
 	if (!amdgpu_sriov_vf(adev)) {
-
-		if (!need_full_reset)
-			need_full_reset = amdgpu_device_ip_need_full_reset(adev);
-
-		if (!need_full_reset && amdgpu_gpu_recovery &&
-		    amdgpu_device_ip_check_soft_reset(adev)) {
-			amdgpu_device_ip_pre_soft_reset(adev);
-			r = amdgpu_device_ip_soft_reset(adev);
-			amdgpu_device_ip_post_soft_reset(adev);
-			if (r || amdgpu_device_ip_check_soft_reset(adev)) {
-				dev_info(adev->dev, "soft reset failed, will fallback to full reset!\n");
-				need_full_reset = true;
-			}
-		}
+		need_full_reset = true;
 
 		if (!test_bit(AMDGPU_SKIP_COREDUMP, &reset_context->flags)) {
 			dev_info(tmp_adev->dev, "Dumping IP State\n");
@@ -5691,8 +5523,7 @@ static void amdgpu_device_halt_activities(struct amdgpu_device *adev,
 		drm_client_dev_suspend(adev_to_drm(tmp_adev));
 
 		/* disable ras on ALL IPs */
-		if (!need_emergency_restart && !amdgpu_reset_in_dpc(adev) &&
-		    amdgpu_device_ip_need_full_reset(tmp_adev))
+		if (!need_emergency_restart && !amdgpu_reset_in_dpc(adev))
 			amdgpu_ras_suspend(tmp_adev);
 
 		amdgpu_userq_pre_reset(tmp_adev);

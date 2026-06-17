@@ -461,17 +461,6 @@ const struct amdgpu_ip_block_version soc21_common_ip_block = {
 	.funcs = &soc21_common_ip_funcs,
 };
 
-static bool soc21_need_full_reset(struct amdgpu_device *adev)
-{
-	switch (amdgpu_ip_version(adev, GC_HWIP, 0)) {
-	case IP_VERSION(11, 0, 0):
-	case IP_VERSION(11, 0, 2):
-	case IP_VERSION(11, 0, 3):
-	default:
-		return true;
-	}
-}
-
 static bool soc21_need_reset_on_init(struct amdgpu_device *adev)
 {
 	u32 sol_reg;
@@ -550,7 +539,6 @@ static const struct amdgpu_asic_funcs soc21_asic_funcs = {
 	.set_vce_clocks = &soc21_set_vce_clocks,
 	.get_config_memsize = &soc21_get_config_memsize,
 	.init_doorbell_index = &soc21_init_doorbell_index,
-	.need_full_reset = &soc21_need_full_reset,
 	.need_reset_on_init = &soc21_need_reset_on_init,
 	.get_pcie_replay_count = &amdgpu_nbio_get_pcie_replay_count,
 	.supports_baco = &amdgpu_dpm_is_baco_supported,

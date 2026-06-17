@@ -223,15 +223,6 @@ static int soc_v1_0_read_register(struct amdgpu_device *adev,
 	return -EINVAL;
 }
 
-static bool soc_v1_0_need_full_reset(struct amdgpu_device *adev)
-{
-	switch (amdgpu_ip_version(adev, GC_HWIP, 0)) {
-	case IP_VERSION(12, 1, 0):
-	default:
-		return true;
-	}
-}
-
 static bool soc_v1_0_need_reset_on_init(struct amdgpu_device *adev)
 {
 
@@ -271,7 +262,6 @@ static const struct amdgpu_asic_funcs soc_v1_0_asic_funcs = {
 	.read_register = &soc_v1_0_read_register,
 	.get_config_memsize = &soc_v1_0_get_config_memsize,
 	.get_xclk = &soc_v1_0_get_xclk,
-	.need_full_reset = &soc_v1_0_need_full_reset,
 	.init_doorbell_index = &soc_v1_0_doorbell_index_init,
 	.need_reset_on_init = &soc_v1_0_need_reset_on_init,
 	.encode_ext_smn_addressing = &soc_v1_0_encode_ext_smn_addressing,
