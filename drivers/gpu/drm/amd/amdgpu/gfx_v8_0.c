@@ -1487,7 +1487,14 @@ static int gfx_v8_0_do_edc_gpr_workarounds(struct amdgpu_device *adev)
 
 	/* bail if the compute ring is not ready */
 	if (!ring->sched.ready)
-		return 0;
+		return -EBUSY;
+
+	if (amdgpu_in_reset(adev)) {
+		/* Set preempt condition to execute IB */
+		amdgpu_ring_set_preempt_cond_exec(ring, true);
+		/* Flush HDP cache so the GPU can see the updated COND_EXEC value */
+		amdgpu_device_flush_hdp(adev, NULL);
+	}
 
 	tmp = RREG32(mmGB_EDC_MODE);
 	WREG32(mmGB_EDC_MODE, 0);
