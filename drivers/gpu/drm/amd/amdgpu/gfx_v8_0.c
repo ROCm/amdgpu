@@ -6914,10 +6914,12 @@ static const struct amdgpu_ring_funcs gfx_v8_0_ring_funcs_compute = {
 	.get_wptr = gfx_v8_0_ring_get_wptr_compute,
 	.set_wptr = gfx_v8_0_ring_set_wptr_compute,
 	.emit_frame_size =
+		5 + /* gfx_v8_0_ring_emit_init_cond_exec (from amdgpu_ib_schedule) */
 		20 + /* gfx_v8_0_ring_emit_gds_switch */
 		7 + /* gfx_v8_0_ring_emit_hdp_flush */
 		5 + /* hdp_invalidate */
 		7 + /* gfx_v8_0_ring_emit_pipeline_sync */
+		5 + /* gfx_v8_0_ring_emit_init_cond_exec (from amdgpu_vm_flush) */
 		VI_FLUSH_GPU_TLB_NUM_WREG * 5 + 7 + /* gfx_v8_0_ring_emit_vm_flush */
 		7 + 7 + 7 + /* gfx_v8_0_ring_emit_fence_compute x3 for user fence, vm fence */
 		7 + /* gfx_v8_0_emit_mem_sync_compute */
@@ -6938,6 +6940,7 @@ static const struct amdgpu_ring_funcs gfx_v8_0_ring_funcs_compute = {
 	.soft_recovery = gfx_v8_0_ring_soft_recovery,
 	.emit_mem_sync = gfx_v8_0_emit_mem_sync_compute,
 	.emit_wave_limit = gfx_v8_0_emit_wave_limit,
+	.init_cond_exec = gfx_v8_0_ring_emit_init_cond_exec,
 };
 
 static const struct amdgpu_ring_funcs gfx_v8_0_ring_funcs_kiq = {
