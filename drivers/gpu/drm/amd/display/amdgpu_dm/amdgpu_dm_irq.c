@@ -1965,7 +1965,6 @@ static void dm_crtc_high_irq(void *interrupt_params)
 {
 	struct common_irq_params *irq_params = interrupt_params;
 	struct amdgpu_device *adev = irq_params->adev;
-	struct drm_writeback_job *job;
 	struct amdgpu_crtc *acrtc;
 	unsigned long flags;
 	int vrr_active;
@@ -1974,32 +1973,24 @@ static void dm_crtc_high_irq(void *interrupt_params)
 	if (!acrtc)
 		return;
 
-	if (acrtc->wb_conn) {
-		spin_lock_irqsave(&acrtc->wb_conn->job_lock, flags);
+	if (acrtc->wb_conn && acrtc->wb_pending) {
+		struct dc_stream_state *stream = acrtc->dm_irq_params.stream;
+		unsigned int v_total, refresh_hz;
 
-		if (acrtc->wb_pending) {
-			job = list_first_entry_or_null(&acrtc->wb_conn->job_queue,
-						       struct drm_writeback_job,
-						       list_entry);
-			acrtc->wb_pending = false;
-			spin_unlock_irqrestore(&acrtc->wb_conn->job_lock, flags);
+		v_total = stream->adjust.v_total_max ?
+			  stream->adjust.v_total_max : stream->timing.v_total;
+		refresh_hz = div_u64((uint64_t) stream->timing.pix_clk_100hz *
+			     100LL, (v_total * stream->timing.h_total));
+		mdelay(1000 / refresh_hz);
 
-			if (job) {
-				unsigned int v_total, refresh_hz;
-				struct dc_stream_state *stream = acrtc->dm_irq_params.stream;
-
-				v_total = stream->adjust.v_total_max ?
-					  stream->adjust.v_total_max : stream->timing.v_total;
-				refresh_hz = div_u64((uint64_t) stream->timing.pix_clk_100hz *
-					     100LL, (v_total * stream->timing.h_total));
-				mdelay(1000 / refresh_hz);
-
-				drm_writeback_signal_completion(acrtc->wb_conn, 0);
-				dc_stream_fc_disable_writeback(adev->dm.dc,
-							       acrtc->dm_irq_params.stream, 0);
-			}
-		} else
-			spin_unlock_irqrestore(&acrtc->wb_conn->job_lock, flags);
+		/*
+		 * Completion (signalling the out fence and releasing the vblank
+		 * reference taken in dm_set_writeback()) is handled by the shared
+		 * helper, which is also used by the teardown path.
+		 */
+		if (amdgpu_dm_crtc_complete_writeback(acrtc))
+			dc_stream_fc_disable_writeback(adev->dm.dc,
+						       acrtc->dm_irq_params.stream, 0);
 	}
 
 	vrr_active = amdgpu_dm_crtc_vrr_active_irq(acrtc);

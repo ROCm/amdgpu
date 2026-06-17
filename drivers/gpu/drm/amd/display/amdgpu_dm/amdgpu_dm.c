@@ -4612,10 +4612,55 @@ static void amdgpu_dm_crtc_copy_transient_flags(struct drm_crtc_state *crtc_stat
 	stream_state->mode_changed = drm_atomic_crtc_needs_modeset(crtc_state);
 }
 
+/**
+ * amdgpu_dm_crtc_complete_writeback - finish a pending writeback job
+ * @acrtc: the CRTC whose pending writeback should be completed
+ *
+ * Clears the pending state, signals the writeback out fence and releases the
+ * vblank reference taken in dm_set_writeback() while the writeback was armed.
+ * The pending flag is tested and cleared under the writeback job lock, so this
+ * is safe to call concurrently from the completion vblank IRQ
+ * (dm_crtc_high_irq()) and from the writeback teardown path
+ * (dm_clear_writeback()); only the caller that observes the pending job
+ * performs the completion.
+ *
+ * Return: true if a pending writeback job was completed by this call.
+ */
+bool amdgpu_dm_crtc_complete_writeback(struct amdgpu_crtc *acrtc)
+{
+	unsigned long flags;
+	bool pending;
+
+	if (!acrtc->wb_conn)
+		return false;
+
+	spin_lock_irqsave(&acrtc->wb_conn->job_lock, flags);
+	pending = acrtc->wb_pending;
+	acrtc->wb_pending = false;
+	spin_unlock_irqrestore(&acrtc->wb_conn->job_lock, flags);
+
+	if (!pending)
+		return false;
+
+	drm_writeback_signal_completion(acrtc->wb_conn, 0);
+	drm_crtc_vblank_put(&acrtc->base);
+
+	return true;
+}
+
 static void dm_clear_writeback(struct amdgpu_display_manager *dm,
+			      struct amdgpu_crtc *acrtc,
 			      struct dm_crtc_state *crtc_state)
 {
 	dc_stream_remove_writeback(dm->dc, crtc_state->stream, 0);
+
+	/*
+	 * If the writeback is still pending when it is torn down (its
+	 * completion vblank IRQ never fired), signal the out fence so a
+	 * waiting client does not stall and release the vblank reference
+	 * taken in dm_set_writeback().
+	 */
+	amdgpu_dm_crtc_complete_writeback(acrtc);
 }
 
 /**
@@ -4768,7 +4813,7 @@ static void amdgpu_dm_commit_streams(struct drm_atomic_commit *state,
 
 		dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
 
-		dm_clear_writeback(dm, dm_old_crtc_state);
+		dm_clear_writeback(dm, acrtc, dm_old_crtc_state);
 		acrtc->wb_enabled = false;
 	}
 
@@ -5042,9 +5087,24 @@ static void dm_set_writeback(struct amdgpu_display_manager *dm,
 
 	dc_stream_add_writeback(dm->dc, crtc_state->stream, wb_info);
 
-	acrtc->wb_pending = true;
 	acrtc->wb_conn = wb_conn;
 	drm_writeback_queue_job(wb_conn, new_con_state);
+
+	/*
+	 * Writeback completion is detected in the CRTC vblank IRQ
+	 * (dm_crtc_high_irq()). Take a vblank reference so the vblank interrupt
+	 * stays enabled while the writeback is pending; otherwise a
+	 * writeback-only commit right after drm_crtc_vblank_on() (e.g.
+	 * re-enabling a CRTC that was disabled) has no other vblank reference,
+	 * the IRQ never fires and the out fence times out. The matching put
+	 * happens once completion is signalled in dm_crtc_high_irq(), or when
+	 * the writeback is torn down in dm_clear_writeback().
+	 *
+	 * Arm wb_pending only after the reference is held so the completion IRQ
+	 * cannot run its matching vblank_put before this get.
+	 */
+	WARN_ON(drm_crtc_vblank_get(&acrtc->base));
+	acrtc->wb_pending = true;
 }
 
 static void amdgpu_dm_update_hdcp(struct drm_atomic_commit *state)
