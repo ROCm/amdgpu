@@ -7,6 +7,7 @@
 
 #include <kunit/test.h>
 #include <linux/types.h>
+#include <linux/mutex.h>
 
 #include "dc.h"
 #include "dm_services.h"
@@ -15,6 +16,201 @@
 #include "amdgpu_mode.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_pp_smu.h"
+
+/* ---- Stub DPM layer ---- */
+
+/**
+ * struct stub_dpm_context - Tracks stub DPM callback invocations
+ * @ret_val: Return value for the next DPM callback
+ * @get_current_clocks_info: Clock info returned by stub get_current_clocks
+ * @get_clock_by_type_clocks: Clocks returned by stub get_clock_by_type
+ * @get_validation_clks: Validation clocks returned by stub
+ * @get_clock_by_type_with_latency_clks: Returned by stub with_latency
+ * @get_clock_by_type_with_voltage_clks: Returned by stub with_voltage
+ * @set_watermarks_ret: Return value for set_watermarks
+ * @display_clock_voltage_ret: Return value for display_clock_voltage_request
+ * @display_disable_memory_clock_switch_ret: Return for disable_memory_clock
+ * @get_max_sustainable_ret: Return for get_max_sustainable_clocks_by_dc
+ * @get_uclk_dpm_ret: Return for get_uclk_dpm_states
+ * @get_dpm_clock_table_ret: Return for get_dpm_clock_table
+ * @set_active_display_count_ret: Return for set_active_display_count
+ * @set_min_deep_sleep_dcefclk_ret: Return for set_min_deep_sleep_dcefclk
+ * @get_validation_clks_ret: Return for get_display_mode_validation_clocks
+ */
+struct stub_dpm_context {
+	int ret_val;
+	struct amd_pp_clock_info get_current_clocks_info;
+	struct amd_pp_clocks get_clock_by_type_clocks;
+	struct amd_pp_simple_clock_info get_validation_clks;
+	int get_validation_clks_ret;
+	struct pp_clock_levels_with_latency get_clock_by_type_with_latency_clks;
+	struct pp_clock_levels_with_voltage get_clock_by_type_with_voltage_clks;
+	int set_watermarks_ret;
+	int display_clock_voltage_ret;
+	int display_disable_memory_clock_switch_ret;
+	int get_max_sustainable_ret;
+	int get_uclk_dpm_ret;
+	int get_dpm_clock_table_ret;
+	int set_active_display_count_ret;
+	int set_min_deep_sleep_dcefclk_ret;
+};
+
+static struct stub_dpm_context *stub_dpm_ctx;
+
+static int stub_get_current_clocks(void *handle, struct amd_pp_clock_info *clocks)
+{
+	if (stub_dpm_ctx->ret_val)
+		return stub_dpm_ctx->ret_val;
+	*clocks = stub_dpm_ctx->get_current_clocks_info;
+	return 0;
+}
+
+static int stub_get_clock_by_type(void *handle, enum amd_pp_clock_type type,
+				  struct amd_pp_clocks *clocks)
+{
+	if (stub_dpm_ctx->ret_val)
+		return stub_dpm_ctx->ret_val;
+	*clocks = stub_dpm_ctx->get_clock_by_type_clocks;
+	return 0;
+}
+
+static int stub_get_display_mode_validation_clocks(void *handle,
+						   struct amd_pp_simple_clock_info *clocks)
+{
+	if (stub_dpm_ctx->get_validation_clks_ret)
+		return stub_dpm_ctx->get_validation_clks_ret;
+	*clocks = stub_dpm_ctx->get_validation_clks;
+	return 0;
+}
+
+static int stub_get_clock_by_type_with_latency(void *handle,
+					       enum amd_pp_clock_type type,
+					       struct pp_clock_levels_with_latency *clocks)
+{
+	if (stub_dpm_ctx->ret_val)
+		return stub_dpm_ctx->ret_val;
+	*clocks = stub_dpm_ctx->get_clock_by_type_with_latency_clks;
+	return 0;
+}
+
+static int stub_get_clock_by_type_with_voltage(void *handle,
+					       enum amd_pp_clock_type type,
+					       struct pp_clock_levels_with_voltage *clocks)
+{
+	if (stub_dpm_ctx->ret_val)
+		return stub_dpm_ctx->ret_val;
+	*clocks = stub_dpm_ctx->get_clock_by_type_with_voltage_clks;
+	return 0;
+}
+
+static void stub_display_configuration_change(void *handle)
+{
+	/* No-op: satisfies display_configuration_changed callback */
+}
+
+static void stub_pm_compute_clocks(void *handle)
+{
+	/* No-op: satisfies pm_compute_clocks callback */
+}
+
+static int stub_set_watermarks_for_clocks_ranges(void *handle, void *clock_ranges)
+{
+	return stub_dpm_ctx->set_watermarks_ret;
+}
+
+static int stub_display_clock_voltage_request(void *handle,
+					      struct pp_display_clock_request *clock)
+{
+	return stub_dpm_ctx->display_clock_voltage_ret;
+}
+
+static int stub_set_active_display_count(void *handle, uint32_t count)
+{
+	return stub_dpm_ctx->set_active_display_count_ret;
+}
+
+static int stub_set_min_deep_sleep_dcefclk(void *handle, uint32_t clock)
+{
+	return stub_dpm_ctx->set_min_deep_sleep_dcefclk_ret;
+}
+
+static int stub_set_hard_min_dcefclk_by_freq(void *handle, uint32_t clock)
+{
+	return 0;
+}
+
+static int stub_set_hard_min_fclk_by_freq(void *handle, uint32_t clock)
+{
+	return 0;
+}
+
+static int stub_notify_smu_enable_pwe(void *handle)
+{
+	return 0;
+}
+
+static int stub_display_disable_memory_clock_switch(void *handle,
+						    bool disable_memory_clock_switch)
+{
+	return stub_dpm_ctx->display_disable_memory_clock_switch_ret;
+}
+
+static int stub_get_max_sustainable_clocks_by_dc(void *handle,
+						 struct pp_smu_nv_clock_table *max_clocks)
+{
+	return stub_dpm_ctx->get_max_sustainable_ret;
+}
+
+static int stub_get_uclk_dpm_states(void *handle,
+				    unsigned int *clock_values_in_khz,
+				    unsigned int *num_states)
+{
+	return stub_dpm_ctx->get_uclk_dpm_ret;
+}
+
+static int stub_get_dpm_clock_table(void *handle, struct dpm_clocks *clock_table)
+{
+	return stub_dpm_ctx->get_dpm_clock_table_ret;
+}
+
+static const struct amd_pm_funcs stub_pp_funcs = {
+	.get_current_clocks = stub_get_current_clocks,
+	.get_clock_by_type = stub_get_clock_by_type,
+	.get_display_mode_validation_clocks = stub_get_display_mode_validation_clocks,
+	.get_clock_by_type_with_latency = stub_get_clock_by_type_with_latency,
+	.get_clock_by_type_with_voltage = stub_get_clock_by_type_with_voltage,
+	.display_configuration_changed = stub_display_configuration_change,
+	.pm_compute_clocks = stub_pm_compute_clocks,
+	.set_watermarks_for_clocks_ranges = stub_set_watermarks_for_clocks_ranges,
+	.display_clock_voltage_request = stub_display_clock_voltage_request,
+	.set_active_display_count = stub_set_active_display_count,
+	.set_min_deep_sleep_dcefclk = stub_set_min_deep_sleep_dcefclk,
+	.set_hard_min_dcefclk_by_freq = stub_set_hard_min_dcefclk_by_freq,
+	.set_hard_min_fclk_by_freq = stub_set_hard_min_fclk_by_freq,
+	.notify_smu_enable_pwe = stub_notify_smu_enable_pwe,
+	.display_disable_memory_clock_switch = stub_display_disable_memory_clock_switch,
+	.get_max_sustainable_clocks_by_dc = stub_get_max_sustainable_clocks_by_dc,
+	.get_uclk_dpm_states = stub_get_uclk_dpm_states,
+	.get_dpm_clock_table = stub_get_dpm_clock_table,
+};
+
+/**
+ * setup_stub_dpm - Initialize a stub DPM environment for testing
+ * @test: KUnit test context
+ * @adev: Pointer to amdgpu_device to configure
+ *
+ * Sets up adev->powerplay.pp_funcs and initializes adev->pm.mutex so that
+ * amdgpu_dpm_* functions can be safely called with stub callbacks.
+ */
+static void setup_stub_dpm(struct kunit *test, struct amdgpu_device *adev)
+{
+	stub_dpm_ctx = kunit_kzalloc(test, sizeof(*stub_dpm_ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, stub_dpm_ctx);
+
+	adev->powerplay.pp_funcs = &stub_pp_funcs;
+	adev->powerplay.pp_handle = adev;
+	mutex_init(&adev->pm.mutex);
+}
 
 /* ---- Tests for get_default_clock_levels ---- */
 
@@ -706,23 +902,35 @@ static void dm_test_build_wm_clock_ranges_mcif(struct kunit *test)
 	KUNIT_ASSERT_NOT_NULL(test, ranges);
 	KUNIT_ASSERT_NOT_NULL(test, wm);
 
-	ranges->num_writer_wm_sets = 1;
+	ranges->num_writer_wm_sets = 2;
 	ranges->writer_wm_sets[0].wm_inst = 1;
 	ranges->writer_wm_sets[0].max_fill_clk_mhz = 1200;
 	ranges->writer_wm_sets[0].min_fill_clk_mhz = 600;
 	ranges->writer_wm_sets[0].max_drain_clk_mhz = 1000;
 	ranges->writer_wm_sets[0].min_drain_clk_mhz = 500;
+	/* set 1: wm_inst > 3 -> clamped to WM_SET_A */
+	ranges->writer_wm_sets[1].wm_inst = 5;
+	ranges->writer_wm_sets[1].max_fill_clk_mhz = 1400;
+	ranges->writer_wm_sets[1].min_fill_clk_mhz = 700;
+	ranges->writer_wm_sets[1].max_drain_clk_mhz = 1100;
+	ranges->writer_wm_sets[1].min_drain_clk_mhz = 550;
 
 	build_wm_clock_ranges_soc15(ranges, wm);
 
 	KUNIT_EXPECT_EQ(test, wm->num_wm_dmif_sets, 0U);
-	KUNIT_EXPECT_EQ(test, wm->num_wm_mcif_sets, 1U);
+	KUNIT_EXPECT_EQ(test, wm->num_wm_mcif_sets, 2U);
 
 	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[0].wm_set_id, WM_SET_B);
 	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[0].wm_max_socclk_clk_in_khz, 1200000U);
 	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[0].wm_min_socclk_clk_in_khz, 600000U);
 	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[0].wm_max_mem_clk_in_khz, 1000000U);
 	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[0].wm_min_mem_clk_in_khz, 500000U);
+
+	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[1].wm_set_id, WM_SET_A);
+	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[1].wm_max_socclk_clk_in_khz, 1400000U);
+	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[1].wm_min_socclk_clk_in_khz, 700000U);
+	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[1].wm_max_mem_clk_in_khz, 1100000U);
+	KUNIT_EXPECT_EQ(test, wm->wm_mcif_clocks_ranges[1].wm_min_mem_clk_in_khz, 550000U);
 }
 
 /* ---- Tests for cap_clock_levels_to_validation ---- */
@@ -911,6 +1119,1259 @@ static void dm_test_nv_clock_id_invalid(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, clock_type, amd_pp_dcef_clock);
 }
 
+/* ---- Tests using stub DPM layer ---- */
+
+/**
+ * dm_test_get_static_clocks_success - Test successful static clock retrieval
+ * @test: KUnit test context
+ *
+ * Verify that dm_pp_get_static_clocks returns true and correctly scales
+ * the max engine and memory clocks from 10kHz to kHz units.
+ */
+static void dm_test_get_static_clocks_success(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_static_clock_info info = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+
+	stub_dpm_ctx->get_current_clocks_info.max_memory_clock = 80000;
+	stub_dpm_ctx->get_current_clocks_info.max_engine_clock = 72000;
+
+	KUNIT_EXPECT_TRUE(test, dm_pp_get_static_clocks(ctx, &info));
+	KUNIT_EXPECT_EQ(test, info.max_mclk_khz, 800000U);
+	KUNIT_EXPECT_EQ(test, info.max_sclk_khz, 720000U);
+	KUNIT_EXPECT_EQ(test, (int)info.max_clocks_state, (int)DM_PP_CLOCKS_STATE_NOMINAL);
+}
+
+/**
+ * dm_test_get_static_clocks_failure - Test DPM error returns false
+ * @test: KUnit test context
+ *
+ * Verify that dm_pp_get_static_clocks returns false when the DPM callback
+ * returns an error.
+ */
+static void dm_test_get_static_clocks_failure(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_static_clock_info info = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	stub_dpm_ctx->ret_val = -EINVAL;
+
+	KUNIT_EXPECT_FALSE(test, dm_pp_get_static_clocks(ctx, &info));
+}
+
+/**
+ * dm_test_apply_display_requirements_dpm_enabled - Test DPM-enabled path
+ * @test: KUnit test context
+ *
+ * Verify that dm_pp_apply_display_requirements calls build_pm_display_cfg
+ * and the DPM callbacks when DPM is enabled, and returns true.
+ */
+static void dm_test_apply_display_requirements_dpm_enabled(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_display_configuration cfg = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	adev->pm.dpm_enabled = true;
+
+	cfg.display_count = 1;
+	cfg.min_engine_clock_khz = 300000;
+	cfg.disp_configs[0].v_refresh = 60;
+
+	KUNIT_EXPECT_TRUE(test, dm_pp_apply_display_requirements(ctx, &cfg));
+	KUNIT_EXPECT_EQ(test, adev->pm.pm_display_cfg.min_core_set_clock, 30000);
+	KUNIT_EXPECT_EQ(test, adev->pm.pm_display_cfg.vrefresh, 60);
+}
+
+/**
+ * dm_test_get_clock_levels_by_type_dpm_error - Test DPM error fallback
+ * @test: KUnit test context
+ *
+ * Verify that dm_pp_get_clock_levels_by_type falls back to default clock
+ * levels when amdgpu_dpm_get_clock_by_type returns an error.
+ */
+static void dm_test_get_clock_levels_by_type_dpm_error(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_clock_levels dc_clks = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	stub_dpm_ctx->ret_val = -EINVAL;
+
+	KUNIT_EXPECT_TRUE(test, dm_pp_get_clock_levels_by_type(ctx,
+				DM_PP_CLOCK_TYPE_DISPLAY_CLK, &dc_clks));
+	KUNIT_EXPECT_EQ(test, dc_clks.num_levels, 6U);
+	KUNIT_EXPECT_EQ(test, dc_clks.clocks_in_khz[0], 300000U);
+}
+
+/**
+ * dm_test_get_clock_levels_by_type_success - Test successful clock query
+ * @test: KUnit test context
+ *
+ * Verify that dm_pp_get_clock_levels_by_type returns the queried clocks
+ * capped by validation clocks.
+ */
+static void dm_test_get_clock_levels_by_type_success(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_clock_levels dc_clks = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+
+	stub_dpm_ctx->get_clock_by_type_clocks.count = 3;
+	stub_dpm_ctx->get_clock_by_type_clocks.clock[0] = 300000;
+	stub_dpm_ctx->get_clock_by_type_clocks.clock[1] = 500000;
+	stub_dpm_ctx->get_clock_by_type_clocks.clock[2] = 700000;
+
+	/* validation at 60000 * 10 = 600000 kHz → caps to 2 levels */
+	stub_dpm_ctx->get_validation_clks.engine_max_clock = 60000;
+	stub_dpm_ctx->get_validation_clks.memory_max_clock = 80000;
+
+	KUNIT_EXPECT_TRUE(test, dm_pp_get_clock_levels_by_type(ctx,
+				DM_PP_CLOCK_TYPE_ENGINE_CLK, &dc_clks));
+	KUNIT_EXPECT_EQ(test, dc_clks.num_levels, 2U);
+	KUNIT_EXPECT_EQ(test, dc_clks.clocks_in_khz[0], 300000U);
+	KUNIT_EXPECT_EQ(test, dc_clks.clocks_in_khz[1], 500000U);
+}
+
+/**
+ * dm_test_get_clock_levels_by_type_validation_fallback - Test validation error
+ * @test: KUnit test context
+ *
+ * Verify that dm_pp_get_clock_levels_by_type uses default validation clocks
+ * (engine=720000, memory=800000 kHz) when get_display_mode_validation_clocks
+ * returns an error, capping levels accordingly.
+ */
+static void dm_test_get_clock_levels_by_type_validation_fallback(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_clock_levels dc_clks = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+
+	/* get_clock_by_type succeeds with 3 engine clock levels */
+	stub_dpm_ctx->get_clock_by_type_clocks.count = 3;
+	stub_dpm_ctx->get_clock_by_type_clocks.clock[0] = 300000;
+	stub_dpm_ctx->get_clock_by_type_clocks.clock[1] = 500000;
+	stub_dpm_ctx->get_clock_by_type_clocks.clock[2] = 800000;
+
+	/* Force validation clocks to fail → triggers default path */
+	stub_dpm_ctx->get_validation_clks_ret = -EINVAL;
+
+	KUNIT_EXPECT_TRUE(test, dm_pp_get_clock_levels_by_type(ctx,
+				DM_PP_CLOCK_TYPE_ENGINE_CLK, &dc_clks));
+	/*
+	 * Default validation: engine_max_clock = 72000 * 10 = 720000 kHz.
+	 * Clocks 300000 and 500000 are within limit, 800000 exceeds it,
+	 * so num_levels is capped to 2.
+	 */
+	KUNIT_EXPECT_EQ(test, dc_clks.num_levels, 2U);
+	KUNIT_EXPECT_EQ(test, dc_clks.clocks_in_khz[0], 300000U);
+	KUNIT_EXPECT_EQ(test, dc_clks.clocks_in_khz[1], 500000U);
+}
+
+/**
+ * dm_test_get_clock_levels_with_latency_success - Test latency clock query
+ * @test: KUnit test context
+ *
+ * Verify dm_pp_get_clock_levels_by_type_with_latency returns true and
+ * copies the clock/latency data from the DPM backend.
+ */
+static void dm_test_get_clock_levels_with_latency_success(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_clock_levels_with_latency info = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+
+	stub_dpm_ctx->get_clock_by_type_with_latency_clks.num_levels = 1;
+	stub_dpm_ctx->get_clock_by_type_with_latency_clks.data[0].clocks_in_khz = 600000;
+	stub_dpm_ctx->get_clock_by_type_with_latency_clks.data[0].latency_in_us = 15;
+
+	KUNIT_EXPECT_TRUE(test, dm_pp_get_clock_levels_by_type_with_latency(ctx,
+				DM_PP_CLOCK_TYPE_ENGINE_CLK, &info));
+	KUNIT_EXPECT_EQ(test, info.num_levels, 1U);
+	KUNIT_EXPECT_EQ(test, info.data[0].clocks_in_khz, 600000U);
+	KUNIT_EXPECT_EQ(test, info.data[0].latency_in_us, 15U);
+}
+
+/**
+ * dm_test_get_clock_levels_with_latency_failure - Test latency query error
+ * @test: KUnit test context
+ *
+ * Verify dm_pp_get_clock_levels_by_type_with_latency returns false on DPM error.
+ */
+static void dm_test_get_clock_levels_with_latency_failure(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_clock_levels_with_latency info = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	stub_dpm_ctx->ret_val = -EINVAL;
+
+	KUNIT_EXPECT_FALSE(test, dm_pp_get_clock_levels_by_type_with_latency(ctx,
+				DM_PP_CLOCK_TYPE_ENGINE_CLK, &info));
+}
+
+/**
+ * dm_test_get_clock_levels_with_voltage_success - Test voltage clock query
+ * @test: KUnit test context
+ *
+ * Verify dm_pp_get_clock_levels_by_type_with_voltage returns true and
+ * copies the clock/voltage data from the DPM backend.
+ */
+static void dm_test_get_clock_levels_with_voltage_success(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_clock_levels_with_voltage info = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+
+	stub_dpm_ctx->get_clock_by_type_with_voltage_clks.num_levels = 1;
+	stub_dpm_ctx->get_clock_by_type_with_voltage_clks.data[0].clocks_in_khz = 400000;
+	stub_dpm_ctx->get_clock_by_type_with_voltage_clks.data[0].voltage_in_mv = 900;
+
+	KUNIT_EXPECT_TRUE(test, dm_pp_get_clock_levels_by_type_with_voltage(ctx,
+				DM_PP_CLOCK_TYPE_MEMORY_CLK, &info));
+	KUNIT_EXPECT_EQ(test, info.num_levels, 1U);
+	KUNIT_EXPECT_EQ(test, info.data[0].clocks_in_khz, 400000U);
+	KUNIT_EXPECT_EQ(test, info.data[0].voltage_in_mv, 900U);
+}
+
+/**
+ * dm_test_get_clock_levels_with_voltage_failure - Test voltage query error
+ * @test: KUnit test context
+ *
+ * Verify dm_pp_get_clock_levels_by_type_with_voltage returns false on DPM error.
+ */
+static void dm_test_get_clock_levels_with_voltage_failure(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_clock_levels_with_voltage info = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	stub_dpm_ctx->ret_val = -EINVAL;
+
+	KUNIT_EXPECT_FALSE(test, dm_pp_get_clock_levels_by_type_with_voltage(ctx,
+				DM_PP_CLOCK_TYPE_MEMORY_CLK, &info));
+}
+
+/**
+ * dm_test_notify_wm_clock_changes_polaris - Test Polaris watermark path
+ * @test: KUnit test context
+ *
+ * Verify dm_pp_notify_wm_clock_changes returns true for Polaris ASICs
+ * when the DPM set_watermarks call succeeds.
+ */
+static void dm_test_notify_wm_clock_changes_polaris(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_wm_sets_with_clock_ranges wm = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	adev->asic_type = CHIP_POLARIS10;
+	stub_dpm_ctx->set_watermarks_ret = 0;
+
+	KUNIT_EXPECT_TRUE(test, dm_pp_notify_wm_clock_changes(ctx, &wm));
+}
+
+/**
+ * dm_test_notify_wm_clock_changes_non_polaris - Test non-Polaris path
+ * @test: KUnit test context
+ *
+ * Verify dm_pp_notify_wm_clock_changes returns false for non-Polaris ASICs.
+ */
+static void dm_test_notify_wm_clock_changes_non_polaris(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_wm_sets_with_clock_ranges wm = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	adev->asic_type = CHIP_NAVI10;
+
+	KUNIT_EXPECT_FALSE(test, dm_pp_notify_wm_clock_changes(ctx, &wm));
+}
+
+/**
+ * dm_test_apply_clock_for_voltage_success - Test successful voltage request
+ * @test: KUnit test context
+ *
+ * Verify dm_pp_apply_clock_for_voltage_request returns true when the DPM
+ * callback succeeds for a valid clock type.
+ */
+static void dm_test_apply_clock_for_voltage_success(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_clock_for_voltage_req req = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	stub_dpm_ctx->display_clock_voltage_ret = 0;
+
+	req.clk_type = DM_PP_CLOCK_TYPE_ENGINE_CLK;
+	req.clocks_in_khz = 500000;
+
+	KUNIT_EXPECT_TRUE(test, dm_pp_apply_clock_for_voltage_request(ctx, &req));
+}
+
+/**
+ * dm_test_apply_clock_for_voltage_eopnotsupp - Test EOPNOTSUPP treated as success
+ * @test: KUnit test context
+ *
+ * Verify dm_pp_apply_clock_for_voltage_request returns true when the DPM
+ * callback returns -EOPNOTSUPP (not supported is non-fatal).
+ */
+static void dm_test_apply_clock_for_voltage_eopnotsupp(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_clock_for_voltage_req req = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	stub_dpm_ctx->display_clock_voltage_ret = -EOPNOTSUPP;
+
+	req.clk_type = DM_PP_CLOCK_TYPE_ENGINE_CLK;
+	req.clocks_in_khz = 500000;
+
+	KUNIT_EXPECT_TRUE(test, dm_pp_apply_clock_for_voltage_request(ctx, &req));
+}
+
+/**
+ * dm_test_apply_clock_for_voltage_fail - Test DPM error returns false
+ * @test: KUnit test context
+ *
+ * Verify dm_pp_apply_clock_for_voltage_request returns false when the DPM
+ * callback fails with an error other than -EOPNOTSUPP.
+ */
+static void dm_test_apply_clock_for_voltage_fail(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct dm_pp_clock_for_voltage_req req = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	stub_dpm_ctx->display_clock_voltage_ret = -EIO;
+
+	req.clk_type = DM_PP_CLOCK_TYPE_ENGINE_CLK;
+	req.clocks_in_khz = 500000;
+
+	KUNIT_EXPECT_FALSE(test, dm_pp_apply_clock_for_voltage_request(ctx, &req));
+}
+
+/* ---- Tests for pp_nv_set_display_count ---- */
+
+/**
+ * dm_test_nv_set_display_count_ok - Test successful display count set
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_display_count returns PP_SMU_RESULT_OK on success.
+ */
+static void dm_test_nv_set_display_count_ok(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->set_active_display_count_ret = 0;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_display_count(&pp_smu, 2),
+			(int)PP_SMU_RESULT_OK);
+}
+
+/**
+ * dm_test_nv_set_display_count_unsupported - Test EOPNOTSUPP mapping
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_display_count returns PP_SMU_RESULT_UNSUPPORTED when
+ * the DPM callback returns -EOPNOTSUPP.
+ */
+static void dm_test_nv_set_display_count_unsupported(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->set_active_display_count_ret = -EOPNOTSUPP;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_display_count(&pp_smu, 2),
+			(int)PP_SMU_RESULT_UNSUPPORTED);
+}
+
+/**
+ * dm_test_nv_set_display_count_fail - Test generic error mapping
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_display_count returns PP_SMU_RESULT_FAIL on a generic
+ * DPM error.
+ */
+static void dm_test_nv_set_display_count_fail(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->set_active_display_count_ret = -EIO;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_display_count(&pp_smu, 2),
+			(int)PP_SMU_RESULT_FAIL);
+}
+
+/* ---- Tests for pp_nv_set_voltage_by_freq ---- */
+
+/**
+ * dm_test_nv_set_voltage_by_freq_ok - Test successful voltage-by-freq
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_voltage_by_freq returns PP_SMU_RESULT_OK on success.
+ */
+static void dm_test_nv_set_voltage_by_freq_ok(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->display_clock_voltage_ret = 0;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_voltage_by_freq(&pp_smu, PP_SMU_NV_DISPCLK, 600),
+			(int)PP_SMU_RESULT_OK);
+}
+
+/**
+ * dm_test_nv_set_voltage_by_freq_invalid_id - Test invalid clock id
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_voltage_by_freq returns PP_SMU_RESULT_FAIL for an
+ * unrecognized clock id without calling DPM.
+ */
+static void dm_test_nv_set_voltage_by_freq_invalid_id(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+
+	KUNIT_EXPECT_EQ(test,
+			(int)pp_nv_set_voltage_by_freq(&pp_smu, (enum pp_smu_nv_clock_id)0xff, 600),
+			(int)PP_SMU_RESULT_FAIL);
+}
+
+/* ---- Tests for pp_nv_set_pstate_handshake_support ---- */
+
+/**
+ * dm_test_nv_pstate_handshake_ok - Test successful pstate handshake
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_pstate_handshake_support returns PP_SMU_RESULT_OK
+ * when the DPM callback succeeds.
+ */
+static void dm_test_nv_pstate_handshake_ok(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->display_disable_memory_clock_switch_ret = 0;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_pstate_handshake_support(&pp_smu, true),
+			(int)PP_SMU_RESULT_OK);
+}
+
+/**
+ * dm_test_nv_pstate_handshake_fail - Test failed pstate handshake
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_pstate_handshake_support returns PP_SMU_RESULT_FAIL
+ * when the DPM callback returns non-zero.
+ */
+static void dm_test_nv_pstate_handshake_fail(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->display_disable_memory_clock_switch_ret = -EIO;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_pstate_handshake_support(&pp_smu, true),
+			(int)PP_SMU_RESULT_FAIL);
+}
+
+/* ---- Tests for pp_rn_get_dpm_clock_table ---- */
+
+/**
+ * dm_test_rn_get_dpm_clock_table_ok - Test successful DPM clock table
+ * @test: KUnit test context
+ *
+ * Verify pp_rn_get_dpm_clock_table returns PP_SMU_RESULT_OK on success.
+ */
+static void dm_test_rn_get_dpm_clock_table_ok(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+	struct dpm_clocks clock_table = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->get_dpm_clock_table_ret = 0;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_rn_get_dpm_clock_table(&pp_smu, &clock_table),
+			(int)PP_SMU_RESULT_OK);
+}
+
+/**
+ * dm_test_rn_get_dpm_clock_table_unsupported - Test EOPNOTSUPP mapping
+ * @test: KUnit test context
+ *
+ * Verify pp_rn_get_dpm_clock_table returns PP_SMU_RESULT_UNSUPPORTED.
+ */
+static void dm_test_rn_get_dpm_clock_table_unsupported(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+	struct dpm_clocks clock_table = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->get_dpm_clock_table_ret = -EOPNOTSUPP;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_rn_get_dpm_clock_table(&pp_smu, &clock_table),
+			(int)PP_SMU_RESULT_UNSUPPORTED);
+}
+
+/**
+ * dm_test_rn_get_dpm_clock_table_fail - Test generic error mapping
+ * @test: KUnit test context
+ *
+ * Verify pp_rn_get_dpm_clock_table returns PP_SMU_RESULT_FAIL.
+ */
+static void dm_test_rn_get_dpm_clock_table_fail(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+	struct dpm_clocks clock_table = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->get_dpm_clock_table_ret = -EIO;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_rn_get_dpm_clock_table(&pp_smu, &clock_table),
+			(int)PP_SMU_RESULT_FAIL);
+}
+
+/* ---- Tests for pp_rv_set_wm_ranges ---- */
+
+/**
+ * dm_test_rv_set_wm_ranges - Test Raven watermark range forwarding
+ * @test: KUnit test context
+ *
+ * Verify pp_rv_set_wm_ranges converts watermark ranges via
+ * build_wm_clock_ranges_soc15 and forwards them to DPM without crashing.
+ */
+static void dm_test_rv_set_wm_ranges(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+	struct pp_smu_wm_range_sets ranges = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+
+	ranges.num_reader_wm_sets = 1;
+	ranges.reader_wm_sets[0].wm_inst = 0;
+	ranges.reader_wm_sets[0].max_drain_clk_mhz = 600;
+	ranges.reader_wm_sets[0].min_drain_clk_mhz = 300;
+
+	pp_rv_set_wm_ranges(&pp_smu, &ranges);
+
+	/* Reaching here without crash confirms coverage */
+	KUNIT_SUCCEED(test);
+}
+
+/* ---- Tests for pp_rv_set_pme_wa_enable ---- */
+
+/**
+ * dm_test_rv_set_pme_wa_enable - Test Raven PME workaround enable
+ * @test: KUnit test context
+ *
+ * Verify pp_rv_set_pme_wa_enable forwards the call to DPM without crashing.
+ */
+static void dm_test_rv_set_pme_wa_enable(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+
+	pp_rv_set_pme_wa_enable(&pp_smu);
+
+	KUNIT_SUCCEED(test);
+}
+
+/* ---- Tests for pp_rv_set_active_display_count ---- */
+
+/**
+ * dm_test_rv_set_active_display_count - Test Raven display count forwarding
+ * @test: KUnit test context
+ *
+ * Verify pp_rv_set_active_display_count forwards the count to DPM without
+ * crashing.
+ */
+static void dm_test_rv_set_active_display_count(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+
+	pp_rv_set_active_display_count(&pp_smu, 2);
+
+	KUNIT_SUCCEED(test);
+}
+
+/* ---- Tests for pp_rv_set_min_deep_sleep_dcfclk ---- */
+
+/**
+ * dm_test_rv_set_min_deep_sleep_dcfclk - Test Raven deep sleep clock
+ * @test: KUnit test context
+ *
+ * Verify pp_rv_set_min_deep_sleep_dcfclk forwards the clock value to DPM
+ * without crashing.
+ */
+static void dm_test_rv_set_min_deep_sleep_dcfclk(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+
+	pp_rv_set_min_deep_sleep_dcfclk(&pp_smu, 300);
+
+	KUNIT_SUCCEED(test);
+}
+
+/* ---- Tests for pp_rv_set_hard_min_dcefclk_by_freq ---- */
+
+/**
+ * dm_test_rv_set_hard_min_dcefclk_by_freq - Test Raven hard min DCEFCLK
+ * @test: KUnit test context
+ *
+ * Verify pp_rv_set_hard_min_dcefclk_by_freq forwards the frequency to DPM
+ * without crashing.
+ */
+static void dm_test_rv_set_hard_min_dcefclk_by_freq(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+
+	pp_rv_set_hard_min_dcefclk_by_freq(&pp_smu, 600);
+
+	KUNIT_SUCCEED(test);
+}
+
+/* ---- Tests for pp_rv_set_hard_min_fclk_by_freq ---- */
+
+/**
+ * dm_test_rv_set_hard_min_fclk_by_freq - Test Raven hard min FCLK
+ * @test: KUnit test context
+ *
+ * Verify pp_rv_set_hard_min_fclk_by_freq forwards the frequency to DPM
+ * without crashing.
+ */
+static void dm_test_rv_set_hard_min_fclk_by_freq(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+
+	pp_rv_set_hard_min_fclk_by_freq(&pp_smu, 800);
+
+	KUNIT_SUCCEED(test);
+}
+
+/* ---- Tests for pp_nv_set_wm_ranges ---- */
+
+/**
+ * dm_test_nv_set_wm_ranges - Test Navi watermark range forwarding
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_wm_ranges forwards ranges to DPM and unconditionally
+ * returns PP_SMU_RESULT_OK.
+ */
+static void dm_test_nv_set_wm_ranges(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+	struct pp_smu_wm_range_sets ranges = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+
+	ranges.num_reader_wm_sets = 1;
+	ranges.reader_wm_sets[0].wm_inst = 0;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_wm_ranges(&pp_smu, &ranges),
+			(int)PP_SMU_RESULT_OK);
+}
+
+/* ---- Tests for pp_nv_set_min_deep_sleep_dcfclk ---- */
+
+/**
+ * dm_test_nv_set_min_deep_sleep_dcfclk_ok - Test successful deep sleep set
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_min_deep_sleep_dcfclk returns PP_SMU_RESULT_OK on success.
+ */
+static void dm_test_nv_set_min_deep_sleep_dcfclk_ok(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->set_min_deep_sleep_dcefclk_ret = 0;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_min_deep_sleep_dcfclk(&pp_smu, 300),
+			(int)PP_SMU_RESULT_OK);
+}
+
+/**
+ * dm_test_nv_set_min_deep_sleep_dcfclk_unsupported - Test EOPNOTSUPP mapping
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_min_deep_sleep_dcfclk returns PP_SMU_RESULT_UNSUPPORTED.
+ */
+static void dm_test_nv_set_min_deep_sleep_dcfclk_unsupported(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->set_min_deep_sleep_dcefclk_ret = -EOPNOTSUPP;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_min_deep_sleep_dcfclk(&pp_smu, 300),
+			(int)PP_SMU_RESULT_UNSUPPORTED);
+}
+
+/**
+ * dm_test_nv_set_min_deep_sleep_dcfclk_fail - Test generic error mapping
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_min_deep_sleep_dcfclk returns PP_SMU_RESULT_FAIL.
+ */
+static void dm_test_nv_set_min_deep_sleep_dcfclk_fail(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->set_min_deep_sleep_dcefclk_ret = -EIO;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_min_deep_sleep_dcfclk(&pp_smu, 300),
+			(int)PP_SMU_RESULT_FAIL);
+}
+
+/* ---- Tests for pp_nv_set_hard_min_dcefclk_by_freq ---- */
+
+/**
+ * dm_test_nv_set_hard_min_dcefclk_ok - Test successful hard min DCEFCLK
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_hard_min_dcefclk_by_freq returns PP_SMU_RESULT_OK.
+ */
+static void dm_test_nv_set_hard_min_dcefclk_ok(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->display_clock_voltage_ret = 0;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_hard_min_dcefclk_by_freq(&pp_smu, 600),
+			(int)PP_SMU_RESULT_OK);
+}
+
+/**
+ * dm_test_nv_set_hard_min_dcefclk_unsupported - Test EOPNOTSUPP mapping
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_hard_min_dcefclk_by_freq returns PP_SMU_RESULT_UNSUPPORTED.
+ */
+static void dm_test_nv_set_hard_min_dcefclk_unsupported(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->display_clock_voltage_ret = -EOPNOTSUPP;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_hard_min_dcefclk_by_freq(&pp_smu, 600),
+			(int)PP_SMU_RESULT_UNSUPPORTED);
+}
+
+/**
+ * dm_test_nv_set_hard_min_dcefclk_fail - Test generic error mapping
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_hard_min_dcefclk_by_freq returns PP_SMU_RESULT_FAIL.
+ */
+static void dm_test_nv_set_hard_min_dcefclk_fail(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->display_clock_voltage_ret = -EIO;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_hard_min_dcefclk_by_freq(&pp_smu, 600),
+			(int)PP_SMU_RESULT_FAIL);
+}
+
+/* ---- Tests for pp_nv_set_hard_min_uclk_by_freq ---- */
+
+/**
+ * dm_test_nv_set_hard_min_uclk_ok - Test successful hard min UCLK
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_hard_min_uclk_by_freq returns PP_SMU_RESULT_OK.
+ */
+static void dm_test_nv_set_hard_min_uclk_ok(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->display_clock_voltage_ret = 0;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_hard_min_uclk_by_freq(&pp_smu, 800),
+			(int)PP_SMU_RESULT_OK);
+}
+
+/**
+ * dm_test_nv_set_hard_min_uclk_unsupported - Test EOPNOTSUPP mapping
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_hard_min_uclk_by_freq returns PP_SMU_RESULT_UNSUPPORTED.
+ */
+static void dm_test_nv_set_hard_min_uclk_unsupported(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->display_clock_voltage_ret = -EOPNOTSUPP;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_hard_min_uclk_by_freq(&pp_smu, 800),
+			(int)PP_SMU_RESULT_UNSUPPORTED);
+}
+
+/**
+ * dm_test_nv_set_hard_min_uclk_fail - Test generic error mapping
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_set_hard_min_uclk_by_freq returns PP_SMU_RESULT_FAIL.
+ */
+static void dm_test_nv_set_hard_min_uclk_fail(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->display_clock_voltage_ret = -EIO;
+
+	KUNIT_EXPECT_EQ(test, (int)pp_nv_set_hard_min_uclk_by_freq(&pp_smu, 800),
+			(int)PP_SMU_RESULT_FAIL);
+}
+
+/* ---- Tests for pp_nv_get_maximum_sustainable_clocks ---- */
+
+/**
+ * dm_test_nv_get_max_sustainable_clocks_ok - Test successful query
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_get_maximum_sustainable_clocks returns PP_SMU_RESULT_OK.
+ */
+static void dm_test_nv_get_max_sustainable_clocks_ok(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+	struct pp_smu_nv_clock_table max_clocks = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->get_max_sustainable_ret = 0;
+
+	KUNIT_EXPECT_EQ(test,
+			(int)pp_nv_get_maximum_sustainable_clocks(&pp_smu, &max_clocks),
+			(int)PP_SMU_RESULT_OK);
+}
+
+/**
+ * dm_test_nv_get_max_sustainable_clocks_unsupported - Test EOPNOTSUPP
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_get_maximum_sustainable_clocks returns PP_SMU_RESULT_UNSUPPORTED.
+ */
+static void dm_test_nv_get_max_sustainable_clocks_unsupported(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+	struct pp_smu_nv_clock_table max_clocks = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->get_max_sustainable_ret = -EOPNOTSUPP;
+
+	KUNIT_EXPECT_EQ(test,
+			(int)pp_nv_get_maximum_sustainable_clocks(&pp_smu, &max_clocks),
+			(int)PP_SMU_RESULT_UNSUPPORTED);
+}
+
+/**
+ * dm_test_nv_get_max_sustainable_clocks_fail - Test generic error
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_get_maximum_sustainable_clocks returns PP_SMU_RESULT_FAIL.
+ */
+static void dm_test_nv_get_max_sustainable_clocks_fail(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+	struct pp_smu_nv_clock_table max_clocks = {};
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->get_max_sustainable_ret = -EIO;
+
+	KUNIT_EXPECT_EQ(test,
+			(int)pp_nv_get_maximum_sustainable_clocks(&pp_smu, &max_clocks),
+			(int)PP_SMU_RESULT_FAIL);
+}
+
+/* ---- Tests for pp_nv_get_uclk_dpm_states ---- */
+
+/**
+ * dm_test_nv_get_uclk_dpm_states_ok - Test successful DPM states query
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_get_uclk_dpm_states returns PP_SMU_RESULT_OK.
+ */
+static void dm_test_nv_get_uclk_dpm_states_ok(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+	unsigned int clock_values[4] = {};
+	unsigned int num_states = 0;
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->get_uclk_dpm_ret = 0;
+
+	KUNIT_EXPECT_EQ(test,
+			(int)pp_nv_get_uclk_dpm_states(&pp_smu, clock_values, &num_states),
+			(int)PP_SMU_RESULT_OK);
+}
+
+/**
+ * dm_test_nv_get_uclk_dpm_states_unsupported - Test EOPNOTSUPP mapping
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_get_uclk_dpm_states returns PP_SMU_RESULT_UNSUPPORTED.
+ */
+static void dm_test_nv_get_uclk_dpm_states_unsupported(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+	unsigned int clock_values[4] = {};
+	unsigned int num_states = 0;
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->get_uclk_dpm_ret = -EOPNOTSUPP;
+
+	KUNIT_EXPECT_EQ(test,
+			(int)pp_nv_get_uclk_dpm_states(&pp_smu, clock_values, &num_states),
+			(int)PP_SMU_RESULT_UNSUPPORTED);
+}
+
+/**
+ * dm_test_nv_get_uclk_dpm_states_fail - Test generic error mapping
+ * @test: KUnit test context
+ *
+ * Verify pp_nv_get_uclk_dpm_states returns PP_SMU_RESULT_FAIL.
+ */
+static void dm_test_nv_get_uclk_dpm_states_fail(struct kunit *test)
+{
+	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	struct pp_smu pp_smu = {};
+	unsigned int clock_values[4] = {};
+	unsigned int num_states = 0;
+
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	setup_stub_dpm(test, adev);
+	ctx->driver_context = adev;
+	pp_smu.dm = ctx;
+	stub_dpm_ctx->get_uclk_dpm_ret = -EIO;
+
+	KUNIT_EXPECT_EQ(test,
+			(int)pp_nv_get_uclk_dpm_states(&pp_smu, clock_values, &num_states),
+			(int)PP_SMU_RESULT_FAIL);
+}
+
 static struct kunit_case dm_pp_smu_test_cases[] = {
 	/* get_default_clock_levels */
 	KUNIT_CASE(dm_test_default_clock_levels_display),
@@ -963,6 +2424,76 @@ static struct kunit_case dm_pp_smu_test_cases[] = {
 	KUNIT_CASE(dm_test_nv_clock_id_phyclk),
 	KUNIT_CASE(dm_test_nv_clock_id_pixelclk),
 	KUNIT_CASE(dm_test_nv_clock_id_invalid),
+	/* dm_pp_get_static_clocks (with stub DPM) */
+	KUNIT_CASE(dm_test_get_static_clocks_success),
+	KUNIT_CASE(dm_test_get_static_clocks_failure),
+	/* dm_pp_apply_display_requirements (DPM enabled) */
+	KUNIT_CASE(dm_test_apply_display_requirements_dpm_enabled),
+	/* dm_pp_get_clock_levels_by_type */
+	KUNIT_CASE(dm_test_get_clock_levels_by_type_dpm_error),
+	KUNIT_CASE(dm_test_get_clock_levels_by_type_success),
+	KUNIT_CASE(dm_test_get_clock_levels_by_type_validation_fallback),
+	/* dm_pp_get_clock_levels_by_type_with_latency */
+	KUNIT_CASE(dm_test_get_clock_levels_with_latency_success),
+	KUNIT_CASE(dm_test_get_clock_levels_with_latency_failure),
+	/* dm_pp_get_clock_levels_by_type_with_voltage */
+	KUNIT_CASE(dm_test_get_clock_levels_with_voltage_success),
+	KUNIT_CASE(dm_test_get_clock_levels_with_voltage_failure),
+	/* dm_pp_notify_wm_clock_changes */
+	KUNIT_CASE(dm_test_notify_wm_clock_changes_polaris),
+	KUNIT_CASE(dm_test_notify_wm_clock_changes_non_polaris),
+	/* dm_pp_apply_clock_for_voltage_request (with DPM) */
+	KUNIT_CASE(dm_test_apply_clock_for_voltage_success),
+	KUNIT_CASE(dm_test_apply_clock_for_voltage_eopnotsupp),
+	KUNIT_CASE(dm_test_apply_clock_for_voltage_fail),
+	/* pp_nv_set_display_count */
+	KUNIT_CASE(dm_test_nv_set_display_count_ok),
+	KUNIT_CASE(dm_test_nv_set_display_count_unsupported),
+	KUNIT_CASE(dm_test_nv_set_display_count_fail),
+	/* pp_nv_set_voltage_by_freq */
+	KUNIT_CASE(dm_test_nv_set_voltage_by_freq_ok),
+	KUNIT_CASE(dm_test_nv_set_voltage_by_freq_invalid_id),
+	/* pp_nv_set_pstate_handshake_support */
+	KUNIT_CASE(dm_test_nv_pstate_handshake_ok),
+	KUNIT_CASE(dm_test_nv_pstate_handshake_fail),
+	/* pp_rn_get_dpm_clock_table */
+	KUNIT_CASE(dm_test_rn_get_dpm_clock_table_ok),
+	KUNIT_CASE(dm_test_rn_get_dpm_clock_table_unsupported),
+	KUNIT_CASE(dm_test_rn_get_dpm_clock_table_fail),
+	/* pp_rv_set_wm_ranges */
+	KUNIT_CASE(dm_test_rv_set_wm_ranges),
+	/* pp_rv_set_pme_wa_enable */
+	KUNIT_CASE(dm_test_rv_set_pme_wa_enable),
+	/* pp_rv_set_active_display_count */
+	KUNIT_CASE(dm_test_rv_set_active_display_count),
+	/* pp_rv_set_min_deep_sleep_dcfclk */
+	KUNIT_CASE(dm_test_rv_set_min_deep_sleep_dcfclk),
+	/* pp_rv_set_hard_min_dcefclk_by_freq */
+	KUNIT_CASE(dm_test_rv_set_hard_min_dcefclk_by_freq),
+	/* pp_rv_set_hard_min_fclk_by_freq */
+	KUNIT_CASE(dm_test_rv_set_hard_min_fclk_by_freq),
+	/* pp_nv_set_wm_ranges */
+	KUNIT_CASE(dm_test_nv_set_wm_ranges),
+	/* pp_nv_set_min_deep_sleep_dcfclk */
+	KUNIT_CASE(dm_test_nv_set_min_deep_sleep_dcfclk_ok),
+	KUNIT_CASE(dm_test_nv_set_min_deep_sleep_dcfclk_unsupported),
+	KUNIT_CASE(dm_test_nv_set_min_deep_sleep_dcfclk_fail),
+	/* pp_nv_set_hard_min_dcefclk_by_freq */
+	KUNIT_CASE(dm_test_nv_set_hard_min_dcefclk_ok),
+	KUNIT_CASE(dm_test_nv_set_hard_min_dcefclk_unsupported),
+	KUNIT_CASE(dm_test_nv_set_hard_min_dcefclk_fail),
+	/* pp_nv_set_hard_min_uclk_by_freq */
+	KUNIT_CASE(dm_test_nv_set_hard_min_uclk_ok),
+	KUNIT_CASE(dm_test_nv_set_hard_min_uclk_unsupported),
+	KUNIT_CASE(dm_test_nv_set_hard_min_uclk_fail),
+	/* pp_nv_get_maximum_sustainable_clocks */
+	KUNIT_CASE(dm_test_nv_get_max_sustainable_clocks_ok),
+	KUNIT_CASE(dm_test_nv_get_max_sustainable_clocks_unsupported),
+	KUNIT_CASE(dm_test_nv_get_max_sustainable_clocks_fail),
+	/* pp_nv_get_uclk_dpm_states */
+	KUNIT_CASE(dm_test_nv_get_uclk_dpm_states_ok),
+	KUNIT_CASE(dm_test_nv_get_uclk_dpm_states_unsupported),
+	KUNIT_CASE(dm_test_nv_get_uclk_dpm_states_fail),
 	{}
 };
 

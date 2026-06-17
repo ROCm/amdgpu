@@ -337,6 +337,7 @@ bool dm_pp_get_clock_levels_by_type(
 
 	return true;
 }
+EXPORT_IF_KUNIT(dm_pp_get_clock_levels_by_type);
 
 bool dm_pp_get_clock_levels_by_type_with_latency(
 	const struct dc_context *ctx,
@@ -357,6 +358,7 @@ bool dm_pp_get_clock_levels_by_type_with_latency(
 
 	return true;
 }
+EXPORT_IF_KUNIT(dm_pp_get_clock_levels_by_type_with_latency);
 
 bool dm_pp_get_clock_levels_by_type_with_voltage(
 	const struct dc_context *ctx,
@@ -377,6 +379,7 @@ bool dm_pp_get_clock_levels_by_type_with_voltage(
 
 	return true;
 }
+EXPORT_IF_KUNIT(dm_pp_get_clock_levels_by_type_with_voltage);
 
 bool dm_pp_notify_wm_clock_changes(
 	const struct dc_context *ctx,
@@ -396,6 +399,7 @@ bool dm_pp_notify_wm_clock_changes(
 
 	return false;
 }
+EXPORT_IF_KUNIT(dm_pp_notify_wm_clock_changes);
 
 bool dm_pp_apply_clock_for_voltage_request(
 	const struct dc_context *ctx,
@@ -464,7 +468,7 @@ STATIC_IFN_KUNIT void build_wm_clock_ranges_soc15(
 }
 EXPORT_IF_KUNIT(build_wm_clock_ranges_soc15);
 
-static void pp_rv_set_wm_ranges(struct pp_smu *pp,
+STATIC_IFN_KUNIT void pp_rv_set_wm_ranges(struct pp_smu *pp,
 		struct pp_smu_wm_range_sets *ranges)
 {
 	const struct dc_context *ctx = pp->dm;
@@ -476,48 +480,54 @@ static void pp_rv_set_wm_ranges(struct pp_smu *pp,
 	amdgpu_dpm_set_watermarks_for_clocks_ranges(adev,
 						    &wm_with_clock_ranges);
 }
+EXPORT_IF_KUNIT(pp_rv_set_wm_ranges);
 
-static void pp_rv_set_pme_wa_enable(struct pp_smu *pp)
+STATIC_IFN_KUNIT void pp_rv_set_pme_wa_enable(struct pp_smu *pp)
 {
 	const struct dc_context *ctx = pp->dm;
 	struct amdgpu_device *adev = ctx->driver_context;
 
 	amdgpu_dpm_notify_smu_enable_pwe(adev);
 }
+EXPORT_IF_KUNIT(pp_rv_set_pme_wa_enable);
 
-static void pp_rv_set_active_display_count(struct pp_smu *pp, int count)
+STATIC_IFN_KUNIT void pp_rv_set_active_display_count(struct pp_smu *pp, int count)
 {
 	const struct dc_context *ctx = pp->dm;
 	struct amdgpu_device *adev = ctx->driver_context;
 
 	amdgpu_dpm_set_active_display_count(adev, count);
 }
+EXPORT_IF_KUNIT(pp_rv_set_active_display_count);
 
-static void pp_rv_set_min_deep_sleep_dcfclk(struct pp_smu *pp, int clock)
+STATIC_IFN_KUNIT void pp_rv_set_min_deep_sleep_dcfclk(struct pp_smu *pp, int clock)
 {
 	const struct dc_context *ctx = pp->dm;
 	struct amdgpu_device *adev = ctx->driver_context;
 
 	amdgpu_dpm_set_min_deep_sleep_dcefclk(adev, clock);
 }
+EXPORT_IF_KUNIT(pp_rv_set_min_deep_sleep_dcfclk);
 
-static void pp_rv_set_hard_min_dcefclk_by_freq(struct pp_smu *pp, int clock)
+STATIC_IFN_KUNIT void pp_rv_set_hard_min_dcefclk_by_freq(struct pp_smu *pp, int clock)
 {
 	const struct dc_context *ctx = pp->dm;
 	struct amdgpu_device *adev = ctx->driver_context;
 
 	amdgpu_dpm_set_hard_min_dcefclk_by_freq(adev, clock);
 }
+EXPORT_IF_KUNIT(pp_rv_set_hard_min_dcefclk_by_freq);
 
-static void pp_rv_set_hard_min_fclk_by_freq(struct pp_smu *pp, int mhz)
+STATIC_IFN_KUNIT void pp_rv_set_hard_min_fclk_by_freq(struct pp_smu *pp, int mhz)
 {
 	const struct dc_context *ctx = pp->dm;
 	struct amdgpu_device *adev = ctx->driver_context;
 
 	amdgpu_dpm_set_hard_min_fclk_by_freq(adev, mhz);
 }
+EXPORT_IF_KUNIT(pp_rv_set_hard_min_fclk_by_freq);
 
-static enum pp_smu_status pp_nv_set_wm_ranges(struct pp_smu *pp,
+STATIC_IFN_KUNIT enum pp_smu_status pp_nv_set_wm_ranges(struct pp_smu *pp,
 		struct pp_smu_wm_range_sets *ranges)
 {
 	const struct dc_context *ctx = pp->dm;
@@ -527,8 +537,9 @@ static enum pp_smu_status pp_nv_set_wm_ranges(struct pp_smu *pp,
 
 	return PP_SMU_RESULT_OK;
 }
+EXPORT_IF_KUNIT(pp_nv_set_wm_ranges);
 
-static enum pp_smu_status pp_nv_set_display_count(struct pp_smu *pp, int count)
+STATIC_IFN_KUNIT enum pp_smu_status pp_nv_set_display_count(struct pp_smu *pp, int count)
 {
 	const struct dc_context *ctx = pp->dm;
 	struct amdgpu_device *adev = ctx->driver_context;
@@ -543,8 +554,9 @@ static enum pp_smu_status pp_nv_set_display_count(struct pp_smu *pp, int count)
 
 	return PP_SMU_RESULT_OK;
 }
+EXPORT_IF_KUNIT(pp_nv_set_display_count);
 
-static enum pp_smu_status
+STATIC_IFN_KUNIT enum pp_smu_status
 pp_nv_set_min_deep_sleep_dcfclk(struct pp_smu *pp, int mhz)
 {
 	const struct dc_context *ctx = pp->dm;
@@ -560,8 +572,9 @@ pp_nv_set_min_deep_sleep_dcfclk(struct pp_smu *pp, int mhz)
 
 	return PP_SMU_RESULT_OK;
 }
+EXPORT_IF_KUNIT(pp_nv_set_min_deep_sleep_dcfclk);
 
-static enum pp_smu_status pp_nv_set_hard_min_dcefclk_by_freq(
+STATIC_IFN_KUNIT enum pp_smu_status pp_nv_set_hard_min_dcefclk_by_freq(
 		struct pp_smu *pp, int mhz)
 {
 	const struct dc_context *ctx = pp->dm;
@@ -583,8 +596,9 @@ static enum pp_smu_status pp_nv_set_hard_min_dcefclk_by_freq(
 
 	return PP_SMU_RESULT_OK;
 }
+EXPORT_IF_KUNIT(pp_nv_set_hard_min_dcefclk_by_freq);
 
-static enum pp_smu_status
+STATIC_IFN_KUNIT enum pp_smu_status
 pp_nv_set_hard_min_uclk_by_freq(struct pp_smu *pp, int mhz)
 {
 	const struct dc_context *ctx = pp->dm;
@@ -606,8 +620,9 @@ pp_nv_set_hard_min_uclk_by_freq(struct pp_smu *pp, int mhz)
 
 	return PP_SMU_RESULT_OK;
 }
+EXPORT_IF_KUNIT(pp_nv_set_hard_min_uclk_by_freq);
 
-static enum pp_smu_status pp_nv_set_pstate_handshake_support(
+STATIC_IFN_KUNIT enum pp_smu_status pp_nv_set_pstate_handshake_support(
 	struct pp_smu *pp, bool pstate_handshake_supported)
 {
 	const struct dc_context *ctx = pp->dm;
@@ -619,6 +634,7 @@ static enum pp_smu_status pp_nv_set_pstate_handshake_support(
 
 	return PP_SMU_RESULT_OK;
 }
+EXPORT_IF_KUNIT(pp_nv_set_pstate_handshake_support);
 
 STATIC_IFN_KUNIT bool pp_smu_nv_clock_id_to_pp(enum pp_smu_nv_clock_id clock_id,
 		enum amd_pp_clock_type *clock_type)
@@ -641,7 +657,7 @@ STATIC_IFN_KUNIT bool pp_smu_nv_clock_id_to_pp(enum pp_smu_nv_clock_id clock_id,
 }
 EXPORT_IF_KUNIT(pp_smu_nv_clock_id_to_pp);
 
-static enum pp_smu_status pp_nv_set_voltage_by_freq(struct pp_smu *pp,
+STATIC_IFN_KUNIT enum pp_smu_status pp_nv_set_voltage_by_freq(struct pp_smu *pp,
 		enum pp_smu_nv_clock_id clock_id, int mhz)
 {
 	const struct dc_context *ctx = pp->dm;
@@ -665,8 +681,9 @@ static enum pp_smu_status pp_nv_set_voltage_by_freq(struct pp_smu *pp,
 
 	return PP_SMU_RESULT_OK;
 }
+EXPORT_IF_KUNIT(pp_nv_set_voltage_by_freq);
 
-static enum pp_smu_status pp_nv_get_maximum_sustainable_clocks(
+STATIC_IFN_KUNIT enum pp_smu_status pp_nv_get_maximum_sustainable_clocks(
 		struct pp_smu *pp, struct pp_smu_nv_clock_table *max_clocks)
 {
 	const struct dc_context *ctx = pp->dm;
@@ -682,8 +699,9 @@ static enum pp_smu_status pp_nv_get_maximum_sustainable_clocks(
 
 	return PP_SMU_RESULT_OK;
 }
+EXPORT_IF_KUNIT(pp_nv_get_maximum_sustainable_clocks);
 
-static enum pp_smu_status pp_nv_get_uclk_dpm_states(struct pp_smu *pp,
+STATIC_IFN_KUNIT enum pp_smu_status pp_nv_get_uclk_dpm_states(struct pp_smu *pp,
 		unsigned int *clock_values_in_khz, unsigned int *num_states)
 {
 	const struct dc_context *ctx = pp->dm;
@@ -700,8 +718,9 @@ static enum pp_smu_status pp_nv_get_uclk_dpm_states(struct pp_smu *pp,
 
 	return PP_SMU_RESULT_OK;
 }
+EXPORT_IF_KUNIT(pp_nv_get_uclk_dpm_states);
 
-static enum pp_smu_status pp_rn_get_dpm_clock_table(
+STATIC_IFN_KUNIT enum pp_smu_status pp_rn_get_dpm_clock_table(
 		struct pp_smu *pp, struct dpm_clocks *clock_table)
 {
 	const struct dc_context *ctx = pp->dm;
@@ -716,6 +735,7 @@ static enum pp_smu_status pp_rn_get_dpm_clock_table(
 
 	return PP_SMU_RESULT_OK;
 }
+EXPORT_IF_KUNIT(pp_rn_get_dpm_clock_table);
 
 void dm_pp_get_funcs(
 		struct dc_context *ctx,
