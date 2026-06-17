@@ -28,6 +28,8 @@
 void amdgpu_amdkfd_rlc_spm_cntl(struct amdgpu_device *adev, int xcc_id, bool cntl)
 {
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[xcc_id].ring;
+	uint32_t seq;
+	int r = 0;
 
 	spin_lock(&adev->gfx.kiq[xcc_id].ring_lock);
 	amdgpu_ring_alloc(kiq_ring, adev->gfx.spmfuncs->set_spm_config_size);
@@ -35,25 +37,50 @@ void amdgpu_amdkfd_rlc_spm_cntl(struct amdgpu_device *adev, int xcc_id, bool cnt
 		adev->gfx.spmfuncs->start(adev, xcc_id);
 	else
 		adev->gfx.spmfuncs->stop(adev, xcc_id);
+	r = amdgpu_fence_emit_polling(kiq_ring, &seq, MAX_KIQ_REG_WAIT);
+	if (r) {
+		amdgpu_ring_undo(kiq_ring);
+		spin_unlock(&adev->gfx.kiq[xcc_id].ring_lock);
+		dev_warn(adev->dev, "%s SPM KIQ fence emit failed (%d)\n", __func__, r);
+		return;
+	}
 	amdgpu_ring_commit(kiq_ring);
 	spin_unlock(&adev->gfx.kiq[xcc_id].ring_lock);
+
+	r = amdgpu_fence_wait_polling(kiq_ring, seq, MAX_KIQ_REG_WAIT);
+	if (r < 1)
+		dev_warn(adev->dev, "%s SPM KIQ fence timeout (seq=%u)\n", __func__, seq);
 }
 
 void amdgpu_amdkfd_rlc_spm_set_rdptr(struct amdgpu_device *adev, int xcc_id, u32 rptr)
 {
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[xcc_id].ring;
+	uint32_t seq;
+	int r = 0;
 
 	spin_lock(&adev->gfx.kiq[xcc_id].ring_lock);
 	amdgpu_ring_alloc(kiq_ring, adev->gfx.spmfuncs->set_spm_config_size);
 	adev->gfx.spmfuncs->set_rdptr(adev, xcc_id, rptr);
+	r = amdgpu_fence_emit_polling(kiq_ring, &seq, MAX_KIQ_REG_WAIT);
+	if (r) {
+		amdgpu_ring_undo(kiq_ring);
+		spin_unlock(&adev->gfx.kiq[xcc_id].ring_lock);
+		dev_warn(adev->dev, "%s SPM KIQ fence emit failed (%d)\n", __func__, r);
+		return;
+	}
 	amdgpu_ring_commit(kiq_ring);
 	spin_unlock(&adev->gfx.kiq[xcc_id].ring_lock);
+
+	r = amdgpu_fence_wait_polling(kiq_ring, seq, MAX_KIQ_REG_WAIT);
+	if (r < 1)
+		dev_warn(adev->dev, "%s SPM KIQ fence timeout (seq=%u)\n", __func__, seq);
 }
 
 int amdgpu_amdkfd_rlc_spm_acquire(struct amdgpu_device *adev, int xcc_id,
 			struct amdgpu_vm *vm, u64 gpu_addr, u32 size)
 {
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[xcc_id].ring;
+	uint32_t seq;
 	int r = 0;
 
 	if (!adev->gfx.rlc.funcs->update_spm_vmid)
@@ -70,23 +97,50 @@ int amdgpu_amdkfd_rlc_spm_acquire(struct amdgpu_device *adev, int xcc_id,
 	spin_lock(&adev->gfx.kiq[xcc_id].ring_lock);
 	amdgpu_ring_alloc(kiq_ring, adev->gfx.spmfuncs->set_spm_config_size);
 	adev->gfx.spmfuncs->set_spm_perfmon_ring_buf(adev, xcc_id, gpu_addr, size);
+	r = amdgpu_fence_emit_polling(kiq_ring, &seq, MAX_KIQ_REG_WAIT);
+	if (r) {
+		amdgpu_ring_undo(kiq_ring);
+		spin_unlock(&adev->gfx.kiq[xcc_id].ring_lock);
+		dev_warn(adev->dev, "%s SPM KIQ fence emit failed (%d)\n", __func__, r);
+		return r;
+	}
 	amdgpu_ring_commit(kiq_ring);
 	spin_unlock(&adev->gfx.kiq[xcc_id].ring_lock);
-	return r;
+
+	r = amdgpu_fence_wait_polling(kiq_ring, seq, MAX_KIQ_REG_WAIT);
+	if (r < 1) {
+		dev_warn(adev->dev, "%s SPM KIQ fence timeout (seq=%u)\n", __func__, seq);
+		return -ETIMEDOUT;
+	}
+	return 0;
 }
 
 void amdgpu_amdkfd_rlc_spm_release(struct amdgpu_device *adev, int xcc_id, struct amdgpu_vm *vm)
 {
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[xcc_id].ring;
+	uint32_t seq;
+	int r = 0;
 
 	/* stop spm stream and interrupt */
 	spin_lock(&adev->gfx.kiq[xcc_id].ring_lock);
 	amdgpu_ring_alloc(kiq_ring, adev->gfx.spmfuncs->set_spm_config_size);
 	adev->gfx.spmfuncs->stop(adev, xcc_id);
+	r = amdgpu_fence_emit_polling(kiq_ring, &seq, MAX_KIQ_REG_WAIT);
+	if (r) {
+		amdgpu_ring_undo(kiq_ring);
+		spin_unlock(&adev->gfx.kiq[xcc_id].ring_lock);
+		dev_warn(adev->dev, "%s SPM KIQ fence emit failed (%d)\n", __func__, r);
+		goto skip_wait;
+	}
 	amdgpu_ring_commit(kiq_ring);
 	spin_unlock(&adev->gfx.kiq[xcc_id].ring_lock);
 
-        amdgpu_vmid_free_reserved(adev, vm, AMDGPU_GFXHUB(0));
+	r = amdgpu_fence_wait_polling(kiq_ring, seq, MAX_KIQ_REG_WAIT);
+	if (r < 1)
+		dev_warn(adev->dev, "%s SPM KIQ fence timeout (seq=%u)\n", __func__, seq);
+
+skip_wait:
+	amdgpu_vmid_free_reserved(adev, vm, AMDGPU_GFXHUB(0));
 
 	/* revert spm vmid with 0xf */
 	if (adev->gfx.rlc.funcs->update_spm_vmid)

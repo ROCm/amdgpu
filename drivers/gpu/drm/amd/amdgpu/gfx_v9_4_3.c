@@ -2800,7 +2800,7 @@ static const struct spm_funcs gfx_v9_4_3_spm_funcs = {
 	.stop = &gfx_v9_4_3_spm_stop,
 	.set_rdptr = &gfx_v9_4_3_spm_set_rdptr,
 	.set_spm_perfmon_ring_buf = &gfx_v9_4_3_set_spm_perfmon_ring_buf,
-	.set_spm_config_size = 30,
+	.set_spm_config_size = 38,
 };
 
 static void gfx_v9_4_3_set_spm_funcs(struct amdgpu_device *adev)
