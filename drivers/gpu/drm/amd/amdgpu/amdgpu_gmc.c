@@ -968,6 +968,7 @@ void amdgpu_gmc_tmz_set(struct amdgpu_device *adev)
 	case IP_VERSION(11, 5, 4):
 	case IP_VERSION(11, 5, 6):
 	case IP_VERSION(11, 7, 0):
+	case IP_VERSION(11, 7, 1):
 		/* Don't enable it by default yet.
 		 */
 		if (amdgpu_tmz < 1) {
