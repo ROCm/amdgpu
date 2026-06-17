@@ -4911,13 +4911,19 @@ static int gfx_v8_0_soft_reset(struct amdgpu_ip_block *ip_block)
 	u32 grbm_soft_reset = 0, srbm_soft_reset = 0;
 	u32 tmp;
 	int i;
+	int r;
 
-	if ((!adev->gfx.grbm_soft_reset) &&
-	    (!adev->gfx.srbm_soft_reset))
-		return 0;
+	grbm_soft_reset =
+		REG_SET_FIELD(0, GRBM_SOFT_RESET, SOFT_RESET_RLC, 1) |
+		REG_SET_FIELD(0, GRBM_SOFT_RESET, SOFT_RESET_GFX, 1) |
+		REG_SET_FIELD(0, GRBM_SOFT_RESET, SOFT_RESET_CP, 1) |
+		REG_SET_FIELD(0, GRBM_SOFT_RESET, SOFT_RESET_CPF, 1) |
+		REG_SET_FIELD(0, GRBM_SOFT_RESET, SOFT_RESET_CPC, 1) |
+		REG_SET_FIELD(0, GRBM_SOFT_RESET, SOFT_RESET_CPG, 1);
 
-	grbm_soft_reset = adev->gfx.grbm_soft_reset;
-	srbm_soft_reset = adev->gfx.srbm_soft_reset;
+	srbm_soft_reset =
+		REG_SET_FIELD(0, SRBM_SOFT_RESET, SOFT_RESET_GRBM, 1) |
+		REG_SET_FIELD(0, SRBM_SOFT_RESET, SOFT_RESET_SEM, 1);
 
 	for (i = 0; i < adev->gfx.num_compute_rings; i++) {
 		struct amdgpu_ring *ring = &adev->gfx.compute_ring[i];
@@ -4927,14 +4933,21 @@ static int gfx_v8_0_soft_reset(struct amdgpu_ip_block *ip_block)
 		gfx_v8_0_deactivate_hqd(adev, 2);
 		vi_srbm_select(adev, 0, 0, 0, 0);
 		mutex_unlock(&adev->srbm_mutex);
+
+		udelay(50);
 	}
+
+	ip_block->version->funcs->set_clockgating_state(ip_block, AMD_CG_STATE_UNGATE);
+	ip_block->version->funcs->set_powergating_state(ip_block, AMD_PG_STATE_UNGATE);
+	ip_block->version->funcs->suspend(ip_block);
 
 	if (grbm_soft_reset || srbm_soft_reset) {
 		tmp = RREG32(mmGMCON_DEBUG);
 		tmp = REG_SET_FIELD(tmp, GMCON_DEBUG, GFX_STALL, 1);
 		tmp = REG_SET_FIELD(tmp, GMCON_DEBUG, GFX_CLEAR, 1);
 		WREG32(mmGMCON_DEBUG, tmp);
-		udelay(50);
+
+		udelay(100);
 	}
 
 	if (grbm_soft_reset) {
@@ -4944,11 +4957,13 @@ static int gfx_v8_0_soft_reset(struct amdgpu_ip_block *ip_block)
 		WREG32(mmGRBM_SOFT_RESET, tmp);
 		tmp = RREG32(mmGRBM_SOFT_RESET);
 
-		udelay(50);
+		udelay(100);
 
 		tmp &= ~grbm_soft_reset;
 		WREG32(mmGRBM_SOFT_RESET, tmp);
 		tmp = RREG32(mmGRBM_SOFT_RESET);
+
+		udelay(100);
 	}
 
 	if (srbm_soft_reset) {
@@ -4958,11 +4973,13 @@ static int gfx_v8_0_soft_reset(struct amdgpu_ip_block *ip_block)
 		WREG32(mmSRBM_SOFT_RESET, tmp);
 		tmp = RREG32(mmSRBM_SOFT_RESET);
 
-		udelay(50);
+		udelay(100);
 
 		tmp &= ~srbm_soft_reset;
 		WREG32(mmSRBM_SOFT_RESET, tmp);
 		tmp = RREG32(mmSRBM_SOFT_RESET);
+
+		udelay(100);
 	}
 
 	if (grbm_soft_reset || srbm_soft_reset) {
@@ -4973,7 +4990,15 @@ static int gfx_v8_0_soft_reset(struct amdgpu_ip_block *ip_block)
 	}
 
 	/* Wait a little for things to settle down */
-	udelay(50);
+	udelay(100);
+
+	r = ip_block->version->funcs->resume(ip_block);
+	r |= ip_block->version->funcs->late_init(ip_block);
+	if (r)
+		return r;
+
+	ip_block->version->funcs->set_clockgating_state(ip_block, AMD_CG_STATE_GATE);
+	ip_block->version->funcs->set_powergating_state(ip_block, AMD_PG_STATE_GATE);
 
 	return 0;
 }

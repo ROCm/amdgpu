@@ -496,8 +496,6 @@ struct amdgpu_gfx {
 	const struct amdgpu_gfx_funcs	*funcs;
 
 	/* reset mask */
-	uint32_t                        grbm_soft_reset;
-	uint32_t                        srbm_soft_reset;
 	uint32_t 			gfx_supported_reset;
 	uint32_t 			compute_supported_reset;
 
