@@ -2772,7 +2772,6 @@ const struct amd_ip_funcs smu_ip_funcs = {
 	.suspend = smu_suspend,
 	.resume = smu_resume,
 	.is_idle = NULL,
-	.check_soft_reset = NULL,
 	.wait_for_idle = NULL,
 	.soft_reset = NULL,
 	.set_clockgating_state = smu_set_clockgating_state,

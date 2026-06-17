@@ -336,11 +336,6 @@ static int dm_wait_for_idle(struct amdgpu_ip_block *ip_block)
 	return 0;
 }
 
-static bool dm_check_soft_reset(struct amdgpu_ip_block *ip_block)
-{
-	return false;
-}
-
 static int dm_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	/* XXX todo */
@@ -4000,7 +3995,6 @@ static const struct amd_ip_funcs amdgpu_dm_funcs = {
 	.resume = dm_resume,
 	.is_idle = dm_is_idle,
 	.wait_for_idle = dm_wait_for_idle,
-	.check_soft_reset = dm_check_soft_reset,
 	.soft_reset = dm_soft_reset,
 	.set_clockgating_state = dm_set_clockgating_state,
 	.set_powergating_state = dm_set_powergating_state,

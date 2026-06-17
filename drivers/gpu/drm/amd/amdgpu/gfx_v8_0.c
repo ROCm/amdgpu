@@ -4898,68 +4898,6 @@ static int gfx_v8_0_resume(struct amdgpu_ip_block *ip_block)
 	return gfx_v8_0_hw_init(ip_block);
 }
 
-static bool gfx_v8_0_check_soft_reset(struct amdgpu_ip_block *ip_block)
-{
-	struct amdgpu_device *adev = ip_block->adev;
-	u32 grbm_soft_reset = 0, srbm_soft_reset = 0;
-	u32 tmp;
-
-	/* GRBM_STATUS */
-	tmp = RREG32(mmGRBM_STATUS);
-	if (tmp & (GRBM_STATUS__PA_BUSY_MASK | GRBM_STATUS__SC_BUSY_MASK |
-		   GRBM_STATUS__BCI_BUSY_MASK | GRBM_STATUS__SX_BUSY_MASK |
-		   GRBM_STATUS__TA_BUSY_MASK | GRBM_STATUS__VGT_BUSY_MASK |
-		   GRBM_STATUS__DB_BUSY_MASK | GRBM_STATUS__CB_BUSY_MASK |
-		   GRBM_STATUS__GDS_BUSY_MASK | GRBM_STATUS__SPI_BUSY_MASK |
-		   GRBM_STATUS__IA_BUSY_MASK | GRBM_STATUS__IA_BUSY_NO_DMA_MASK |
-		   GRBM_STATUS__CP_BUSY_MASK | GRBM_STATUS__CP_COHERENCY_BUSY_MASK)) {
-		grbm_soft_reset = REG_SET_FIELD(grbm_soft_reset,
-						GRBM_SOFT_RESET, SOFT_RESET_CP, 1);
-		grbm_soft_reset = REG_SET_FIELD(grbm_soft_reset,
-						GRBM_SOFT_RESET, SOFT_RESET_GFX, 1);
-		srbm_soft_reset = REG_SET_FIELD(srbm_soft_reset,
-						SRBM_SOFT_RESET, SOFT_RESET_GRBM, 1);
-	}
-
-	/* GRBM_STATUS2 */
-	tmp = RREG32(mmGRBM_STATUS2);
-	if (REG_GET_FIELD(tmp, GRBM_STATUS2, RLC_BUSY))
-		grbm_soft_reset = REG_SET_FIELD(grbm_soft_reset,
-						GRBM_SOFT_RESET, SOFT_RESET_RLC, 1);
-
-	if (REG_GET_FIELD(tmp, GRBM_STATUS2, CPF_BUSY) ||
-	    REG_GET_FIELD(tmp, GRBM_STATUS2, CPC_BUSY) ||
-	    REG_GET_FIELD(tmp, GRBM_STATUS2, CPG_BUSY)) {
-		grbm_soft_reset = REG_SET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET,
-						SOFT_RESET_CPF, 1);
-		grbm_soft_reset = REG_SET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET,
-						SOFT_RESET_CPC, 1);
-		grbm_soft_reset = REG_SET_FIELD(grbm_soft_reset, GRBM_SOFT_RESET,
-						SOFT_RESET_CPG, 1);
-		srbm_soft_reset = REG_SET_FIELD(srbm_soft_reset, SRBM_SOFT_RESET,
-						SOFT_RESET_GRBM, 1);
-	}
-
-	/* SRBM_STATUS */
-	tmp = RREG32(mmSRBM_STATUS);
-	if (REG_GET_FIELD(tmp, SRBM_STATUS, GRBM_RQ_PENDING))
-		srbm_soft_reset = REG_SET_FIELD(srbm_soft_reset,
-						SRBM_SOFT_RESET, SOFT_RESET_GRBM, 1);
-	if (REG_GET_FIELD(tmp, SRBM_STATUS, SEM_BUSY))
-		srbm_soft_reset = REG_SET_FIELD(srbm_soft_reset,
-						SRBM_SOFT_RESET, SOFT_RESET_SEM, 1);
-
-	if (grbm_soft_reset || srbm_soft_reset) {
-		adev->gfx.grbm_soft_reset = grbm_soft_reset;
-		adev->gfx.srbm_soft_reset = srbm_soft_reset;
-		return true;
-	} else {
-		adev->gfx.grbm_soft_reset = 0;
-		adev->gfx.srbm_soft_reset = 0;
-		return false;
-	}
-}
-
 static int gfx_v8_0_pre_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
@@ -6989,7 +6927,6 @@ static const struct amd_ip_funcs gfx_v8_0_ip_funcs = {
 	.resume = gfx_v8_0_resume,
 	.is_idle = gfx_v8_0_is_idle,
 	.wait_for_idle = gfx_v8_0_wait_for_idle,
-	.check_soft_reset = gfx_v8_0_check_soft_reset,
 	.pre_soft_reset = gfx_v8_0_pre_soft_reset,
 	.soft_reset = gfx_v8_0_soft_reset,
 	.post_soft_reset = gfx_v8_0_post_soft_reset,

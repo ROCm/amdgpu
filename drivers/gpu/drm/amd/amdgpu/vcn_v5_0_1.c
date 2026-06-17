@@ -1674,7 +1674,6 @@ static const struct amd_ip_funcs vcn_v5_0_1_ip_funcs = {
 	.resume = vcn_v5_0_1_resume,
 	.is_idle = vcn_v5_0_1_is_idle,
 	.wait_for_idle = vcn_v5_0_1_wait_for_idle,
-	.check_soft_reset = NULL,
 	.pre_soft_reset = NULL,
 	.soft_reset = NULL,
 	.post_soft_reset = NULL,
