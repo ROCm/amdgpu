@@ -656,7 +656,7 @@ TRACE_EVENT(amdgpu_userq_emit_fence,
 	    TP_fast_assign(
 			   __entry->fence_context = fence->base.context;
 			   __entry->fence_seqno = fence->base.seqno;
-			   __assign_str(dev);
+			   __amdkcl_assign_str(dev, dev_name(device));
 			   __entry->doorbell_index = queue->doorbell_index;
 #ifdef HAVE_DRM_FILE_CLIENT_ID
 			   __entry->client_id = queue->userq_mgr->file->client_id;
@@ -684,7 +684,7 @@ TRACE_EVENT(amdgpu_userq_wait_deps,
 			     __field(u32, queue_type)
 			     ),
 	    TP_fast_assign(
-			   __assign_str(dev);
+			   __amdkcl_assign_str(dev, dev_name(device));
 			   __entry->doorbell_index = queue->doorbell_index;
 			   __entry->queue_type = queue->queue_type;
 #ifdef HAVE_DRM_FILE_CLIENT_ID
