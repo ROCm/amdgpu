@@ -658,7 +658,11 @@ TRACE_EVENT(amdgpu_userq_emit_fence,
 			   __entry->fence_seqno = fence->base.seqno;
 			   __assign_str(dev);
 			   __entry->doorbell_index = queue->doorbell_index;
+#ifdef HAVE_DRM_FILE_CLIENT_ID
 			   __entry->client_id = queue->userq_mgr->file->client_id;
+#else
+			   __entry->client_id = 0;
+#endif
 			   __entry->queue_type = queue->queue_type;
 			   ),
 	    TP_printk("dev=%s, client_id=%llu, type=%u, doorbell=%llu, fence=%llu:%llu",
@@ -683,7 +687,11 @@ TRACE_EVENT(amdgpu_userq_wait_deps,
 			   __assign_str(dev);
 			   __entry->doorbell_index = queue->doorbell_index;
 			   __entry->queue_type = queue->queue_type;
+#ifdef HAVE_DRM_FILE_CLIENT_ID
 			   __entry->client_id = queue->userq_mgr->file->client_id;
+#else
+			   __entry->client_id = 0;
+#endif
 			   __entry->context = queue->fence_drv->context;
 			   __entry->dep_context = dep->base.context;
 			   __entry->dep_seqno = dep->base.seqno;
@@ -706,7 +714,11 @@ TRACE_EVENT(amdgpu_userq_state_start,
 	    TP_fast_assign(
 			   __entry->doorbell_index = queue->doorbell_index;
 			   __entry->queue_type = queue->queue_type;
+#ifdef HAVE_DRM_FILE_CLIENT_ID
 			   __entry->client_id = queue->userq_mgr->file->client_id;
+#else
+			   __entry->client_id = 0;
+#endif
 			   __entry->from = queue->state;
 			   ),
 	    TP_printk("client_id=%llu, type=%u, doorbell=%llu, from=%d",
@@ -725,7 +737,11 @@ TRACE_EVENT(amdgpu_userq_state_changed,
 	    TP_fast_assign(
 			   __entry->doorbell_index = queue->doorbell_index;
 			   __entry->queue_type = queue->queue_type;
+#ifdef HAVE_DRM_FILE_CLIENT_ID
 			   __entry->client_id = queue->userq_mgr->file->client_id;
+#else
+			   __entry->client_id = 0;
+#endif
 			   __entry->to = new_state;
 			   ),
 	    TP_printk("client_id=%llu, type=%u, doorbell=%llu, to=%d",
