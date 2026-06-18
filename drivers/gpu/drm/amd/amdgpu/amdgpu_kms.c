@@ -1608,6 +1608,7 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 	struct amdgpu_sem *sem;
 	struct amdgpu_bo *pd;
 	unsigned long handle;
+	int sem_handle;
 	u32 pasid;
 
 	if (!fpriv)
@@ -1648,8 +1649,8 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 		amdgpu_bo_list_put(list);
 	xa_destroy(&fpriv->bo_list_handles);
 
-	idr_for_each_entry(&fpriv->sem_handles, sem, handle)
-		amdgpu_sem_destroy(fpriv, handle);
+	idr_for_each_entry(&fpriv->sem_handles, sem, sem_handle)
+		amdgpu_sem_destroy(fpriv, sem_handle);
 	idr_destroy(&fpriv->sem_handles);
 
 	kfree(fpriv);
