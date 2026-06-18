@@ -13,6 +13,7 @@
 #include "amdgpu_mode.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_irq.h"
+#include "amdgpu_dm_kunit_test_helpers.h"
 #include "dmub/dmub_srv.h"
 
 static void dm_test_irq_handler(void *arg)
@@ -778,17 +779,9 @@ static void dm_test_get_crtc_by_otg_inst_returns_match(struct kunit *test)
 	struct amdgpu_crtc *acrtc_a, *acrtc_b;
 	struct amdgpu_device *adev;
 	struct drm_device *drm;
-	struct device *dev;
 
-	dev = drm_kunit_helper_alloc_device(test);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
-
-	drm = __drm_kunit_helper_alloc_drm_device(test, dev,
-						   sizeof(*adev),
-						   offsetof(struct amdgpu_device, ddev),
-						   DRIVER_MODESET);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
-	adev = drm_to_adev(drm);
+	adev = dm_kunit_alloc_adev(test);
+	drm = &adev->ddev;
 
 	acrtc_a = kunit_kzalloc(test, sizeof(*acrtc_a), GFP_KERNEL);
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, acrtc_a);
@@ -819,17 +812,9 @@ static void dm_test_get_crtc_by_otg_inst_returns_null(struct kunit *test)
 	struct amdgpu_crtc *acrtc;
 	struct amdgpu_device *adev;
 	struct drm_device *drm;
-	struct device *dev;
 
-	dev = drm_kunit_helper_alloc_device(test);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
-
-	drm = __drm_kunit_helper_alloc_drm_device(test, dev,
-						   sizeof(*adev),
-						   offsetof(struct amdgpu_device, ddev),
-						   DRIVER_MODESET);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
-	adev = drm_to_adev(drm);
+	adev = dm_kunit_alloc_adev(test);
+	drm = &adev->ddev;
 
 	acrtc = kunit_kzalloc(test, sizeof(*acrtc), GFP_KERNEL);
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, acrtc);
@@ -851,18 +836,8 @@ static void dm_test_get_crtc_by_otg_inst_returns_null(struct kunit *test)
 static void dm_test_get_crtc_by_otg_inst_empty_list(struct kunit *test)
 {
 	struct amdgpu_device *adev;
-	struct drm_device *drm;
-	struct device *dev;
 
-	dev = drm_kunit_helper_alloc_device(test);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
-
-	drm = __drm_kunit_helper_alloc_drm_device(test, dev,
-						   sizeof(*adev),
-						   offsetof(struct amdgpu_device, ddev),
-						   DRIVER_MODESET);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
-	adev = drm_to_adev(drm);
+	adev = dm_kunit_alloc_adev(test);
 
 	KUNIT_EXPECT_NULL(test, amdgpu_dm_get_crtc_by_otg_inst(adev, 0));
 }

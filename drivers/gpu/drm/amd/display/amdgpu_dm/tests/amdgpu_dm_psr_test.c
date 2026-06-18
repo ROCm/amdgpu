@@ -12,79 +12,17 @@
 #include "amdgpu_mode.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_psr.h"
+#include "amdgpu_dm_kunit_test_helpers.h"
 #include "power_helpers.h"
-
-/*
- * Helper: allocate and zero-initialise a dc_link sufficient for
- * amdgpu_dm_psr_fill_caps() testing.  The function only accesses
- * embedded members (dpcd_caps, psr_settings) so no pointer fields
- * need to be wired up.
- */
-static struct dc_link *alloc_test_link(struct kunit *test)
-{
-	struct dc_link *link;
-
-	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, link);
-
-	return link;
-}
-
-/*
- * Helper: allocate and wire the minimal DM/DC state needed for
- * amdgpu_dm_psr_is_active_allowed() testing.
- */
-static struct amdgpu_display_manager *alloc_test_dm(struct kunit *test)
-{
-	struct amdgpu_display_manager *dm;
-	struct dc *dc;
-	struct dc_state *state;
-
-	dm = kunit_kzalloc(test, sizeof(*dm), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, dm);
-
-	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, dc);
-
-	state = kunit_kzalloc(test, sizeof(*state), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, state);
-
-	dm->dc = dc;
-	dc->current_state = state;
-
-	return dm;
-}
-
-static void add_test_stream(struct kunit *test, struct dc_state *state,
-		unsigned int index, struct dc_link *link)
-{
-	struct dc_stream_state *stream;
-
-	KUNIT_ASSERT_LT(test, index, (unsigned int)MAX_PIPES);
-
-	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, stream);
-
-	stream->link = link;
-	state->streams[index] = stream;
-	if (state->stream_count <= index)
-		state->stream_count = index + 1;
-}
 
 static struct dc_stream_state *alloc_test_psr_stream(struct kunit *test)
 {
-	struct dc_stream_state *stream;
 	struct dc_link *link;
 
-	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, stream);
-
-	link = alloc_test_link(test);
+	link = dm_kunit_alloc_link(test);
 	link->psr_settings.psr_feature_enabled = true;
-	stream->link = link;
-	kref_init(&stream->refcount);
 
-	return stream;
+	return dm_kunit_alloc_stream(test, link);
 }
 
 static struct core_power *create_test_power_module(struct kunit *test,
@@ -108,7 +46,7 @@ static struct core_power *create_test_power_module(struct kunit *test,
 
 static struct dc_link *alloc_test_psrsu_link(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct dc_context *ctx;
 	struct dc *dc;
 
@@ -359,7 +297,7 @@ static void dm_test_set_psr_caps_no_dpcd_psr(struct kunit *test)
 static void dm_test_set_psr_caps_edp1_disabled(struct kunit *test)
 {
 	struct dc_link *link = alloc_test_psr_caps_link(test);
-	struct dc_link *edp0 = alloc_test_link(test);
+	struct dc_link *edp0 = dm_kunit_alloc_link(test);
 	struct amdgpu_dm_connector *aconnector = alloc_test_aconnector(test);
 	struct dc *dc = link->ctx->dc;
 
@@ -393,7 +331,7 @@ static void dm_test_set_psr_caps_success_psr1(struct kunit *test)
 
 static void dm_test_psr_fill_caps_version_1(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct psr_caps caps;
 
 	memset(&caps, 0, sizeof(caps));
@@ -406,7 +344,7 @@ static void dm_test_psr_fill_caps_version_1(struct kunit *test)
 
 static void dm_test_psr_fill_caps_version_su1(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct psr_caps caps;
 
 	memset(&caps, 0, sizeof(caps));
@@ -419,7 +357,7 @@ static void dm_test_psr_fill_caps_version_su1(struct kunit *test)
 
 static void dm_test_psr_fill_caps_version_unsupported(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct psr_caps caps;
 
 	memset(&caps, 0, sizeof(caps));
@@ -438,7 +376,7 @@ static void dm_test_psr_fill_caps_version_unsupported(struct kunit *test)
 
 static void dm_test_psr_fill_caps_setup_time_zero(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct psr_caps caps;
 
 	memset(&caps, 0, sizeof(caps));
@@ -452,7 +390,7 @@ static void dm_test_psr_fill_caps_setup_time_zero(struct kunit *test)
 
 static void dm_test_psr_fill_caps_setup_time_mid(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct psr_caps caps;
 
 	memset(&caps, 0, sizeof(caps));
@@ -466,7 +404,7 @@ static void dm_test_psr_fill_caps_setup_time_mid(struct kunit *test)
 
 static void dm_test_psr_fill_caps_setup_time_max(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct psr_caps caps;
 
 	memset(&caps, 0, sizeof(caps));
@@ -482,7 +420,7 @@ static void dm_test_psr_fill_caps_setup_time_max(struct kunit *test)
 
 static void dm_test_psr_fill_caps_link_training_required(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct psr_caps caps;
 
 	memset(&caps, 0, sizeof(caps));
@@ -495,7 +433,7 @@ static void dm_test_psr_fill_caps_link_training_required(struct kunit *test)
 
 static void dm_test_psr_fill_caps_link_training_not_required(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct psr_caps caps;
 
 	memset(&caps, 0, sizeof(caps));
@@ -510,7 +448,7 @@ static void dm_test_psr_fill_caps_link_training_not_required(struct kunit *test)
 
 static void dm_test_psr_fill_caps_dpcd_fields(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct psr_caps caps;
 
 	memset(&caps, 0, sizeof(caps));
@@ -536,7 +474,7 @@ static void dm_test_psr_fill_caps_dpcd_fields(struct kunit *test)
 
 static void dm_test_psr_fill_caps_dpcd_fields_unset(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct psr_caps caps;
 
 	memset(&caps, 0xFF, sizeof(caps));
@@ -557,7 +495,7 @@ static void dm_test_psr_fill_caps_dpcd_fields_unset(struct kunit *test)
 
 static void dm_test_psr_fill_caps_rate_control_always_zero(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct psr_caps caps;
 
 	/* Pre-fill caps with non-zero to verify overwrite */
@@ -570,7 +508,7 @@ static void dm_test_psr_fill_caps_rate_control_always_zero(struct kunit *test)
 
 static void dm_test_psr_fill_caps_power_opts_z10_always_set(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct psr_caps caps;
 
 	memset(&caps, 0, sizeof(caps));
@@ -588,7 +526,7 @@ static void dm_test_psr_fill_caps_power_opts_z10_always_set(struct kunit *test)
 
 static void dm_test_psr_fill_caps_power_opts_smu_opt_set(struct kunit *test)
 {
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 	struct psr_caps caps;
 	unsigned int old_feature_mask;
 
@@ -647,7 +585,7 @@ static void dm_test_psr_set_event_psr_not_enabled(struct kunit *test)
  */
 static void dm_test_psr_set_event_get_event_fails(struct kunit *test)
 {
-	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
 	struct dc_stream_state *stream = alloc_test_psr_stream(test);
 
 	dm->power_module = NULL;
@@ -661,7 +599,7 @@ static void dm_test_psr_set_event_get_event_fails(struct kunit *test)
  */
 static void dm_test_psr_set_event_already_set(struct kunit *test)
 {
-	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
 	struct dc_stream_state *stream = alloc_test_psr_stream(test);
 	struct psr_caps caps = {0};
 	struct core_power *core_power;
@@ -682,7 +620,7 @@ static void dm_test_psr_set_event_already_set(struct kunit *test)
  */
 static void dm_test_psr_set_event_updates_event(struct kunit *test)
 {
-	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
 	struct dc_stream_state *stream = alloc_test_psr_stream(test);
 	struct psr_caps caps = {0};
 	struct core_power *core_power;
@@ -706,7 +644,7 @@ static void dm_test_psr_set_event_updates_event(struct kunit *test)
  */
 static void dm_test_psr_is_active_allowed_no_streams(struct kunit *test)
 {
-	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
 
 	KUNIT_EXPECT_FALSE(test, amdgpu_dm_psr_is_active_allowed(dm));
 }
@@ -717,10 +655,10 @@ static void dm_test_psr_is_active_allowed_no_streams(struct kunit *test)
  */
 static void dm_test_psr_is_active_allowed_null_link(struct kunit *test)
 {
-	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
 	struct dc_state *state = dm->dc->current_state;
 
-	add_test_stream(test, state, 0, NULL);
+	dm_kunit_add_stream_to_state(test, state, 0, NULL);
 
 	KUNIT_EXPECT_FALSE(test, amdgpu_dm_psr_is_active_allowed(dm));
 }
@@ -732,11 +670,11 @@ static void dm_test_psr_is_active_allowed_null_link(struct kunit *test)
  */
 static void dm_test_psr_is_active_allowed_requires_enabled_and_allowed(struct kunit *test)
 {
-	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
 	struct dc_state *state = dm->dc->current_state;
-	struct dc_link *link = alloc_test_link(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
 
-	add_test_stream(test, state, 0, link);
+	dm_kunit_add_stream_to_state(test, state, 0, link);
 	link->psr_settings.psr_allow_active = true;
 	KUNIT_EXPECT_FALSE(test, amdgpu_dm_psr_is_active_allowed(dm));
 
@@ -752,17 +690,17 @@ static void dm_test_psr_is_active_allowed_requires_enabled_and_allowed(struct ku
  */
 static void dm_test_psr_is_active_allowed_any_stream(struct kunit *test)
 {
-	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
 	struct dc_state *state = dm->dc->current_state;
-	struct dc_link *disabled_link = alloc_test_link(test);
-	struct dc_link *allowed_link = alloc_test_link(test);
+	struct dc_link *disabled_link = dm_kunit_alloc_link(test);
+	struct dc_link *allowed_link = dm_kunit_alloc_link(test);
 
 	disabled_link->psr_settings.psr_allow_active = true;
 	allowed_link->psr_settings.psr_feature_enabled = true;
 	allowed_link->psr_settings.psr_allow_active = true;
 
-	add_test_stream(test, state, 0, disabled_link);
-	add_test_stream(test, state, 1, allowed_link);
+	dm_kunit_add_stream_to_state(test, state, 0, disabled_link);
+	dm_kunit_add_stream_to_state(test, state, 1, allowed_link);
 
 	KUNIT_EXPECT_TRUE(test, amdgpu_dm_psr_is_active_allowed(dm));
 }

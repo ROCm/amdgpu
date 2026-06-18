@@ -16,6 +16,7 @@
 #include "dm_helpers.h"
 #include "ddc_service_types.h"
 #include "amdgpu_dm_helpers.h"
+#include "amdgpu_dm_kunit_test_helpers.h"
 
 /* Tests for edid_extract_panel_id() */
 
@@ -552,26 +553,14 @@ static void dm_test_mst_start_top_mgr_boot(struct kunit *test)
 {
 	struct amdgpu_dm_connector *aconnector;
 	struct amdgpu_device *adev;
-	struct drm_device *drm;
-	struct device *dev;
 	struct dc_link *link;
 
-	dev = drm_kunit_helper_alloc_device(test);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
+	adev = dm_kunit_alloc_adev(test);
 
-	drm = __drm_kunit_helper_alloc_drm_device(test, dev,
-						  sizeof(*adev),
-						  offsetof(struct amdgpu_device, ddev),
-						  DRIVER_MODESET);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
-	adev = drm_to_adev(drm);
+	link = dm_kunit_alloc_link(test);
 
-	aconnector = kunit_kzalloc(test, sizeof(*aconnector), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, aconnector);
-	aconnector->base.dev = drm;
+	aconnector = dm_kunit_alloc_connector(test, adev, NULL);
 
-	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, link);
 	link->priv = aconnector;
 
 	KUNIT_EXPECT_TRUE(test, dm_helpers_dp_mst_start_top_mgr(NULL, link, true));

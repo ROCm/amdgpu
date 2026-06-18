@@ -20,6 +20,7 @@
 #include "amdgpu_mode.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_mst_types.h"
+#include "amdgpu_dm_kunit_test_helpers.h"
 #include "inc/link_service.h"
 
 /*
@@ -914,18 +915,10 @@ static void dm_mst_test_create_fake_mst_encoders(struct kunit *test)
 {
 	struct amdgpu_device *adev;
 	struct drm_device *drm;
-	struct device *dev;
 	int i;
 
-	dev = drm_kunit_helper_alloc_device(test);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
-
-	drm = __drm_kunit_helper_alloc_drm_device(test, dev,
-						   sizeof(*adev),
-						   offsetof(struct amdgpu_device, ddev),
-						   DRIVER_MODESET | DRIVER_ATOMIC);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
-	adev = drm_to_adev(drm);
+	adev = dm_kunit_alloc_adev(test);
+	drm = &adev->ddev;
 	adev->dm.display_indexes_num = 3;
 	adev->mode_info.num_crtc = 3;
 

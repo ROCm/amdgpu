@@ -12,6 +12,7 @@
 #include "amdgpu_mode.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_replay.h"
+#include "amdgpu_dm_kunit_test_helpers.h"
 #include "modules/power/power_helpers.h"
 #include "dmub/dmub_srv.h"
 
@@ -35,8 +36,9 @@ static struct replay_test_ctx *alloc_replay_ctx(struct kunit *test)
 	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
 	KUNIT_ASSERT_NOT_NULL(test, ctx);
 
-	ctx->link = kunit_kzalloc(test, sizeof(*ctx->link), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, ctx->link);
+	ctx->link = dm_kunit_alloc_link_with_ctx(test);
+	ctx->dc_ctx = ctx->link->ctx;
+	ctx->dc = ctx->dc_ctx->dc;
 
 	ctx->aconnector = kunit_kzalloc(test, sizeof(*ctx->aconnector), GFP_KERNEL);
 	KUNIT_ASSERT_NOT_NULL(test, ctx->aconnector);
@@ -44,21 +46,10 @@ static struct replay_test_ctx *alloc_replay_ctx(struct kunit *test)
 	ctx->dm_state = kunit_kzalloc(test, sizeof(*ctx->dm_state), GFP_KERNEL);
 	KUNIT_ASSERT_NOT_NULL(test, ctx->dm_state);
 
-	ctx->dc = kunit_kzalloc(test, sizeof(*ctx->dc), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, ctx->dc);
-
-	ctx->dc_ctx = kunit_kzalloc(test, sizeof(*ctx->dc_ctx), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, ctx->dc_ctx);
-
-	ctx->stream = kunit_kzalloc(test, sizeof(*ctx->stream), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, ctx->stream);
+	ctx->stream = dm_kunit_alloc_stream(test, ctx->link);
 
 	/* Wire connector state so to_dm_connector_state() works */
 	ctx->aconnector->base.state = &ctx->dm_state->base;
-	ctx->link->ctx = ctx->dc_ctx;
-	ctx->dc_ctx->dc = ctx->dc;
-	ctx->dc->ctx = ctx->dc_ctx;
-	ctx->stream->link = ctx->link;
 
 	return ctx;
 }

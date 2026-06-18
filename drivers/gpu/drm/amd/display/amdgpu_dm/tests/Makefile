@@ -11,6 +11,7 @@ ccflags-y += -I$(src)/../../../amdgpu
 ccflags-y += -I$(src)/../../../amdkfd
 ccflags-y += -I$(src)/../../../include
 
+obj-$(CONFIG_DRM_AMD_DC_KUNIT_TEST) += amdgpu_dm_kunit_helpers.o
 obj-$(CONFIG_DRM_AMD_DC_KUNIT_TEST) += amdgpu_dm_crc_test.o
 obj-$(CONFIG_DRM_AMD_DC_KUNIT_TEST) += amdgpu_dm_hdcp_test.o
 obj-$(CONFIG_DRM_AMD_DC_KUNIT_TEST) += amdgpu_dm_audio_test.o

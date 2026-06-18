@@ -13,6 +13,7 @@
 #include "amdgpu_mode.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_backlight.h"
+#include "amdgpu_dm_kunit_test_helpers.h"
 #include "amd_shared.h"
 #include "dc/inc/hw/panel_cntl.h"
 
@@ -21,16 +22,6 @@ struct dm_backlight_connector_fixture {
 	struct amdgpu_dm_connector *aconnector;
 	struct dc_link *link;
 };
-
-static struct amdgpu_display_manager *alloc_test_dm(struct kunit *test)
-{
-	struct amdgpu_display_manager *dm;
-
-	dm = kunit_kzalloc(test, sizeof(*dm), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, dm);
-
-	return dm;
-}
 
 static void setup_test_connector(struct kunit *test,
 				 struct dm_backlight_connector_fixture *fixture,
@@ -57,7 +48,7 @@ static void setup_test_connector(struct kunit *test,
  */
 static void dm_test_backlight_device_index_matches_second(struct kunit *test)
 {
-	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
 	struct backlight_device *bd0;
 	struct backlight_device *bd1;
 
@@ -79,7 +70,7 @@ static void dm_test_backlight_device_index_matches_second(struct kunit *test)
  */
 static void dm_test_backlight_device_index_missing_fallback(struct kunit *test)
 {
-	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
 	struct backlight_device *known_bd;
 	struct backlight_device *unknown_bd;
 
@@ -102,7 +93,7 @@ static void dm_test_backlight_device_index_missing_fallback(struct kunit *test)
  */
 static void dm_test_backlight_caps_valid_short_circuit(struct kunit *test)
 {
-	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
 	struct amdgpu_dm_backlight_caps *caps = &dm->backlight_caps[0];
 
 	caps->caps_valid = true;
@@ -125,7 +116,7 @@ static void dm_test_backlight_caps_valid_short_circuit(struct kunit *test)
  */
 static void dm_test_backlight_caps_aux_support_noop(struct kunit *test)
 {
-	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
 	struct amdgpu_dm_backlight_caps *caps = &dm->backlight_caps[0];
 
 	caps->caps_valid = false;
@@ -146,7 +137,7 @@ static void dm_test_backlight_caps_aux_support_noop(struct kunit *test)
  */
 static void dm_test_backlight_caps_non_aux_sets_defaults(struct kunit *test)
 {
-	struct amdgpu_display_manager *dm = alloc_test_dm(test);
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
 	struct amdgpu_dm_backlight_caps *caps = &dm->backlight_caps[0];
 
 	caps->caps_valid = false;

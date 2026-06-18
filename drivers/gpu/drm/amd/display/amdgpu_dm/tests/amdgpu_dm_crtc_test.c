@@ -15,6 +15,7 @@
 #include "amdgpu_mode.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_crtc.h"
+#include "amdgpu_dm_kunit_test_helpers.h"
 #include "amdgpu_dm_irq_params.h"
 
 /* Tests for amdgpu_dm_crtc_modeset_required() */
@@ -435,23 +436,13 @@ static void dm_test_crtc_set_vupdate_irq_no_otg(struct kunit *test)
 {
 	struct amdgpu_crtc *acrtc;
 	struct amdgpu_device *adev;
-	struct drm_device *drm;
-	struct device *dev;
 
-	dev = drm_kunit_helper_alloc_device(test);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
-
-	drm = __drm_kunit_helper_alloc_drm_device(test, dev,
-						   sizeof(*adev),
-						   offsetof(struct amdgpu_device, ddev),
-						   DRIVER_MODESET);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
-	adev = drm_to_adev(drm);
+	adev = dm_kunit_alloc_adev(test);
 
 	acrtc = kunit_kzalloc(test, sizeof(*acrtc), GFP_KERNEL);
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, acrtc);
 
-	acrtc->base.dev = drm;
+	acrtc->base.dev = &adev->ddev;
 	acrtc->otg_inst = -1;
 
 	KUNIT_EXPECT_EQ(test, amdgpu_dm_crtc_set_vupdate_irq(&acrtc->base, true), 0);

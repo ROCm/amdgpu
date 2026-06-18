@@ -20,6 +20,7 @@
 #include "amdgpu.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_wb.h"
+#include "amdgpu_dm_kunit_test_helpers.h"
 
 
 /* Helper functions */
@@ -71,22 +72,7 @@ static struct drm_connector_state *alloc_test_conn_state(struct kunit *test,
 	return conn_state;
 }
 
-static struct amdgpu_device *alloc_test_adev(struct kunit *test)
-{
-	struct drm_device *drm;
-	struct device *dev;
 
-	dev = drm_kunit_helper_alloc_device(test);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
-
-	drm = __drm_kunit_helper_alloc_drm_device(test, dev,
-						   sizeof(struct amdgpu_device),
-						   offsetof(struct amdgpu_device, ddev),
-						   DRIVER_MODESET | DRIVER_ATOMIC);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
-
-	return drm_to_adev(drm);
-}
 
 /* Tests for amdgpu_dm_wb_encoder_atomic_check */
 
@@ -350,7 +336,7 @@ static void dm_test_wb_connector_init_success(struct kunit *test)
 	struct dc *dc;
 	int ret;
 
-	adev = alloc_test_adev(test);
+	adev = dm_kunit_alloc_adev(test);
 	adev->mode_info.num_crtc = 1;
 	dm = &adev->dm;
 	dm->adev = adev;

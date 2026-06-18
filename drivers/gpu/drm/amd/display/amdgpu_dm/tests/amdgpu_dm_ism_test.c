@@ -9,20 +9,7 @@
 
 #include "dc.h"
 #include "amdgpu_dm_ism.h"
-
-/*
- * Helper: allocate and zero-initialise a dc_stream_state for timing tests.
- * Only the timing sub-struct is accessed by the functions under test.
- */
-static struct dc_stream_state *alloc_test_stream(struct kunit *test)
-{
-	struct dc_stream_state *stream;
-
-	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, stream);
-
-	return stream;
-}
+#include "amdgpu_dm_kunit_test_helpers.h"
 
 /*
  * Helper: allocate and zero-initialise an ISM instance.
@@ -275,7 +262,7 @@ static void dm_test_ism_sso_delay_null_stream(struct kunit *test)
 static void dm_test_ism_sso_delay_zero_frames(struct kunit *test)
 {
 	struct amdgpu_dm_ism *ism = alloc_test_ism(test);
-	struct dc_stream_state *stream = alloc_test_stream(test);
+	struct dc_stream_state *stream = dm_kunit_alloc_stream(test, NULL);
 
 	stream->timing.v_total = 1125;
 	stream->timing.h_total = 2200;
@@ -288,7 +275,7 @@ static void dm_test_ism_sso_delay_zero_frames(struct kunit *test)
 static void dm_test_ism_sso_delay_1080p60_3frames(struct kunit *test)
 {
 	struct amdgpu_dm_ism *ism = alloc_test_ism(test);
-	struct dc_stream_state *stream = alloc_test_stream(test);
+	struct dc_stream_state *stream = dm_kunit_alloc_stream(test, NULL);
 	uint64_t expected_one_frame_ns, expected;
 
 	/*
@@ -311,7 +298,7 @@ static void dm_test_ism_sso_delay_1080p60_3frames(struct kunit *test)
 static void dm_test_ism_sso_delay_4k60_1frame(struct kunit *test)
 {
 	struct amdgpu_dm_ism *ism = alloc_test_ism(test);
-	struct dc_stream_state *stream = alloc_test_stream(test);
+	struct dc_stream_state *stream = dm_kunit_alloc_stream(test, NULL);
 	uint64_t expected_one_frame_ns;
 
 	/*
@@ -347,7 +334,7 @@ static void dm_test_ism_idle_delay_null_stream(struct kunit *test)
 static void dm_test_ism_idle_delay_zero_filter_frames(struct kunit *test)
 {
 	struct amdgpu_dm_ism *ism = alloc_test_ism(test);
-	struct dc_stream_state *stream = alloc_test_stream(test);
+	struct dc_stream_state *stream = dm_kunit_alloc_stream(test, NULL);
 
 	stream->timing.v_total = 1125;
 	stream->timing.h_total = 2200;
@@ -361,7 +348,7 @@ static void dm_test_ism_idle_delay_zero_filter_frames(struct kunit *test)
 static void dm_test_ism_idle_delay_zero_entry_count(struct kunit *test)
 {
 	struct amdgpu_dm_ism *ism = alloc_test_ism(test);
-	struct dc_stream_state *stream = alloc_test_stream(test);
+	struct dc_stream_state *stream = dm_kunit_alloc_stream(test, NULL);
 
 	stream->timing.v_total = 1125;
 	stream->timing.h_total = 2200;
@@ -376,7 +363,7 @@ static void dm_test_ism_idle_delay_zero_entry_count(struct kunit *test)
 static void dm_test_ism_idle_delay_zero_delay_frames(struct kunit *test)
 {
 	struct amdgpu_dm_ism *ism = alloc_test_ism(test);
-	struct dc_stream_state *stream = alloc_test_stream(test);
+	struct dc_stream_state *stream = dm_kunit_alloc_stream(test, NULL);
 
 	stream->timing.v_total = 1125;
 	stream->timing.h_total = 2200;
@@ -392,7 +379,7 @@ static void dm_test_ism_idle_delay_zero_delay_frames(struct kunit *test)
 static void dm_test_ism_idle_delay_no_short_idles(struct kunit *test)
 {
 	struct amdgpu_dm_ism *ism = alloc_test_ism(test);
-	struct dc_stream_state *stream = alloc_test_stream(test);
+	struct dc_stream_state *stream = dm_kunit_alloc_stream(test, NULL);
 	uint64_t one_frame_ns;
 
 	/*
@@ -426,7 +413,7 @@ static void dm_test_ism_idle_delay_no_short_idles(struct kunit *test)
 static void dm_test_ism_idle_delay_enough_short_idles(struct kunit *test)
 {
 	struct amdgpu_dm_ism *ism = alloc_test_ism(test);
-	struct dc_stream_state *stream = alloc_test_stream(test);
+	struct dc_stream_state *stream = dm_kunit_alloc_stream(test, NULL);
 	uint64_t one_frame_ns, expected;
 
 	/*
@@ -461,7 +448,7 @@ static void dm_test_ism_idle_delay_enough_short_idles(struct kunit *test)
 static void dm_test_ism_idle_delay_wraps_around_buffer(struct kunit *test)
 {
 	struct amdgpu_dm_ism *ism = alloc_test_ism(test);
-	struct dc_stream_state *stream = alloc_test_stream(test);
+	struct dc_stream_state *stream = dm_kunit_alloc_stream(test, NULL);
 	uint64_t one_frame_ns, expected;
 
 	/*
@@ -497,7 +484,7 @@ static void dm_test_ism_idle_delay_wraps_around_buffer(struct kunit *test)
 static void dm_test_ism_idle_delay_old_history_cutoff(struct kunit *test)
 {
 	struct amdgpu_dm_ism *ism = alloc_test_ism(test);
-	struct dc_stream_state *stream = alloc_test_stream(test);
+	struct dc_stream_state *stream = dm_kunit_alloc_stream(test, NULL);
 	uint64_t one_frame_ns;
 
 	/*
@@ -545,7 +532,7 @@ static void dm_test_ism_idle_delay_old_history_cutoff(struct kunit *test)
 static void dm_test_ism_idle_delay_mixed_durations(struct kunit *test)
 {
 	struct amdgpu_dm_ism *ism = alloc_test_ism(test);
-	struct dc_stream_state *stream = alloc_test_stream(test);
+	struct dc_stream_state *stream = dm_kunit_alloc_stream(test, NULL);
 	uint64_t one_frame_ns;
 
 	/*
@@ -586,7 +573,7 @@ static void dm_test_ism_idle_delay_mixed_durations(struct kunit *test)
 static void dm_test_ism_idle_delay_entry_count_exceeds_history_size(struct kunit *test)
 {
 	struct amdgpu_dm_ism *ism = alloc_test_ism(test);
-	struct dc_stream_state *stream = alloc_test_stream(test);
+	struct dc_stream_state *stream = dm_kunit_alloc_stream(test, NULL);
 	uint64_t one_frame_ns, expected;
 
 	/*

@@ -12,6 +12,7 @@
 #include "dc.h"
 #include "amdgpu.h"
 #include "amdgpu_dm_colorop.h"
+#include "amdgpu_dm_kunit_test_helpers.h"
 
 /* Tests for amdgpu_dm_supported_degam_tfs */
 
@@ -222,19 +223,11 @@ static void dm_test_initialize_default_pipeline_caps(struct kunit *test,
 	struct amdgpu_device *adev;
 	struct drm_device *drm;
 	struct drm_plane *plane;
-	struct device *dev;
 	struct dc *dc;
 	int ret;
 
-	dev = drm_kunit_helper_alloc_device(test);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
-
-	drm = __drm_kunit_helper_alloc_drm_device(test, dev,
-						   sizeof(*adev),
-						   offsetof(struct amdgpu_device, ddev),
-						   DRIVER_MODESET);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
-	adev = drm_to_adev(drm);
+	adev = dm_kunit_alloc_adev(test);
+	drm = &adev->ddev;
 
 	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
