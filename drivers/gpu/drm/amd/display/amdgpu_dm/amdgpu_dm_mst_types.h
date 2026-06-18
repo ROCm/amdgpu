@@ -108,8 +108,15 @@ bool retrieve_branch_specific_data(struct amdgpu_dm_connector *aconnector);
 ssize_t dm_dp_aux_transfer_result(ssize_t result,
 				  enum aux_return_code_type operation_result);
 void dm_dp_aux_fill_payload_flags(u8 request, struct aux_payload *payload);
+ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg);
 u8 dm_mst_msg_ready_mask(enum mst_msg_ready_type msg_rdy_type);
 void dm_mst_select_esi_dpcd(u8 dpcd_rev, int *dpcd_addr, u8 *dpcd_bytes_to_read);
+struct drm_encoder *dm_mst_atomic_best_encoder(struct drm_connector *connector,
+						 struct drm_atomic_commit *state);
+int dm_dp_mst_atomic_check(struct drm_connector *connector,
+				   struct drm_atomic_commit *state);
+int dm_dp_mst_detect(struct drm_connector *connector,
+			     struct drm_modeset_acquire_ctx *ctx, bool force);
 #endif
 
 #endif
