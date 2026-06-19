@@ -888,15 +888,9 @@ int amdgpu_userq_ioctl(struct drm_device *dev, void *data,
 static int
 amdgpu_userq_restore_all(struct amdgpu_userq_mgr *uq_mgr)
 {
-	struct amdgpu_fpriv *fpriv = uq_mgr_to_fpriv(uq_mgr);
-	struct amdgpu_vm *vm = &fpriv->vm;
 	struct amdgpu_usermode_queue *queue;
 	unsigned long queue_id;
 	int ret = 0, r;
-
-
-	if (amdgpu_bo_reserve(vm->root.bo, false))
-		return false;
 
 	mutex_lock(&uq_mgr->userq_mutex);
 	/* Resume all the queues for this process */
@@ -913,10 +907,8 @@ amdgpu_userq_restore_all(struct amdgpu_userq_mgr *uq_mgr)
 		r = amdgpu_userq_map_helper(queue);
 		if (r)
 			ret = r;
-
 	}
 	mutex_unlock(&uq_mgr->userq_mutex);
-	amdgpu_bo_unreserve(vm->root.bo);
 
 	if (ret)
 		drm_file_err(uq_mgr->file,
@@ -974,7 +966,7 @@ amdgpu_userq_bo_validate(struct amdgpu_device *adev, struct drm_exec *exec,
 
 /* Make sure the whole VM is ready to be used */
 static int
-amdgpu_userq_vm_validate(struct amdgpu_userq_mgr *uq_mgr)
+amdgpu_userq_vm_validate_and_restore_queue(struct amdgpu_userq_mgr *uq_mgr)
 {
 	struct amdgpu_fpriv *fpriv = uq_mgr_to_fpriv(uq_mgr);
 	struct amdgpu_device *adev = uq_mgr->adev;
@@ -1111,8 +1103,12 @@ retry_lock:
 	dma_fence_wait(vm->last_update, false);
 
 	ret = amdgpu_evf_mgr_rearm(&fpriv->evf_mgr, &exec);
-	if (ret)
+	if (ret) {
 		drm_file_err(uq_mgr->file, "Failed to replace eviction fence\n");
+		goto unlock_all;
+	}
+
+	ret = amdgpu_userq_restore_all(uq_mgr);
 
 unlock_all:
 	drm_exec_fini(&exec);
@@ -1140,13 +1136,11 @@ static void amdgpu_userq_restore_worker(struct work_struct *work)
 	if (!dma_fence_is_signaled(ev_fence))
 		goto put_fence;
 
-	ret = amdgpu_userq_vm_validate(uq_mgr);
+	ret = amdgpu_userq_vm_validate_and_restore_queue(uq_mgr);
 	if (ret) {
 		drm_file_err(uq_mgr->file, "Failed to validate BOs to restore ret=%d\n", ret);
 		goto put_fence;
 	}
-
-	amdgpu_userq_restore_all(uq_mgr);
 
 put_fence:
 	dma_fence_put(ev_fence);
