@@ -2692,13 +2692,14 @@ void link_set_dpms_on(
 	 */
 	if (stream->timing.flags.DSC) {
 		if (dc_is_dp_signal(stream->signal) ||
-		    dc_is_virtual_signal(stream->signal))
+			dc_is_virtual_signal(stream->signal))
 			link_set_dsc_enable(pipe_ctx, true);
 	}
 
 	if (link->replay_settings.config.replay_supported && !dc_is_embedded_signal(link->connector_signal))
 		dp_setup_replay(link, stream);
 
+	// TODO: Split DPMS-on into 3 functions at this point
 	status = enable_link(state, pipe_ctx);
 
 	if (status != DC_OK) {
@@ -2711,9 +2712,9 @@ void link_set_dpms_on(
 		 * show the stream anyway. But MST displays can't proceed
 		 * without link training.
 		 */
-			if ((status != DC_FAIL_DP_LINK_TRAINING &&
-					status != DC_FAIL_HDMI_FRL_LINK_TRAINING) ||
-					stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
+		if ((status != DC_FAIL_DP_LINK_TRAINING &&
+				status != DC_FAIL_HDMI_FRL_LINK_TRAINING) ||
+				stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
 			if (false == link->link_status.link_active)
 				disable_link(link, &pipe_ctx->link_res,
 						stream->signal);
@@ -2721,6 +2722,7 @@ void link_set_dpms_on(
 			return;
 		}
 	}
+	// TODO: Split DPMS-on into 3 functions at this point
 
 	if (stream->timing.flags.DSC && dc_is_hdmi_frl_signal(stream->signal))
 		//TODO: bring HDMI FRL in line with DP
@@ -2739,13 +2741,11 @@ void link_set_dpms_on(
 	if (!(dc_is_virtual_signal(stream->signal) ||
 			dc_is_hdmi_frl_signal(stream->signal) ||
 			dp_is_128b_132b_signal(pipe_ctx))) {
-
-			if (link_enc)
-				link_enc->funcs->setup(
+		if (link_enc)
+			link_enc->funcs->setup(
 					link_enc,
 					stream->signal);
-
-		}
+	}
 
 	dc->hwss.enable_stream(pipe_ctx);
 
