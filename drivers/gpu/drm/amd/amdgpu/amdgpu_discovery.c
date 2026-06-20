@@ -95,6 +95,7 @@
 #include "lsdma_v6_0.h"
 #include "lsdma_v7_0.h"
 #include "lsdma_v7_1.h"
+#include "lsdma_v8_0.h"
 #include "vcn_v2_0.h"
 #include "jpeg_v2_0.h"
 #include "vcn_v3_0.h"
@@ -3994,6 +3995,9 @@ int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev)
 		break;
 	case IP_VERSION(7, 1, 0):
 		adev->lsdma.funcs = &lsdma_v7_1_funcs;
+		break;
+	case IP_VERSION(8, 0, 0):
+		adev->lsdma.funcs = &lsdma_v8_0_funcs;
 		break;
 	default:
 		break;
