@@ -430,7 +430,7 @@ static int reset_queue_mes(struct device_queue_manager *dqm, struct queue *q,
 	if (r)
 		return r;
 	/* Proceed remove_queue with reset=true */
-	remove_queue_mes_on_reset_option(dqm, q, &pdd->qpd, true, false);
+	remove_queue_mes_on_reset_option(dqm, q, &pdd->qpd, true, true);
 	set_queue_as_reset(dqm, q, &pdd->qpd);
 	return 0;
 }
