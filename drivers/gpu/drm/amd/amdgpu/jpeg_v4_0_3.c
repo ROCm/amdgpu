@@ -119,6 +119,19 @@ static int jpeg_v4_0_3_early_init(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
 
+	switch (amdgpu_user_queue) {
+	case -1:
+	case 0:
+	default:
+		adev->jpeg.disable_kq = false;
+		adev->jpeg.disable_uq = true;
+		break;
+	case 2:
+		adev->jpeg.disable_kq = true;
+		adev->jpeg.disable_uq = true;
+		break;
+	}
+
 	adev->jpeg.num_jpeg_rings = AMDGPU_MAX_JPEG_RINGS_4_0_3;
 
 	jpeg_v4_0_3_set_dec_ring_funcs(adev);
@@ -175,6 +188,10 @@ static int jpeg_v4_0_3_sw_init(struct amdgpu_ip_block *ip_block)
 		for (j = 0; j < adev->jpeg.num_jpeg_rings; ++j) {
 			ring = &adev->jpeg.inst[i].ring_dec[j];
 			ring->use_doorbell = true;
+			if (adev->jpeg.disable_kq) {
+				ring->no_scheduler = true;
+				ring->no_user_submission = true;
+			}
 			ring->vm_hub = AMDGPU_MMHUB0(adev->jpeg.inst[i].aid_id);
 			if (!amdgpu_sriov_vf(adev)) {
 				ring->doorbell_index =

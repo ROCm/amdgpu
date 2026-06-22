@@ -33,7 +33,6 @@
 #include <drm/drm_vblank.h>
 
 #include <linux/cc_platform.h>
-#include <linux/console.h>
 #include <linux/dynamic_debug.h>
 #include <linux/module.h>
 #include <linux/mmu_notifier.h>
@@ -146,7 +145,8 @@ enum AMDGPU_DEBUG_MASK {
 	AMDGPU_DEBUG_SMU_POOL = BIT(7),
 	AMDGPU_DEBUG_VM_USERPTR = BIT(8),
 	AMDGPU_DEBUG_DISABLE_RAS_CE_LOG = BIT(9),
-	AMDGPU_DEBUG_ENABLE_CE_CS = BIT(10)
+	AMDGPU_DEBUG_ENABLE_CE_CS = BIT(10),
+	AMDGPU_DEBUG_HIBERNATION_THAW_RESUME_GPU = BIT(11),
 };
 
 unsigned int amdgpu_vram_limit = UINT_MAX;
@@ -177,7 +177,6 @@ int amdgpu_dc = -1;
 int amdgpu_sched_jobs = 32;
 int amdgpu_sched_hw_submission = 2;
 int amdgpu_no_evict;
-int amdgpu_direct_gma_size;
 uint amdgpu_pcie_gen_cap;
 uint amdgpu_pcie_lane_cap;
 u64 amdgpu_cg_mask = 0xffffffffffffffff;
@@ -503,9 +502,6 @@ module_param_named(ppfeaturemask, amdgpu_pp_feature_mask, hexint, 0444);
 
 MODULE_PARM_DESC(no_evict, "Support pinning request from user space (1 = enable, 0 = disable (default))");
 module_param_named(no_evict, amdgpu_no_evict, int, 0444);
-
-MODULE_PARM_DESC(direct_gma_size, "Direct GMA size in megabytes (max 96MB)");
-module_param_named(direct_gma_size, amdgpu_direct_gma_size, int, 0444);
 
 /**
  * DOC: forcelongtraining (uint)
@@ -2317,6 +2313,11 @@ static void amdgpu_init_debug_options(struct amdgpu_device *adev)
 		pr_info("debug: allowing command submission to CE engine\n");
 		adev->debug_enable_ce_cs = true;
 	}
+
+	if (amdgpu_debug_mask & AMDGPU_DEBUG_HIBERNATION_THAW_RESUME_GPU) {
+		pr_info("debug: resume gpu in thaw() of hibernation\n");
+		adev->debug_hibernation_thaw_resume_gpu = true;
+	}
 }
 
 static unsigned long amdgpu_fix_asic_type(struct pci_dev *pdev, unsigned long flags)
@@ -2775,10 +2776,11 @@ static int amdgpu_pmops_freeze(struct device *dev)
 static int amdgpu_pmops_thaw(struct device *dev)
 {
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
+	struct amdgpu_device *adev = drm_to_adev(drm_dev);
 
 #if defined(HAVE_PM_HIBERNATION_MODE_IS_SUSPEND) || defined(HAVE_PM_HIBERNATE_IS_RECOVERING)
 	/* do not resume device if it's normal hibernation */
-	if (console_suspend_enabled &&
+	if (!adev->debug_hibernation_thaw_resume_gpu &&
 	    !pm_hibernate_is_recovering() &&
 	    !pm_hibernation_mode_is_suspend())
 		return 0;
@@ -3150,8 +3152,8 @@ const struct drm_ioctl_desc amdgpu_ioctls_kms[] = {
 	DRM_IOCTL_DEF_DRV(AMDGPU_USERQ_SIGNAL, amdgpu_userq_signal_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(AMDGPU_USERQ_WAIT, amdgpu_userq_wait_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_LIST_HANDLES, amdgpu_gem_list_handles_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_DGMA, amdgpu_gem_dgma_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(AMDGPU_SEM, amdgpu_sem_ioctl, DRM_AUTH|DRM_RENDER_ALLOW)
+	DRM_IOCTL_DEF_DRV(AMDGPU_SEM, amdgpu_sem_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(AMDGPU_PROC_OPTIONS, amdgpu_proc_options_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
 };
 
 static struct drm_driver amdgpu_kms_driver = {
@@ -3304,6 +3306,9 @@ static struct pci_driver amdgpu_kms_pci_driver = {
 static int __init amdgpu_init(void)
 {
 	int r;
+
+	/* Train lockdep on correct lock ordering */
+	amdgpu_lockdep_init();
 
 	r = amdgpu_sync_init();
 	if (r)

@@ -724,7 +724,12 @@ void amdgpu_device_mm_access(struct amdgpu_device *adev, loff_t pos,
 	if (!drm_dev_enter(adev_to_drm(adev), &idx))
 		return;
 
-	BUG_ON(!IS_ALIGNED(pos, 4) || !IS_ALIGNED(size, 4));
+	if (!IS_ALIGNED(pos, 4) || !IS_ALIGNED(size, 4)) {
+		dev_err(adev->dev, "unaligned pos/size (pos=0x%llx, size=0x%zx)\n",
+			pos, size);
+		drm_dev_exit(idx);
+		return;
+	}
 
 	spin_lock_irqsave(&adev->mmio_idx_lock, flags);
 	for (last = pos + size; pos < last; pos += 4) {
@@ -1634,7 +1639,6 @@ static int amdgpu_device_check_arguments(struct amdgpu_device *adev)
 	amdgpu_device_check_block_size(adev);
 
 	adev->firmware.load_type = amdgpu_ucode_get_load_type(adev, amdgpu_fw_load_type);
-	amdgpu_direct_gma_size = min(amdgpu_direct_gma_size, 96);
 
 	for (i = 0; i < MAX_XCP; i++) {
 		switch (amdgpu_enforce_isolation) {
@@ -2071,7 +2075,7 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 		adev->flags |= AMD_IS_PX;
 
 	if (!(adev->flags & AMD_IS_APU)) {
-		parent = pcie_find_root_port(adev->pdev);
+		parent = amdgpu_device_find_parent(adev);
 		adev->has_pr3 = parent ? pci_pr3_present(parent) : false;
 	}
 
@@ -3082,7 +3086,7 @@ static int amdgpu_device_ip_suspend_phase2(struct amdgpu_device *adev)
 		amdgpu_dpm_gfx_state_change(adev, sGpuChangeState_D3Entry);
 
 	for (i = adev->num_ip_blocks - 1; i >= 0; i--) {
-		if (!adev->ip_blocks[i].status.valid)
+		if (!adev->ip_blocks[i].status.valid || !adev->ip_blocks[i].status.hw)
 			continue;
 		/* displays are handled in phase1 */
 		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_DCE)
@@ -3801,6 +3805,9 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	mutex_init(&adev->pm.stable_pstate_ctx_lock);
 	mutex_init(&adev->benchmark_mutex);
 	mutex_init(&adev->gfx.reset_sem_mutex);
+
+	/* Associate locks with lockdep classes for ordering validation */
+	amdgpu_lockdep_set_class(adev);
 	/* Initialize the mutex for cleaner shader isolation between GFX and compute processes */
 	mutex_init(&adev->enforce_isolation_mutex);
 	for (i = 0; i < MAX_XCP; ++i) {
@@ -3812,6 +3819,9 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	mutex_init(&adev->gfx.workload_profile_mutex);
 	mutex_init(&adev->vcn.workload_profile_mutex);
 
+	spin_lock_init(&adev->irq.lock);
+
+	amdgpu_early_init_rlc_reg_funcs(adev);
 	amdgpu_device_init_apu_flags(adev);
 
 	r = amdgpu_device_check_arguments(adev);
@@ -5169,12 +5179,12 @@ link_reset_failed:
 int amdgpu_device_pre_asic_reset(struct amdgpu_device *adev,
 				 struct amdgpu_reset_context *reset_context)
 {
-	int i, r = 0;
 	struct amdgpu_job *job = NULL;
 	struct dma_fence *fence = NULL;
 	struct amdgpu_device *tmp_adev = reset_context->reset_req_dev;
 	bool need_full_reset =
 		test_bit(AMDGPU_NEED_FULL_RESET, &reset_context->flags);
+	int i, r;
 
 	if (reset_context->reset_req_dev == adev)
 		job = reset_context->job;
@@ -5199,9 +5209,6 @@ int amdgpu_device_pre_asic_reset(struct amdgpu_device *adev,
 	}
 
 	amdgpu_fence_driver_isr_toggle(adev, false);
-
-	if (job && job->vm)
-		drm_sched_increase_karma(&job->base);
 
 	r = amdgpu_reset_prepare_hwcontext(adev, reset_context);
 	/* If reset handler not implemented, continue; otherwise return */

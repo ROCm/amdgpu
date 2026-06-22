@@ -95,6 +95,7 @@ struct kfd_sdma_activity_handler_workarea {
 
 struct temp_sdma_queue_list {
 	uint64_t __user *rptr;
+	void *mqd;
 	uint64_t sdma_val;
 	unsigned int queue_id;
 	struct list_head list;
@@ -165,6 +166,7 @@ static void kfd_sdma_activity_worker(struct work_struct *work)
 
 		INIT_LIST_HEAD(&sdma_q->list);
 		sdma_q->rptr = (uint64_t __user *)q->properties.read_ptr;
+		sdma_q->mqd = q->mqd;
 		sdma_q->queue_id = q->properties.queue_id;
 		list_add_tail(&sdma_q->list, &sdma_q_list.list);
 	}
@@ -193,7 +195,15 @@ static void kfd_sdma_activity_worker(struct work_struct *work)
 
 	list_for_each_entry(sdma_q, &sdma_q_list.list, list) {
 		val = 0;
-		ret = read_sdma_queue_counter(sdma_q->rptr, &val);
+
+		if (dqm->dev->kfd2kgd->hqd_sdma_get_counter)
+			ret = dqm->dev->kfd2kgd->hqd_sdma_get_counter(
+					dqm->dev->adev, sdma_q->mqd,
+					dqm->dev->kfd->device_info.num_sdma_queues_per_engine,
+					&val);
+		else
+			ret = read_sdma_queue_counter(sdma_q->rptr, &val);
+
 		if (ret) {
 			pr_debug("Failed to read SDMA queue active counter for queue id: %d",
 				 sdma_q->queue_id);
@@ -1052,6 +1062,33 @@ out:
 	return process;
 }
 
+/**
+ * amdgpu_amdkfd_set_sigbus_delay - Set per-process KFD SIGBUS delay
+ * @task: task in the target process
+ * @ms:   encoded delay value (0 = immediate, 0xFFFFFFFF = suppress,
+ *        otherwise delay in milliseconds)
+ *
+ * Stores the SIGBUS delivery option on the kfd_process associated with
+ * @task. If the calling process has not opened /dev/kfd yet (no
+ * kfd_process exists), this is a no-op - the option only applies to
+ * processes that actually use KFD.
+ */
+int amdgpu_amdkfd_set_sigbus_delay(struct task_struct *task, u32 ms)
+{
+	struct kfd_process *p;
+
+	if (!task->mm)
+		return -EINVAL;
+
+	p = kfd_lookup_process_by_mm(task->mm);
+	if (!p)
+		return 0;
+
+	atomic_set(&p->kfd_sigbus_delay_ms, ms);
+	kfd_unref_process(p);
+	return 0;
+}
+
 static struct kfd_process *find_process_by_mm(const struct mm_struct *mm)
 {
 	struct kfd_process *process;
@@ -1245,10 +1282,12 @@ static void kfd_process_remove_sysfs(struct kfd_process *p)
 	if (!p->kobj)
 		return;
 
-	sysfs_remove_file(p->kobj, &p->attr_pasid);
-	kobject_del(p->kobj_queues);
-	kobject_put(p->kobj_queues);
-	p->kobj_queues = NULL;
+	if (p->kobj_queues) {
+		sysfs_remove_file(p->kobj, &p->attr_pasid);
+		kobject_del(p->kobj_queues);
+		kobject_put(p->kobj_queues);
+		p->kobj_queues = NULL;
+	}
 
 	for (i = 0; i < p->n_pdds; i++) {
 		pdd = p->pdds[i];
@@ -1256,17 +1295,21 @@ static void kfd_process_remove_sysfs(struct kfd_process *p)
 		sysfs_remove_file(p->kobj, &pdd->attr_vram);
 		sysfs_remove_file(p->kobj, &pdd->attr_sdma);
 
-		sysfs_remove_file(pdd->kobj_stats, &pdd->attr_evict);
-		if (pdd->dev->kfd2kgd->get_cu_occupancy)
-			sysfs_remove_file(pdd->kobj_stats,
-					  &pdd->attr_cu_occupancy);
-		kobject_del(pdd->kobj_stats);
-		kobject_put(pdd->kobj_stats);
-		pdd->kobj_stats = NULL;
+		if (pdd->kobj_stats) {
+			sysfs_remove_file(pdd->kobj_stats, &pdd->attr_evict);
+			if (pdd->dev->kfd2kgd->get_cu_occupancy)
+				sysfs_remove_file(pdd->kobj_stats,
+						  &pdd->attr_cu_occupancy);
+			kobject_del(pdd->kobj_stats);
+			kobject_put(pdd->kobj_stats);
+			pdd->kobj_stats = NULL;
+		}
 	}
 
 	for_each_set_bit(i, p->svms.bitmap_supported, p->n_pdds) {
 		pdd = p->pdds[i];
+		if (!pdd->kobj_counters)
+			continue;
 
 		sysfs_remove_file(pdd->kobj_counters, &pdd->attr_faults);
 		sysfs_remove_file(pdd->kobj_counters, &pdd->attr_page_in);
@@ -1346,6 +1389,13 @@ static void kfd_process_wq_release(struct work_struct *work)
 
 	kfd_debugfs_remove_process(p);
 
+	/*
+	 * Remove the proc/sysfs entries before destroying PDDs. The removal path
+	 * walks the PDD array and sysfs callbacks dereference PDD fields, so the
+	 * backing data must remain valid until sysfs removal has completed.
+	 */
+	kfd_process_remove_sysfs(p);
+
 	kfd_process_kunmap_signal_bo(p);
 	kfd_process_free_outstanding_kfd_bos(p);
 	svm_range_list_fini(p);
@@ -1358,11 +1408,6 @@ static void kfd_process_wq_release(struct work_struct *work)
 	mutex_destroy(&p->mutex);
 
 	put_task_struct(p->lead_thread);
-
-	/* the last step is removing process entries under /sys
-	 * to indicate the process has been terminated.
-	 */
-	kfd_process_remove_sysfs(p);
 
 	kfree(p);
 }
@@ -1426,6 +1471,11 @@ void kfd_process_notifier_release_internal(struct kfd_process *p)
 	kfd_process_table_remove(p);
 	cancel_delayed_work_sync(&p->eviction_work);
 	cancel_delayed_work_sync(&p->restore_work);
+	/*
+	 * If work pending, cancel it and drop the extra ref
+	 */
+	if (cancel_delayed_work_sync(&p->signal_work))
+		kfd_unref_process(p);
 
 	/*
 	 * Dequeue and destroy user queues, it is not safe for GPU to access
@@ -1720,6 +1770,7 @@ struct kfd_process *create_process(const struct task_struct *thread, bool primar
 
 	INIT_DELAYED_WORK(&process->eviction_work, evict_process_worker);
 	INIT_DELAYED_WORK(&process->restore_work, restore_process_worker);
+	INIT_DELAYED_WORK(&process->signal_work, kfd_signal_sigbus_delayed_fn);
 	process->last_restore_timestamp = get_jiffies_64();
 	err = kfd_event_init_process(process);
 	if (err)
@@ -2212,7 +2263,7 @@ int kfd_process_evict_queues(struct kfd_process *p, bool force, uint32_t trigger
 		struct kfd_process_device *pdd = p->pdds[i];
 		struct device *dev = pdd->dev->adev->dev;
 
-		kfd_smi_event_queue_eviction(pdd->dev, p->lead_thread->pid,
+		kfd_smi_event_queue_eviction(pdd->dev, p->lead_thread,
 					     trigger);
 
 		r_tmp = pdd->dev->dqm->ops.evict_process_queues(pdd->dev->dqm,
@@ -2244,7 +2295,7 @@ fail:
 		if (n_evicted == 0)
 			break;
 
-		kfd_smi_event_queue_restore(pdd->dev, p->lead_thread->pid);
+		kfd_smi_event_queue_restore(pdd->dev, p->lead_thread);
 
 		if (pdd->dev->dqm->ops.restore_process_queues(pdd->dev->dqm,
 							      &pdd->qpd))
@@ -2267,7 +2318,7 @@ int kfd_process_restore_queues(struct kfd_process *p)
 		struct kfd_process_device *pdd = p->pdds[i];
 		struct device *dev = pdd->dev->adev->dev;
 
-		kfd_smi_event_queue_restore(pdd->dev, p->lead_thread->pid);
+		kfd_smi_event_queue_restore(pdd->dev, p->lead_thread);
 
 		r = pdd->dev->dqm->ops.restore_process_queues(pdd->dev->dqm,
 							      &pdd->qpd);

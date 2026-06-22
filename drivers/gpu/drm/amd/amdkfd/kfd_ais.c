@@ -33,6 +33,23 @@
 #include <linux/netdevice.h>
 #include <net/route.h>
 #include <linux/inet.h>
+#include <linux/fs.h>
+#if IS_ENABLED(CONFIG_NFS_FS)
+#include <net/ip6_route.h>
+#include <linux/nfs_fs.h>
+#include <linux/sunrpc/clnt.h>
+#include <linux/sunrpc/xprt.h>
+#endif
+
+/*
+ * AIS Storage Type - identifies the type of storage backend
+ */
+enum ais_storage_type {
+	AIS_STORAGE_BLOCK,      /* Local block device (NVMe, etc.) */
+	AIS_STORAGE_NETWORK,    /* Network filesystem (NFS, CIFS, etc.) */
+	AIS_STORAGE_UNKNOWN,    /* Unknown/unsupported storage type */
+};
+
 /* Each VRAM page uses sizeof(struct page) on system memory */
 #define AIS_P2P_PAGE_STRUCT_SIZE(size) ((size)/PAGE_SIZE * sizeof(struct page))
 
@@ -258,9 +275,6 @@ static struct bio_vec *amdgpu_init_bvec(struct sg_table *sgt, uint64_t size,
 	return bvec;
 }
 
-/* Each VRAM page uses sizeof(struct page) on system memory */
-#define AIS_P2P_PAGE_STRUCT_SIZE(size) ((size)/PAGE_SIZE * sizeof(struct page))
-
 int kfd_ais_init(struct amdgpu_device *adev)
 {
 #ifdef CONFIG_PCI_P2PDMA
@@ -455,6 +469,401 @@ static bool kfd_ais_check_p2p_cached(struct kfd_process_device *pdd,
 	return xa_load(&pdd->ais_counters_xa, kfd_ais_make_key(pdev)) != NULL;
 }
 
+/*
+ * kfd_ais_get_storage_type - Determine the storage type for a file
+ *
+ * @file: The file pointer to check
+ * Returns: AIS_STORAGE_BLOCK for local block devices,
+ *          AIS_STORAGE_NETWORK for network filesystems (NFS),
+ *          AIS_STORAGE_UNKNOWN for unsupported types
+ */
+static enum ais_storage_type kfd_ais_get_storage_type(struct file *file)
+{
+	struct super_block *sb;
+	const char *fstype;
+
+	if (!file || !file->f_path.mnt || !file->f_path.mnt->mnt_sb)
+		return AIS_STORAGE_UNKNOWN;
+
+	sb = file->f_path.mnt->mnt_sb;
+	fstype = sb->s_type->name;
+
+	if (S_ISBLK(file_inode(file)->i_mode) || sb->s_bdev)
+		return AIS_STORAGE_BLOCK;
+
+#if IS_ENABLED(CONFIG_NFS_FS)
+	if (fstype) {
+		/* NFS variants */
+		if (strcmp(fstype, "nfs") == 0 ||
+		    strcmp(fstype, "nfs4") == 0)
+			return AIS_STORAGE_NETWORK;
+	}
+#endif
+
+	return AIS_STORAGE_UNKNOWN;
+}
+
+#if IS_ENABLED(CONFIG_NFS_FS)
+/**
+ * route_to_netdev() - Find the network device that routes to a given IPv4 address
+ * @net: Network namespace to use for routing lookup
+ * @dst_ip: Destination IPv4 address in network byte order
+ *
+ * Return: net_device with refcount held, or NULL. Caller must dev_put().
+ */
+static struct net_device *route_to_netdev(struct net *net, __be32 dst_ip)
+{
+	struct flowi4 fl4 = {};
+	struct rtable *rt;
+	struct net_device *netdev;
+
+	fl4.daddr = dst_ip;
+	rt = ip_route_output_flow(net, &fl4, NULL);
+	if (IS_ERR(rt))
+		return NULL;
+
+	netdev = rt->dst.dev;
+	dev_hold(netdev);
+	ip_rt_put(rt);
+
+	return netdev;
+}
+
+#if IS_ENABLED(CONFIG_IPV6)
+/**
+ * route_to_netdev6() - Find the network device that routes to a given IPv6 address
+ * @net: Network namespace to use for routing lookup
+ * @dst_ip: Destination IPv6 address
+ *
+ * Return: net_device with refcount held, or NULL. Caller must dev_put().
+ */
+static struct net_device *route_to_netdev6(struct net *net,
+					   const struct in6_addr *dst_ip)
+{
+	struct flowi6 fl6 = {};
+	struct dst_entry *dst;
+	struct net_device *netdev;
+
+	fl6.daddr = *dst_ip;
+	dst = ip6_route_output(net, NULL, &fl6);
+	if (IS_ERR(dst) || dst->error) {
+		if (!IS_ERR(dst))
+			dst_release(dst);
+		return NULL;
+	}
+
+	netdev = dst->dev;
+	dev_hold(netdev);
+	dst_release(dst);
+
+	return netdev;
+}
+#endif /* IS_ENABLED(CONFIG_IPV6) */
+
+#define NFS_ROUTE_CACHE_SIZE 16
+
+struct nfs_route_cache_entry {
+	sa_family_t family;
+	union {
+		__be32 ip4;
+		struct in6_addr ip6;
+	} addr;
+	struct pci_dev *pdev;  /* NULL means lookup failed */
+};
+
+/**
+ * struct nfs_p2p_check_ctx - Context for iterating over NFS transports
+ * @gpu_dev: GPU device to check P2P against
+ * @pdd: Process device data for P2P distance caching
+ * @net: Network namespace for routing lookups
+ * @transport_count: Total number of transports checked
+ * @failed_count: Number of transports that failed P2P
+ * @route_cache: Per-I/O cache of route lookup results
+ * @cache_count: Number of entries in route_cache
+ */
+struct nfs_p2p_check_ctx {
+	struct device *gpu_dev;
+	struct kfd_process_device *pdd;  /* for P2P distance cache */
+	struct net *net;  /* network namespace for routing lookups */
+	int transport_count;  /* total number of transports checked */
+	int failed_count;     /* number of transports that failed P2P */
+	/* Per-IO route cache */
+	struct nfs_route_cache_entry route_cache[NFS_ROUTE_CACHE_SIZE];
+	int cache_count;
+};
+
+/**
+ * nfs_route_cache_lookup() - Check route cache for a cached PCI device lookup
+ * @ctx: P2P check context containing the cache
+ * @addr: Socket address to look up
+ *
+ * Return: Cached pci_dev pointer, or ERR_PTR(-ENOENT) if not in cache.
+ */
+static struct pci_dev *nfs_route_cache_lookup(struct nfs_p2p_check_ctx *ctx,
+					      struct sockaddr_storage *addr)
+{
+	int i;
+
+	for (i = 0; i < ctx->cache_count; i++) {
+		struct nfs_route_cache_entry *e = &ctx->route_cache[i];
+
+		if (e->family != addr->ss_family)
+			continue;
+
+		if (addr->ss_family == AF_INET) {
+			struct sockaddr_in *sin = (struct sockaddr_in *)addr;
+
+			if (e->addr.ip4 == sin->sin_addr.s_addr)
+				return e->pdev;
+#if IS_ENABLED(CONFIG_IPV6)
+		} else if (addr->ss_family == AF_INET6) {
+			struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)addr;
+
+			if (ipv6_addr_equal(&e->addr.ip6, &sin6->sin6_addr))
+				return e->pdev;
+#endif
+		}
+	}
+	return ERR_PTR(-ENOENT);
+}
+
+/**
+ * nfs_route_cache_add() - Add a route lookup result to the cache
+ * @ctx: P2P check context containing the cache
+ * @addr: Socket address that was looked up
+ * @pdev: PCI device result (or NULL if lookup failed)
+ */
+static void nfs_route_cache_add(struct nfs_p2p_check_ctx *ctx,
+				struct sockaddr_storage *addr,
+				struct pci_dev *pdev)
+{
+	struct nfs_route_cache_entry *e;
+
+	if (ctx->cache_count >= NFS_ROUTE_CACHE_SIZE)
+		return;  /* Cache full, skip */
+
+	e = &ctx->route_cache[ctx->cache_count++];
+	e->family = addr->ss_family;
+	e->pdev = pdev;
+
+	if (addr->ss_family == AF_INET) {
+		struct sockaddr_in *sin = (struct sockaddr_in *)addr;
+
+		e->addr.ip4 = sin->sin_addr.s_addr;
+#if IS_ENABLED(CONFIG_IPV6)
+	} else if (addr->ss_family == AF_INET6) {
+		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)addr;
+
+		e->addr.ip6 = sin6->sin6_addr;
+#endif
+	}
+}
+
+/**
+ * nfs_xprt_check_p2p() - Callback to check P2P for one NFS transport
+ * @clnt: RPC client (unused)
+ * @xprt: RPC transport to check
+ * @data: nfs_p2p_check_ctx pointer
+ *
+ * Called for each transport in an NFS client's transport list.
+ * Finds the NIC that routes to this transport's destination and
+ * validates P2P distance to the GPU.
+ *
+ * Return: Always 0 to continue iteration.
+ */
+static int nfs_xprt_check_p2p(struct rpc_clnt *clnt, struct rpc_xprt *xprt,
+			      void *data)
+{
+	struct nfs_p2p_check_ctx *ctx = data;
+	struct net_device *netdev;
+	struct pci_dev *pdev;
+	int distance;
+
+	ctx->transport_count++;
+
+	/* Check route cache first to avoid redundant lookups */
+	pdev = nfs_route_cache_lookup(ctx, &xprt->addr);
+	if (!IS_ERR(pdev)) {
+		if (!pdev) {
+			ctx->failed_count++;
+			return 0;
+		}
+		goto check_p2p;
+	}
+
+	/* Cache miss, do the route lookup */
+	if (xprt->addr.ss_family == AF_INET) {
+		struct sockaddr_in *sin = (struct sockaddr_in *)&xprt->addr;
+
+		netdev = route_to_netdev(ctx->net, sin->sin_addr.s_addr);
+#if IS_ENABLED(CONFIG_IPV6)
+	} else if (xprt->addr.ss_family == AF_INET6) {
+		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&xprt->addr;
+
+		netdev = route_to_netdev6(ctx->net, &sin6->sin6_addr);
+#endif
+	} else {
+		pr_debug("AIS: NFS transport uses unsupported address family %d\n",
+			 xprt->addr.ss_family);
+		ctx->failed_count++;
+		return 0;
+	}
+	if (!netdev) {
+		pr_debug("AIS: no route for NFS transport\n");
+		nfs_route_cache_add(ctx, &xprt->addr, NULL);
+		ctx->failed_count++;
+		return 0;
+	}
+
+	pdev = netdev_to_pci_dev(netdev);
+	dev_put(netdev);
+
+	if (!pdev) {
+		pr_debug("AIS: NFS transport NIC has no PCI parent\n");
+		nfs_route_cache_add(ctx, &xprt->addr, NULL);
+		ctx->failed_count++;
+		return 0;
+	}
+
+	nfs_route_cache_add(ctx, &xprt->addr, pdev);
+
+check_p2p:
+	if (kfd_ais_check_p2p_cached(ctx->pdd, pdev))
+		return 0;
+
+	distance = pci_p2pdma_distance(pdev, ctx->gpu_dev, false);
+	if (distance < 0) {
+		pr_debug("AIS: P2P not accessible for NFS transport NIC %s\n",
+			 pci_name(pdev));
+		ctx->failed_count++;
+		return 0;
+	}
+
+	/* Cache successful result for this NIC */
+	kfd_ais_create_counter(pdev, ctx->pdd);
+
+	return 0;
+}
+
+/**
+ * nfs_check_all_transports_p2p() - Verify P2P accessibility for all NFS transports
+ * @server: NFS server structure
+ * @gpu_dev: GPU device to check P2P against
+ * @pdd: Process device data for P2P distance caching
+ *
+ * Return: 0 if all transports pass P2P check, negative error otherwise.
+ */
+static int nfs_check_all_transports_p2p(struct nfs_server *server,
+					struct device *gpu_dev,
+					struct kfd_process_device *pdd)
+{
+	struct nfs_p2p_check_ctx ctx = {
+		.gpu_dev = gpu_dev,
+		.pdd = pdd,
+		.transport_count = 0,
+		.failed_count = 0,
+	};
+
+	if (!server->nfs_client || !server->nfs_client->cl_rpcclient)
+		return -EINVAL;
+
+	ctx.net = server->nfs_client->cl_net;
+
+	rpc_clnt_iterate_for_each_xprt(server->nfs_client->cl_rpcclient,
+				       nfs_xprt_check_p2p, &ctx);
+
+	if (ctx.transport_count == 0) {
+		pr_debug("AIS: NFS has no transports\n");
+		return -ENODEV;
+	}
+
+	if (ctx.failed_count > 0) {
+		pr_info("AIS: NFS P2P check: %d/%d transports failed\n",
+			ctx.failed_count, ctx.transport_count);
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+/**
+ * nfs_get_server_netdev() - Find the network device for an NFS mount
+ * @sb: Superblock of the NFS filesystem
+ *
+ * Return: net_device with refcount held, or NULL. Caller must dev_put().
+ */
+static struct net_device *nfs_get_server_netdev(struct super_block *sb)
+{
+	struct nfs_server *server;
+	struct net_device *netdev;
+	struct net *net;
+
+	if (!sb || !sb->s_fs_info)
+		return NULL;
+
+	server = NFS_SB(sb);
+	if (!server || !server->nfs_client)
+		return NULL;
+
+	net = server->nfs_client->cl_net;
+
+	if (server->nfs_client->cl_addr.ss_family == AF_INET) {
+		struct sockaddr_in *sin;
+
+		sin = (struct sockaddr_in *)&server->nfs_client->cl_addr;
+		netdev = route_to_netdev(net, sin->sin_addr.s_addr);
+#if IS_ENABLED(CONFIG_IPV6)
+	} else if (server->nfs_client->cl_addr.ss_family == AF_INET6) {
+		struct sockaddr_in6 *sin6;
+
+		sin6 = (struct sockaddr_in6 *)&server->nfs_client->cl_addr;
+		netdev = route_to_netdev6(net, &sin6->sin6_addr);
+#endif
+	} else {
+		pr_debug("AIS: NFS server uses unsupported address family\n");
+		return NULL;
+	}
+
+	return netdev;
+}
+
+/*
+ * get_network_fs_pci_dev - Get the PCI device of the NIC for a network filesystem
+ *
+ * @file: File on the network filesystem
+ * Return: PCI device pointer with reference held, or NULL. Caller must pci_dev_put().
+ */
+static struct pci_dev *get_network_fs_pci_dev(struct file *file)
+{
+	struct super_block *sb;
+	struct net_device *netdev;
+	struct pci_dev *pdev;
+
+	if (!file || !file->f_path.mnt || !file->f_path.mnt->mnt_sb)
+		return NULL;
+
+	sb = file->f_path.mnt->mnt_sb;
+
+	/* Caller already verified this is NFS via kfd_ais_get_storage_type() */
+	netdev = nfs_get_server_netdev(sb);
+	if (!netdev) {
+		pr_debug("AIS: could not find NIC for NFS filesystem\n");
+		return NULL;
+	}
+
+	pdev = netdev_to_pci_dev(netdev);
+	dev_put(netdev);
+
+	if (!pdev) {
+		pr_debug("AIS: NIC has no PCI parent\n");
+		return NULL;
+	}
+
+	pci_dev_get(pdev);
+	return pdev;
+}
+#endif /* IS_ENABLED(CONFIG_NFS_FS) */
+
 #ifdef STATX_DIOALIGN
 static int kfd_ais_get_dio_align(struct file *filep, unsigned int *offset_align,
 			unsigned int *mem_align)
@@ -476,12 +885,31 @@ static int kfd_ais_get_dio_align(struct file *filep, unsigned int *offset_align,
 }
 #endif
 
+static int kfd_ais_zerosize_io_rw_file(struct file *file, struct kfd_ais_in_args *in)
+{
+	struct iov_iter iter;
+	struct kiocb kiocb;
+	struct bio_vec bvec;
+	bool is_read = (in->op == KFD_IOC_AIS_READ);
+
+	memset(&bvec, 0, sizeof(bvec));
+	iov_iter_bvec(&iter, is_read ? ITER_DEST : ITER_SOURCE, &bvec, 0, 0);
+
+	init_sync_kiocb(&kiocb, file);
+	kiocb.ki_pos = in->file_offset;
+	if (file->f_flags & O_DIRECT)
+		kiocb.ki_flags |= IOCB_DIRECT;
+
+	return is_read ? vfs_iocb_iter_read(file, &kiocb, &iter) :
+			 vfs_iocb_iter_write(file, &kiocb, &iter);
+}
+
 int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		    struct kfd_ais_in_args *in, struct kfd_process_device *pdd,
 		    uint64_t *size_copied)
 {
 	struct file *filep;
-	struct pci_dev *pdev;
+	struct pci_dev *pdev = NULL;
 	struct sg_table *sgt;
 	int nr_segs = 0, retry = 3;
 	struct iov_iter iter;
@@ -490,6 +918,7 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	loff_t cur_pos;
 	int ret = 0;
 	bool is_read = (in->op == KFD_IOC_AIS_READ);
+	enum ais_storage_type storage_type;
 #ifdef STATX_DIOALIGN
 	unsigned int dio_offset_align, dio_mem_align;
 #else
@@ -503,6 +932,9 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	filep = fget((unsigned int)in->fd);
 	if (!filep)
 		return -EBADF;
+
+	storage_type = kfd_ais_get_storage_type(filep);
+
 #ifdef STATX_DIOALIGN
 	if (filep->f_flags & O_DIRECT) {
 		ret = kfd_ais_get_dio_align(filep, &dio_offset_align, &dio_mem_align);
@@ -519,7 +951,39 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	}
 #endif
 
-	pdev = get_pci_dev_from_file(filep);
+	switch (storage_type) {
+	case AIS_STORAGE_BLOCK:
+		pdev = get_pci_dev_from_file(filep);
+		break;
+#if IS_ENABLED(CONFIG_NFS_FS)
+	case AIS_STORAGE_NETWORK:
+		/*
+		 * For NFS, first verify P2P accessibility for all transports.
+		 * NFSv4.1+ can have multiple transports (trunking/multipath)
+		 * going over different NICs - we must verify all of them.
+		 */
+		if (filep->f_path.mnt && filep->f_path.mnt->mnt_sb &&
+		    filep->f_path.mnt->mnt_sb->s_fs_info) {
+			ret = nfs_check_all_transports_p2p(
+				NFS_SB(filep->f_path.mnt->mnt_sb),
+				adev->dev, pdd);
+			if (ret) {
+				dev_info(adev->dev,
+					 "AIS: NFS transport P2P check failed\n");
+				goto out;
+			}
+		}
+		/* Get primary NIC for P2P cache entry */
+		pdev = get_network_fs_pci_dev(filep);
+		break;
+#endif
+	case AIS_STORAGE_UNKNOWN:
+	default:
+		dev_err(adev->dev, "AIS: unsupported storage type\n");
+		ret = -ENODEV;
+		goto out;
+	}
+
 	if (!pdev) {
 		ret = -ENODEV;
 		goto out;
@@ -527,10 +991,13 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 
 	/* Check if P2P already validated; on miss, check and create entry */
 	if (!kfd_ais_check_p2p_cached(pdd, pdev)) {
-		if (pci_p2pdma_distance(pdev, adev->dev, false) < 0) {
-			dev_info(adev->dev, "DMA-BUF p2p not accessible!\n");
-			ret = -ENODEV;
-			goto put_pdev;
+		/* For network storage, P2P was already verified for all transports */
+		if (storage_type != AIS_STORAGE_NETWORK) {
+			if (pci_p2pdma_distance(pdev, adev->dev, false) < 0) {
+				dev_info(adev->dev, "AIS: P2P DMA not accessible\n");
+				ret = -ENODEV;
+				goto out;
+			}
 		}
 		/* P2P accessible - create counter entry so future calls skip
 		 * the distance check.
@@ -540,7 +1007,16 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 
 	if (WARN_ON(bo->preferred_domains != AMDGPU_GEM_DOMAIN_VRAM)) {
 		ret = -EINVAL;
-		goto put_pdev;
+		goto out;
+	}
+	/*
+	 * Zero sized IO is supported by read and write operations.
+	 */
+	if (in->size == 0) {
+		ret = kfd_ais_zerosize_io_rw_file(filep, in);
+		if (ret)
+			dev_err(adev->dev, "AIS: failed to read/write zero size IO\n");
+		goto out;
 	}
 	/* Use NULL instead of peer pdev. This is deliberate so that
 	 * sg_dma_address is set to physical address instead of dma mapped
@@ -551,7 +1027,7 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 					       in->size, NULL, DMA_BIDIRECTIONAL, &sgt);
 	if (ret) {
 		dev_err(adev->dev, "AIS: failed to get SG table\n");
-		goto put_pdev;
+		goto out;
 	}
 
 	bvec = amdgpu_init_bvec(sgt, in->size, &nr_segs);
@@ -595,16 +1071,25 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 
 
 	if (ret > 0 || (ret == 0 && is_read)) {
-		dev_dbg(adev->dev, "AIS: vfs transfer %llu bytes\n", *size_copied);
-		ret = kfd_ais_update_counters(*size_copied, pdev, pdd, is_read);
+		dev_dbg(adev->dev, "AIS: vfs transfer %llu bytes (%s)\n",
+			*size_copied,
+			storage_type == AIS_STORAGE_NETWORK ? "network" : "block");
+		/*
+		 * Skip per-NIC byte accounting for NFS. With NFSv4.1+
+		 * trunking/multipath, I/O can flow through multiple NICs,
+		 * so attributing all bytes to the primary NIC (cl_addr)
+		 * would make the per-NIC sysfs counters incorrect.
+		 */
+		if (pdev && storage_type != AIS_STORAGE_NETWORK)
+			ret = kfd_ais_update_counters(*size_copied, pdev, pdd, is_read);
 	}
 
 	kvfree(bvec);
 put_sg:
 	amdgpu_amdkfd_gpuvm_put_sg_table(bo, NULL, DMA_BIDIRECTIONAL, sgt);
-put_pdev:
-	pci_dev_put(pdev);
 out:
+	if (pdev)
+		pci_dev_put(pdev);
 	fput(filep);
 	return ret < 0 ? ret : 0;
 

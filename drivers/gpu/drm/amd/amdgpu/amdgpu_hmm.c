@@ -830,7 +830,6 @@ int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 	const u64 max_bytes = SZ_2G;
 
 	struct hmm_range *hmm_range = &range->hmm_range;
-	unsigned long timeout;
 	unsigned long *pfns;
 	unsigned long end;
 	int r;
@@ -867,23 +866,13 @@ int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 		pr_debug("hmm range: start = 0x%lx, end = 0x%lx",
 			hmm_range->start, hmm_range->end);
 
-		timeout = jiffies + msecs_to_jiffies(HMM_RANGE_DEFAULT_TIMEOUT);
-
-retry:
 		r = hmm_range_fault(hmm_range);
 #ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
-		if (unlikely(r <= 0)) {
+		if (unlikely(r <= 0))
 #else
-		if (unlikely(r)) {
+		if (unlikely(r))
 #endif
-#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
-			if ((r == 0 || r == -EBUSY) && !time_after(jiffies, timeout))
-#else
-			if (r == -EBUSY && !time_after(jiffies, timeout))
-#endif
-				goto retry;
 			goto out_free_pfns;
-		}
 
 		if (hmm_range->end == end)
 			break;

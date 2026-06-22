@@ -676,3 +676,13 @@ int ras_core_convert_soc_pa_to_cur_nps_pages(struct ras_core_context *ras_core,
 
 	return count;
 }
+
+int ras_core_check_address_sanity(struct ras_core_context *ras_core,
+		uint64_t addr)
+{
+	if (ras_core && ras_core->sys_fn &&
+		ras_core->sys_fn->check_address_sanity)
+		return ras_core->sys_fn->check_address_sanity(ras_core, addr);
+
+	return 0;
+}

@@ -806,6 +806,8 @@ static ssize_t amdgpu_set_pp_od_clk_voltage(struct device *dev,
 	while ((sub_str = strsep(&tmp_str, delimiter)) != NULL) {
 		if (strlen(sub_str) == 0)
 			continue;
+		if (parameter_size >= ARRAY_SIZE(parameter))
+			return -EINVAL;
 		ret = kstrtol(sub_str, 0, &parameter[parameter_size]);
 		if (ret)
 			return -EINVAL;
@@ -874,6 +876,8 @@ static ssize_t amdgpu_get_pp_od_clk_voltage(struct device *dev,
 
 	for (clk_index = 0 ; clk_index < ARRAY_SIZE(od_clocks) ; clk_index++) {
 		amdgpu_dpm_emit_clock_levels(adev, od_clocks[clk_index], buf, &size);
+		if (unlikely(size >= (PAGE_SIZE - 1)))
+			break;
 	}
 
 	if (size == 0)
@@ -1389,7 +1393,6 @@ static ssize_t amdgpu_set_pp_power_profile_mode(struct device *dev,
 	long parameter[64];
 	char *sub_str, buf_cpy[128];
 	char *tmp_str;
-	uint32_t i = 0;
 	char tmp[2];
 	long int profile_mode = 0;
 	const char delimiter[3] = {' ', '\n', '\0'};
@@ -1398,18 +1401,18 @@ static ssize_t amdgpu_set_pp_power_profile_mode(struct device *dev,
 	if (count == 0 || sysfs_streq(buf, ""))
 		return -EINVAL;
 
-	tmp[0] = *(buf);
+	tmp[0] = *(buf++);
 	tmp[1] = '\0';
 	ret = kstrtol(tmp, 0, &profile_mode);
 	if (ret)
 		return -EINVAL;
 
 	if (profile_mode == PP_SMC_POWER_PROFILE_CUSTOM) {
-		if (count < 2 || count > 127)
+		if (count < 2 || count > sizeof(buf_cpy))
 			return -EINVAL;
-		while (isspace(*++buf))
-			i++;
-		memcpy(buf_cpy, buf, count-i);
+		while (isspace(*buf))
+			buf++;
+		strscpy(buf_cpy, buf, sizeof(buf_cpy));
 		tmp_str = buf_cpy;
 		while ((sub_str = strsep(&tmp_str, delimiter)) != NULL) {
 			if (strlen(sub_str) == 0)
@@ -3955,6 +3958,7 @@ static int parse_input_od_command_lines(const char *buf,
 					size_t count,
 					u32 *type,
 					long *params,
+					size_t params_max,
 					uint32_t *num_of_params)
 {
 	const char delimiter[3] = {' ', '\n', '\0'};
@@ -3990,6 +3994,9 @@ static int parse_input_od_command_lines(const char *buf,
 		if (strlen(sub_str) == 0)
 			continue;
 
+		if (parameter_size >= params_max)
+			return -EINVAL;
+
 		ret = kstrtol(sub_str, 0, &params[parameter_size]);
 		if (ret)
 			return -EINVAL;
@@ -4021,6 +4028,7 @@ amdgpu_distribute_custom_od_settings(struct amdgpu_device *adev,
 					   count,
 					   &cmd_type,
 					   parameter,
+					   ARRAY_SIZE(parameter),
 					   &parameter_size);
 	if (ret)
 		return ret;

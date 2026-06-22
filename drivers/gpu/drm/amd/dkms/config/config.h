@@ -571,6 +571,9 @@
 /* Define to 1 if you have the <drm/drm_probe_helper.h> header file. */
 #define HAVE_DRM_DRM_PROBE_HELPER_H 1
 
+/* Define to 1 if you have the <drm/drm_vblank_helper.h> header file. */
+#define HAVE_DRM_DRM_VBLANK_HELPER_H 1
+
 /* drm_driver_feature DRIVER_IRQ_SHARED is available */
 /* #undef HAVE_DRM_DRV_DRIVER_IRQ_SHARED */
 
@@ -1155,6 +1158,9 @@
 
 /* Reporting reservation_ww_class missing */
 /* #undef HAVE_RESERVATION_WW_CLASS_BUG */
+
+/* security_locked_down(LOCKDOWN_PCI_ACCESS) is available */
+#define HAVE_SECURITY_LOCKED_DOWN 1
 
 /* sg_alloc_table_from_pages_segment() is available */
 #define HAVE_SG_ALLOC_TABLE_FROM_PAGES_SEGMENT 1

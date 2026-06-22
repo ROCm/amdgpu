@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Advanced Micro Devices, Inc. All rights reserved.
 
 #ifndef _dcn_4_2_1_OFFSET_HEADER

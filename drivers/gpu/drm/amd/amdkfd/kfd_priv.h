@@ -1079,6 +1079,19 @@ struct kfd_process {
 	bool signal_event_limit_reached;
 
 	struct rb_root_cached bo_interval_tree;
+	/**
+	 * @kfd_sigbus_delay_ms: Per-process KFD SIGBUS delivery option for
+	 * poison/RAS events (set via DRM_IOCTL_AMDGPU_PROC_OPTIONS /
+	 * AMDGPU_PROC_OPTIONS_OP_KFD_SIGBUS_DELAY).
+	 *
+	 *   0          - send SIGBUS immediately (default)
+	 *   0xFFFFFFFF - suppress SIGBUS delivery
+	 *   other      - delay SIGBUS delivery by this many milliseconds
+	 */
+	atomic_t kfd_sigbus_delay_ms;
+
+	/* Delayed signal delivery to user */
+	struct delayed_work signal_work;
 
 	/* Information used for memory eviction */
 	void *kgd_process_info;
@@ -1676,7 +1689,6 @@ extern const struct kfd_device_global_init_class device_global_init_class_cik;
 
 int kfd_event_init_process(struct kfd_process *p);
 void kfd_event_free_process(struct kfd_process *p);
-int kfd_event_mmap(struct kfd_process *process, struct vm_area_struct *vma);
 int kfd_wait_on_events(struct kfd_process *p,
 		       uint32_t num_events, void __user *data,
 		       bool all, uint32_t *user_timeout_ms,
@@ -1705,6 +1717,7 @@ void kfd_signal_vm_fault_event(struct kfd_process_device *pdd,
 void kfd_signal_reset_event(struct kfd_node *dev);
 
 void kfd_signal_poison_consumed_event(struct kfd_node *dev, u32 pasid);
+void kfd_signal_sigbus_delayed_fn(struct work_struct *work);
 void kfd_signal_process_terminate_event(struct kfd_process *p);
 
 static inline void kfd_flush_tlb(struct kfd_process_device *pdd)

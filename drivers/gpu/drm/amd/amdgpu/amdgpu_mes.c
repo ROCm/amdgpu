@@ -217,7 +217,7 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 	if (r)
 		goto error_doorbell;
 
-	if (amdgpu_ip_version(adev, GC_HWIP, 0) >= IP_VERSION(12, 1, 0)) {
+	if (amdgpu_ip_version(adev, GC_HWIP, 0) >= IP_VERSION(11, 0, 0)) {
 		/* When queue/pipe reset is done in MES instead of in the
 		 * driver, MES passes hung queues information to the driver in
 		 * hung_queue_hqd_info. Calculate required space to store this
@@ -252,6 +252,10 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 		}
 	}
 
+	adev->gfx.mec.mes_hung_db_array =
+		kcalloc(amdgpu_mes_get_hung_queue_db_array_size(adev),
+			sizeof(u32), GFP_KERNEL);
+
 	return 0;
 
 error_doorbell:
@@ -278,6 +282,8 @@ void amdgpu_mes_fini(struct amdgpu_device *adev)
 {
 	int i;
 	int num_xcc = adev->gfx.xcc_mask ? NUM_XCC(adev->gfx.xcc_mask) : 1;
+
+	kfree(adev->gfx.mec.mes_hung_db_array);
 
 	amdgpu_bo_free_kernel(&adev->mes.event_log_gpu_obj,
 			      &adev->mes.event_log_gpu_addr,
@@ -435,6 +441,59 @@ int amdgpu_mes_reset_legacy_queue(struct amdgpu_device *adev,
 	amdgpu_mes_unlock(&adev->mes);
 	if (r)
 		dev_err(adev->dev, "failed to reset legacy queue\n");
+
+	return r;
+}
+
+int amdgpu_mes_reset_queue_mmio(struct amdgpu_device *adev,
+				int queue_type,
+				unsigned int vmid,
+				unsigned int me,
+				unsigned int pipe,
+				unsigned int queue,
+				uint32_t xcc_id)
+{
+	struct mes_reset_queue_input queue_input;
+	int r;
+
+	memset(&queue_input, 0, sizeof(queue_input));
+
+	queue_input.xcc_id = xcc_id;
+	queue_input.me_id = me;
+	queue_input.pipe_id = pipe;
+	queue_input.queue_id = queue;
+	queue_input.vmid = vmid;
+	queue_input.queue_type = queue_type;
+	queue_input.use_mmio = true;
+
+	amdgpu_mes_lock(&adev->mes);
+	r = adev->mes.funcs->reset_hw_queue(&adev->mes, &queue_input);
+	amdgpu_mes_unlock(&adev->mes);
+	if (r)
+		dev_err(adev->dev, "failed to reset legacy queue\n");
+
+	return r;
+}
+
+int amdgpu_mes_reset_user_queue(struct amdgpu_device *adev,
+				int queue_type,
+				unsigned int doorbell_index,
+				unsigned int xcc_id)
+{
+	struct mes_reset_queue_input queue_input;
+	int r;
+
+	memset(&queue_input, 0, sizeof(queue_input));
+
+	queue_input.xcc_id = xcc_id;
+	queue_input.queue_type = queue_type;
+	queue_input.doorbell_offset = doorbell_index;
+
+	amdgpu_mes_lock(&adev->mes);
+	r = adev->mes.funcs->reset_hw_queue(&adev->mes, &queue_input);
+	amdgpu_mes_unlock(&adev->mes);
+	if (r)
+		dev_err(adev->dev, "failed to reset user queue\n");
 
 	return r;
 }
@@ -781,6 +840,18 @@ out:
 	return r;
 }
 
+void amdgpu_mes_validate_fw_version(struct amdgpu_device *adev)
+{
+	u32 fw_from_ucode = adev->mes.fw_version[AMDGPU_MES_SCHED_PIPE];
+	u32 fw_from_reg = adev->mes.sched_version & AMDGPU_MES_VERSION_MASK;
+
+	if (fw_from_ucode != fw_from_reg)
+		dev_info(adev->dev,
+			 "MES firmware reports incorrect version in ucode binary (0x%x vs 0x%x)\n",
+			 fw_from_ucode, fw_from_reg);
+}
+
+
 bool amdgpu_mes_suspend_resume_all_supported(struct amdgpu_device *adev)
 {
 	uint32_t mes_rev = adev->mes.sched_version & AMDGPU_MES_VERSION_MASK;
@@ -793,8 +864,13 @@ bool amdgpu_mes_suspend_resume_all_supported(struct amdgpu_device *adev)
 
 bool amdgpu_mes_queue_reset_by_mes_supported(struct amdgpu_device *adev)
 {
-	return (amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(12, 1, 0) &&
-		(adev->mes.sched_version & AMDGPU_MES_VERSION_MASK) >= 0x73);
+	u32 ip_maj = IP_VERSION_MAJ(amdgpu_ip_version(adev, GC_HWIP, 0));
+	u32 ip_min = IP_VERSION_MIN(amdgpu_ip_version(adev, GC_HWIP, 0));
+	u32 mes_sched = adev->mes.sched_version & AMDGPU_MES_VERSION_MASK;
+
+	return (ip_maj == 11 && mes_sched >= 0x8c) ||
+		((ip_maj == 12 && ip_min == 0) && mes_sched >= 0x8d) ||
+		((ip_maj == 12 && ip_min == 1) && mes_sched >= 0x73);
 }
 
 /* Fix me -- node_id is used to identify the correct MES instances in the future */

@@ -29,10 +29,12 @@
 #include <linux/uaccess.h>
 #include <linux/mman.h>
 #include <linux/memory.h>
+#include <linux/workqueue.h>
 #include "kfd_priv.h"
 #include "kfd_events.h"
 #include "kfd_device_queue_manager.h"
 #include <linux/device.h>
+#include <drm/amdgpu_drm.h>
 
 /*
  * Wrapper around wait_queue_entry_t
@@ -53,43 +55,11 @@ struct kfd_event_waiter {
  */
 struct kfd_signal_page {
 	uint64_t *kernel_address;
-	uint64_t __user *user_address;
-	bool need_to_free_pages;
 };
 
 static uint64_t *page_slots(struct kfd_signal_page *page)
 {
 	return page->kernel_address;
-}
-
-static struct kfd_signal_page *allocate_signal_page(struct kfd_process *p)
-{
-	void *backing_store;
-	struct kfd_signal_page *page;
-
-	page = kzalloc(sizeof(*page), GFP_KERNEL);
-	if (!page)
-		return NULL;
-
-	backing_store = (void *) __get_free_pages(GFP_KERNEL,
-					get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
-	if (!backing_store)
-		goto fail_alloc_signal_store;
-
-	/* Initialize all events to unsignaled */
-	memset(backing_store, (uint8_t) UNSIGNALED_EVENT_SLOT,
-	       KFD_SIGNAL_EVENT_LIMIT * 8);
-
-	page->kernel_address = backing_store;
-	page->need_to_free_pages = true;
-	pr_debug("Allocated new event signal page at %p, for process %p\n",
-			page, p);
-
-	return page;
-
-fail_alloc_signal_store:
-	kfree(page);
-	return NULL;
 }
 
 static int allocate_event_notification_slot(struct kfd_process *p,
@@ -98,13 +68,13 @@ static int allocate_event_notification_slot(struct kfd_process *p,
 {
 	int id;
 
-	if (!p->signal_page) {
-		p->signal_page = allocate_signal_page(p);
-		if (!p->signal_page)
-			return -ENOMEM;
-		/* Oldest user mode expects 256 event slots */
-		p->signal_mapped_size = 256*8;
-	}
+	/*
+	 * The signal page is allocated in user mode and mapped to the kernel
+	 * via the event_page_offset of the create event IOCTL. Without it no
+	 * signal events can be created.
+	 */
+	if (!p->signal_page)
+		return -ENOMEM;
 
 	if (restore_id) {
 		id = idr_alloc(&p->event_idr, ev, *restore_id, *restore_id + 1,
@@ -210,10 +180,8 @@ static int create_signal_event(struct file *devkfd, struct kfd_process *p,
 
 	p->signal_event_count++;
 
-	ev->user_signal_address = &p->signal_page->user_address[ev->event_id];
-	pr_debug("Signal event number %zu created with id %d, address %p\n",
-			p->signal_event_count, ev->event_id,
-			ev->user_signal_address);
+	pr_debug("Signal event number %zu created with id %d\n",
+			p->signal_event_count, ev->event_id);
 
 	return 0;
 }
@@ -301,12 +269,7 @@ static void shutdown_signal_page(struct kfd_process *p)
 {
 	struct kfd_signal_page *page = p->signal_page;
 
-	if (page) {
-		if (page->need_to_free_pages)
-			free_pages((unsigned long)page->kernel_address,
-				   get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
-		kfree(page);
-	}
+	kfree(page);
 }
 
 void kfd_event_free_process(struct kfd_process *p)
@@ -800,7 +763,8 @@ static struct kfd_event_waiter *alloc_event_waiters(uint32_t num_events)
 {
 	struct kfd_event_waiter *event_waiters;
 	uint32_t i;
-
+	if (num_events > KFD_SIGNAL_EVENT_LIMIT)
+		return NULL;
 	event_waiters = kcalloc(num_events, sizeof(struct kfd_event_waiter),
 				GFP_KERNEL);
 	if (!event_waiters)
@@ -1068,51 +1032,6 @@ out:
 	return ret;
 }
 
-int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
-{
-	unsigned long pfn;
-	struct kfd_signal_page *page;
-	int ret;
-
-	/* check required size doesn't exceed the allocated size */
-	if (get_order(KFD_SIGNAL_EVENT_LIMIT * 8) <
-			get_order(vma->vm_end - vma->vm_start)) {
-		pr_err("Event page mmap requested illegal size\n");
-		return -EINVAL;
-	}
-
-	page = p->signal_page;
-	if (!page) {
-		/* Probably KFD bug, but mmap is user-accessible. */
-		pr_debug("Signal page could not be found\n");
-		return -EINVAL;
-	}
-
-	pfn = __pa(page->kernel_address);
-	pfn >>= PAGE_SHIFT;
-
-	vm_flags_set(vma, VM_IO | VM_DONTCOPY | VM_DONTEXPAND | VM_NORESERVE
-		       | VM_DONTDUMP | VM_PFNMAP);
-
-	pr_debug("Mapping signal page\n");
-	pr_debug("     start user address  == 0x%08lx\n", vma->vm_start);
-	pr_debug("     end user address    == 0x%08lx\n", vma->vm_end);
-	pr_debug("     pfn                 == 0x%016lX\n", pfn);
-	pr_debug("     vm_flags            == 0x%08lX\n", vma->vm_flags);
-	pr_debug("     size                == 0x%08lX\n",
-			vma->vm_end - vma->vm_start);
-
-	page->user_address = (uint64_t __user *)vma->vm_start;
-
-	/* mapping the page to user process */
-	ret = remap_pfn_range(vma, vma->vm_start, pfn,
-			vma->vm_end - vma->vm_start, vma->vm_page_prot);
-	if (!ret)
-		p->signal_mapped_size = vma->vm_end - vma->vm_start;
-
-	return ret;
-}
-
 /*
  * Assumes that p is not going away.
  */
@@ -1338,6 +1257,71 @@ void kfd_signal_reset_event(struct kfd_node *dev)
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 }
 
+/*
+ * Per-process opt-in for poison-consumption SIGBUS handling.
+ *
+ * Default: kernel sends SIGBUS to the process immediately when poison is
+ * consumed, in addition to delivering the KFD HW/MEMORY exception events.
+ *
+ * Userspace (ROCr) can opt-in per-process via the
+ * DRM_IOCTL_AMDGPU_PROC_OPTIONS / AMDGPU_PROC_OPTIONS_OP_KFD_SIGBUS_DELAY
+ * option. This lets the app's registered system-event callback handle the
+ * RAS error first, instead of being killed by SIGBUS.
+ *
+ * Encoded value (stored on the kfd_process):
+ *   0          - default: SIGBUS immediately (no opt-in)
+ *   0xFFFFFFFF - opt-in, never escalate to SIGBUS
+ *   N (other)  - opt-in, escalate to SIGBUS after N ms if app does not
+ *                handle the error in time (safety timeout)
+ */
+
+void kfd_signal_sigbus_delayed_fn(struct work_struct *work)
+{
+	struct kfd_process *p = container_of(to_delayed_work(work),
+				struct kfd_process, signal_work);
+
+	if (p->lead_thread)
+		send_sig(SIGBUS, p->lead_thread, 0);
+
+	kfd_unref_process(p);
+}
+
+static void kfd_signal_sigbus_with_delay(struct kfd_node *dev,
+					 struct kfd_process *p)
+{
+	u32 delay_ms = atomic_read(&p->kfd_sigbus_delay_ms);
+
+	if (delay_ms == AMDGPU_PROC_OPTIONS_KFD_SIGBUS_DELAY_DISABLED) {
+		dev_info(dev->adev->dev,
+			 "SIGBUS suppressed for process %s(pid:%d): app opted in to handle RAS error\n",
+			 p->lead_thread->comm, p->lead_thread->pid);
+		return;
+	}
+
+	if (delay_ms == 0)
+		goto send_now;
+
+	/*
+	 * Take an extra reference for the delayed worker. If the work is
+	 * already pending (e.g. another device of this process consumed poison
+	 * just before), drop the reference and skip rescheduling - the process
+	 * only needs to be notified once.
+	 */
+	kref_get(&p->ref);
+	if (!schedule_delayed_work(&p->signal_work, msecs_to_jiffies(delay_ms))) {
+		kfd_unref_process(p);
+		return;
+	}
+
+	dev_info(dev->adev->dev,
+		 "Deferring SIGBUS to process %s(pid:%d) by %u ms (RAS error opt-in safety timeout)\n",
+		 p->lead_thread->comm, p->lead_thread->pid, delay_ms);
+	return;
+
+send_now:
+	send_sig(SIGBUS, p->lead_thread, 0);
+}
+
 void kfd_signal_poison_consumed_event(struct kfd_node *dev, u32 pasid)
 {
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid, NULL);
@@ -1392,7 +1376,7 @@ void kfd_signal_poison_consumed_event(struct kfd_node *dev, u32 pasid)
 	rcu_read_unlock();
 
 	/* user application will handle SIGBUS signal */
-	send_sig(SIGBUS, p->lead_thread, 0);
+	kfd_signal_sigbus_with_delay(dev, p);
 
 	kfd_unref_process(p);
 }

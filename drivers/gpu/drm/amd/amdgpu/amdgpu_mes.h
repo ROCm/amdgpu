@@ -168,6 +168,9 @@ struct amdgpu_mes {
 	int                 master_xcc_ids[AMDGPU_MAX_MES_INST_PIPES];
 	struct amdgpu_bo    *shared_cmd_buf_obj[AMDGPU_MAX_MES_INST_PIPES];
 	uint64_t            shared_cmd_buf_gpu_addr[AMDGPU_MAX_MES_INST_PIPES];
+
+	bool			compute_pipe_reset_enabled;
+	bool			gfx_pipe_reset_enabled;
 };
 
 struct amdgpu_mes_hung_queue_hqd_info {
@@ -441,6 +444,7 @@ struct amdgpu_mes_funcs {
 	(adev)->mes.kiq_hw_fini((adev), (xcc_id))
 
 int amdgpu_mes_init_microcode(struct amdgpu_device *adev, int pipe);
+void amdgpu_mes_validate_fw_version(struct amdgpu_device *adev);
 int amdgpu_mes_init(struct amdgpu_device *adev);
 void amdgpu_mes_fini(struct amdgpu_device *adev);
 
@@ -458,6 +462,17 @@ int amdgpu_mes_reset_legacy_queue(struct amdgpu_device *adev,
 				  unsigned int vmid,
 				  bool use_mmio,
 				  uint32_t xcc_id);
+int amdgpu_mes_reset_queue_mmio(struct amdgpu_device *adev,
+				int queue_type,
+				unsigned int vmid,
+				unsigned int me,
+				unsigned int pipe,
+				unsigned int queue,
+				uint32_t xcc_id);
+int amdgpu_mes_reset_user_queue(struct amdgpu_device *adev,
+				int queue_type,
+				unsigned int doorbell_index,
+				unsigned int xcc_id);
 
 int amdgpu_mes_get_hung_queue_db_array_size(struct amdgpu_device *adev);
 int amdgpu_mes_detect_and_reset_hung_queues(struct amdgpu_device *adev,

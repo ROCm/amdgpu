@@ -4057,19 +4057,70 @@ static int gfx_v9_0_hw_init(struct amdgpu_ip_block *ip_block)
 	    !amdgpu_sriov_vf(adev))
 		gfx_v9_4_2_set_power_brake_sequence(adev);
 
+	r = amdgpu_irq_get(adev, &adev->gfx.priv_reg_irq, 0);
+	if (r)
+		return r;
+
+	r = amdgpu_irq_get(adev, &adev->gfx.priv_inst_irq, 0);
+	if (r)
+		goto err_priv_inst;
+
+	r = amdgpu_irq_get(adev, &adev->gfx.bad_op_irq, 0);
+	if (r)
+		goto err_bad_op;
+
+	return 0;
+
+err_bad_op:
+	amdgpu_irq_put(adev, &adev->gfx.priv_inst_irq, 0);
+err_priv_inst:
+	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
 	return r;
+}
+
+static void gfx_v9_0_deactivate_kcq_hqd(struct amdgpu_device *adev)
+{
+	amdgpu_gfx_rlc_enter_safe_mode(adev, 0);
+	for (int i = 0; i < adev->gfx.num_compute_rings; i++) {
+		u32 tmp;
+		struct amdgpu_ring *ring = &adev->gfx.compute_ring[i];
+
+		mutex_lock(&adev->srbm_mutex);
+		soc15_grbm_select(adev, ring->me, ring->pipe, ring->queue, 0, 0);
+		tmp = RREG32_SOC15(GC, 0, mmCP_HQD_ACTIVE);
+		/* disable the queue if it's active */
+		if (tmp & CP_HQD_ACTIVE__ACTIVE_MASK) {
+			int j;
+
+			WREG32_SOC15(GC, 0, mmCP_HQD_DEQUEUE_REQUEST, 1);
+			for (j = 0; j < adev->usec_timeout; j++) {
+				tmp = RREG32_SOC15(GC, 0, mmCP_HQD_ACTIVE);
+				if (!(tmp & CP_HQD_ACTIVE__ACTIVE_MASK))
+					break;
+				udelay(1);
+			}
+			if (j == AMDGPU_MAX_USEC_TIMEOUT) {
+				DRM_DEBUG("comp_%u_%u_%u dequeue request failed.\n",
+							ring->me, ring->pipe, ring->queue);
+				/* Manual disable if dequeue request times out */
+				WREG32_SOC15(GC, 0, mmCP_HQD_ACTIVE, 0);
+			}
+			WREG32_SOC15(GC, 0, mmCP_HQD_DEQUEUE_REQUEST, 0);
+		}
+		soc15_grbm_select(adev, 0, 0, 0, 0, 0);
+		mutex_unlock(&adev->srbm_mutex);
+	}
+	amdgpu_gfx_rlc_exit_safe_mode(adev, 0);
 }
 
 static int gfx_v9_0_hw_fini(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
 
-	if (amdgpu_ras_is_supported(adev, AMDGPU_RAS_BLOCK__GFX))
-		amdgpu_irq_put(adev, &adev->gfx.cp_ecc_error_irq, 0);
-	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
-	amdgpu_irq_put(adev, &adev->gfx.spm_irq, 0);
-	amdgpu_irq_put(adev, &adev->gfx.priv_inst_irq, 0);
 	amdgpu_irq_put(adev, &adev->gfx.bad_op_irq, 0);
+	amdgpu_irq_put(adev, &adev->gfx.priv_inst_irq, 0);
+	amdgpu_irq_put(adev, &adev->gfx.spm_irq, 0);
+	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
 
 	/* DF freeze and kcq disable will fail */
 	if (!amdgpu_ras_intr_triggered())
@@ -4086,6 +4137,10 @@ static int gfx_v9_0_hw_fini(struct amdgpu_ip_block *ip_block)
 		WREG32_FIELD15(GC, 0, CP_PQ_WPTR_POLL_CNTL, EN, 0);
 		return 0;
 	}
+
+	if ((adev->flags & AMD_IS_APU) && amdgpu_in_reset(adev) &&
+		amdgpu_asic_reset_method(adev) == AMD_RESET_METHOD_MODE2)
+		gfx_v9_0_deactivate_kcq_hqd(adev);
 
 	/* Use deinitialize sequence from CAIL when unbinding device from driver,
 	 * otherwise KIQ is hanging when binding back
@@ -4918,6 +4973,8 @@ static int gfx_v9_0_early_init(struct amdgpu_ip_block *ip_block)
 	/* init rlcg reg access ctrl */
 	gfx_v9_0_init_rlcg_reg_access_ctrl(adev);
 
+	amdgpu_init_rlc_reg_funcs(adev);
+
 	return gfx_v9_0_init_microcode(adev);
 }
 
@@ -4960,19 +5017,7 @@ static int gfx_v9_0_late_init(struct amdgpu_ip_block *ip_block)
 	struct amdgpu_device *adev = ip_block->adev;
 	int r;
 
-	r = amdgpu_irq_get(adev, &adev->gfx.priv_reg_irq, 0);
-	if (r)
-		return r;
-
 	r = amdgpu_irq_get(adev, &adev->gfx.spm_irq, 0);
-	if (r)
-		return r;
-
-	r = amdgpu_irq_get(adev, &adev->gfx.priv_inst_irq, 0);
-	if (r)
-		return r;
-
-	r = amdgpu_irq_get(adev, &adev->gfx.bad_op_irq, 0);
 	if (r)
 		return r;
 

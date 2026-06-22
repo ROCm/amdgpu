@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Advanced Micro Devices, Inc. All rights reserved.
 
 #ifndef _clk_15_0_5_SH_MASK_HEADER

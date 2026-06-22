@@ -106,6 +106,7 @@
 #include "amdgpu_mca.h"
 #include "amdgpu_aca.h"
 #include "amdgpu_ras.h"
+#include "amdgpu_lockdep.h"
 #include "amdgpu_cper.h"
 #include "amdgpu_xcp.h"
 #include "amdgpu_seq64.h"
@@ -189,7 +190,6 @@ extern int amdgpu_dc;
 extern int amdgpu_sched_jobs;
 extern int amdgpu_sched_hw_submission;
 extern int amdgpu_no_evict;
-extern int amdgpu_direct_gma_size;
 extern uint amdgpu_pcie_gen_cap;
 extern uint amdgpu_pcie_lane_cap;
 extern u64 amdgpu_cg_mask;
@@ -272,7 +272,6 @@ extern int amdgpu_ptl;
 
 extern uint amdgpu_hdmi_hpd_debounce_delay_ms;
 
-#define AMDGPU_VM_MAX_NUM_CTX			4096
 #define AMDGPU_SG_THRESHOLD			(256*1024*1024)
 #define AMDGPU_WAIT_IDLE_TIMEOUT_IN_MS	        3000
 #define AMDGPU_MAX_USEC_TIMEOUT			100000	/* 100 ms */
@@ -633,9 +632,6 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data, struct drm_file *fi
 int amdgpu_cs_wait_fences_ioctl(struct drm_device *dev, void *data,
 				struct drm_file *filp);
 
-int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
-			   struct drm_file *filp);
-
 /* VRAM scratch page for HDP bug, default vram page */
 struct amdgpu_mem_scratch {
 	struct amdgpu_bo		*robj;
@@ -656,15 +652,6 @@ struct amdgpu_mmio_remap {
 	u32 reg_offset;
 	resource_size_t bus_addr;
 	struct amdgpu_bo *bo;
-};
-
-
-struct amdgpu_direct_gma {
-	/* reserved in visible vram*/
-	struct amdgpu_bo	*dgma_bo;
-	atomic64_t		vram_usage;
-	/* reserved in gart */
-	atomic64_t		gart_usage;
 };
 
 enum amdgpu_uid_type {
@@ -875,9 +862,6 @@ struct amdgpu_device {
 	uint32_t			bios_size;
 	uint32_t			bios_scratch_reg_offset;
 	uint32_t			bios_scratch[AMDGPU_BIOS_NUM_SCRATCH];
-
-	/* Direct GMA */
-	struct amdgpu_direct_gma	direct_gma;
 
 	/* Register/doorbell mmio */
 	resource_size_t			rmmio_base;
@@ -1159,6 +1143,7 @@ struct amdgpu_device {
 	bool                            debug_vm_userptr;
 	bool                            debug_disable_ce_logs;
 	bool                            debug_enable_ce_cs;
+	bool                            debug_hibernation_thaw_resume_gpu;
 
 	/* Protection for the following isolation structure */
 	struct mutex                    enforce_isolation_mutex;
@@ -1497,6 +1482,8 @@ void amdgpu_disable_vblank_kms(struct drm_crtc *crtc);
 
 int amdgpu_info_ioctl(struct drm_device *dev, void *data,
 		      struct drm_file *filp);
+int amdgpu_proc_options_ioctl(struct drm_device *dev, void *data,
+			      struct drm_file *filp);
 
 /*
  * functions used by amdgpu_encoder.c

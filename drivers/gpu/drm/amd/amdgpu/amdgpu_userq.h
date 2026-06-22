@@ -110,8 +110,7 @@ struct amdgpu_userq_funcs {
 	int (*map)(struct amdgpu_usermode_queue *queue);
 	int (*preempt)(struct amdgpu_usermode_queue *queue);
 	int (*restore)(struct amdgpu_usermode_queue *queue);
-	int (*detect_and_reset)(struct amdgpu_device *adev,
-		  int queue_type);
+	int (*reset)(struct amdgpu_usermode_queue *queue);
 };
 
 /* Usermode queues for gfx */
@@ -126,6 +125,8 @@ struct amdgpu_userq_mgr {
 	struct amdgpu_device		*adev;
 	struct delayed_work		resume_work;
 	struct drm_file			*file;
+	struct mutex			proc_ctx_lock;
+	struct amdgpu_userq_obj		proc_ctx_obj;
 
 	/**
 	 * @reset_work:

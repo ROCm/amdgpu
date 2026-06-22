@@ -58,11 +58,10 @@ extern "C" {
 #define DRM_AMDGPU_USERQ_SIGNAL		0x17
 #define DRM_AMDGPU_USERQ_WAIT		0x18
 #define DRM_AMDGPU_GEM_LIST_HANDLES	0x19
-/* not upstream */
-#define DRM_AMDGPU_GEM_DGMA		0x5c
 
 /* hybrid specific ioctls */
 #define DRM_AMDGPU_SEM			0x5b
+#define DRM_AMDGPU_PROC_OPTIONS		0x1A
 
 #define DRM_IOCTL_AMDGPU_GEM_CREATE	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_CREATE, union drm_amdgpu_gem_create)
 #define DRM_IOCTL_AMDGPU_GEM_MMAP	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_MMAP, union drm_amdgpu_gem_mmap)
@@ -84,8 +83,7 @@ extern "C" {
 #define DRM_IOCTL_AMDGPU_USERQ_SIGNAL	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_USERQ_SIGNAL, struct drm_amdgpu_userq_signal)
 #define DRM_IOCTL_AMDGPU_USERQ_WAIT	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_USERQ_WAIT, struct drm_amdgpu_userq_wait)
 #define DRM_IOCTL_AMDGPU_GEM_LIST_HANDLES DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_LIST_HANDLES, struct drm_amdgpu_gem_list_handles)
-
-#define DRM_IOCTL_AMDGPU_GEM_DGMA	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_DGMA, struct drm_amdgpu_gem_dgma)
+#define DRM_IOCTL_AMDGPU_PROC_OPTIONS	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_PROC_OPTIONS, struct drm_amdgpu_proc_options)
 
 /**
  * DOC: memory domains
@@ -123,17 +121,13 @@ extern "C" {
 #define AMDGPU_GEM_DOMAIN_GWS		0x10
 #define AMDGPU_GEM_DOMAIN_OA		0x20
 #define AMDGPU_GEM_DOMAIN_DOORBELL	0x40
-#define AMDGPU_GEM_DOMAIN_DGMA		0x400
-#define AMDGPU_GEM_DOMAIN_DGMA_IMPORT	0x800
 #define AMDGPU_GEM_DOMAIN_MASK		(AMDGPU_GEM_DOMAIN_CPU | \
 					 AMDGPU_GEM_DOMAIN_GTT | \
 					 AMDGPU_GEM_DOMAIN_VRAM | \
 					 AMDGPU_GEM_DOMAIN_GDS | \
 					 AMDGPU_GEM_DOMAIN_GWS | \
 					 AMDGPU_GEM_DOMAIN_OA |	\
-					 AMDGPU_GEM_DOMAIN_DOORBELL |\
-					 AMDGPU_GEM_DOMAIN_DGMA |\
-					 AMDGPU_GEM_DOMAIN_DGMA_IMPORT)
+					 AMDGPU_GEM_DOMAIN_DOORBELL)
 
 /* Flag that CPU access will be required for the case of VRAM domain */
 #define AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED	(1 << 0)
@@ -688,15 +682,6 @@ struct drm_amdgpu_gem_userptr {
 	/* AMDGPU_GEM_USERPTR_* */
 	__u32		flags;
 	/* Resulting GEM handle */
-	__u32		handle;
-};
-
-#define AMDGPU_GEM_DGMA_IMPORT			0
-#define AMDGPU_GEM_DGMA_QUERY_PHYS_ADDR		1
-struct drm_amdgpu_gem_dgma {
-	__u64		addr;
-	__u64		size;
-	__u32		op;
 	__u32		handle;
 };
 
@@ -1340,8 +1325,6 @@ struct drm_amdgpu_cs_chunk_cp_gfx_shadow {
 #define AMDGPU_INFO_VIRTUAL_RANGE		0x51
 /* query pin memory capability */
 #define AMDGPU_CAPABILITY_PIN_MEM_FLAG  (1 << 0)
-/* query direct gma capability */
-#define AMDGPU_CAPABILITY_DIRECT_GMA_FLAG	(1 << 1)
 
 #define AMDGPU_INFO_MMR_SE_INDEX_SHIFT	0
 #define AMDGPU_INFO_MMR_SE_INDEX_MASK	0xff
@@ -1762,7 +1745,8 @@ struct drm_amdgpu_virtual_range {
 
 struct drm_amdgpu_capability {
 	__u32 flag;
-	__u32 direct_gma_size;
+	/* was direct_gma_size; kept reserved to preserve UAPI size, always 0 */
+	__u32 reserved;
 };
 
 /*
@@ -1776,6 +1760,25 @@ struct drm_amdgpu_freesync {
         __u32 op;                       /* AMDGPU_FREESYNC_FULLSCREEN_ENTER or */
                                         /* AMDGPU_FREESYNC_FULLSCREEN_ENTER */
         __u32 spare[7];
+};
+
+/*
+ * Definition of user options
+ *
+ * option: AMDGPU_PROC_OPTIONS_OP_KFD_SIGBUS_DELAY
+ *    0:          Disable sigbus delay - SIGBUS will be raised immediately
+ *    0xFFFFFFFF: SIGBUS will not be raised
+ *    other:      Set the sigbus delay in milliseconds
+ */
+#define AMDGPU_PROC_OPTIONS_OP_KFD_SIGBUS_DELAY		0
+
+#define AMDGPU_PROC_OPTIONS_KFD_SIGBUS_DELAY_DISABLED	0xFFFFFFFFu
+
+struct drm_amdgpu_proc_options {
+	__u32 op;
+	struct {
+		__u32 value;
+	} kfd_sigbus_delay;
 };
 
 #if defined(__cplusplus)

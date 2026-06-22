@@ -36,6 +36,8 @@
 #include "amdgpu_ring_mux.h"
 #include "amdgpu_xcp.h"
 
+struct amdgpu_usermode_queue;
+
 /* GFX current status */
 #define AMDGPU_GFX_NORMAL_MODE			0x00000000L
 #define AMDGPU_GFX_SAFE_MODE			0x00000001L
@@ -116,6 +118,9 @@ struct amdgpu_mec {
 	u32 num_pipe_per_mec;
 	u32 num_queue_per_pipe;
 	void			*mqd_backup[AMDGPU_MAX_COMPUTE_RINGS * AMDGPU_MAX_GC_INSTANCES];
+	bool use_mmio_for_reset;
+	u32 *mes_hung_db_array;
+	struct mutex		reset_mutex;
 };
 
 struct amdgpu_mec_bitmap {
@@ -410,6 +415,7 @@ struct amdgpu_me {
 	uint32_t			num_pipe_per_me;
 	uint32_t			num_queue_per_pipe;
 	void				*mqd_backup[AMDGPU_MAX_GFX_RINGS];
+	bool				use_mmio_for_reset;
 
 	/* These are the resources for which amdgpu takes ownership */
 	DECLARE_BITMAP(queue_bitmap, AMDGPU_MAX_GFX_QUEUES);
@@ -554,6 +560,11 @@ struct amdgpu_gfx {
 	bool				disable_uq;
 };
 
+struct amdgpu_gfx_deferred_entry {
+	struct amdgpu_ring	*ring;
+	struct amdgpu_fence	*fence;
+};
+
 struct amdgpu_gfx_ras_reg_entry {
 	struct amdgpu_ras_err_status_reg_entry reg_entry;
 	enum amdgpu_gfx_ras_mem_id_type mem_id_type;
@@ -626,7 +637,8 @@ void amdgpu_gfx_off_ctrl(struct amdgpu_device *adev, bool enable);
 void amdgpu_gfx_off_ctrl_immediate(struct amdgpu_device *adev, bool enable);
 int amdgpu_get_gfx_off_status(struct amdgpu_device *adev, uint32_t *value);
 int amdgpu_gfx_ras_late_init(struct amdgpu_device *adev, struct ras_common_if *ras_block);
-void amdgpu_gfx_ras_fini(struct amdgpu_device *adev);
+void amdgpu_gfx_ras_suspend(struct amdgpu_device *adev, struct ras_common_if *ras_block);
+void amdgpu_gfx_ras_fini(struct amdgpu_device *adev, struct ras_common_if *ras_block);
 int amdgpu_get_gfx_off_entrycount(struct amdgpu_device *adev, u64 *value);
 int amdgpu_get_gfx_off_residency(struct amdgpu_device *adev, u32 *residency);
 int amdgpu_set_gfx_off_residency(struct amdgpu_device *adev, bool value);
@@ -651,6 +663,12 @@ int amdgpu_gfx_poison_consumption_handler(struct amdgpu_device *adev,
 bool amdgpu_gfx_is_master_xcc(struct amdgpu_device *adev, int xcc_id);
 int amdgpu_gfx_sysfs_init(struct amdgpu_device *adev);
 void amdgpu_gfx_sysfs_fini(struct amdgpu_device *adev);
+int amdgpu_gfx_reset_mes_compute(struct amdgpu_device *adev,
+				 struct amdgpu_ring *ring,
+				 struct amdgpu_fence *guilty_fence,
+				 struct amdgpu_usermode_queue *uq,
+				 unsigned int *hung_queue_count,
+				 void *faulty_queue_input);
 void amdgpu_gfx_ras_error_func(struct amdgpu_device *adev,
 		void *ras_error_status,
 		void (*func)(struct amdgpu_device *adev, void *ras_error_status,
@@ -676,6 +694,11 @@ void amdgpu_debugfs_gfx_sched_mask_init(struct amdgpu_device *adev);
 void amdgpu_debugfs_compute_sched_mask_init(struct amdgpu_device *adev);
 
 int amdgpu_gfx_ring_preempt_ib(struct amdgpu_ring *ring);
+
+int amdgpu_gfx_mes_reset_queue(struct amdgpu_ring *ring,
+			       unsigned int vmid,
+			       struct amdgpu_fence *timedout_fence,
+			       bool use_mmio);
 
 static inline const char *amdgpu_gfx_compute_mode_desc(int mode)
 {
