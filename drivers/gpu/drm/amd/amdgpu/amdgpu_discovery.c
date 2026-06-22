@@ -1505,6 +1505,15 @@ void amdgpu_discovery_sysfs_fini(struct amdgpu_device *adev)
 	if (!ip_top)
 		return;
 
+	/*
+	 * In standalone mode the sysfs hierarchy is tied to the PCI device
+	 * lifetime and is torn down by amdgpu_discovery_sysfs_early_fini().
+	 * Freeing it here would leave a dangling pointer in the early
+	 * discovery list, causing a use-after-free on driver unbind.
+	 */
+	if (ip_top->standalone_mode)
+		return;
+
 	adev->discovery.ip_top = NULL;
 	die_kset = &ip_top->die_kset;
 	spin_lock(&die_kset->list_lock);
