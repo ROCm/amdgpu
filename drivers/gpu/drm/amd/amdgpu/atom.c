@@ -114,8 +114,10 @@ static uint32_t atom_iio_execute(struct atom_context *ctx, int base,
 				 uint32_t index, uint32_t data)
 {
 	uint32_t temp = 0xCDCDCDCD;
+	int start = base;
 
-	while (1)
+	/* IIO opcodes read up to base+3; keep within the BIOS image */
+	while (base + 3 < ctx->bios_size)
 		switch (CU8(base)) {
 		case ATOM_IIO_NOP:
 			base++;
@@ -180,6 +182,9 @@ static uint32_t atom_iio_execute(struct atom_context *ctx, int base,
 			pr_info("Unknown IIO opcode\n");
 			return 0;
 		}
+
+	pr_info("IIO method starting at offset %d runs past BIOS image\n", start);
+	return 0;
 }
 
 static uint32_t atom_get_src_int(atom_exec_context *ctx, uint8_t attr,
