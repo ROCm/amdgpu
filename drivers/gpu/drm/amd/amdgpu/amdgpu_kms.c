@@ -285,6 +285,10 @@ static int amdgpu_firmware_info(struct drm_amdgpu_info_firmware *fw_info,
 		fw_info->ver = adev->pm.fw_version;
 		fw_info->feature = 0;
 		break;
+	case AMDGPU_INFO_FW_MP5:
+		fw_info->ver = adev->pm.mp5_fw_version;
+		fw_info->feature = 0;
+		break;
 	case AMDGPU_INFO_FW_TA:
 		switch (query_fw->index) {
 		case TA_FW_TYPE_PSP_XGMI:
@@ -1975,6 +1979,14 @@ static int amdgpu_debugfs_firmware_info_show(struct seq_file *m, void *unused)
 	smu_debug = (fw_info.ver >> 0) & 0xff;
 	seq_printf(m, "SMC feature version: %u, program: %d, firmware version: 0x%08x (%d.%d.%d)\n",
 		   fw_info.feature, smu_program, fw_info.ver, smu_major, smu_minor, smu_debug);
+
+	/* MP5 */
+	query_fw.fw_type = AMDGPU_INFO_FW_MP5;
+	ret = amdgpu_firmware_info(&fw_info, &query_fw, adev);
+	if (ret)
+		return ret;
+	seq_printf(m, "MP5 feature version: %u, firmware version: 0x%08x\n",
+		   fw_info.feature, fw_info.ver);
 
 	/* SDMA */
 	query_fw.fw_type = AMDGPU_INFO_FW_SDMA;
