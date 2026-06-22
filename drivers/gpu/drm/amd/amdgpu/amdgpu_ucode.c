@@ -800,6 +800,7 @@ FW_VERSION_ATTR(asd_fw_version, 0444, psp.asd_context.bin_desc.fw_version);
 FW_VERSION_ATTR(ta_ras_fw_version, 0444, psp.ras_context.context.bin_desc.fw_version);
 FW_VERSION_ATTR(ta_xgmi_fw_version, 0444, psp.xgmi_context.context.bin_desc.fw_version);
 FW_VERSION_ATTR(smc_fw_version, 0444, pm.fw_version);
+FW_VERSION_ATTR(mp5_fw_version, 0444, pm.mp5_fw_version);
 FW_VERSION_ATTR(sdma_fw_version, 0444, sdma.instance[0].fw_version);
 FW_VERSION_ATTR(sdma2_fw_version, 0444, sdma.instance[1].fw_version);
 FW_VERSION_ATTR(vcn_fw_version, 0444, vcn.fw_version);
@@ -823,6 +824,7 @@ static struct attribute *fw_attrs[] = {
 	&dev_attr_dmcu_fw_version.attr, &dev_attr_dmcub_fw_version.attr,
 	&dev_attr_imu_fw_version.attr, &dev_attr_mes_fw_version.attr,
 	&dev_attr_mes_kiq_fw_version.attr, &dev_attr_pldm_fw_version.attr,
+	&dev_attr_mp5_fw_version.attr,
 	NULL
 };
 
