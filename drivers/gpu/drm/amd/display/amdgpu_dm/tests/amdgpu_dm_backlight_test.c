@@ -1034,10 +1034,13 @@ static void dm_test_should_create_sysfs_no_backlight_index(struct kunit *test)
 }
 
 /**
- * dm_test_should_create_sysfs_aux_backlight - Test AUX backlight disables sysfs
+ * dm_test_should_create_sysfs_oled_no_cacp - Test OLED without CACP disables sysfs
  * @test: The KUnit test context
+ *
+ * A non-LCD panel that does not support CACP must not expose the sysfs
+ * backlight interface.
  */
-static void dm_test_should_create_sysfs_aux_backlight(struct kunit *test)
+static void dm_test_should_create_sysfs_oled_no_cacp(struct kunit *test)
 {
 	struct dm_backlight_connector_fixture fixture = {};
 	int saved_abm_level = amdgpu_dm_get_abm_level_param();
@@ -1045,7 +1048,8 @@ static void dm_test_should_create_sysfs_aux_backlight(struct kunit *test)
 	amdgpu_dm_set_abm_level_param(-1);
 	setup_test_connector(test, &fixture, 0, SIGNAL_TYPE_EDP);
 	fixture.aconnector->base.connector_type = DRM_MODE_CONNECTOR_eDP;
-	fixture.adev->dm.backlight_caps[0].aux_support = true;
+	fixture.link->panel_type = PANEL_TYPE_OLED;
+	fixture.link->panel_config.cacp.cacp_supported = false;
 
 	KUNIT_EXPECT_FALSE(test, amdgpu_dm_should_create_sysfs(fixture.aconnector));
 
@@ -1053,10 +1057,33 @@ static void dm_test_should_create_sysfs_aux_backlight(struct kunit *test)
 }
 
 /**
- * dm_test_should_create_sysfs_pwm_backlight - Test PWM backlight enables sysfs
+ * dm_test_should_create_sysfs_oled_cacp - Test OLED with CACP enables sysfs
+ * @test: The KUnit test context
+ *
+ * An OLED panel that supports CACP must expose the sysfs backlight
+ * interface so the ABM/CACP level can be controlled.
+ */
+static void dm_test_should_create_sysfs_oled_cacp(struct kunit *test)
+{
+	struct dm_backlight_connector_fixture fixture = {};
+	int saved_abm_level = amdgpu_dm_get_abm_level_param();
+
+	amdgpu_dm_set_abm_level_param(-1);
+	setup_test_connector(test, &fixture, 0, SIGNAL_TYPE_EDP);
+	fixture.aconnector->base.connector_type = DRM_MODE_CONNECTOR_eDP;
+	fixture.link->panel_type = PANEL_TYPE_OLED;
+	fixture.link->panel_config.cacp.cacp_supported = true;
+
+	KUNIT_EXPECT_TRUE(test, amdgpu_dm_should_create_sysfs(fixture.aconnector));
+
+	amdgpu_dm_set_abm_level_param(saved_abm_level);
+}
+
+/**
+ * dm_test_should_create_sysfs_lcd_panel - Test LCD eDP panel enables sysfs
  * @test: The KUnit test context
  */
-static void dm_test_should_create_sysfs_pwm_backlight(struct kunit *test)
+static void dm_test_should_create_sysfs_lcd_panel(struct kunit *test)
 {
 	struct dm_backlight_connector_fixture fixture = {};
 	int saved_abm_level = amdgpu_dm_get_abm_level_param();
@@ -1065,7 +1092,6 @@ static void dm_test_should_create_sysfs_pwm_backlight(struct kunit *test)
 	setup_test_connector(test, &fixture, 0, SIGNAL_TYPE_EDP);
 	fixture.aconnector->base.connector_type = DRM_MODE_CONNECTOR_eDP;
 	fixture.link->panel_type = PANEL_TYPE_LCD;
-	fixture.adev->dm.backlight_caps[0].aux_support = false;
 
 	KUNIT_EXPECT_TRUE(test, amdgpu_dm_should_create_sysfs(fixture.aconnector));
 
@@ -1225,8 +1251,9 @@ static struct kunit_case dm_backlight_test_cases[] = {
 	KUNIT_CASE(dm_test_should_create_sysfs_abm_forced),
 	KUNIT_CASE(dm_test_should_create_sysfs_non_edp),
 	KUNIT_CASE(dm_test_should_create_sysfs_no_backlight_index),
-	KUNIT_CASE(dm_test_should_create_sysfs_aux_backlight),
-	KUNIT_CASE(dm_test_should_create_sysfs_pwm_backlight),
+	KUNIT_CASE(dm_test_should_create_sysfs_oled_no_cacp),
+	KUNIT_CASE(dm_test_should_create_sysfs_oled_cacp),
+	KUNIT_CASE(dm_test_should_create_sysfs_lcd_panel),
 	/* amdgpu_dm_setup_backlight_device */
 	KUNIT_CASE(dm_test_setup_backlight_device_non_edp),
 	KUNIT_CASE(dm_test_setup_backlight_device_connection_none),

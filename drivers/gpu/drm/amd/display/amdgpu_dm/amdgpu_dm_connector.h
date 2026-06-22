@@ -166,5 +166,7 @@ enum dc_aspect_ratio get_aspect_ratio(const struct drm_display_mode *mode_in);
 void decide_crtc_timing_for_drm_display_mode(struct drm_display_mode *drm_mode,
 					     const struct drm_display_mode *native_mode,
 					     bool scale_enabled);
+void amdgpu_dm_set_panel_type(struct amdgpu_dm_connector *aconnector);
+void amdgpu_dm_update_cacp_caps(struct amdgpu_dm_connector *aconnector);
 #endif
 #endif /* __AMDGPU_DM_CONNECTOR_H__ */

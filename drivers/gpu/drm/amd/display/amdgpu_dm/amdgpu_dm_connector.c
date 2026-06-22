@@ -405,7 +405,7 @@ amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_commit *state,
 }
 
 #ifdef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
-static void amdgpu_dm_set_panel_type(struct amdgpu_dm_connector *aconnector)
+STATIC_IFN_KUNIT void amdgpu_dm_set_panel_type(struct amdgpu_dm_connector *aconnector)
 {
 	struct drm_connector *connector = &aconnector->base;
 	struct drm_display_info *display_info = &connector->display_info;
@@ -472,9 +472,10 @@ static void amdgpu_dm_set_panel_type(struct amdgpu_dm_connector *aconnector)
 
 	drm_dbg_kms(aconnector->base.dev, "Panel type: %d\n", link->panel_type);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_set_panel_type);
 #endif
 
-static void amdgpu_dm_update_cacp_caps(struct amdgpu_dm_connector *aconnector)
+STATIC_IFN_KUNIT void amdgpu_dm_update_cacp_caps(struct amdgpu_dm_connector *aconnector)
 {
 	struct amdgpu_device *adev = drm_to_adev(aconnector->base.dev);
 	struct dc_link *link = aconnector->dc_link;
@@ -499,6 +500,7 @@ static void amdgpu_dm_update_cacp_caps(struct amdgpu_dm_connector *aconnector)
 	drm_dbg_kms(aconnector->base.dev, "cacp_supported: %d\n",
 		    link->panel_config.cacp.cacp_supported);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_update_cacp_caps);
 
 DEFINE_FREE(sink_release, struct dc_sink *, if (_T) dc_sink_release(_T))
 

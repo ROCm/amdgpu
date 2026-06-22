@@ -2015,6 +2015,341 @@ static void dm_test_is_freesync_video_mode_no_match(struct kunit *test)
 	KUNIT_EXPECT_FALSE(test, amdgpu_dm_is_freesync_video_mode(&candidate, aconnector));
 }
 
+/* Tests for amdgpu_dm_update_cacp_caps() */
+
+struct dm_cacp_fixture {
+	struct amdgpu_device *adev;
+	struct amdgpu_dm_connector *aconnector;
+	struct dc_link *link;
+};
+
+static void setup_cacp_fixture(struct kunit *test,
+			       struct dm_cacp_fixture *fixture,
+			       enum signal_type signal,
+			       enum dc_panel_type panel_type)
+{
+	fixture->adev = kunit_kzalloc(test, sizeof(*fixture->adev), GFP_KERNEL);
+	fixture->aconnector = kunit_kzalloc(test, sizeof(*fixture->aconnector),
+					    GFP_KERNEL);
+	fixture->link = kunit_kzalloc(test, sizeof(*fixture->link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, fixture->adev);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, fixture->aconnector);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, fixture->link);
+
+	fixture->aconnector->dc_link = fixture->link;
+	fixture->aconnector->base.dev = &fixture->adev->ddev;
+	fixture->link->connector_signal = signal;
+	fixture->link->panel_type = panel_type;
+}
+
+/**
+ * dm_test_cacp_caps_unsupported_ip - Test CACP disabled on old DCE IP
+ * @test: The KUnit test context
+ *
+ * A DCE IP version below 3.1.4 does not support CACP, so cacp_supported
+ * must remain false regardless of signal or panel type.
+ */
+static void dm_test_cacp_caps_unsupported_ip(struct kunit *test)
+{
+	struct dm_cacp_fixture fixture = {};
+
+	setup_cacp_fixture(test, &fixture, SIGNAL_TYPE_EDP, PANEL_TYPE_OLED);
+	fixture.adev->ip_versions[DCE_HWIP][0] = IP_VERSION(3, 1, 2);
+
+	amdgpu_dm_update_cacp_caps(fixture.aconnector);
+
+	KUNIT_EXPECT_FALSE(test, fixture.link->panel_config.cacp.cacp_supported);
+}
+
+/**
+ * dm_test_cacp_caps_excluded_ip_316 - Test CACP disabled on DCE IP 3.1.6
+ * @test: The KUnit test context
+ *
+ * DCE IP version 3.1.6 is explicitly excluded from CACP support.
+ */
+static void dm_test_cacp_caps_excluded_ip_316(struct kunit *test)
+{
+	struct dm_cacp_fixture fixture = {};
+
+	setup_cacp_fixture(test, &fixture, SIGNAL_TYPE_EDP, PANEL_TYPE_OLED);
+	fixture.adev->ip_versions[DCE_HWIP][0] = IP_VERSION(3, 1, 6);
+
+	amdgpu_dm_update_cacp_caps(fixture.aconnector);
+
+	KUNIT_EXPECT_FALSE(test, fixture.link->panel_config.cacp.cacp_supported);
+}
+
+/**
+ * dm_test_cacp_caps_edp_oled_supported - Test CACP enabled on eDP OLED
+ * @test: The KUnit test context
+ *
+ * A supported DCE IP version on an eDP OLED panel must enable CACP.
+ */
+static void dm_test_cacp_caps_edp_oled_supported(struct kunit *test)
+{
+	struct dm_cacp_fixture fixture = {};
+
+	setup_cacp_fixture(test, &fixture, SIGNAL_TYPE_EDP, PANEL_TYPE_OLED);
+	fixture.adev->ip_versions[DCE_HWIP][0] = IP_VERSION(3, 1, 4);
+
+	amdgpu_dm_update_cacp_caps(fixture.aconnector);
+
+	KUNIT_EXPECT_TRUE(test, fixture.link->panel_config.cacp.cacp_supported);
+}
+
+/**
+ * dm_test_cacp_caps_lvds_oled_supported - Test CACP enabled on LVDS OLED
+ * @test: The KUnit test context
+ *
+ * LVDS is an accepted connector signal for CACP support.
+ */
+static void dm_test_cacp_caps_lvds_oled_supported(struct kunit *test)
+{
+	struct dm_cacp_fixture fixture = {};
+
+	setup_cacp_fixture(test, &fixture, SIGNAL_TYPE_LVDS, PANEL_TYPE_OLED);
+	fixture.adev->ip_versions[DCE_HWIP][0] = IP_VERSION(3, 5, 0);
+
+	amdgpu_dm_update_cacp_caps(fixture.aconnector);
+
+	KUNIT_EXPECT_TRUE(test, fixture.link->panel_config.cacp.cacp_supported);
+}
+
+/**
+ * dm_test_cacp_caps_non_edp_signal - Test CACP disabled on non-eDP/LVDS signal
+ * @test: The KUnit test context
+ *
+ * External DisplayPort is neither eDP nor LVDS, so CACP must be disabled.
+ */
+static void dm_test_cacp_caps_non_edp_signal(struct kunit *test)
+{
+	struct dm_cacp_fixture fixture = {};
+
+	setup_cacp_fixture(test, &fixture, SIGNAL_TYPE_DISPLAY_PORT,
+			   PANEL_TYPE_OLED);
+	fixture.adev->ip_versions[DCE_HWIP][0] = IP_VERSION(3, 1, 4);
+
+	amdgpu_dm_update_cacp_caps(fixture.aconnector);
+
+	KUNIT_EXPECT_FALSE(test, fixture.link->panel_config.cacp.cacp_supported);
+}
+
+/**
+ * dm_test_cacp_caps_lcd_panel - Test CACP disabled on LCD panel
+ * @test: The KUnit test context
+ *
+ * Plain LCD panels do not benefit from CACP, so it must be disabled even
+ * on a supported IP version and eDP signal.
+ */
+static void dm_test_cacp_caps_lcd_panel(struct kunit *test)
+{
+	struct dm_cacp_fixture fixture = {};
+
+	setup_cacp_fixture(test, &fixture, SIGNAL_TYPE_EDP, PANEL_TYPE_LCD);
+	fixture.adev->ip_versions[DCE_HWIP][0] = IP_VERSION(3, 1, 4);
+
+	amdgpu_dm_update_cacp_caps(fixture.aconnector);
+
+	KUNIT_EXPECT_FALSE(test, fixture.link->panel_config.cacp.cacp_supported);
+}
+
+/* Tests for amdgpu_dm_set_panel_type() */
+
+struct dm_panel_type_fixture {
+	struct amdgpu_device *adev;
+	struct drm_device *drm;
+	struct amdgpu_dm_connector *aconnector;
+	struct dc_link *link;
+	struct dc_sink *sink;
+};
+
+static void setup_panel_type_fixture(struct kunit *test,
+				     struct dm_panel_type_fixture *fixture)
+{
+	struct device *dev;
+
+	dev = drm_kunit_helper_alloc_device(test);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
+
+	fixture->drm = __drm_kunit_helper_alloc_drm_device(test, dev,
+							   sizeof(*fixture->adev),
+							   offsetof(struct amdgpu_device, ddev),
+							   DRIVER_MODESET);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, fixture->drm);
+	fixture->adev = drm_to_adev(fixture->drm);
+
+	fixture->aconnector = kunit_kzalloc(test, sizeof(*fixture->aconnector),
+					    GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, fixture->aconnector);
+	fixture->link = kunit_kzalloc(test, sizeof(*fixture->link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, fixture->link);
+	fixture->sink = kunit_kzalloc(test, sizeof(*fixture->sink), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, fixture->sink);
+
+	fixture->aconnector->dc_link = fixture->link;
+	drmm_connector_init(fixture->drm, &fixture->aconnector->base,
+			    &dm_test_connector_funcs, DRM_MODE_CONNECTOR_eDP,
+			    NULL);
+}
+
+/**
+ * dm_test_set_panel_type_vsdb_oled - Test VSDB OLED maps to PANEL_TYPE_OLED
+ * @test: The KUnit test context
+ */
+static void dm_test_set_panel_type_vsdb_oled(struct kunit *test)
+{
+	struct dm_panel_type_fixture fixture = {};
+
+	setup_panel_type_fixture(test, &fixture);
+	fixture.aconnector->base.display_info.amd_vsdb.panel_type =
+		AMD_VSDB_PANEL_TYPE_OLED;
+
+	amdgpu_dm_set_panel_type(fixture.aconnector);
+
+	KUNIT_EXPECT_EQ(test, (int)fixture.link->panel_type,
+			(int)PANEL_TYPE_OLED);
+}
+
+/**
+ * dm_test_set_panel_type_vsdb_miniled - Test VSDB MINILED maps to PANEL_TYPE_MINILED
+ * @test: The KUnit test context
+ */
+static void dm_test_set_panel_type_vsdb_miniled(struct kunit *test)
+{
+	struct dm_panel_type_fixture fixture = {};
+
+	setup_panel_type_fixture(test, &fixture);
+	fixture.aconnector->base.display_info.amd_vsdb.panel_type =
+		AMD_VSDB_PANEL_TYPE_MINILED;
+
+	amdgpu_dm_set_panel_type(fixture.aconnector);
+
+	KUNIT_EXPECT_EQ(test, (int)fixture.link->panel_type,
+			(int)PANEL_TYPE_MINILED);
+}
+
+/**
+ * dm_test_set_panel_type_dpcd_oled - Test DPCD oled bit maps to PANEL_TYPE_OLED
+ * @test: The KUnit test context
+ */
+static void dm_test_set_panel_type_dpcd_oled(struct kunit *test)
+{
+	struct dm_panel_type_fixture fixture = {};
+
+	setup_panel_type_fixture(test, &fixture);
+	fixture.link->dpcd_sink_ext_caps.bits.oled = 1;
+
+	amdgpu_dm_set_panel_type(fixture.aconnector);
+
+	KUNIT_EXPECT_EQ(test, (int)fixture.link->panel_type,
+			(int)PANEL_TYPE_OLED);
+}
+
+/**
+ * dm_test_set_panel_type_dpcd_miniled - Test DPCD miniled bit maps to PANEL_TYPE_MINILED
+ * @test: The KUnit test context
+ */
+static void dm_test_set_panel_type_dpcd_miniled(struct kunit *test)
+{
+	struct dm_panel_type_fixture fixture = {};
+
+	setup_panel_type_fixture(test, &fixture);
+	fixture.link->dpcd_sink_ext_caps.bits.miniled = 1;
+
+	amdgpu_dm_set_panel_type(fixture.aconnector);
+
+	KUNIT_EXPECT_EQ(test, (int)fixture.link->panel_type,
+			(int)PANEL_TYPE_MINILED);
+}
+
+/**
+ * dm_test_set_panel_type_did_oled - Test DID OLED maps to PANEL_TYPE_OLED
+ * @test: The KUnit test context
+ *
+ * When VSDB and DPCD do not identify the panel, a DID panel type of
+ * DRM_MODE_PANEL_TYPE_OLED must map to PANEL_TYPE_OLED.
+ */
+static void dm_test_set_panel_type_did_oled(struct kunit *test)
+{
+	struct dm_panel_type_fixture fixture = {};
+
+	setup_panel_type_fixture(test, &fixture);
+	fixture.aconnector->base.display_info.panel_type =
+		DRM_MODE_PANEL_TYPE_OLED;
+
+	amdgpu_dm_set_panel_type(fixture.aconnector);
+
+	KUNIT_EXPECT_EQ(test, (int)fixture.link->panel_type,
+			(int)PANEL_TYPE_OLED);
+}
+
+/**
+ * dm_test_set_panel_type_did_lcd - Test DID LCD maps to PANEL_TYPE_LCD
+ * @test: The KUnit test context
+ *
+ * When VSDB and DPCD do not identify the panel, a DID panel type of
+ * DRM_MODE_PANEL_TYPE_LCD must map to PANEL_TYPE_LCD.
+ */
+static void dm_test_set_panel_type_did_lcd(struct kunit *test)
+{
+	struct dm_panel_type_fixture fixture = {};
+
+	setup_panel_type_fixture(test, &fixture);
+	fixture.aconnector->base.display_info.panel_type =
+		DRM_MODE_PANEL_TYPE_LCD;
+
+	amdgpu_dm_set_panel_type(fixture.aconnector);
+
+	KUNIT_EXPECT_EQ(test, (int)fixture.link->panel_type,
+			(int)PANEL_TYPE_LCD);
+}
+
+/**
+ * dm_test_set_panel_type_vendor_lum_heuristic - Test vendor luminance heuristic maps to MINILED
+ * @test: The KUnit test context
+ *
+ * A panel from the specific vendor whose first luminance range is at least
+ * 1.5x the second is treated as a mini-LED panel.
+ */
+static void dm_test_set_panel_type_vendor_lum_heuristic(struct kunit *test)
+{
+	struct dm_panel_type_fixture fixture = {};
+	struct drm_amd_vsdb_info *vsdb;
+
+	setup_panel_type_fixture(test, &fixture);
+	fixture.link->local_sink = fixture.sink;
+	fixture.sink->edid_caps.manufacturer_id = DDC_MANUFACTURERNAME_SAMSUNG;
+
+	vsdb = &fixture.aconnector->base.display_info.amd_vsdb;
+	vsdb->version = 1;
+	vsdb->luminance_range1.max_luminance = 3000;
+	vsdb->luminance_range2.max_luminance = 1000;
+
+	amdgpu_dm_set_panel_type(fixture.aconnector);
+
+	KUNIT_EXPECT_EQ(test, (int)fixture.link->panel_type,
+			(int)PANEL_TYPE_MINILED);
+}
+
+/**
+ * dm_test_set_panel_type_defaults_to_lcd - Test undetermined panel defaults to LCD
+ * @test: The KUnit test context
+ *
+ * When no source identifies the panel, the type now defaults to
+ * PANEL_TYPE_LCD instead of remaining PANEL_TYPE_NONE.
+ */
+static void dm_test_set_panel_type_defaults_to_lcd(struct kunit *test)
+{
+	struct dm_panel_type_fixture fixture = {};
+
+	setup_panel_type_fixture(test, &fixture);
+
+	amdgpu_dm_set_panel_type(fixture.aconnector);
+
+	KUNIT_EXPECT_EQ(test, (int)fixture.link->panel_type,
+			(int)PANEL_TYPE_LCD);
+}
+
 static struct kunit_case amdgpu_dm_connector_tests[] = {
 	/* get_subconnector_type */
 	KUNIT_CASE(dm_test_subconnector_type_none),
@@ -2143,6 +2478,22 @@ static struct kunit_case amdgpu_dm_connector_tests[] = {
 	KUNIT_CASE(dm_test_is_freesync_video_mode_null_mode),
 	KUNIT_CASE(dm_test_is_freesync_video_mode_match),
 	KUNIT_CASE(dm_test_is_freesync_video_mode_no_match),
+	/* amdgpu_dm_update_cacp_caps */
+	KUNIT_CASE(dm_test_cacp_caps_unsupported_ip),
+	KUNIT_CASE(dm_test_cacp_caps_excluded_ip_316),
+	KUNIT_CASE(dm_test_cacp_caps_edp_oled_supported),
+	KUNIT_CASE(dm_test_cacp_caps_lvds_oled_supported),
+	KUNIT_CASE(dm_test_cacp_caps_non_edp_signal),
+	KUNIT_CASE(dm_test_cacp_caps_lcd_panel),
+	/* amdgpu_dm_set_panel_type */
+	KUNIT_CASE(dm_test_set_panel_type_vsdb_oled),
+	KUNIT_CASE(dm_test_set_panel_type_vsdb_miniled),
+	KUNIT_CASE(dm_test_set_panel_type_dpcd_oled),
+	KUNIT_CASE(dm_test_set_panel_type_dpcd_miniled),
+	KUNIT_CASE(dm_test_set_panel_type_did_oled),
+	KUNIT_CASE(dm_test_set_panel_type_did_lcd),
+	KUNIT_CASE(dm_test_set_panel_type_vendor_lum_heuristic),
+	KUNIT_CASE(dm_test_set_panel_type_defaults_to_lcd),
 	{}
 };
 
