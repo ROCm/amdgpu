@@ -67,6 +67,7 @@ static enum hrtimer_restart amdgpu_vkms_vblank_simulate(struct hrtimer *timer)
 }
 #endif
 
+#if !defined(DRM_CRTC_VBLANK_TIMER_FUNCS)
 static int amdgpu_vkms_enable_vblank(struct drm_crtc *crtc)
 {
 	struct drm_vblank_crtc *vblank = drm_crtc_vblank_crtc(crtc);
@@ -116,6 +117,7 @@ static bool amdgpu_vkms_get_vblank_timestamp(struct drm_crtc *crtc,
 	*vblank_time  = ktime_sub(*vblank_time, output->period_ns);
 	return true;
 }
+#endif
 
 static const struct drm_crtc_funcs amdgpu_vkms_crtc_funcs = {
 	.set_config             = drm_atomic_helper_set_config,
@@ -135,6 +137,7 @@ static const struct drm_crtc_funcs amdgpu_vkms_crtc_funcs = {
 #endif
 };
 
+#ifndef DRM_CRTC_VBLANK_TIMER_FUNCS
 static void amdgpu_vkms_crtc_atomic_enable(struct drm_crtc *crtc,
 #if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE)
 					   struct drm_atomic_state *state)
@@ -176,6 +179,7 @@ static void amdgpu_vkms_crtc_atomic_flush(struct drm_crtc *crtc,
 		crtc->state->event = NULL;
 	}
 }
+#endif
 
 static const struct drm_crtc_helper_funcs amdgpu_vkms_crtc_helper_funcs = {
 #ifndef DRM_CRTC_VBLANK_TIMER_FUNCS
