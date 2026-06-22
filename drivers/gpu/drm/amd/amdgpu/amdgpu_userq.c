@@ -142,7 +142,8 @@ static void amdgpu_userq_hang_detect_work(struct work_struct *work)
 		int r;
 
 		if (queue->queue_type == AMDGPU_HW_IP_COMPUTE)
-			r = amdgpu_gfx_reset_mes_compute(adev, NULL, NULL, NULL, NULL, NULL);
+			r = amdgpu_gfx_reset_mes_compute(adev, NULL, NULL,
+							 queue, NULL, NULL);
 		else
 			r = userq_funcs->reset(queue);
 		if (r)
@@ -690,6 +691,7 @@ amdgpu_userq_create(struct drm_file *filp, union drm_amdgpu_userq *args)
 	}
 
 	queue->doorbell_index = index;
+	queue->doorbell_offset = (u32)args->in.doorbell_offset;
 	trace_amdgpu_userq_create_start(queue);
 	r = uq_funcs->mqd_create(queue, &args->in);
 	if (r) {
@@ -1148,6 +1150,24 @@ static void amdgpu_userq_restore_worker(struct work_struct *work)
 
 put_fence:
 	dma_fence_put(ev_fence);
+}
+
+void amdgpu_userq_process_reset_irq(struct amdgpu_device *adev,
+				    u32 pasid, u32 doorbell_offset)
+{
+	struct xarray *xa = &adev->userq_doorbell_xa;
+	struct amdgpu_usermode_queue *queue;
+	unsigned long flags, idx;
+
+	xa_lock_irqsave(xa, flags);
+	xa_for_each(xa, idx, queue) {
+		if (queue->vm && queue->vm->pasid == pasid &&
+		    queue->doorbell_offset == doorbell_offset) {
+			amdgpu_userq_start_hang_detect_work(queue);
+			break;
+		}
+	}
+	xa_unlock_irqrestore(xa, flags);
 }
 
 static int
