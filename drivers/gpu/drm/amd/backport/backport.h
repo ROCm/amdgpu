@@ -155,5 +155,6 @@
 #include <kcl/kcl_uio.h>
 #include <kcl/kcl_mempool.h>
 #include <kcl/backport/kcl_pm_runtime.h>
+#include <kcl/kcl__defs.h>
 
 #endif /* AMDGPU_BACKPORT_H */
