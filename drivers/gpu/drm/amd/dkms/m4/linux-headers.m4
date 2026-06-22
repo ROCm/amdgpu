@@ -199,4 +199,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #kernel.h: split out mathematical helpers
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/math.h])
+
+	dnl #v6.11-rc6-54-g4b132aacb076
+	dnl #tools: Add xdrgen
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/sunrpc/xdrgen/_defs.h])
 ])
