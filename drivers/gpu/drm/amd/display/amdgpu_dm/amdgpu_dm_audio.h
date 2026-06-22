@@ -51,6 +51,8 @@ void amdgpu_dm_audio_component_unbind(struct device *kdev,
 void amdgpu_dm_audio_eld_notify(struct amdgpu_device *adev, int pin);
 int amdgpu_dm_audio_get_param(void);
 void amdgpu_dm_audio_set_param(int val);
+void amdgpu_dm_audio_init_pins(struct amdgpu_device *adev, int audio_count,
+			       const unsigned int *inst_array);
 #endif
 
 #endif /* __AMDGPU_DM_AUDIO_H__ */

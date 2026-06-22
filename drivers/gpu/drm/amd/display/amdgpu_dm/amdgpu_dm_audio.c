@@ -120,8 +120,31 @@ static const struct component_ops amdgpu_dm_audio_component_bind_ops = {
 	.unbind	= amdgpu_dm_audio_component_unbind,
 };
 
+STATIC_IFN_KUNIT
+void amdgpu_dm_audio_init_pins(struct amdgpu_device *adev, int audio_count,
+			       const unsigned int *inst_array)
+{
+	int i;
+
+	adev->mode_info.audio.num_pins = audio_count;
+
+	for (i = 0; i < audio_count; i++) {
+		adev->mode_info.audio.pin[i].channels = -1;
+		adev->mode_info.audio.pin[i].rate = -1;
+		adev->mode_info.audio.pin[i].bits_per_sample = -1;
+		adev->mode_info.audio.pin[i].status_bits = 0;
+		adev->mode_info.audio.pin[i].category_code = 0;
+		adev->mode_info.audio.pin[i].connected = false;
+		adev->mode_info.audio.pin[i].id = inst_array[i];
+		adev->mode_info.audio.pin[i].offset = 0;
+	}
+}
+EXPORT_IF_KUNIT(amdgpu_dm_audio_init_pins);
+
 int amdgpu_dm_audio_init(struct amdgpu_device *adev)
 {
+	unsigned int inst_array[MAX_AUDIOS];
+	int audio_count;
 	int i, ret;
 
 	if (!amdgpu_audio)
@@ -129,19 +152,10 @@ int amdgpu_dm_audio_init(struct amdgpu_device *adev)
 
 	adev->mode_info.audio.enabled = true;
 
-	adev->mode_info.audio.num_pins = adev->dm.dc->res_pool->audio_count;
-
-	for (i = 0; i < adev->mode_info.audio.num_pins; i++) {
-		adev->mode_info.audio.pin[i].channels = -1;
-		adev->mode_info.audio.pin[i].rate = -1;
-		adev->mode_info.audio.pin[i].bits_per_sample = -1;
-		adev->mode_info.audio.pin[i].status_bits = 0;
-		adev->mode_info.audio.pin[i].category_code = 0;
-		adev->mode_info.audio.pin[i].connected = false;
-		adev->mode_info.audio.pin[i].id =
-			adev->dm.dc->res_pool->audios[i]->inst;
-		adev->mode_info.audio.pin[i].offset = 0;
-	}
+	audio_count = adev->dm.dc->res_pool->audio_count;
+	for (i = 0; i < audio_count; i++)
+		inst_array[i] = adev->dm.dc->res_pool->audios[i]->inst;
+	amdgpu_dm_audio_init_pins(adev, audio_count, inst_array);
 
 	ret = component_add(adev->dev, &amdgpu_dm_audio_component_bind_ops);
 	if (ret < 0)
