@@ -433,11 +433,11 @@ static void amdgpu_dm_set_panel_type(struct amdgpu_dm_connector *aconnector)
 	}
 
 	/* If VSDB and DPCD didn't determine panel type, check DID */
-	if (link->panel_type == PANEL_TYPE_NONE) {
+	if (panel_type == PANEL_TYPE_NONE) {
 		if (display_info->panel_type == DRM_MODE_PANEL_TYPE_LCD)
-			link->panel_type = PANEL_TYPE_LCD;
+			panel_type = PANEL_TYPE_LCD;
 		else if (display_info->panel_type == DRM_MODE_PANEL_TYPE_OLED)
-			link->panel_type = PANEL_TYPE_OLED;
+			panel_type = PANEL_TYPE_OLED;
 	}
 
 	if (panel_type == PANEL_TYPE_NONE) {
