@@ -769,20 +769,21 @@ void dc_stream_set_dither_option(struct dc_stream_state *stream,
 {
 	struct bit_depth_reduction_params params;
 	struct dc_link *link = stream->link;
-	struct pipe_ctx *pipes = NULL;
+	struct resource_context *res_ctx = &link->dc->current_state->res_ctx;
+	struct pipe_ctx *otg_master;
+	struct pipe_ctx *opp_heads[MAX_PIPES];
+	int opp_cnt;
 	int i;
 
-	for (i = 0; i < MAX_PIPES; i++) {
-		if (link->dc->current_state->res_ctx.pipe_ctx[i].stream ==
-				stream) {
-			pipes = &link->dc->current_state->res_ctx.pipe_ctx[i];
-			break;
-		}
-	}
-
-	if (!pipes)
+	otg_master = resource_get_otg_master_for_stream(res_ctx, stream);
+	if (!otg_master)
 		return;
 	if (option > DITHER_OPTION_MAX)
+		return;
+
+	opp_cnt = resource_get_opp_heads_for_otg_master(otg_master, res_ctx, opp_heads);
+
+	if (opp_cnt == 0)
 		return;
 
 	dc_exit_ips_for_hw_access(stream->ctx->dc);
@@ -793,16 +794,30 @@ void dc_stream_set_dither_option(struct dc_stream_state *stream,
 	resource_build_bit_depth_reduction_params(stream, &params);
 	stream->bit_depth_params = params;
 
-	if (pipes->plane_res.xfm &&
-	    pipes->plane_res.xfm->funcs->transform_set_pixel_storage_depth) {
-		pipes->plane_res.xfm->funcs->transform_set_pixel_storage_depth(
-			pipes->plane_res.xfm,
-			pipes->plane_res.scl_data.lb_params.depth,
-			&stream->bit_depth_params);
-	}
+	/*
+	 * Program bit-depth reduction (dither) on every OPP head of the
+	 * stream. Under ODM combine there is more than one OPP head and they
+	 * must all be kept in sync, otherwise (e.g. when CRC capture requests
+	 * dither off) a secondary ODM segment can keep dither enabled and
+	 * produce a different CRC than the primary segment.
+	 */
+	for (i = 0; i < opp_cnt; i++) {
+		struct pipe_ctx *opp_head = opp_heads[i];
 
-	pipes->stream_res.opp->funcs->
-		opp_program_bit_depth_reduction(pipes->stream_res.opp, &params);
+		if (opp_head->plane_res.xfm &&
+		    opp_head->plane_res.xfm->funcs->transform_set_pixel_storage_depth) {
+			opp_head->plane_res.xfm->funcs->transform_set_pixel_storage_depth(
+				opp_head->plane_res.xfm,
+				opp_head->plane_res.scl_data.lb_params.depth,
+				&stream->bit_depth_params);
+		}
+
+		if (opp_head->stream_res.opp &&
+		    opp_head->stream_res.opp->funcs->opp_program_bit_depth_reduction) {
+			opp_head->stream_res.opp->funcs->opp_program_bit_depth_reduction(
+				opp_head->stream_res.opp, &params);
+		}
+	}
 }
 
 bool dc_stream_set_gamut_remap(struct dc *dc, const struct dc_stream_state *stream)
