@@ -151,6 +151,11 @@ bool ras_core_gpu_is_rma(struct ras_core_context *ras_core)
 	return ras_core->is_rma;
 }
 
+int ras_core_set_debug_mode(struct ras_core_context *ras_core, bool enable)
+{
+	return ras_mp1_set_debug_mode(ras_core, enable);
+}
+
 static int ras_core_seqno_fifo_write(struct ras_core_context *ras_core,
 		enum ras_seqno_fifo fifo_type, uint64_t seqno)
 {

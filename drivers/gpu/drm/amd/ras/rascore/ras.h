@@ -167,6 +167,7 @@ struct ras_mp1_sys_func {
 			enum ras_fw_eeprom_cmd index, uint32_t param, uint32_t *read_arg);
 	int (*mp1_get_ras_enabled_mask)(struct ras_core_context *ras_core,
 			uint64_t *enabled_mask);
+	int (*mp1_set_debug_mode)(struct ras_core_context *ras_core, bool enable);
 };
 
 struct ras_eeprom_sys_func {
@@ -400,4 +401,6 @@ int ras_core_get_device_system_info(struct ras_core_context *ras_core,
 int ras_core_convert_soc_pa_to_cur_nps_pages(struct ras_core_context *ras_core,
 		uint64_t soc_pa, uint64_t *page_pfn, uint32_t max_pages);
 int ras_core_check_address_sanity(struct ras_core_context *ras_core, uint64_t addr);
+
+int ras_core_set_debug_mode(struct ras_core_context *ras_core, bool enable);
 #endif

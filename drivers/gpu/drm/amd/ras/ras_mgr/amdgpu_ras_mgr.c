@@ -795,3 +795,13 @@ int amdgpu_ras_mgr_lookup_bad_pages_in_a_row(struct amdgpu_device *adev,
 	return ras_core_convert_soc_pa_to_cur_nps_pages(ras_mgr->ras_core,
 			addr, nps_page_addr, max_page_count);
 }
+
+int amdgpu_ras_mgr_set_debug_mode(struct amdgpu_device *adev, bool enable)
+{
+	struct amdgpu_ras_mgr *ras_mgr = amdgpu_ras_mgr_get_context(adev);
+
+	if (!ras_mgr || !ras_mgr->ras_core || !ras_mgr->ras_is_ready)
+		return false;
+
+	return ras_core_set_debug_mode(ras_mgr->ras_core, enable);
+}
