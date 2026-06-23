@@ -129,13 +129,15 @@ static ssize_t dm_mst_test_desc_aux_transfer(struct drm_dp_aux *aux,
  */
 static void dm_mst_test_needs_dsc_aux_workaround_match(struct kunit *test)
 {
-	struct dc_link link = {0};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.branch_dev_id = DP_BRANCH_DEVICE_ID_90CC24;
-	link.dpcd_caps.dpcd_rev.raw = DPCD_REV_14;
-	link.dpcd_caps.sink_count.bits.SINK_COUNT = 2;
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
 
-	KUNIT_EXPECT_TRUE(test, needs_dsc_aux_workaround(&link));
+	link->dpcd_caps.branch_dev_id = DP_BRANCH_DEVICE_ID_90CC24;
+	link->dpcd_caps.dpcd_rev.raw = DPCD_REV_14;
+	link->dpcd_caps.sink_count.bits.SINK_COUNT = 2;
+
+	KUNIT_EXPECT_TRUE(test, needs_dsc_aux_workaround(link));
 }
 
 /**
@@ -147,13 +149,15 @@ static void dm_mst_test_needs_dsc_aux_workaround_match(struct kunit *test)
  */
 static void dm_mst_test_needs_dsc_aux_workaround_rev12(struct kunit *test)
 {
-	struct dc_link link = {0};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.branch_dev_id = DP_BRANCH_DEVICE_ID_90CC24;
-	link.dpcd_caps.dpcd_rev.raw = DPCD_REV_12;
-	link.dpcd_caps.sink_count.bits.SINK_COUNT = 3;
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
 
-	KUNIT_EXPECT_TRUE(test, needs_dsc_aux_workaround(&link));
+	link->dpcd_caps.branch_dev_id = DP_BRANCH_DEVICE_ID_90CC24;
+	link->dpcd_caps.dpcd_rev.raw = DPCD_REV_12;
+	link->dpcd_caps.sink_count.bits.SINK_COUNT = 3;
+
+	KUNIT_EXPECT_TRUE(test, needs_dsc_aux_workaround(link));
 }
 
 /**
@@ -165,13 +169,15 @@ static void dm_mst_test_needs_dsc_aux_workaround_rev12(struct kunit *test)
  */
 static void dm_mst_test_needs_dsc_aux_workaround_wrong_dev_id(struct kunit *test)
 {
-	struct dc_link link = {0};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.branch_dev_id = 0x123456;
-	link.dpcd_caps.dpcd_rev.raw = DPCD_REV_14;
-	link.dpcd_caps.sink_count.bits.SINK_COUNT = 2;
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
 
-	KUNIT_EXPECT_FALSE(test, needs_dsc_aux_workaround(&link));
+	link->dpcd_caps.branch_dev_id = 0x123456;
+	link->dpcd_caps.dpcd_rev.raw = DPCD_REV_14;
+	link->dpcd_caps.sink_count.bits.SINK_COUNT = 2;
+
+	KUNIT_EXPECT_FALSE(test, needs_dsc_aux_workaround(link));
 }
 
 /**
@@ -183,13 +189,15 @@ static void dm_mst_test_needs_dsc_aux_workaround_wrong_dev_id(struct kunit *test
  */
 static void dm_mst_test_needs_dsc_aux_workaround_wrong_rev(struct kunit *test)
 {
-	struct dc_link link = {0};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.branch_dev_id = DP_BRANCH_DEVICE_ID_90CC24;
-	link.dpcd_caps.dpcd_rev.raw = 0x11; /* DPCD 1.1 */
-	link.dpcd_caps.sink_count.bits.SINK_COUNT = 2;
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
 
-	KUNIT_EXPECT_FALSE(test, needs_dsc_aux_workaround(&link));
+	link->dpcd_caps.branch_dev_id = DP_BRANCH_DEVICE_ID_90CC24;
+	link->dpcd_caps.dpcd_rev.raw = 0x11; /* DPCD 1.1 */
+	link->dpcd_caps.sink_count.bits.SINK_COUNT = 2;
+
+	KUNIT_EXPECT_FALSE(test, needs_dsc_aux_workaround(link));
 }
 
 /**
@@ -201,13 +209,15 @@ static void dm_mst_test_needs_dsc_aux_workaround_wrong_rev(struct kunit *test)
  */
 static void dm_mst_test_needs_dsc_aux_workaround_low_sink_count(struct kunit *test)
 {
-	struct dc_link link = {0};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.branch_dev_id = DP_BRANCH_DEVICE_ID_90CC24;
-	link.dpcd_caps.dpcd_rev.raw = DPCD_REV_14;
-	link.dpcd_caps.sink_count.bits.SINK_COUNT = 1;
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
 
-	KUNIT_EXPECT_FALSE(test, needs_dsc_aux_workaround(&link));
+	link->dpcd_caps.branch_dev_id = DP_BRANCH_DEVICE_ID_90CC24;
+	link->dpcd_caps.dpcd_rev.raw = DPCD_REV_14;
+	link->dpcd_caps.sink_count.bits.SINK_COUNT = 1;
+
+	KUNIT_EXPECT_FALSE(test, needs_dsc_aux_workaround(link));
 }
 
 /**
@@ -219,13 +229,15 @@ static void dm_mst_test_needs_dsc_aux_workaround_low_sink_count(struct kunit *te
  */
 static void dm_mst_test_needs_dsc_aux_workaround_zero_sink_count(struct kunit *test)
 {
-	struct dc_link link = {0};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.branch_dev_id = DP_BRANCH_DEVICE_ID_90CC24;
-	link.dpcd_caps.dpcd_rev.raw = DPCD_REV_14;
-	link.dpcd_caps.sink_count.bits.SINK_COUNT = 0;
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
 
-	KUNIT_EXPECT_FALSE(test, needs_dsc_aux_workaround(&link));
+	link->dpcd_caps.branch_dev_id = DP_BRANCH_DEVICE_ID_90CC24;
+	link->dpcd_caps.dpcd_rev.raw = DPCD_REV_14;
+	link->dpcd_caps.sink_count.bits.SINK_COUNT = 0;
+
+	KUNIT_EXPECT_FALSE(test, needs_dsc_aux_workaround(link));
 }
 
 /* Tests for dm_mst_get_pbn_divider */
@@ -943,17 +955,23 @@ static void dm_mst_test_create_fake_mst_encoders(struct kunit *test)
  */
 static void dm_mst_test_atomic_check_no_old_crtc(struct kunit *test)
 {
-	struct drm_connector_state old_conn_state = { 0 };
-	struct drm_connector_state new_conn_state = { 0 };
-	struct drm_atomic_commit state = { 0 };
+	struct drm_connector_state *old_conn_state;
+	struct drm_connector_state *new_conn_state;
+	struct drm_atomic_commit *state;
 	struct amdgpu_dm_connector *aconnector;
 	struct amdgpu_dm_connector *root;
 	struct drm_dp_mst_port *port;
 	unsigned int connector_index = 2;
 
+	old_conn_state = kunit_kzalloc(test, sizeof(*old_conn_state), GFP_KERNEL);
+	new_conn_state = kunit_kzalloc(test, sizeof(*new_conn_state), GFP_KERNEL);
+	state = kunit_kzalloc(test, sizeof(*state), GFP_KERNEL);
 	aconnector = kunit_kzalloc(test, sizeof(*aconnector), GFP_KERNEL);
 	root = kunit_kzalloc(test, sizeof(*root), GFP_KERNEL);
 	port = kunit_kzalloc(test, sizeof(*port), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, old_conn_state);
+	KUNIT_ASSERT_NOT_NULL(test, new_conn_state);
+	KUNIT_ASSERT_NOT_NULL(test, state);
 	KUNIT_ASSERT_NOT_NULL(test, aconnector);
 	KUNIT_ASSERT_NOT_NULL(test, root);
 	KUNIT_ASSERT_NOT_NULL(test, port);
@@ -962,18 +980,18 @@ static void dm_mst_test_atomic_check_no_old_crtc(struct kunit *test)
 	aconnector->mst_root = root;
 	aconnector->mst_output_port = port;
 	port->connector = &aconnector->base;
-	old_conn_state.connector = &aconnector->base;
-	new_conn_state.connector = &aconnector->base;
-	state.num_connector = connector_index + 1;
-	state.connectors = kunit_kzalloc(test,
-					 sizeof(*state.connectors) * state.num_connector,
+	old_conn_state->connector = &aconnector->base;
+	new_conn_state->connector = &aconnector->base;
+	state->num_connector = connector_index + 1;
+	state->connectors = kunit_kzalloc(test,
+					 sizeof(*state->connectors) * state->num_connector,
 					 GFP_KERNEL);
-	KUNIT_ASSERT_NOT_NULL(test, state.connectors);
-	state.connectors[connector_index].ptr = &aconnector->base;
-	state.connectors[connector_index].old_state = &old_conn_state;
-	state.connectors[connector_index].new_state = &new_conn_state;
+	KUNIT_ASSERT_NOT_NULL(test, state->connectors);
+	state->connectors[connector_index].ptr = &aconnector->base;
+	state->connectors[connector_index].old_state = old_conn_state;
+	state->connectors[connector_index].new_state = new_conn_state;
 
-	KUNIT_EXPECT_EQ(test, dm_dp_mst_atomic_check(&aconnector->base, &state), 0);
+	KUNIT_EXPECT_EQ(test, dm_dp_mst_atomic_check(&aconnector->base, state), 0);
 }
 
 /**

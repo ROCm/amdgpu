@@ -29,10 +29,12 @@
  */
 static void dm_test_subconnector_type_none(struct kunit *test)
 {
-	struct dc_link link = {};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.dongle_type = DISPLAY_DONGLE_NONE;
-	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(&link), (int)DRM_MODE_SUBCONNECTOR_Native);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+
+	link->dpcd_caps.dongle_type = DISPLAY_DONGLE_NONE;
+	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(link), (int)DRM_MODE_SUBCONNECTOR_Native);
 }
 
 /**
@@ -41,10 +43,12 @@ static void dm_test_subconnector_type_none(struct kunit *test)
  */
 static void dm_test_subconnector_type_vga(struct kunit *test)
 {
-	struct dc_link link = {};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_VGA_CONVERTER;
-	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(&link), (int)DRM_MODE_SUBCONNECTOR_VGA);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+
+	link->dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_VGA_CONVERTER;
+	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(link), (int)DRM_MODE_SUBCONNECTOR_VGA);
 }
 
 /**
@@ -53,10 +57,12 @@ static void dm_test_subconnector_type_vga(struct kunit *test)
  */
 static void dm_test_subconnector_type_dvi_converter(struct kunit *test)
 {
-	struct dc_link link = {};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_DVI_CONVERTER;
-	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(&link), (int)DRM_MODE_SUBCONNECTOR_DVID);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+
+	link->dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_DVI_CONVERTER;
+	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(link), (int)DRM_MODE_SUBCONNECTOR_DVID);
 }
 
 /**
@@ -65,10 +71,12 @@ static void dm_test_subconnector_type_dvi_converter(struct kunit *test)
  */
 static void dm_test_subconnector_type_dvi_dongle(struct kunit *test)
 {
-	struct dc_link link = {};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_DVI_DONGLE;
-	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(&link), (int)DRM_MODE_SUBCONNECTOR_DVID);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+
+	link->dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_DVI_DONGLE;
+	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(link), (int)DRM_MODE_SUBCONNECTOR_DVID);
 }
 
 /**
@@ -77,10 +85,12 @@ static void dm_test_subconnector_type_dvi_dongle(struct kunit *test)
  */
 static void dm_test_subconnector_type_hdmi_converter(struct kunit *test)
 {
-	struct dc_link link = {};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_HDMI_CONVERTER;
-	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(&link), (int)DRM_MODE_SUBCONNECTOR_HDMIA);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+
+	link->dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_HDMI_CONVERTER;
+	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(link), (int)DRM_MODE_SUBCONNECTOR_HDMIA);
 }
 
 /**
@@ -89,10 +99,12 @@ static void dm_test_subconnector_type_hdmi_converter(struct kunit *test)
  */
 static void dm_test_subconnector_type_hdmi_dongle(struct kunit *test)
 {
-	struct dc_link link = {};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_HDMI_DONGLE;
-	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(&link), (int)DRM_MODE_SUBCONNECTOR_HDMIA);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+
+	link->dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_HDMI_DONGLE;
+	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(link), (int)DRM_MODE_SUBCONNECTOR_HDMIA);
 }
 
 /**
@@ -101,10 +113,12 @@ static void dm_test_subconnector_type_hdmi_dongle(struct kunit *test)
  */
 static void dm_test_subconnector_type_mismatched(struct kunit *test)
 {
-	struct dc_link link = {};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_HDMI_MISMATCHED_DONGLE;
-	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(&link), (int)DRM_MODE_SUBCONNECTOR_Unknown);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+
+	link->dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_HDMI_MISMATCHED_DONGLE;
+	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(link), (int)DRM_MODE_SUBCONNECTOR_Unknown);
 }
 
 /**
@@ -113,10 +127,12 @@ static void dm_test_subconnector_type_mismatched(struct kunit *test)
  */
 static void dm_test_subconnector_type_default_unknown(struct kunit *test)
 {
-	struct dc_link link = {};
+	struct dc_link *link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
 
-	link.dpcd_caps.dongle_type = (typeof(link.dpcd_caps.dongle_type))0x7f;
-	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(&link), (int)DRM_MODE_SUBCONNECTOR_Unknown);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+
+	link->dpcd_caps.dongle_type = (typeof(link->dpcd_caps.dongle_type))0x7f;
+	KUNIT_EXPECT_EQ(test, (int)get_subconnector_type(link), (int)DRM_MODE_SUBCONNECTOR_Unknown);
 }
 
 /* Tests for get_output_content_type() */

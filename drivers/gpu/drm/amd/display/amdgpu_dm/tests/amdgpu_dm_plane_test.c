@@ -185,22 +185,26 @@ static void dm_test_fill_blending_coverage_alpha_format(struct kunit *test)
 static void dm_test_fill_blending_global_alpha(struct kunit *test)
 {
 	struct amdgpu_device *adev;
-	struct drm_plane plane = {0};
-	struct drm_plane_state state = { 0 };
+	struct drm_plane *plane;
+	struct drm_plane_state *state;
 	bool per_pixel_alpha;
 	bool pre_multiplied_alpha;
 	bool global_alpha;
 	int global_alpha_value;
 
 	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	state = kunit_kzalloc(test, sizeof(*state), GFP_KERNEL);
 	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+	KUNIT_ASSERT_NOT_NULL(test, state);
 
-	plane.dev = &adev->ddev;
-	state.plane = &plane;
-	state.pixel_blend_mode = DRM_MODE_BLEND_PIXEL_NONE;
-	state.alpha = 0x8000;
+	plane->dev = &adev->ddev;
+	state->plane = plane;
+	state->pixel_blend_mode = DRM_MODE_BLEND_PIXEL_NONE;
+	state->alpha = 0x8000;
 
-	amdgpu_dm_plane_fill_blending_from_plane_state(&state,
+	amdgpu_dm_plane_fill_blending_from_plane_state(state,
 						       &per_pixel_alpha,
 						       &pre_multiplied_alpha,
 						       &global_alpha,
@@ -250,23 +254,28 @@ static void dm_test_modifier_gfx9_swizzle_mode(struct kunit *test)
  */
 static void dm_test_get_plane_formats(struct kunit *test)
 {
-	struct drm_plane plane = {0};
-	struct dc_plane_cap cap = {0};
+	struct drm_plane *plane;
+	struct dc_plane_cap *cap;
 	uint32_t formats[32] = {0};
 
-	plane.type = DRM_PLANE_TYPE_PRIMARY;
-	KUNIT_EXPECT_EQ(test, amdgpu_dm_plane_get_plane_formats(&plane, NULL, formats, 32), 14);
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	cap = kunit_kzalloc(test, sizeof(*cap), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+	KUNIT_ASSERT_NOT_NULL(test, cap);
 
-	cap.pixel_format_support.nv12 = true;
-	cap.pixel_format_support.p010 = true;
-	cap.pixel_format_support.fp16 = true;
-	KUNIT_EXPECT_EQ(test, amdgpu_dm_plane_get_plane_formats(&plane, &cap, formats, 32), 20);
+	plane->type = DRM_PLANE_TYPE_PRIMARY;
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_plane_get_plane_formats(plane, NULL, formats, 32), 14);
 
-	plane.type = DRM_PLANE_TYPE_OVERLAY;
-	KUNIT_EXPECT_EQ(test, amdgpu_dm_plane_get_plane_formats(&plane, NULL, formats, 32), 9);
+	cap->pixel_format_support.nv12 = true;
+	cap->pixel_format_support.p010 = true;
+	cap->pixel_format_support.fp16 = true;
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_plane_get_plane_formats(plane, cap, formats, 32), 20);
 
-	plane.type = DRM_PLANE_TYPE_CURSOR;
-	KUNIT_EXPECT_EQ(test, amdgpu_dm_plane_get_plane_formats(&plane, NULL, formats, 32), 1);
+	plane->type = DRM_PLANE_TYPE_OVERLAY;
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_plane_get_plane_formats(plane, NULL, formats, 32), 9);
+
+	plane->type = DRM_PLANE_TYPE_CURSOR;
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_plane_get_plane_formats(plane, NULL, formats, 32), 1);
 }
 
 /**
@@ -433,30 +442,36 @@ static void dm_test_get_cursor_position(struct kunit *test)
 {
 	struct amdgpu_device *adev;
 	struct amdgpu_crtc *amdgpu_crtc;
-	struct drm_plane plane = {0};
-	struct drm_plane_state state = {0};
-	struct drm_framebuffer fb = {0};
+	struct drm_plane *plane;
+	struct drm_plane_state *state;
+	struct drm_framebuffer *fb;
 	struct dc_cursor_position position = {0};
 
 	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
 	amdgpu_crtc = kunit_kzalloc(test, sizeof(*amdgpu_crtc), GFP_KERNEL);
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	state = kunit_kzalloc(test, sizeof(*state), GFP_KERNEL);
+	fb = kunit_kzalloc(test, sizeof(*fb), GFP_KERNEL);
 	KUNIT_ASSERT_NOT_NULL(test, adev);
 	KUNIT_ASSERT_NOT_NULL(test, amdgpu_crtc);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+	KUNIT_ASSERT_NOT_NULL(test, state);
+	KUNIT_ASSERT_NOT_NULL(test, fb);
 
 	adev->ip_versions[DCE_HWIP][0] = IP_VERSION(4, 0, 0);
 	amdgpu_crtc->max_cursor_width = 64;
 	amdgpu_crtc->max_cursor_height = 64;
 
-	plane.dev = &adev->ddev;
-	plane.state = &state;
-	state.fb = &fb;
-	state.crtc_x = -5;
-	state.crtc_y = -7;
-	state.crtc_w = 32;
-	state.crtc_h = 32;
+	plane->dev = &adev->ddev;
+	plane->state = state;
+	state->fb = fb;
+	state->crtc_x = -5;
+	state->crtc_y = -7;
+	state->crtc_w = 32;
+	state->crtc_h = 32;
 
 	KUNIT_ASSERT_EQ(test,
-			amdgpu_dm_plane_get_cursor_position(&plane, &amdgpu_crtc->base, &position),
+			amdgpu_dm_plane_get_cursor_position(plane, &amdgpu_crtc->base, &position),
 			0);
 	KUNIT_EXPECT_TRUE(test, position.enable);
 	KUNIT_EXPECT_EQ(test, position.x, 0);
@@ -466,10 +481,10 @@ static void dm_test_get_cursor_position(struct kunit *test)
 	KUNIT_EXPECT_TRUE(test, position.translate_by_source);
 
 	memset(&position, 0, sizeof(position));
-	state.crtc_x = -64;
-	state.crtc_y = 0;
+	state->crtc_x = -64;
+	state->crtc_y = 0;
 	KUNIT_ASSERT_EQ(test,
-			amdgpu_dm_plane_get_cursor_position(&plane, &amdgpu_crtc->base, &position),
+			amdgpu_dm_plane_get_cursor_position(plane, &amdgpu_crtc->base, &position),
 			0);
 	KUNIT_EXPECT_FALSE(test, position.enable);
 }
@@ -483,35 +498,37 @@ static void dm_test_get_cursor_position(struct kunit *test)
 static void dm_test_format_mod_supported(struct kunit *test)
 {
 	struct amdgpu_device *adev;
-	struct drm_plane plane = {0};
+	struct drm_plane *plane;
 	uint64_t listed_mod;
 
 	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
 	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
 
 	adev->family = AMDGPU_FAMILY_NV;
-	plane.dev = &adev->ddev;
+	plane->dev = &adev->ddev;
 
 	KUNIT_EXPECT_TRUE(test,
-			  amdgpu_dm_plane_format_mod_supported(&plane, DRM_FORMAT_XRGB8888,
+			  amdgpu_dm_plane_format_mod_supported(plane, DRM_FORMAT_XRGB8888,
 							       DRM_FORMAT_MOD_LINEAR));
 	KUNIT_EXPECT_TRUE(test,
-			  amdgpu_dm_plane_format_mod_supported(&plane, DRM_FORMAT_XRGB8888,
+			  amdgpu_dm_plane_format_mod_supported(plane, DRM_FORMAT_XRGB8888,
 							       DRM_FORMAT_MOD_INVALID));
 
 	KUNIT_EXPECT_FALSE(test,
-			   amdgpu_dm_plane_format_mod_supported(&plane, DRM_FORMAT_XRGB8888,
+			   amdgpu_dm_plane_format_mod_supported(plane, DRM_FORMAT_XRGB8888,
 								DRM_FORMAT_MOD_VENDOR_AMD));
 
 	listed_mod = AMD_FMT_MOD |
 		     AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S_X) |
 		     AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX9) |
 		     AMD_FMT_MOD_SET(DCC, 1);
-	plane.modifiers = &listed_mod;
-	plane.modifier_count = 1;
+	plane->modifiers = &listed_mod;
+	plane->modifier_count = 1;
 
 	KUNIT_EXPECT_FALSE(test,
-			   amdgpu_dm_plane_format_mod_supported(&plane, DRM_FORMAT_NV12, listed_mod));
+			   amdgpu_dm_plane_format_mod_supported(plane, DRM_FORMAT_NV12, listed_mod));
 }
 
 /**

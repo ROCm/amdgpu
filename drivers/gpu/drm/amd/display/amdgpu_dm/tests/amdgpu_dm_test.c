@@ -452,14 +452,19 @@ static void dm_test_get_plane_scale_zero_src_width(struct kunit *test)
  */
 static void dm_test_scaling_state_same(struct kunit *test)
 {
-	struct dm_connector_state a = { 0 };
-	struct dm_connector_state b = { 0 };
+	struct dm_connector_state *a;
+	struct dm_connector_state *b;
 
-	a.scaling = RMX_FULL;
-	a.underscan_enable = false;
-	b = a;
+	a = kunit_kzalloc(test, sizeof(*a), GFP_KERNEL);
+	b = kunit_kzalloc(test, sizeof(*b), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, a);
+	KUNIT_ASSERT_NOT_NULL(test, b);
 
-	KUNIT_EXPECT_FALSE(test, is_scaling_state_different(&a, &b));
+	a->scaling = RMX_FULL;
+	a->underscan_enable = false;
+	*b = *a;
+
+	KUNIT_EXPECT_FALSE(test, is_scaling_state_different(a, b));
 }
 
 /**
@@ -468,13 +473,18 @@ static void dm_test_scaling_state_same(struct kunit *test)
  */
 static void dm_test_scaling_state_scaling_changed(struct kunit *test)
 {
-	struct dm_connector_state a = { 0 };
-	struct dm_connector_state b = { 0 };
+	struct dm_connector_state *a;
+	struct dm_connector_state *b;
 
-	a.scaling = RMX_FULL;
-	b.scaling = RMX_CENTER;
+	a = kunit_kzalloc(test, sizeof(*a), GFP_KERNEL);
+	b = kunit_kzalloc(test, sizeof(*b), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, a);
+	KUNIT_ASSERT_NOT_NULL(test, b);
 
-	KUNIT_EXPECT_TRUE(test, is_scaling_state_different(&a, &b));
+	a->scaling = RMX_FULL;
+	b->scaling = RMX_CENTER;
+
+	KUNIT_EXPECT_TRUE(test, is_scaling_state_different(a, b));
 }
 
 /**
@@ -483,16 +493,21 @@ static void dm_test_scaling_state_scaling_changed(struct kunit *test)
  */
 static void dm_test_scaling_state_underscan_enabled(struct kunit *test)
 {
-	struct dm_connector_state old_state = { 0 };
-	struct dm_connector_state new_state = { 0 };
+	struct dm_connector_state *old_state;
+	struct dm_connector_state *new_state;
+
+	old_state = kunit_kzalloc(test, sizeof(*old_state), GFP_KERNEL);
+	new_state = kunit_kzalloc(test, sizeof(*new_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, old_state);
+	KUNIT_ASSERT_NOT_NULL(test, new_state);
 
 	/* new enables underscan with non-zero borders, old has it disabled */
-	new_state.underscan_enable = true;
-	new_state.underscan_hborder = 16;
-	new_state.underscan_vborder = 16;
-	old_state.underscan_enable = false;
+	new_state->underscan_enable = true;
+	new_state->underscan_hborder = 16;
+	new_state->underscan_vborder = 16;
+	old_state->underscan_enable = false;
 
-	KUNIT_EXPECT_TRUE(test, is_scaling_state_different(&new_state, &old_state));
+	KUNIT_EXPECT_TRUE(test, is_scaling_state_different(new_state, old_state));
 }
 
 /**
@@ -501,16 +516,21 @@ static void dm_test_scaling_state_underscan_enabled(struct kunit *test)
  */
 static void dm_test_scaling_state_underscan_border_changed(struct kunit *test)
 {
-	struct dm_connector_state a = { 0 };
-	struct dm_connector_state b = { 0 };
+	struct dm_connector_state *a;
+	struct dm_connector_state *b;
 
-	a.underscan_enable = true;
-	a.underscan_hborder = 16;
-	a.underscan_vborder = 16;
-	b = a;
-	b.underscan_hborder = 32;
+	a = kunit_kzalloc(test, sizeof(*a), GFP_KERNEL);
+	b = kunit_kzalloc(test, sizeof(*b), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, a);
+	KUNIT_ASSERT_NOT_NULL(test, b);
 
-	KUNIT_EXPECT_TRUE(test, is_scaling_state_different(&a, &b));
+	a->underscan_enable = true;
+	a->underscan_hborder = 16;
+	a->underscan_vborder = 16;
+	*b = *a;
+	b->underscan_hborder = 32;
+
+	KUNIT_EXPECT_TRUE(test, is_scaling_state_different(a, b));
 }
 
 /* Tests for is_timing_unchanged_for_freesync() */
