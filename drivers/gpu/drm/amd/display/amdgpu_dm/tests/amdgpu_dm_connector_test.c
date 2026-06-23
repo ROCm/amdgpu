@@ -2772,6 +2772,130 @@ static void dm_test_fbc_init_no_modes(struct kunit *test)
 	KUNIT_EXPECT_NULL(test, ctx->adev->dm.compressor.bo_ptr);
 }
 
+/* Tests for amdgpu_dm_detect_mst_link_for_all_connectors() */
+
+/* Allocate a bare drm_device suitable for registering connectors against. */
+static struct drm_device *dm_test_alloc_drm(struct kunit *test)
+{
+	struct device *dev;
+	struct drm_device *drm;
+
+	dev = drm_kunit_helper_alloc_device(test);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
+
+	drm = __drm_kunit_helper_alloc_drm_device(test, dev, sizeof(*drm), 0,
+						  DRIVER_MODESET);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
+
+	return drm;
+}
+
+/*
+ * Allocate an amdgpu_dm_connector and register its embedded drm_connector with
+ * @drm so that drm_for_each_connector_iter() and to_amdgpu_dm_connector() both
+ * resolve to it.
+ */
+static struct amdgpu_dm_connector *dm_test_add_connector(struct kunit *test,
+		struct drm_device *drm, int connector_type)
+{
+	struct amdgpu_dm_connector *aconnector;
+
+	aconnector = kunit_kzalloc(test, sizeof(*aconnector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, aconnector);
+
+	KUNIT_ASSERT_EQ(test,
+		drmm_connector_init(drm, &aconnector->base,
+				    &dm_test_connector_funcs, connector_type,
+				    NULL), 0);
+
+	return aconnector;
+}
+
+/**
+ * dm_test_detect_mst_no_connectors - Test the no-op path on an empty device
+ * @test: The KUnit test context
+ */
+static void dm_test_detect_mst_no_connectors(struct kunit *test)
+{
+	struct drm_device *drm = dm_test_alloc_drm(test);
+
+	/* No connectors registered → iteration body never runs */
+	KUNIT_EXPECT_EQ(test,
+		amdgpu_dm_detect_mst_link_for_all_connectors(drm), 0);
+}
+
+/**
+ * dm_test_detect_mst_skips_writeback - Test writeback connectors are skipped
+ * @test: The KUnit test context
+ *
+ * A writeback connector is hit by the early ``continue`` before its dc_link is
+ * ever dereferenced, so leaving dc_link NULL must not crash.
+ */
+static void dm_test_detect_mst_skips_writeback(struct kunit *test)
+{
+	struct drm_device *drm = dm_test_alloc_drm(test);
+	struct amdgpu_dm_connector *aconnector;
+
+	aconnector = dm_test_add_connector(test, drm,
+					   DRM_MODE_CONNECTOR_WRITEBACK);
+	/* dc_link intentionally left NULL: it must not be touched */
+	aconnector->dc_link = NULL;
+
+	KUNIT_EXPECT_EQ(test,
+		amdgpu_dm_detect_mst_link_for_all_connectors(drm), 0);
+}
+
+/**
+ * dm_test_detect_mst_non_mst_link - Test a non-MST link starts no topology
+ * @test: The KUnit test context
+ */
+static void dm_test_detect_mst_non_mst_link(struct kunit *test)
+{
+	struct drm_device *drm = dm_test_alloc_drm(test);
+	struct amdgpu_dm_connector *aconnector;
+	struct dc_link *link;
+
+	aconnector = dm_test_add_connector(test, drm,
+					   DRM_MODE_CONNECTOR_DisplayPort);
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+
+	/* Not an MST branch → the topology manager is never started */
+	link->type = dc_connection_single;
+	aconnector->dc_link = link;
+
+	KUNIT_EXPECT_EQ(test,
+		amdgpu_dm_detect_mst_link_for_all_connectors(drm), 0);
+}
+
+/**
+ * dm_test_detect_mst_branch_without_aux - Test an MST branch with no aux is
+ * skipped
+ * @test: The KUnit test context
+ *
+ * The condition short-circuits on a NULL mst_mgr.aux, so the real
+ * drm_dp_mst_topology_mgr_set_mst() path is never reached.
+ */
+static void dm_test_detect_mst_branch_without_aux(struct kunit *test)
+{
+	struct drm_device *drm = dm_test_alloc_drm(test);
+	struct amdgpu_dm_connector *aconnector;
+	struct dc_link *link;
+
+	aconnector = dm_test_add_connector(test, drm,
+					   DRM_MODE_CONNECTOR_DisplayPort);
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+
+	link->type = dc_connection_mst_branch;
+	aconnector->dc_link = link;
+	/* mst_mgr.aux is NULL (kzalloc) → second half of the && is false */
+	KUNIT_ASSERT_NULL(test, aconnector->mst_mgr.aux);
+
+	KUNIT_EXPECT_EQ(test,
+		amdgpu_dm_detect_mst_link_for_all_connectors(drm), 0);
+}
+
 static struct kunit_case amdgpu_dm_connector_tests[] = {
 	/* get_subconnector_type */
 	KUNIT_CASE(dm_test_subconnector_type_none),
@@ -2934,6 +3058,11 @@ static struct kunit_case amdgpu_dm_connector_tests[] = {
 	KUNIT_CASE(dm_test_fbc_init_non_edp),
 	KUNIT_CASE(dm_test_fbc_init_already_allocated),
 	KUNIT_CASE(dm_test_fbc_init_no_modes),
+	/* amdgpu_dm_detect_mst_link_for_all_connectors */
+	KUNIT_CASE(dm_test_detect_mst_no_connectors),
+	KUNIT_CASE(dm_test_detect_mst_skips_writeback),
+	KUNIT_CASE(dm_test_detect_mst_non_mst_link),
+	KUNIT_CASE(dm_test_detect_mst_branch_without_aux),
 	{}
 };
 

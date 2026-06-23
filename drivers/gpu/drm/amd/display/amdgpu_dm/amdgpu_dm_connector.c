@@ -341,6 +341,7 @@ int amdgpu_dm_detect_mst_link_for_all_connectors(struct drm_device *dev)
 
 	return ret;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_detect_mst_link_for_all_connectors);
 
 static void hdmi_cec_unset_edid(struct amdgpu_dm_connector *aconnector)
 {
