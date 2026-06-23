@@ -147,7 +147,7 @@ int dm_dmub_hw_init(struct amdgpu_device *adev)
 	struct dmub_srv_hw_params hw_params;
 	enum dmub_status status;
 	const unsigned char *fw_inst_const, *fw_bss_data;
-	u32 i, fw_inst_const_size, fw_bss_data_size;
+	u32 fw_inst_const_size, fw_bss_data_size;
 	bool has_hw_support;
 
 	if (!dmub_srv)
@@ -243,8 +243,7 @@ int dm_dmub_hw_init(struct amdgpu_device *adev)
 	if (dmcu)
 		hw_params.psp_version = dmcu->psp_version;
 
-	for (i = 0; i < fb_info->num_fb; ++i)
-		hw_params.fb[i] = &fb_info->fb[i];
+	hw_params.fb_info = fb_info;
 
 	/* Enable usb4 dpia in the FW APU */
 	if (dc->caps.is_apu &&
