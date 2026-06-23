@@ -33,6 +33,104 @@ static void dm_test_irq_handler_alt(void *arg)
 {
 }
 
+static void dm_test_irq_handler_count(void *arg)
+{
+	int *count = arg;
+
+	if (count)
+		(*count)++;
+}
+
+static struct dc *dm_test_alloc_dc_with_ctx(struct kunit *test)
+{
+	struct dc_context *ctx;
+	struct dc *dc;
+
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, ctx);
+
+	dc->ctx = ctx;
+	ctx->dc = dc;
+
+	return dc;
+}
+
+static enum dc_irq_source dm_test_to_dal_irq_source_dcn10(
+		struct irq_service *irq_service,
+		uint32_t src_id,
+		uint32_t ext_id)
+{
+	switch (src_id) {
+	case DCN_1_0__SRCID__DC_D1_OTG_VSTARTUP:
+		return DC_IRQ_SOURCE_VBLANK1;
+	case DCN_1_0__SRCID__OTG0_IHC_V_UPDATE_NO_LOCK_INTERRUPT:
+		return DC_IRQ_SOURCE_VUPDATE1;
+	case DCN_1_0__SRCID__HUBP0_FLIP_INTERRUPT:
+		return DC_IRQ_SOURCE_PFLIP1;
+	case DCN_1_0__SRCID__DMCUB_OUTBOX_LOW_PRIORITY_READY_INT:
+		return DC_IRQ_SOURCE_DMCUB_OUTBOX;
+	default:
+		return DC_IRQ_SOURCE_INVALID;
+	}
+}
+
+static const struct irq_service_funcs dm_test_irq_service_funcs_dcn10 = {
+	.to_dal_irq_source = dm_test_to_dal_irq_source_dcn10
+};
+
+static bool dm_test_irq_src_set(struct irq_service *irq_service,
+				const struct irq_source_info *info, bool enable)
+{
+	return true;
+}
+
+static bool dm_test_irq_src_ack(struct irq_service *irq_service,
+				const struct irq_source_info *info)
+{
+	return true;
+}
+
+/* Per-source funcs let dc_interrupt_set() succeed without register access. */
+static struct irq_source_info_funcs dm_test_irq_src_funcs = {
+	.set = dm_test_irq_src_set,
+	.ack = dm_test_irq_src_ack,
+};
+
+static struct dc *dm_test_alloc_dc_with_irq_service(struct kunit *test,
+						    const struct irq_service_funcs *funcs)
+{
+	struct irq_source_info *info;
+	struct resource_pool *res_pool;
+	struct irq_service *irqs;
+	struct dc *dc;
+	int i;
+
+	dc = dm_test_alloc_dc_with_ctx(test);
+	res_pool = kunit_kzalloc(test, sizeof(*res_pool), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, res_pool);
+	irqs = kunit_kzalloc(test, sizeof(*irqs), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, irqs);
+
+	/*
+	 * Populate the per-source info table so dc_interrupt_set()/_ack()
+	 * succeed without touching hardware registers.
+	 */
+	info = kunit_kzalloc(test, sizeof(*info) * DAL_IRQ_SOURCES_NUMBER,
+			     GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, info);
+	for (i = 0; i < DAL_IRQ_SOURCES_NUMBER; i++)
+		info[i].funcs = &dm_test_irq_src_funcs;
+
+	irqs->funcs = funcs;
+	irqs->info = info;
+	res_pool->irqs = irqs;
+	dc->res_pool = res_pool;
+
+	return dc;
+}
+
 static void dm_test_crtc_list_del(void *data)
 {
 	struct amdgpu_crtc *acrtc = data;
@@ -1179,6 +1277,462 @@ static void dm_test_hpd_rx_irq_work_suspend_flushes(struct kunit *test)
 	amdgpu_dm_hpd_rx_irq_work_suspend(&adev->dm);
 }
 
+/* Tests for CRTC-based irq state callbacks (no-CRTC early return) */
+
+/**
+ * dm_test_set_crtc_irq_state_no_crtc - Test crtc irq state with missing CRTC
+ * @test: The KUnit test context
+ */
+static void dm_test_set_crtc_irq_state_no_crtc(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+
+	/* mode_info.crtcs[0] is NULL -> returns 0 without dereferencing DC. */
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_set_crtc_irq_state(adev, NULL, 0, AMDGPU_IRQ_STATE_ENABLE), 0);
+}
+
+/**
+ * dm_test_set_pflip_irq_state_no_crtc - Test pflip irq state with missing CRTC
+ * @test: The KUnit test context
+ */
+static void dm_test_set_pflip_irq_state_no_crtc(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_set_pflip_irq_state(adev, NULL, 0, AMDGPU_IRQ_STATE_DISABLE), 0);
+}
+
+/**
+ * dm_test_set_vline0_irq_state_no_crtc - Test vline0 irq state with missing CRTC
+ * @test: The KUnit test context
+ */
+static void dm_test_set_vline0_irq_state_no_crtc(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_set_vline0_irq_state(adev, NULL, 0, AMDGPU_IRQ_STATE_ENABLE), 0);
+}
+
+/**
+ * dm_test_set_vupdate_irq_state_no_crtc - Test vupdate irq state with missing CRTC
+ * @test: The KUnit test context
+ */
+static void dm_test_set_vupdate_irq_state_no_crtc(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_set_vupdate_irq_state(adev, NULL, 0, AMDGPU_IRQ_STATE_ENABLE), 0);
+}
+
+/* Tests for CRTC-based irq state callbacks (dm_irq_state happy path) */
+
+/**
+ * dm_test_set_crtc_irq_state_otg_disabled - Test crtc irq state with disabled OTG
+ * @test: The KUnit test context
+ */
+static void dm_test_set_crtc_irq_state_otg_disabled(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct amdgpu_crtc *acrtc;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	acrtc = kunit_kzalloc(test, sizeof(*acrtc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, acrtc);
+
+	/* otg_inst == -1 short-circuits before computing the irq source. */
+	acrtc->otg_inst = -1;
+	adev->mode_info.crtcs[0] = acrtc;
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_set_crtc_irq_state(adev, NULL, 0, AMDGPU_IRQ_STATE_ENABLE), 0);
+}
+
+/**
+ * dm_test_set_crtc_irq_state_enable - Test crtc irq state reaches DC (enable)
+ * @test: The KUnit test context
+ */
+static void dm_test_set_crtc_irq_state_enable(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct amdgpu_crtc *acrtc;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	acrtc = kunit_kzalloc(test, sizeof(*acrtc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, acrtc);
+
+	/*
+	 * otg_inst >= 0 computes the irq source and reaches the NULL-safe
+	 * dc_interrupt_set(); the ips_support branch is skipped (dc == NULL).
+	 */
+	acrtc->otg_inst = 3;
+	adev->mode_info.crtcs[0] = acrtc;
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_set_crtc_irq_state(adev, NULL, 0, AMDGPU_IRQ_STATE_ENABLE), 0);
+}
+
+/**
+ * dm_test_set_pflip_irq_state_disable - Test pflip irq state reaches DC (disable)
+ * @test: The KUnit test context
+ */
+static void dm_test_set_pflip_irq_state_disable(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct amdgpu_crtc *acrtc;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	acrtc = kunit_kzalloc(test, sizeof(*acrtc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, acrtc);
+
+	/* The disable state exercises the st == false path. */
+	acrtc->otg_inst = 1;
+	adev->mode_info.crtcs[0] = acrtc;
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_set_pflip_irq_state(adev, NULL, 0, AMDGPU_IRQ_STATE_DISABLE), 0);
+}
+
+/**
+ * dm_test_set_vline0_irq_state_enable - Test vline0 irq state reaches DC (enable)
+ * @test: The KUnit test context
+ */
+static void dm_test_set_vline0_irq_state_enable(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct amdgpu_crtc *acrtc;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	acrtc = kunit_kzalloc(test, sizeof(*acrtc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, acrtc);
+
+	acrtc->otg_inst = 0;
+	adev->mode_info.crtcs[0] = acrtc;
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_set_vline0_irq_state(adev, NULL, 0, AMDGPU_IRQ_STATE_ENABLE), 0);
+}
+
+/**
+ * dm_test_set_vupdate_irq_state_enable - Test vupdate irq state reaches DC (enable)
+ * @test: The KUnit test context
+ */
+static void dm_test_set_vupdate_irq_state_enable(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct amdgpu_crtc *acrtc;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	acrtc = kunit_kzalloc(test, sizeof(*acrtc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, acrtc);
+
+	acrtc->otg_inst = 2;
+	adev->mode_info.crtcs[0] = acrtc;
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_set_vupdate_irq_state(adev, NULL, 0, AMDGPU_IRQ_STATE_ENABLE), 0);
+}
+
+/**
+ * dm_test_set_crtc_irq_state_allows_idle - Test the idle-optimization branch
+ * @test: The KUnit test context
+ *
+ * With a non-NULL DC that advertises IPS support and currently allows idle
+ * optimizations, dm_irq_state() must call dc_allow_idle_optimizations() before
+ * dc_interrupt_set(). disable_idle_power_optimizations makes that call a safe
+ * early return, and per-source stub funcs let dc_interrupt_set() succeed.
+ */
+static void dm_test_set_crtc_irq_state_allows_idle(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct amdgpu_crtc *acrtc;
+	struct dal_logger *logger;
+	struct dc *dc;
+
+	adev = dm_kunit_alloc_adev(test);
+	acrtc = kunit_kzalloc(test, sizeof(*acrtc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, acrtc);
+
+	dc = dm_test_alloc_dc_with_irq_service(test, &dm_test_irq_service_funcs_dcn10);
+
+	/* DC_LOG_* dereferences ctx->logger->dev, so wire a real drm device. */
+	logger = kunit_kzalloc(test, sizeof(*logger), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, logger);
+	logger->dev = &adev->ddev;
+	dc->ctx->logger = logger;
+
+	dc->caps.ips_support = true;
+	dc->idle_optimizations_allowed = true;
+	/* Keep dc_allow_idle_optimizations() a safe early return. */
+	dc->debug.disable_idle_power_optimizations = true;
+	adev->dm.dc = dc;
+
+	acrtc->otg_inst = 0;
+	adev->mode_info.crtcs[0] = acrtc;
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_set_crtc_irq_state(adev, NULL, 0, AMDGPU_IRQ_STATE_ENABLE), 0);
+}
+
+/* Tests for amdgpu_dm_irq_immediate_work() */
+
+/**
+ * dm_test_irq_immediate_work_empty - Test immediate work on empty high table
+ * @test: The KUnit test context
+ */
+static void dm_test_irq_immediate_work_empty(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	/* No registered high-context handlers: must be a safe no-op. */
+	amdgpu_dm_irq_immediate_work(adev, DC_IRQ_SOURCE_HPD1);
+}
+
+/**
+ * dm_test_irq_immediate_work_invokes_handler - Test immediate work calls handler
+ * @test: The KUnit test context
+ */
+static void dm_test_irq_immediate_work_invokes_handler(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc_interrupt_params int_params = { 0 };
+	int count = 0;
+	void *handler;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	int_params.int_context = INTERRUPT_HIGH_IRQ_CONTEXT;
+	int_params.irq_source = DC_IRQ_SOURCE_HPD1;
+	handler = amdgpu_dm_irq_register_interrupt(adev, &int_params,
+						   dm_test_irq_handler_count, &count);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, handler);
+
+	/* High-context handlers are invoked synchronously, in-place. */
+	amdgpu_dm_irq_immediate_work(adev, DC_IRQ_SOURCE_HPD1);
+	KUNIT_EXPECT_EQ(test, count, 1);
+
+	amdgpu_dm_irq_unregister_interrupt(adev, DC_IRQ_SOURCE_HPD1, dm_test_irq_handler_count);
+}
+
+/**
+ * dm_test_irq_immediate_work_invokes_all - Test immediate work calls all handlers
+ * @test: The KUnit test context
+ */
+static void dm_test_irq_immediate_work_invokes_all(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc_interrupt_params int_params = { 0 };
+	int count = 0;
+	void *handler;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	int_params.int_context = INTERRUPT_HIGH_IRQ_CONTEXT;
+	int_params.irq_source = DC_IRQ_SOURCE_HPD2;
+	handler = amdgpu_dm_irq_register_interrupt(adev, &int_params,
+						   dm_test_irq_handler_count, &count);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, handler);
+	handler = amdgpu_dm_irq_register_interrupt(adev, &int_params,
+						   dm_test_irq_handler_count, &count);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, handler);
+
+	/* Both registered high-context handlers must run. */
+	amdgpu_dm_irq_immediate_work(adev, DC_IRQ_SOURCE_HPD2);
+	KUNIT_EXPECT_EQ(test, count, 2);
+
+	amdgpu_dm_irq_unregister_interrupt(adev, DC_IRQ_SOURCE_HPD2, dm_test_irq_handler_count);
+	amdgpu_dm_irq_unregister_interrupt(adev, DC_IRQ_SOURCE_HPD2, dm_test_irq_handler_count);
+}
+
+/* Tests for amdgpu_dm_irq_schedule_work() */
+
+/**
+ * dm_test_irq_schedule_work_empty - Test schedule work on empty low table
+ * @test: The KUnit test context
+ */
+static void dm_test_irq_schedule_work_empty(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	/* Empty handler list: schedule_work returns immediately. */
+	amdgpu_dm_irq_schedule_work(adev, DC_IRQ_SOURCE_HPD1);
+}
+
+/**
+ * dm_test_irq_schedule_work_queues_handler - Test schedule work runs handler
+ * @test: The KUnit test context
+ */
+static void dm_test_irq_schedule_work_queues_handler(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc_interrupt_params int_params = { 0 };
+	int count = 0;
+	void *handler;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	int_params.int_context = INTERRUPT_LOW_IRQ_CONTEXT;
+	int_params.irq_source = DC_IRQ_SOURCE_HPD1;
+	handler = amdgpu_dm_irq_register_interrupt(adev, &int_params,
+						   dm_test_irq_handler_count, &count);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, handler);
+
+	amdgpu_dm_irq_schedule_work(adev, DC_IRQ_SOURCE_HPD1);
+
+	/*
+	 * Low-context work runs asynchronously on system_highpri_wq.
+	 * amdgpu_dm_irq_fini() flushes each pending work item before freeing
+	 * the handlers, so the handler is guaranteed to have run afterwards.
+	 */
+	amdgpu_dm_irq_fini(adev);
+	KUNIT_EXPECT_EQ(test, count, 1);
+}
+
+/**
+ * dm_test_irq_schedule_work_requeue_fallback - Test the re-queue fallback path
+ * @test: The KUnit test context
+ *
+ * The first schedule queues the handler's work item. Issuing a second
+ * schedule before the work has run makes queue_work() fail for the
+ * still-pending item, forcing amdgpu_dm_irq_schedule_work() into the fallback
+ * that allocates and queues a fresh handler copy. Both work items run when
+ * amdgpu_dm_irq_fini() flushes the queue, so the handler fires twice.
+ */
+static void dm_test_irq_schedule_work_requeue_fallback(struct kunit *test)
+{
+	struct dc_interrupt_params int_params = { 0 };
+	struct amdgpu_device *adev;
+	int count = 0;
+	void *handler;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	int_params.int_context = INTERRUPT_LOW_IRQ_CONTEXT;
+	int_params.irq_source = DC_IRQ_SOURCE_HPD1;
+	handler = amdgpu_dm_irq_register_interrupt(adev, &int_params,
+						   dm_test_irq_handler_count, &count);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, handler);
+
+	amdgpu_dm_irq_schedule_work(adev, DC_IRQ_SOURCE_HPD1);
+	amdgpu_dm_irq_schedule_work(adev, DC_IRQ_SOURCE_HPD1);
+
+	amdgpu_dm_irq_fini(adev);
+	KUNIT_EXPECT_EQ(test, count, 2);
+}
+
+/* Tests for amdgpu_dm_set_hpd_irq_state() */
+
+/**
+ * dm_test_set_hpd_irq_state_null_dc - Test HPD irq state with no DC
+ * @test: The KUnit test context
+ */
+static void dm_test_set_hpd_irq_state_null_dc(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+
+	/* dc_interrupt_set() is a no-op when dc is NULL, so both states
+	 * return 0 without dereferencing the (absent) DC.
+	 */
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_set_hpd_irq_state(adev, NULL, AMDGPU_HPD_1,
+							  AMDGPU_IRQ_STATE_ENABLE), 0);
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_set_hpd_irq_state(adev, NULL, AMDGPU_HPD_1,
+							  AMDGPU_IRQ_STATE_DISABLE), 0);
+}
+
+/* Tests for amdgpu_dm_set_dmub_outbox_irq_state() */
+
+/**
+ * dm_test_set_dmub_outbox_irq_state_null_dc - Test outbox irq state with no DC
+ * @test: The KUnit test context
+ */
+static void dm_test_set_dmub_outbox_irq_state_null_dc(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_set_dmub_outbox_irq_state(adev, NULL, 0,
+								  AMDGPU_IRQ_STATE_ENABLE), 0);
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_set_dmub_outbox_irq_state(adev, NULL, 0,
+								  AMDGPU_IRQ_STATE_DISABLE), 0);
+}
+
+/* Tests for amdgpu_dm_set_dmub_trace_irq_state() */
+
+/**
+ * dm_test_set_dmub_trace_irq_state_null_dc - Test trace irq state with no DC
+ * @test: The KUnit test context
+ */
+static void dm_test_set_dmub_trace_irq_state_null_dc(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_set_dmub_trace_irq_state(adev, NULL, 0,
+								 AMDGPU_IRQ_STATE_ENABLE), 0);
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_set_dmub_trace_irq_state(adev, NULL, 0,
+								 AMDGPU_IRQ_STATE_DISABLE), 0);
+}
+
+/* Tests for amdgpu_dm_outbox_init() */
+
+/**
+ * dm_test_outbox_init_null_dc - Test outbox init is a safe no-op with no DC
+ * @test: The KUnit test context
+ */
+static void dm_test_outbox_init_null_dc(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+
+	/* Single dc_interrupt_set() call must be skipped when dc is NULL. */
+	amdgpu_dm_outbox_init(adev);
+}
+
 static struct kunit_case amdgpu_dm_irq_tests[] = {
 	/* amdgpu_dm_hpd_to_dal_irq_source */
 	KUNIT_CASE(dm_test_hpd_to_dal_irq_source_hpd1),
@@ -1247,6 +1801,34 @@ static struct kunit_case amdgpu_dm_irq_tests[] = {
 	/* amdgpu_dm_hpd_rx_irq_work_suspend */
 	KUNIT_CASE(dm_test_hpd_rx_irq_work_suspend_null),
 	KUNIT_CASE(dm_test_hpd_rx_irq_work_suspend_flushes),
+	/* CRTC-based irq state callbacks (no-CRTC early return) */
+	KUNIT_CASE(dm_test_set_crtc_irq_state_no_crtc),
+	KUNIT_CASE(dm_test_set_pflip_irq_state_no_crtc),
+	KUNIT_CASE(dm_test_set_vline0_irq_state_no_crtc),
+	KUNIT_CASE(dm_test_set_vupdate_irq_state_no_crtc),
+	/* CRTC-based irq state callbacks (dm_irq_state happy path) */
+	KUNIT_CASE(dm_test_set_crtc_irq_state_otg_disabled),
+	KUNIT_CASE(dm_test_set_crtc_irq_state_enable),
+	KUNIT_CASE(dm_test_set_pflip_irq_state_disable),
+	KUNIT_CASE(dm_test_set_vline0_irq_state_enable),
+	KUNIT_CASE(dm_test_set_vupdate_irq_state_enable),
+	KUNIT_CASE(dm_test_set_crtc_irq_state_allows_idle),
+	/* amdgpu_dm_irq_immediate_work */
+	KUNIT_CASE(dm_test_irq_immediate_work_empty),
+	KUNIT_CASE(dm_test_irq_immediate_work_invokes_handler),
+	KUNIT_CASE(dm_test_irq_immediate_work_invokes_all),
+	/* amdgpu_dm_irq_schedule_work */
+	KUNIT_CASE(dm_test_irq_schedule_work_empty),
+	KUNIT_CASE(dm_test_irq_schedule_work_queues_handler),
+	KUNIT_CASE(dm_test_irq_schedule_work_requeue_fallback),
+	/* amdgpu_dm_set_hpd_irq_state */
+	KUNIT_CASE(dm_test_set_hpd_irq_state_null_dc),
+	/* amdgpu_dm_set_dmub_outbox_irq_state */
+	KUNIT_CASE(dm_test_set_dmub_outbox_irq_state_null_dc),
+	/* amdgpu_dm_set_dmub_trace_irq_state */
+	KUNIT_CASE(dm_test_set_dmub_trace_irq_state_null_dc),
+	/* amdgpu_dm_outbox_init */
+	KUNIT_CASE(dm_test_outbox_init_null_dc),
 	{}
 };
 

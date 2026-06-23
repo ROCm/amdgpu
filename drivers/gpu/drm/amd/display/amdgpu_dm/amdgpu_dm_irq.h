@@ -123,9 +123,44 @@ int amdgpu_dm_dcn10_register_irq_handlers(struct amdgpu_device *adev);
 int amdgpu_dm_register_outbox_irq_handlers(struct amdgpu_device *adev);
 
 #if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
+struct amdgpu_irq_src;
+enum amdgpu_interrupt_state;
+
 enum dc_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned int type);
 bool are_sinks_equal(const struct dc_sink *sink1, const struct dc_sink *sink2);
 const char *dmub_notification_type_str(enum dmub_notification_type e);
+int amdgpu_dm_set_hpd_irq_state(struct amdgpu_device *adev,
+				struct amdgpu_irq_src *source,
+				unsigned int type,
+				enum amdgpu_interrupt_state state);
+int amdgpu_dm_set_dmub_outbox_irq_state(struct amdgpu_device *adev,
+					struct amdgpu_irq_src *source,
+					unsigned int crtc_id,
+					enum amdgpu_interrupt_state state);
+int amdgpu_dm_set_dmub_trace_irq_state(struct amdgpu_device *adev,
+				       struct amdgpu_irq_src *source,
+				       unsigned int type,
+				       enum amdgpu_interrupt_state state);
+int amdgpu_dm_set_pflip_irq_state(struct amdgpu_device *adev,
+				  struct amdgpu_irq_src *source,
+				  unsigned int crtc_id,
+				  enum amdgpu_interrupt_state state);
+int amdgpu_dm_set_crtc_irq_state(struct amdgpu_device *adev,
+				 struct amdgpu_irq_src *source,
+				 unsigned int crtc_id,
+				 enum amdgpu_interrupt_state state);
+int amdgpu_dm_set_vline0_irq_state(struct amdgpu_device *adev,
+				   struct amdgpu_irq_src *source,
+				   unsigned int crtc_id,
+				   enum amdgpu_interrupt_state state);
+int amdgpu_dm_set_vupdate_irq_state(struct amdgpu_device *adev,
+				    struct amdgpu_irq_src *source,
+				    unsigned int crtc_id,
+				    enum amdgpu_interrupt_state state);
+void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
+				 enum dc_irq_source irq_source);
+void amdgpu_dm_irq_immediate_work(struct amdgpu_device *adev,
+				  enum dc_irq_source irq_source);
 #endif
 
 #endif /* __AMDGPU_DM_IRQ_H__ */
