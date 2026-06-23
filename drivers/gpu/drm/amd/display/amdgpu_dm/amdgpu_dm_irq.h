@@ -169,6 +169,10 @@ void schedule_hpd_rx_offload_work(struct amdgpu_device *adev,
 				  struct hpd_rx_irq_offload_work_queue *offload_wq,
 				  union hpd_irq_data hpd_irq_data);
 void handle_hpd_rx_irq(void *param);
+void dmub_hpd_callback(struct amdgpu_device *adev,
+		       struct dmub_notification *notify);
+void dmub_hpd_sense_callback(struct amdgpu_device *adev,
+			     struct dmub_notification *notify);
 #endif
 
 #endif /* __AMDGPU_DM_IRQ_H__ */

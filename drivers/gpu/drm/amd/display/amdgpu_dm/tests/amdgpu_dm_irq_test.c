@@ -2812,6 +2812,411 @@ static void dm_test_handle_hpd_rx_irq_link_loss(struct kunit *test)
 				->dm.hpd_rx_offload_wq->is_handling_link_loss);
 }
 
+/* Tests for dmub_hpd_callback()/dmub_hpd_sense_callback() */
+
+/**
+ * dm_test_dmub_hpd_callback_null_inputs - Test DMUB callback null inputs
+ * @test: The KUnit test context
+ */
+static void dm_test_dmub_hpd_callback_null_inputs(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = dm_kunit_alloc_adev(test);
+
+	dmub_hpd_callback(NULL, NULL);
+	dmub_hpd_callback(adev, NULL);
+}
+
+/**
+ * dm_test_dmub_hpd_callback_invalid_index - Test DMUB callback index check
+ * @test: The KUnit test context
+ */
+static void dm_test_dmub_hpd_callback_invalid_index(struct kunit *test)
+{
+	struct dmub_notification notify = { 0 };
+	struct amdgpu_device *adev;
+	struct dc *dc;
+
+	adev = dm_kunit_alloc_adev(test);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	adev->dm.dc = dc;
+	notify.link_index = 1;
+
+	dmub_hpd_callback(adev, &notify);
+}
+
+/**
+ * dm_test_dmub_hpd_callback_empty_connectors - Test DMUB callback without match
+ * @test: The KUnit test context
+ */
+static void dm_test_dmub_hpd_callback_empty_connectors(struct kunit *test)
+{
+	struct dmub_notification notify = { 0 };
+	struct amdgpu_device *adev;
+	struct dc *dc;
+
+	adev = dm_kunit_alloc_adev(test);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	adev->dm.dc = dc;
+	adev->dm.ddev = &adev->ddev;
+	dc->link_count = 1;
+	notify.type = DMUB_NOTIFICATION_HPD_SENSE_NOTIFY;
+
+	dmub_hpd_callback(adev, &notify);
+	dmub_hpd_sense_callback(adev, &notify);
+}
+
+/**
+ * dm_test_dmub_hpd_callback_unknown_type_match - Test DMUB callback matched
+ *						   connector, unknown type
+ * @test: The KUnit test context
+ *
+ * A writeback connector must be skipped (continue) and a non-writeback
+ * connector whose dc_link matches the notification link must be selected.
+ * An unrecognized notification type takes the "unknown" warn branch, and the
+ * post-loop dispatch is a no-op (neither HPD nor HPD_IRQ), so no real DC/MST
+ * handler runs.
+ */
+static void dm_test_dmub_hpd_callback_unknown_type_match(struct kunit *test)
+{
+	struct dmub_notification notify = { 0 };
+	struct amdgpu_dm_connector *aconn;
+	struct drm_connector *wbconn;
+	struct amdgpu_device *adev;
+	struct dc_link *link;
+	struct dc *dc;
+
+	adev = dm_kunit_alloc_adev(test);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	adev->dm.dc = dc;
+	adev->dm.ddev = &adev->ddev;
+	dc->link_count = 1;
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+	dc->links[0] = link;
+
+	/* A writeback connector must be skipped by the loop. */
+	wbconn = kunit_kzalloc(test, sizeof(*wbconn), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, wbconn);
+	KUNIT_ASSERT_EQ(test, drm_connector_init(&adev->ddev, wbconn, &dm_test_connector_funcs,
+						 DRM_MODE_CONNECTOR_WRITEBACK), 0);
+	KUNIT_ASSERT_EQ(test, kunit_add_action_or_reset(test, dm_test_connector_cleanup, wbconn), 0);
+
+	/* A DisplayPort connector whose dc_link matches drives the match branch. */
+	aconn = kunit_kzalloc(test, sizeof(*aconn), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, aconn);
+	KUNIT_ASSERT_EQ(test, drm_connector_init(&adev->ddev, &aconn->base,
+						 &dm_test_connector_funcs,
+						 DRM_MODE_CONNECTOR_DisplayPort), 0);
+	KUNIT_ASSERT_EQ(test,
+			kunit_add_action_or_reset(test, dm_test_connector_cleanup, &aconn->base), 0);
+	aconn->dc_link = link;
+
+	notify.link_index = 0;
+	notify.type = DMUB_NOTIFICATION_HPD_SENSE_NOTIFY;
+
+	dmub_hpd_callback(adev, &notify);
+}
+
+/**
+ * dm_test_dmub_hpd_callback_hpd_type - Test DMUB callback HPD type dispatch
+ * @test: The KUnit test context
+ *
+ * A matched connector with notification type DMUB_NOTIFICATION_HPD logs the
+ * HPD callback and dispatches to handle_hpd_irq_helper(). Detection is stubbed
+ * to report no connection and link detect to fail, so the connected branches
+ * are skipped and no real DC/DRM hotplug path runs.
+ */
+static void dm_test_dmub_hpd_callback_hpd_type(struct kunit *test)
+{
+	struct dmub_notification notify = { 0 };
+	struct amdgpu_dm_connector *aconn;
+	struct link_service *link_srv;
+	struct amdgpu_device *adev;
+	struct dc_context *ctx;
+	struct dc_link *link;
+	struct dc *dc;
+
+	adev = dm_kunit_alloc_adev(test);
+	mutex_init(&adev->dm.dc_lock);
+
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, ctx);
+	link_srv = kunit_kzalloc(test, sizeof(*link_srv), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link_srv);
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+
+	link_srv->detect_connection_type = dm_test_detect_connection_none;
+	link_srv->detect_link = dm_test_detect_link_false;
+	dc->ctx = ctx;
+	dc->link_srv = link_srv;
+	ctx->dc = dc;
+	link->dc = dc;
+	link->ctx = ctx;
+
+	adev->dm.dc = dc;
+	adev->dm.ddev = &adev->ddev;
+	dc->link_count = 1;
+	dc->links[0] = link;
+
+	aconn = kunit_kzalloc(test, sizeof(*aconn), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, aconn);
+	KUNIT_ASSERT_EQ(test, drm_connector_init(&adev->ddev, &aconn->base,
+						 &dm_test_connector_funcs,
+						 DRM_MODE_CONNECTOR_DisplayPort), 0);
+	KUNIT_ASSERT_EQ(test,
+			kunit_add_action_or_reset(test, dm_test_connector_cleanup, &aconn->base), 0);
+	mutex_init(&aconn->hpd_lock);
+	INIT_DELAYED_WORK(&aconn->hdmi_hpd_debounce_work,
+			  amdgpu_dm_hdmi_hpd_debounce_work);
+	aconn->dc_link = link;
+
+	notify.link_index = 0;
+	notify.type = DMUB_NOTIFICATION_HPD;
+
+	dmub_hpd_callback(adev, &notify);
+}
+
+/**
+ * dm_test_dmub_hpd_callback_hpd_irq_type - Test DMUB callback HPD_IRQ dispatch
+ * @test: The KUnit test context
+ *
+ * A matched connector with notification type DMUB_NOTIFICATION_HPD_IRQ logs
+ * the HPD RX callback and dispatches to handle_hpd_rx_irq(). The HPD RX handler
+ * stub reports no left work, so the function returns through the early goto
+ * without scheduling offload work; an MST-branch link skips the trailing
+ * drm_dp_cec_irq().
+ */
+static void dm_test_dmub_hpd_callback_hpd_irq_type(struct kunit *test)
+{
+	struct hpd_rx_irq_offload_work_queue *offload_wq;
+	struct dmub_notification notify = { 0 };
+	struct amdgpu_dm_connector *aconn;
+	struct link_service *link_srv;
+	struct amdgpu_device *adev;
+	struct dc_context *ctx;
+	struct dc_link *link;
+	struct dc *dc;
+
+	adev = dm_kunit_alloc_adev(test);
+	mutex_init(&adev->dm.dc_lock);
+
+	offload_wq = kunit_kzalloc(test, sizeof(*offload_wq), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, offload_wq);
+	spin_lock_init(&offload_wq->offload_lock);
+	adev->dm.hpd_rx_offload_wq = offload_wq;
+
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, ctx);
+	link_srv = kunit_kzalloc(test, sizeof(*link_srv), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link_srv);
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+
+	link_srv->dp_handle_hpd_rx_irq = dm_test_handle_hpd_rx_no_work;
+	dc->ctx = ctx;
+	dc->link_srv = link_srv;
+	ctx->dc = dc;
+	link->dc = dc;
+	link->ctx = ctx;
+	link->link_index = 0;
+	link->type = dc_connection_mst_branch;
+
+	adev->dm.dc = dc;
+	adev->dm.ddev = &adev->ddev;
+	dc->link_count = 1;
+	dc->links[0] = link;
+
+	aconn = kunit_kzalloc(test, sizeof(*aconn), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, aconn);
+	KUNIT_ASSERT_EQ(test, drm_connector_init(&adev->ddev, &aconn->base,
+						 &dm_test_connector_funcs,
+						 DRM_MODE_CONNECTOR_DisplayPort), 0);
+	KUNIT_ASSERT_EQ(test,
+			kunit_add_action_or_reset(test, dm_test_connector_cleanup, &aconn->base), 0);
+	mutex_init(&aconn->hpd_lock);
+	aconn->mst_mgr.mst_state = true;
+	aconn->dc_link = link;
+
+	notify.link_index = 0;
+	notify.type = DMUB_NOTIFICATION_HPD_IRQ;
+
+	dmub_hpd_callback(adev, &notify);
+}
+
+/* Tests for amdgpu_dm_register_hpd_handlers() */
+
+/**
+ * dm_test_register_hpd_handlers_empty - Test HPD registration with no connectors
+ * @test: The KUnit test context
+ */
+static void dm_test_register_hpd_handlers_empty(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+
+	adev = dm_kunit_alloc_adev(test);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	adev->dm.dc = dc;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_register_hpd_handlers(adev), 0);
+}
+
+/**
+ * dm_test_register_hpd_handlers_valid - Test HPD/HPDRX registration succeeds
+ * @test: The KUnit test context
+ */
+static void dm_test_register_hpd_handlers_valid(struct kunit *test)
+{
+	struct amdgpu_dm_connector *aconn;
+	struct amdgpu_device *adev;
+	struct dc_link *link;
+	struct dc *dc;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	adev->dm.dc = dc;
+
+	aconn = kunit_kzalloc(test, sizeof(*aconn), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, aconn);
+	KUNIT_ASSERT_EQ(test, drm_connector_init(&adev->ddev, &aconn->base,
+						 &dm_test_connector_funcs,
+						 DRM_MODE_CONNECTOR_DisplayPort), 0);
+	KUNIT_ASSERT_EQ(test,
+			kunit_add_action_or_reset(test, dm_test_connector_cleanup, &aconn->base), 0);
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+	link->irq_source_hpd = DC_IRQ_SOURCE_HPD1;
+	link->irq_source_hpd_rx = DC_IRQ_SOURCE_HPD1RX;
+	aconn->dc_link = link;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_register_hpd_handlers(adev), 0);
+	KUNIT_EXPECT_FALSE(test,
+			   list_empty(&adev->dm.irq_handler_list_low_tab[DC_IRQ_SOURCE_HPD1]));
+	KUNIT_EXPECT_FALSE(test,
+			   list_empty(&adev->dm.irq_handler_list_low_tab[DC_IRQ_SOURCE_HPD1RX]));
+
+	amdgpu_dm_irq_fini(adev);
+}
+
+/**
+ * dm_test_register_hpd_handlers_invalid_hpd - Test invalid HPD source fails
+ * @test: The KUnit test context
+ */
+static void dm_test_register_hpd_handlers_invalid_hpd(struct kunit *test)
+{
+	struct amdgpu_dm_connector *aconn;
+	struct amdgpu_device *adev;
+	struct dc_link *link;
+	struct dc *dc;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	adev->dm.dc = dc;
+
+	aconn = kunit_kzalloc(test, sizeof(*aconn), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, aconn);
+	KUNIT_ASSERT_EQ(test, drm_connector_init(&adev->ddev, &aconn->base,
+						 &dm_test_connector_funcs,
+						 DRM_MODE_CONNECTOR_DisplayPort), 0);
+	KUNIT_ASSERT_EQ(test,
+			kunit_add_action_or_reset(test, dm_test_connector_cleanup, &aconn->base), 0);
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+	link->irq_source_hpd = DC_IRQ_SOURCE_HPD1RX;
+	link->irq_source_hpd_rx = DC_IRQ_SOURCE_INVALID;
+	aconn->dc_link = link;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_register_hpd_handlers(adev), -EINVAL);
+	amdgpu_dm_irq_fini(adev);
+}
+
+/**
+ * dm_test_register_hpd_handlers_invalid_hpd_rx - Test invalid HPDRX source fails
+ * @test: The KUnit test context
+ */
+static void dm_test_register_hpd_handlers_invalid_hpd_rx(struct kunit *test)
+{
+	struct amdgpu_dm_connector *aconn;
+	struct amdgpu_device *adev;
+	struct dc_link *link;
+	struct dc *dc;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	adev->dm.dc = dc;
+
+	aconn = kunit_kzalloc(test, sizeof(*aconn), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, aconn);
+	KUNIT_ASSERT_EQ(test, drm_connector_init(&adev->ddev, &aconn->base,
+						 &dm_test_connector_funcs,
+						 DRM_MODE_CONNECTOR_DisplayPort), 0);
+	KUNIT_ASSERT_EQ(test,
+			kunit_add_action_or_reset(test, dm_test_connector_cleanup, &aconn->base), 0);
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+	link->irq_source_hpd = DC_IRQ_SOURCE_INVALID;
+	link->irq_source_hpd_rx = DC_IRQ_SOURCE_HPD1;
+	aconn->dc_link = link;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_register_hpd_handlers(adev), -EINVAL);
+	amdgpu_dm_irq_fini(adev);
+}
+
+/**
+ * dm_test_register_hpd_handlers_dmub_outbox - Test DMUB outbox callbacks register
+ * @test: The KUnit test context
+ *
+ * Enables DMUB outbox support so dc_is_dmub_outbox_supported() returns true,
+ * exercising the dm_register_dmub_notify_callback() block. Asserts that the
+ * HPD, HPD_IRQ and HPD_SENSE_NOTIFY callbacks are registered.
+ */
+static void dm_test_register_hpd_handlers_dmub_outbox(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+	dc = dm_test_alloc_dc_with_ctx(test);
+	adev->dm.dc = dc;
+
+	/* Make dc_is_dmub_outbox_supported() return true. */
+	dc->caps.dmcub_support = true;
+	dc->ctx->asic_id.chip_family = AMDGPU_FAMILY_GC_11_0_1;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_register_hpd_handlers(adev), 0);
+	KUNIT_EXPECT_PTR_EQ(test, adev->dm.dmub_callback[DMUB_NOTIFICATION_HPD],
+			    (dmub_notify_interrupt_callback_t)dmub_hpd_callback);
+	KUNIT_EXPECT_PTR_EQ(test, adev->dm.dmub_callback[DMUB_NOTIFICATION_HPD_IRQ],
+			    (dmub_notify_interrupt_callback_t)dmub_hpd_callback);
+	KUNIT_EXPECT_PTR_EQ(test,
+			    adev->dm.dmub_callback[DMUB_NOTIFICATION_HPD_SENSE_NOTIFY],
+			    (dmub_notify_interrupt_callback_t)dmub_hpd_sense_callback);
+
+	amdgpu_dm_irq_fini(adev);
+}
+
 static struct kunit_case amdgpu_dm_irq_tests[] = {
 	/* amdgpu_dm_hpd_to_dal_irq_source */
 	KUNIT_CASE(dm_test_hpd_to_dal_irq_source_hpd1),
@@ -2934,6 +3339,19 @@ static struct kunit_case amdgpu_dm_irq_tests[] = {
 	KUNIT_CASE(dm_test_handle_hpd_rx_irq_msg_rdy),
 	KUNIT_CASE(dm_test_handle_hpd_rx_irq_link_loss),
 	KUNIT_CASE(dm_test_schedule_hpd_rx_offload_work),
+	/* dmub_hpd_callback/dmub_hpd_sense_callback */
+	KUNIT_CASE(dm_test_dmub_hpd_callback_null_inputs),
+	KUNIT_CASE(dm_test_dmub_hpd_callback_invalid_index),
+	KUNIT_CASE(dm_test_dmub_hpd_callback_empty_connectors),
+	KUNIT_CASE(dm_test_dmub_hpd_callback_unknown_type_match),
+	KUNIT_CASE(dm_test_dmub_hpd_callback_hpd_type),
+	KUNIT_CASE(dm_test_dmub_hpd_callback_hpd_irq_type),
+	/* amdgpu_dm_register_hpd_handlers */
+	KUNIT_CASE(dm_test_register_hpd_handlers_empty),
+	KUNIT_CASE(dm_test_register_hpd_handlers_valid),
+	KUNIT_CASE(dm_test_register_hpd_handlers_invalid_hpd),
+	KUNIT_CASE(dm_test_register_hpd_handlers_invalid_hpd_rx),
+	KUNIT_CASE(dm_test_register_hpd_handlers_dmub_outbox),
 	{}
 };
 

@@ -1585,7 +1585,7 @@ EXPORT_IF_KUNIT(handle_hpd_rx_irq);
  * Dmub Hpd interrupt processing callback. Gets displayindex through the
  * ink index and calls helper to do the processing.
  */
-static void dmub_hpd_callback(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT void dmub_hpd_callback(struct amdgpu_device *adev,
 			      struct dmub_notification *notify)
 {
 	struct amdgpu_dm_connector *aconnector;
@@ -1651,6 +1651,7 @@ static void dmub_hpd_callback(struct amdgpu_device *adev,
 		}
 	}
 }
+EXPORT_IF_KUNIT(dmub_hpd_callback);
 
 /**
  * dmub_hpd_sense_callback - DMUB HPD sense processing callback.
@@ -1660,11 +1661,12 @@ static void dmub_hpd_callback(struct amdgpu_device *adev,
  * HPD sense changes can occur during low power states and need to be
  * notified from firmware to driver.
  */
-static void dmub_hpd_sense_callback(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT void dmub_hpd_sense_callback(struct amdgpu_device *adev,
 			      struct dmub_notification *notify)
 {
 	drm_dbg_driver(adev_to_drm(adev), "DMUB HPD SENSE callback.\n");
 }
+EXPORT_IF_KUNIT(dmub_hpd_sense_callback);
 
 int amdgpu_dm_register_hpd_handlers(struct amdgpu_device *adev)
 {
@@ -1742,6 +1744,7 @@ int amdgpu_dm_register_hpd_handlers(struct amdgpu_device *adev)
 	}
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_register_hpd_handlers);
 
 /* ========== IRQ handlers ========== */
 struct amdgpu_crtc *
