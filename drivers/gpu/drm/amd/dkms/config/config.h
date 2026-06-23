@@ -1302,6 +1302,9 @@
 /* struct drm_plane_helper_funcs->get_scanout_buffer is available */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER 1
 
+/* struct drm_plane_state->color_mgmt_changed is available */
+#define HAVE_STRUCT_DRM_PLANE_STATE_COLOR_MGMT_CHANGED 1
+
 /* struct __drm_private_objs_state->state_to_destroy is available */
 #define HAVE_STRUCT_DRM_PRIVATE_OBJS_STATE_STATE_TO_DESTROY 1
 
