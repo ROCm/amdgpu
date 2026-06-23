@@ -2665,6 +2665,113 @@ static void dm_test_update_subconnector_non_dp_noop(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, (int)val, (int)DRM_MODE_SUBCONNECTOR_VGA);
 }
 
+/* Tests for amdgpu_dm_fbc_init() */
+
+/*
+ * Build an amdgpu_dm_connector wired to a kunit-allocated amdgpu_device so
+ * that drm_to_adev() and to_amdgpu_dm_connector() resolve correctly, with a
+ * dc, dc_link and an empty modes list ready for amdgpu_dm_fbc_init().
+ */
+struct dm_test_fbc_ctx {
+	struct amdgpu_device *adev;
+	struct amdgpu_dm_connector *aconnector;
+	struct dc *dc;
+	struct dc_link *link;
+};
+
+static struct dm_test_fbc_ctx *dm_test_fbc_ctx_alloc(struct kunit *test)
+{
+	struct dm_test_fbc_ctx *ctx;
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	ctx->adev = kunit_kzalloc(test, sizeof(*ctx->adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->adev);
+	ctx->aconnector = kunit_kzalloc(test, sizeof(*ctx->aconnector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->aconnector);
+	ctx->dc = kunit_kzalloc(test, sizeof(*ctx->dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->dc);
+	ctx->link = kunit_kzalloc(test, sizeof(*ctx->link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->link);
+
+	ctx->aconnector->base.dev = &ctx->adev->ddev;
+	INIT_LIST_HEAD(&ctx->aconnector->base.modes);
+	ctx->adev->dm.dc = ctx->dc;
+	ctx->aconnector->dc_link = ctx->link;
+
+	/* Default to the fully-enabled path so each test only flips one knob */
+	ctx->link->connector_signal = SIGNAL_TYPE_EDP;
+	ctx->dc->fbc_compressor =
+		(struct compressor *)kunit_kzalloc(test, sizeof(void *), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->dc->fbc_compressor);
+
+	return ctx;
+}
+
+/**
+ * dm_test_fbc_init_no_compressor - Test fbc_init is a no-op without a compressor
+ * @test: The KUnit test context
+ */
+static void dm_test_fbc_init_no_compressor(struct kunit *test)
+{
+	struct dm_test_fbc_ctx *ctx = dm_test_fbc_ctx_alloc(test);
+
+	ctx->dc->fbc_compressor = NULL;
+
+	amdgpu_dm_fbc_init(&ctx->aconnector->base);
+
+	KUNIT_EXPECT_NULL(test, ctx->adev->dm.compressor.bo_ptr);
+}
+
+/**
+ * dm_test_fbc_init_non_edp - Test fbc_init is a no-op for non-eDP links
+ * @test: The KUnit test context
+ */
+static void dm_test_fbc_init_non_edp(struct kunit *test)
+{
+	struct dm_test_fbc_ctx *ctx = dm_test_fbc_ctx_alloc(test);
+
+	ctx->link->connector_signal = SIGNAL_TYPE_DISPLAY_PORT;
+
+	amdgpu_dm_fbc_init(&ctx->aconnector->base);
+
+	KUNIT_EXPECT_NULL(test, ctx->adev->dm.compressor.bo_ptr);
+}
+
+/**
+ * dm_test_fbc_init_already_allocated - Test fbc_init keeps an existing buffer
+ * @test: The KUnit test context
+ */
+static void dm_test_fbc_init_already_allocated(struct kunit *test)
+{
+	struct dm_test_fbc_ctx *ctx = dm_test_fbc_ctx_alloc(test);
+	struct amdgpu_bo *existing;
+
+	existing = kunit_kzalloc(test, sizeof(void *), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, existing);
+	ctx->adev->dm.compressor.bo_ptr = existing;
+
+	amdgpu_dm_fbc_init(&ctx->aconnector->base);
+
+	/* Buffer already present → left untouched, no reallocation */
+	KUNIT_EXPECT_PTR_EQ(test, ctx->adev->dm.compressor.bo_ptr, existing);
+}
+
+/**
+ * dm_test_fbc_init_no_modes - Test fbc_init skips allocation with no modes
+ * @test: The KUnit test context
+ */
+static void dm_test_fbc_init_no_modes(struct kunit *test)
+{
+	struct dm_test_fbc_ctx *ctx = dm_test_fbc_ctx_alloc(test);
+
+	/* All prerequisites met but the modes list is empty → max_size 0 */
+	amdgpu_dm_fbc_init(&ctx->aconnector->base);
+
+	KUNIT_EXPECT_NULL(test, ctx->adev->dm.compressor.bo_ptr);
+}
+
 static struct kunit_case amdgpu_dm_connector_tests[] = {
 	/* get_subconnector_type */
 	KUNIT_CASE(dm_test_subconnector_type_none),
@@ -2822,6 +2929,11 @@ static struct kunit_case amdgpu_dm_connector_tests[] = {
 	KUNIT_CASE(dm_test_set_panel_type_did_lcd),
 	KUNIT_CASE(dm_test_set_panel_type_vendor_lum_heuristic),
 	KUNIT_CASE(dm_test_set_panel_type_defaults_to_lcd),
+	/* amdgpu_dm_fbc_init */
+	KUNIT_CASE(dm_test_fbc_init_no_compressor),
+	KUNIT_CASE(dm_test_fbc_init_non_edp),
+	KUNIT_CASE(dm_test_fbc_init_already_allocated),
+	KUNIT_CASE(dm_test_fbc_init_no_modes),
 	{}
 };
 

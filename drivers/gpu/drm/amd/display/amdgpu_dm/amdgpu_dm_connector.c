@@ -265,7 +265,7 @@ EXPORT_IF_KUNIT(update_subconnector_property);
 
 static int amdgpu_dm_connector_get_modes(struct drm_connector *connector);
 
-static void amdgpu_dm_fbc_init(struct drm_connector *connector)
+STATIC_IFN_KUNIT void amdgpu_dm_fbc_init(struct drm_connector *connector)
 {
 	struct amdgpu_device *adev = drm_to_adev(connector->dev);
 	struct dm_compressor_info *compressor = &adev->dm.compressor;
@@ -303,6 +303,7 @@ static void amdgpu_dm_fbc_init(struct drm_connector *connector)
 	}
 
 }
+EXPORT_IF_KUNIT(amdgpu_dm_fbc_init);
 
 
 int amdgpu_dm_detect_mst_link_for_all_connectors(struct drm_device *dev)
