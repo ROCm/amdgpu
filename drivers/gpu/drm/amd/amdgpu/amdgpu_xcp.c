@@ -469,14 +469,18 @@ void amdgpu_xcp_release_sched(struct amdgpu_device *adev,
 {
 	struct drm_gpu_scheduler *sched =
 		container_of(entity->entity.rq, typeof(*sched), rq);
+	struct amdgpu_xcp_mgr *xcp_mgr = adev->xcp_mgr;
 
-	if (!adev->xcp_mgr)
+	if (!xcp_mgr)
 		return;
 
 	if (drm_sched_wqueue_ready(sched)) {
 		struct amdgpu_ring *ring = to_amdgpu_ring(sched);
-		if (ring->xcp_id < MAX_XCP)
-			atomic_dec(&adev->xcp_mgr->xcp[ring->xcp_id].ref_cnt);
+
+		mutex_lock(&xcp_mgr->xcp_lock);
+		if (ring->xcp_id < xcp_mgr->num_xcps && xcp_mgr->xcp[ring->xcp_id].valid)
+			atomic_dec(&xcp_mgr->xcp[ring->xcp_id].ref_cnt);
+		mutex_unlock(&xcp_mgr->xcp_lock);
 	}
 }
 
@@ -489,7 +493,9 @@ int amdgpu_xcp_select_scheds(struct amdgpu_device *adev,
 	u32 sel_xcp_id;
 	int i;
 	struct amdgpu_xcp_mgr *xcp_mgr = adev->xcp_mgr;
+	int r = 0;
 
+	mutex_lock(&xcp_mgr->xcp_lock);
 	if (fpriv->xcp_id == AMDGPU_XCP_NO_PARTITION) {
 		u32 least_ref_cnt = ~0;
 
@@ -506,19 +512,27 @@ int amdgpu_xcp_select_scheds(struct amdgpu_device *adev,
 	}
 	sel_xcp_id = fpriv->xcp_id;
 
+	if (sel_xcp_id >= xcp_mgr->num_xcps || !xcp_mgr->xcp[sel_xcp_id].valid) {
+		dev_err(adev->dev, "Selected partition #%d is not valid.", sel_xcp_id);
+		r = -ENODEV;
+		goto out;
+	}
+
 	if (xcp_mgr->xcp[sel_xcp_id].gpu_sched[hw_ip][hw_prio].num_scheds) {
 		*num_scheds =
-			xcp_mgr->xcp[fpriv->xcp_id].gpu_sched[hw_ip][hw_prio].num_scheds;
+			xcp_mgr->xcp[sel_xcp_id].gpu_sched[hw_ip][hw_prio].num_scheds;
 		*scheds =
-			xcp_mgr->xcp[fpriv->xcp_id].gpu_sched[hw_ip][hw_prio].sched;
-		atomic_inc(&adev->xcp_mgr->xcp[sel_xcp_id].ref_cnt);
+			xcp_mgr->xcp[sel_xcp_id].gpu_sched[hw_ip][hw_prio].sched;
+		atomic_inc(&xcp_mgr->xcp[sel_xcp_id].ref_cnt);
 		dev_dbg(adev->dev, "Selected partition #%d", sel_xcp_id);
 	} else {
 		dev_err(adev->dev, "Failed to schedule partition #%d.", sel_xcp_id);
-		return -ENOENT;
+		r = -ENOENT;
 	}
 
-	return 0;
+out:
+	mutex_unlock(&xcp_mgr->xcp_lock);
+	return r;
 }
 
 static void amdgpu_set_xcp_id(struct amdgpu_device *adev,
