@@ -537,6 +537,7 @@ void amdgpu_dm_irq_suspend(struct amdgpu_device *adev)
 	if (dev->mode_config.poll_enabled)
 		drm_kms_helper_poll_disable(dev);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_suspend);
 
 void amdgpu_dm_irq_resume_early(struct amdgpu_device *adev)
 {
@@ -558,6 +559,7 @@ void amdgpu_dm_irq_resume_early(struct amdgpu_device *adev)
 
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_resume_early);
 
 void amdgpu_dm_irq_resume_late(struct amdgpu_device *adev)
 {
@@ -586,6 +588,7 @@ void amdgpu_dm_irq_resume_late(struct amdgpu_device *adev)
 	if (dev->mode_config.poll_enabled)
 		drm_kms_helper_poll_enable(dev);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_resume_late);
 
 /*
  * amdgpu_dm_irq_schedule_work - schedule all work items registered for the
@@ -900,6 +903,8 @@ void amdgpu_dm_set_irq_funcs(struct amdgpu_device *adev)
 	adev->hpd_irq.num_types = adev->mode_info.num_hpd;
 	adev->hpd_irq.funcs = &dm_hpd_irq_funcs;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_set_irq_funcs);
+
 void amdgpu_dm_outbox_init(struct amdgpu_device *adev)
 {
 	dc_interrupt_set(adev->dm.dc,
@@ -1187,6 +1192,7 @@ out_err:
 	kfree(hpd_rx_offload_wq);
 	return NULL;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_hpd_rx_irq_create_workqueue);
 
 void amdgpu_dm_hpd_rx_irq_work_suspend(struct amdgpu_display_manager *dm)
 {
@@ -1197,6 +1203,7 @@ void amdgpu_dm_hpd_rx_irq_work_suspend(struct amdgpu_display_manager *dm)
 			flush_workqueue(dm->hpd_rx_offload_wq[i].wq);
 	}
 }
+EXPORT_IF_KUNIT(amdgpu_dm_hpd_rx_irq_work_suspend);
 
 STATIC_IFN_KUNIT bool are_sinks_equal(const struct dc_sink *sink1, const struct dc_sink *sink2)
 {

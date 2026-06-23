@@ -7,14 +7,23 @@
 
 #include <kunit/test.h>
 #include <drm/drm_kunit_helpers.h>
+#include <drm/drm_atomic_helper.h>
+#include <drm/drm_probe_helper.h>
 
 #include "dc.h"
+#include "inc/core_types.h"
+#include "irq/irq_service.h"
 #include "amdgpu.h"
 #include "amdgpu_mode.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_irq.h"
 #include "amdgpu_dm_kunit_test_helpers.h"
+#include "dc_dmub_srv.h"
+#include "ivsrcid/ivsrcid_vislands30.h"
+#include "ivsrcid/dcn/irqsrcs_dcn_1_0.h"
+#include "link_service.h"
 #include "dmub/dmub_srv.h"
+#include "dal_asic_id.h"
 
 static void dm_test_irq_handler(void *arg)
 {
@@ -29,6 +38,22 @@ static void dm_test_crtc_list_del(void *data)
 	struct amdgpu_crtc *acrtc = data;
 
 	list_del_init(&acrtc->base.head);
+}
+
+struct dm_test_hpd_rx_wq_ctx {
+	struct hpd_rx_irq_offload_work_queue *wq;
+	int count;
+};
+
+static void dm_test_destroy_hpd_rx_wq(void *data)
+{
+	struct dm_test_hpd_rx_wq_ctx *ctx = data;
+	int i;
+
+	for (i = 0; i < ctx->count; i++)
+		if (ctx->wq[i].wq)
+			destroy_workqueue(ctx->wq[i].wq);
+	kfree(ctx->wq);
 }
 
 /* Tests for amdgpu_dm_hpd_to_dal_irq_source() */
@@ -842,6 +867,318 @@ static void dm_test_get_crtc_by_otg_inst_empty_list(struct kunit *test)
 	KUNIT_EXPECT_NULL(test, amdgpu_dm_get_crtc_by_otg_inst(adev, 0));
 }
 
+/* Tests for amdgpu_dm_set_irq_funcs() */
+
+/**
+ * dm_test_set_irq_funcs - Test irq src funcs and counts are populated
+ * @test: The KUnit test context
+ */
+static void dm_test_set_irq_funcs(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+
+	adev->mode_info.num_crtc = 6;
+	adev->mode_info.num_hpd = 4;
+
+	amdgpu_dm_set_irq_funcs(adev);
+
+	KUNIT_EXPECT_EQ(test, adev->crtc_irq.num_types, 6);
+	KUNIT_EXPECT_EQ(test, adev->vline0_irq.num_types, 6);
+	KUNIT_EXPECT_EQ(test, adev->vupdate_irq.num_types, 6);
+	KUNIT_EXPECT_EQ(test, adev->pageflip_irq.num_types, 6);
+	KUNIT_EXPECT_EQ(test, adev->dmub_outbox_irq.num_types, 1);
+	KUNIT_EXPECT_EQ(test, adev->dmub_trace_irq.num_types, 1);
+	KUNIT_EXPECT_EQ(test, adev->hpd_irq.num_types, 4);
+
+	KUNIT_EXPECT_TRUE(test, adev->crtc_irq.funcs != NULL);
+	KUNIT_EXPECT_TRUE(test, adev->vline0_irq.funcs != NULL);
+	KUNIT_EXPECT_TRUE(test, adev->dmub_outbox_irq.funcs != NULL);
+	KUNIT_EXPECT_TRUE(test, adev->vupdate_irq.funcs != NULL);
+	KUNIT_EXPECT_TRUE(test, adev->dmub_trace_irq.funcs != NULL);
+	KUNIT_EXPECT_TRUE(test, adev->pageflip_irq.funcs != NULL);
+	KUNIT_EXPECT_TRUE(test, adev->hpd_irq.funcs != NULL);
+}
+
+/* Tests for amdgpu_dm_irq_suspend()/resume_early()/resume_late() */
+
+/**
+ * dm_test_irq_suspend_empty - Test suspend walks empty handler tables safely
+ * @test: The KUnit test context
+ */
+static void dm_test_irq_suspend_empty(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	int src;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	/*
+	 * With no registered handlers the HW dc_interrupt_set() calls are
+	 * skipped, so suspend must complete without touching the (absent) DC.
+	 */
+	amdgpu_dm_irq_suspend(adev);
+
+	for (src = 0; src < DAL_IRQ_SOURCES_NUMBER; src++) {
+		KUNIT_EXPECT_TRUE(test, list_empty(&adev->dm.irq_handler_list_low_tab[src]));
+		KUNIT_EXPECT_TRUE(test, list_empty(&adev->dm.irq_handler_list_high_tab[src]));
+	}
+}
+
+/**
+ * dm_test_irq_resume_early_empty - Test early resume walks empty tables safely
+ * @test: The KUnit test context
+ */
+static void dm_test_irq_resume_early_empty(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	int src;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	amdgpu_dm_irq_resume_early(adev);
+
+	for (src = 0; src < DAL_IRQ_SOURCES_NUMBER; src++)
+		KUNIT_EXPECT_TRUE(test, list_empty(&adev->dm.irq_handler_list_high_tab[src]));
+}
+
+/**
+ * dm_test_irq_resume_late_empty - Test late resume walks empty tables safely
+ * @test: The KUnit test context
+ */
+static void dm_test_irq_resume_late_empty(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	int src;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	amdgpu_dm_irq_resume_late(adev);
+
+	for (src = 0; src < DAL_IRQ_SOURCES_NUMBER; src++)
+		KUNIT_EXPECT_TRUE(test, list_empty(&adev->dm.irq_handler_list_low_tab[src]));
+}
+
+/**
+ * dm_test_irq_suspend_registered - Test suspend reaches the dc_interrupt_set path
+ * @test: The KUnit test context
+ *
+ * Registers a low-context HPD handler so the handler list is non-empty,
+ * forcing amdgpu_dm_irq_suspend() to call dc_interrupt_set() (NULL-safe with
+ * no DC) and flush_work() on the registered handler.
+ */
+static void dm_test_irq_suspend_registered(struct kunit *test)
+{
+	struct dc_interrupt_params int_params = { 0 };
+	struct amdgpu_device *adev;
+	void *handler;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	int_params.int_context = INTERRUPT_LOW_IRQ_CONTEXT;
+	int_params.irq_source = DC_IRQ_SOURCE_HPD1;
+	handler = amdgpu_dm_irq_register_interrupt(adev, &int_params,
+						   dm_test_irq_handler, adev);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, handler);
+
+	amdgpu_dm_irq_suspend(adev);
+
+	amdgpu_dm_irq_unregister_interrupt(adev, DC_IRQ_SOURCE_HPD1,
+					   dm_test_irq_handler);
+}
+
+/**
+ * dm_test_irq_suspend_disables_polling - Test suspend disables KMS polling
+ * @test: The KUnit test context
+ *
+ * With KMS polling active, suspend must take the poll-disable branch.
+ * drm_kms_helper_poll_disable() only cancels the poll work; it leaves the
+ * poll_enabled flag set (cleared later by drm_kms_helper_poll_fini()).
+ */
+static void dm_test_irq_suspend_disables_polling(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	/* Enable KMS polling so suspend takes the poll-disable branch. */
+	drm_kms_helper_poll_init(&adev->ddev);
+	KUNIT_ASSERT_TRUE(test, adev->ddev.mode_config.poll_enabled);
+
+	amdgpu_dm_irq_suspend(adev);
+
+	KUNIT_EXPECT_TRUE(test, adev->ddev.mode_config.poll_enabled);
+
+	drm_kms_helper_poll_fini(&adev->ddev);
+}
+
+/**
+ * dm_test_irq_resume_early_registered - Test early resume reaches dc_interrupt_set
+ * @test: The KUnit test context
+ *
+ * Registers a low-context HPD RX handler so early resume calls
+ * dc_interrupt_set() for the short-pulse interrupt source.
+ */
+static void dm_test_irq_resume_early_registered(struct kunit *test)
+{
+	struct dc_interrupt_params int_params = { 0 };
+	struct amdgpu_device *adev;
+	void *handler;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	int_params.int_context = INTERRUPT_LOW_IRQ_CONTEXT;
+	int_params.irq_source = DC_IRQ_SOURCE_HPD1RX;
+	handler = amdgpu_dm_irq_register_interrupt(adev, &int_params,
+						   dm_test_irq_handler, adev);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, handler);
+
+	amdgpu_dm_irq_resume_early(adev);
+
+	amdgpu_dm_irq_unregister_interrupt(adev, DC_IRQ_SOURCE_HPD1RX,
+					   dm_test_irq_handler);
+}
+
+/**
+ * dm_test_irq_resume_late_registered - Test late resume reaches dc_interrupt_set
+ * @test: The KUnit test context
+ *
+ * Registers a low-context HPD handler so late resume calls dc_interrupt_set()
+ * for the HPD interrupt source.
+ */
+static void dm_test_irq_resume_late_registered(struct kunit *test)
+{
+	struct dc_interrupt_params int_params = { 0 };
+	struct amdgpu_device *adev;
+	void *handler;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	int_params.int_context = INTERRUPT_LOW_IRQ_CONTEXT;
+	int_params.irq_source = DC_IRQ_SOURCE_HPD1;
+	handler = amdgpu_dm_irq_register_interrupt(adev, &int_params,
+						   dm_test_irq_handler, adev);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, handler);
+
+	amdgpu_dm_irq_resume_late(adev);
+
+	amdgpu_dm_irq_unregister_interrupt(adev, DC_IRQ_SOURCE_HPD1,
+					   dm_test_irq_handler);
+}
+
+/**
+ * dm_test_irq_resume_late_enables_polling - Test late resume re-enables polling
+ * @test: The KUnit test context
+ *
+ * With KMS polling active, late resume must take the poll-enable branch and
+ * leave polling enabled.
+ */
+static void dm_test_irq_resume_late_enables_polling(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	/* Enable KMS polling so resume_late takes the poll-enable branch. */
+	drm_kms_helper_poll_init(&adev->ddev);
+	KUNIT_ASSERT_TRUE(test, adev->ddev.mode_config.poll_enabled);
+
+	amdgpu_dm_irq_resume_late(adev);
+
+	KUNIT_EXPECT_TRUE(test, adev->ddev.mode_config.poll_enabled);
+
+	drm_kms_helper_poll_fini(&adev->ddev);
+}
+
+/* Tests for amdgpu_dm_hpd_rx_irq_create_workqueue() */
+
+/**
+ * dm_test_hpd_rx_irq_create_workqueue - Test workqueue array creation
+ * @test: The KUnit test context
+ */
+static void dm_test_hpd_rx_irq_create_workqueue(struct kunit *test)
+{
+	struct dm_test_hpd_rx_wq_ctx *ctx;
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	int i;
+
+	adev = dm_kunit_alloc_adev(test);
+
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	dc->caps.max_links = 4;
+	adev->dm.dc = dc;
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, ctx);
+
+	ctx->wq = amdgpu_dm_hpd_rx_irq_create_workqueue(adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->wq);
+	ctx->count = dc->caps.max_links;
+	KUNIT_ASSERT_EQ(test, kunit_add_action_or_reset(test, dm_test_destroy_hpd_rx_wq, ctx), 0);
+
+	for (i = 0; i < dc->caps.max_links; i++)
+		KUNIT_EXPECT_TRUE(test, ctx->wq[i].wq != NULL);
+}
+
+/* Tests for amdgpu_dm_hpd_rx_irq_work_suspend() */
+
+/**
+ * dm_test_hpd_rx_irq_work_suspend_null - Test suspend with no work queue
+ * @test: The KUnit test context
+ */
+static void dm_test_hpd_rx_irq_work_suspend_null(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm;
+
+	dm = kunit_kzalloc(test, sizeof(*dm), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dm);
+
+	/* A NULL hpd_rx_offload_wq must be a safe no-op (DC untouched). */
+	amdgpu_dm_hpd_rx_irq_work_suspend(dm);
+}
+
+/**
+ * dm_test_hpd_rx_irq_work_suspend_flushes - Test suspend flushes queues
+ * @test: The KUnit test context
+ */
+static void dm_test_hpd_rx_irq_work_suspend_flushes(struct kunit *test)
+{
+	struct dm_test_hpd_rx_wq_ctx *ctx;
+	struct amdgpu_device *adev;
+	struct dc *dc;
+
+	adev = dm_kunit_alloc_adev(test);
+
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	dc->caps.max_links = 2;
+	adev->dm.dc = dc;
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, ctx);
+
+	ctx->wq = amdgpu_dm_hpd_rx_irq_create_workqueue(adev);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->wq);
+	ctx->count = dc->caps.max_links;
+	KUNIT_ASSERT_EQ(test, kunit_add_action_or_reset(test, dm_test_destroy_hpd_rx_wq, ctx), 0);
+
+	adev->dm.hpd_rx_offload_wq = ctx->wq;
+
+	amdgpu_dm_hpd_rx_irq_work_suspend(&adev->dm);
+}
+
 static struct kunit_case amdgpu_dm_irq_tests[] = {
 	/* amdgpu_dm_hpd_to_dal_irq_source */
 	KUNIT_CASE(dm_test_hpd_to_dal_irq_source_hpd1),
@@ -894,6 +1231,22 @@ static struct kunit_case amdgpu_dm_irq_tests[] = {
 	KUNIT_CASE(dm_test_get_crtc_by_otg_inst_returns_match),
 	KUNIT_CASE(dm_test_get_crtc_by_otg_inst_returns_null),
 	KUNIT_CASE(dm_test_get_crtc_by_otg_inst_empty_list),
+	/* amdgpu_dm_set_irq_funcs */
+	KUNIT_CASE(dm_test_set_irq_funcs),
+	/* amdgpu_dm_irq_suspend/resume_early/resume_late */
+	KUNIT_CASE(dm_test_irq_suspend_empty),
+	KUNIT_CASE(dm_test_irq_resume_early_empty),
+	KUNIT_CASE(dm_test_irq_resume_late_empty),
+	KUNIT_CASE(dm_test_irq_suspend_registered),
+	KUNIT_CASE(dm_test_irq_suspend_disables_polling),
+	KUNIT_CASE(dm_test_irq_resume_early_registered),
+	KUNIT_CASE(dm_test_irq_resume_late_registered),
+	KUNIT_CASE(dm_test_irq_resume_late_enables_polling),
+	/* amdgpu_dm_hpd_rx_irq_create_workqueue */
+	KUNIT_CASE(dm_test_hpd_rx_irq_create_workqueue),
+	/* amdgpu_dm_hpd_rx_irq_work_suspend */
+	KUNIT_CASE(dm_test_hpd_rx_irq_work_suspend_null),
+	KUNIT_CASE(dm_test_hpd_rx_irq_work_suspend_flushes),
 	{}
 };
 
