@@ -173,6 +173,11 @@ void dmub_hpd_callback(struct amdgpu_device *adev,
 		       struct dmub_notification *notify);
 void dmub_hpd_sense_callback(struct amdgpu_device *adev,
 			     struct dmub_notification *notify);
+void dm_pflip_high_irq(void *interrupt_params);
+void dm_vupdate_high_irq(void *interrupt_params);
+void dm_crtc_high_irq(void *interrupt_params);
+void dm_handle_hpd_work(struct work_struct *work);
+void dm_dmub_outbox1_low_irq(void *interrupt_params);
 #endif
 
 #endif /* __AMDGPU_DM_IRQ_H__ */
