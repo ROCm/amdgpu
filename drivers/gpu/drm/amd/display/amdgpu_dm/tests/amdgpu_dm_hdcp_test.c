@@ -402,7 +402,235 @@ static void dm_test_process_output_callback_and_watchdog_needed(struct kunit *te
 	cancel_delayed_work_sync(&work->watchdog_timer_dwork);
 	cancel_delayed_work_sync(&work->property_validate_dwork);
 }
+
+/**
+ * dm_test_process_output_callback_stop_and_needed_requeues - stop+needed requeues callback work
+ * @test: KUnit test context
+ *
+ * When callback_stop and callback_needed are both set, process_output()
+ * should cancel the previous callback_dwork and queue it again.
+ */
+static void dm_test_process_output_callback_stop_and_needed_requeues(struct kunit *test)
+{
+	struct hdcp_workqueue *work = alloc_test_workqueue(test);
+
+	schedule_delayed_work(&work->callback_dwork, msecs_to_jiffies(10000));
+	KUNIT_ASSERT_TRUE(test, delayed_work_pending(&work->callback_dwork));
+
+	work->output.callback_stop = true;
+	work->output.callback_needed = true;
+	work->output.callback_delay = 300;
+
+	process_output(work);
+
+	KUNIT_EXPECT_TRUE(test, delayed_work_pending(&work->callback_dwork));
+
+	cancel_delayed_work_sync(&work->callback_dwork);
+	cancel_delayed_work_sync(&work->property_validate_dwork);
+}
+
+/**
+ * dm_test_process_output_watchdog_stop_and_needed_requeues - stop+needed requeues watchdog work
+ * @test: KUnit test context
+ *
+ * When watchdog_timer_stop and watchdog_timer_needed are both set,
+ * process_output() should cancel previous watchdog work and queue it again.
+ */
+static void dm_test_process_output_watchdog_stop_and_needed_requeues(struct kunit *test)
+{
+	struct hdcp_workqueue *work = alloc_test_workqueue(test);
+
+	schedule_delayed_work(&work->watchdog_timer_dwork, msecs_to_jiffies(10000));
+	KUNIT_ASSERT_TRUE(test, delayed_work_pending(&work->watchdog_timer_dwork));
+
+	work->output.watchdog_timer_stop = true;
+	work->output.watchdog_timer_needed = true;
+	work->output.watchdog_timer_delay = 700;
+
+	process_output(work);
+
+	KUNIT_EXPECT_TRUE(test, delayed_work_pending(&work->watchdog_timer_dwork));
+
+	cancel_delayed_work_sync(&work->watchdog_timer_dwork);
+	cancel_delayed_work_sync(&work->property_validate_dwork);
+}
 /* End of tests for process_output() */
+
+/* Tests for event_property_update() */
+
+/**
+ * alloc_test_workqueue_for_property_update - allocate minimal workqueue for callback tests
+ * @test: KUnit test context for managed allocation
+ *
+ * Allocates a minimal hdcp_workqueue with property_update_work initialised
+ * so event_property_update() can resolve container_of() safely.
+ */
+static struct hdcp_workqueue *alloc_test_workqueue_for_property_update(struct kunit *test)
+{
+	struct hdcp_workqueue *work;
+
+	work = kunit_kzalloc(test, sizeof(*work), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, work);
+
+	INIT_WORK(&work->property_update_work, dummy_work_fn);
+
+	return work;
+}
+
+/**
+ * dm_test_event_property_update_skips_null_connector - null connector is ignored
+ * @test: KUnit test context
+ *
+ * If aconnector entry is NULL, event_property_update() should skip it
+ * without modifying encryption_status.
+ */
+static void dm_test_event_property_update_skips_null_connector(struct kunit *test)
+{
+	struct hdcp_workqueue *work = alloc_test_workqueue_for_property_update(test);
+	enum mod_hdcp_encryption_status before;
+
+	work->encryption_status[0] = MOD_HDCP_ENCRYPTION_STATUS_HDCP2_TYPE0_ON;
+	before = work->encryption_status[0];
+
+	event_property_update(&work->property_update_work);
+
+	KUNIT_EXPECT_EQ(test, work->encryption_status[0], before);
+}
+
+/* End of tests for event_property_update() */
+
+/* Tests for hdcp_handle_cpirq() */
+
+/**
+ * dm_test_hdcp_handle_cpirq_schedules_work - cpirq handler queues cpirq_work
+ * @test: KUnit test context
+ *
+ * hdcp_handle_cpirq() should schedule cpirq_work for the selected link.
+ */
+static void dm_test_hdcp_handle_cpirq_schedules_work(struct kunit *test)
+{
+	struct hdcp_workqueue *work;
+
+	work = kunit_kzalloc(test, sizeof(*work), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, work);
+
+	INIT_WORK(&work->cpirq_work, dummy_work_fn);
+
+	hdcp_handle_cpirq(work, 0);
+
+	KUNIT_EXPECT_TRUE(test, work_pending(&work->cpirq_work));
+
+	cancel_work_sync(&work->cpirq_work);
+}
+
+/**
+ * dm_test_hdcp_handle_cpirq_selects_link_index - only selected link work is queued
+ * @test: KUnit test context
+ *
+ * hdcp_handle_cpirq() should schedule cpirq_work for the selected index
+ * and not queue unrelated links.
+ */
+static void dm_test_hdcp_handle_cpirq_selects_link_index(struct kunit *test)
+{
+	struct hdcp_workqueue *work;
+
+	work = kunit_kcalloc(test, 2, sizeof(*work), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, work);
+
+	INIT_WORK(&work[0].cpirq_work, dummy_work_fn);
+	INIT_WORK(&work[1].cpirq_work, dummy_work_fn);
+
+	hdcp_handle_cpirq(work, 1);
+
+	KUNIT_EXPECT_FALSE(test, work_pending(&work[0].cpirq_work));
+	KUNIT_EXPECT_TRUE(test, work_pending(&work[1].cpirq_work));
+
+	cancel_work_sync(&work[1].cpirq_work);
+}
+
+/* End of tests for hdcp_handle_cpirq() */
+
+/* Tests for hdcp_update_display() helper logic */
+
+/**
+ * dm_test_hdcp_update_display_enable_schedules_property_validate - enable path queues validate work
+ * @test: KUnit test context
+ *
+ * hdcp_update_display() should schedule property_validate_dwork when
+ * encryption is enabled.
+ */
+static void dm_test_hdcp_update_display_enable_schedules_property_validate(struct kunit *test)
+{
+	struct hdcp_workqueue *work;
+
+	work = kunit_kzalloc(test, sizeof(*work), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, work);
+
+	INIT_DELAYED_WORK(&work->property_validate_dwork, dummy_work_fn);
+	work->srm_size = 0;
+
+	hdcp_update_display_encryption_control(work, work, 0, true);
+
+	KUNIT_EXPECT_TRUE(test, delayed_work_pending(&work->property_validate_dwork));
+
+	cancel_delayed_work_sync(&work->property_validate_dwork);
+}
+
+/**
+ * dm_test_hdcp_update_display_disable_resets_status_and_cancels_validate - disable path state update
+ * @test: KUnit test context
+ *
+ * hdcp_update_display() should set encryption_status to HDCP_OFF and
+ * cancel property_validate_dwork when encryption is disabled.
+ */
+static void dm_test_hdcp_update_display_disable_resets_status_and_cancels_validate(struct kunit *test)
+{
+	struct hdcp_workqueue *work;
+
+	work = kunit_kzalloc(test, sizeof(*work), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, work);
+
+	INIT_DELAYED_WORK(&work->property_validate_dwork, dummy_work_fn);
+	schedule_delayed_work(&work->property_validate_dwork, msecs_to_jiffies(10000));
+	KUNIT_ASSERT_TRUE(test, delayed_work_pending(&work->property_validate_dwork));
+
+	work->encryption_status[3] = MOD_HDCP_ENCRYPTION_STATUS_HDCP2_TYPE1_ON;
+
+	hdcp_update_display_encryption_control(work, work, 3, false);
+
+	KUNIT_EXPECT_EQ(test, work->encryption_status[3],
+			MOD_HDCP_ENCRYPTION_STATUS_HDCP_OFF);
+	KUNIT_EXPECT_FALSE(test, delayed_work_pending(&work->property_validate_dwork));
+}
+
+/* End of tests for hdcp_update_display() helper logic */
+
+/* Tests for hdcp_create_workqueue() */
+
+/**
+ * dm_test_hdcp_create_workqueue_zero_max_links_returns_null - zero-link creation fails early
+ * @test: KUnit test context
+ *
+ * When dc->caps.max_links is zero, hdcp_create_workqueue() should fail
+ * the initial allocation path and return NULL.
+ */
+static void dm_test_hdcp_create_workqueue_zero_max_links_returns_null(struct kunit *test)
+{
+	struct cp_psp cp_psp = {0};
+	struct dc *dc;
+	struct hdcp_workqueue *work;
+
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+
+	dc->caps.max_links = 0;
+
+	work = hdcp_create_workqueue(NULL, &cp_psp, dc);
+
+	KUNIT_EXPECT_PTR_EQ(test, work, NULL);
+}
+
+/* End of tests for hdcp_create_workqueue() */
 
 static struct kunit_case dm_hdcp_test_cases[] = {
 	/* hdcp_get_content_protection_from_status() */
@@ -423,6 +651,18 @@ static struct kunit_case dm_hdcp_test_cases[] = {
 	KUNIT_CASE(dm_test_process_output_watchdog_needed),
 	KUNIT_CASE(dm_test_process_output_watchdog_stop),
 	KUNIT_CASE(dm_test_process_output_callback_and_watchdog_needed),
+	KUNIT_CASE(dm_test_process_output_callback_stop_and_needed_requeues),
+	KUNIT_CASE(dm_test_process_output_watchdog_stop_and_needed_requeues),
+	/* event_property_update() */
+	KUNIT_CASE(dm_test_event_property_update_skips_null_connector),
+	/* hdcp_handle_cpirq() */
+	KUNIT_CASE(dm_test_hdcp_handle_cpirq_schedules_work),
+	KUNIT_CASE(dm_test_hdcp_handle_cpirq_selects_link_index),
+	/* hdcp_update_display() helper logic */
+	KUNIT_CASE(dm_test_hdcp_update_display_enable_schedules_property_validate),
+	KUNIT_CASE(dm_test_hdcp_update_display_disable_resets_status_and_cancels_validate),
+	/* hdcp_create_workqueue() */
+	KUNIT_CASE(dm_test_hdcp_create_workqueue_zero_max_links_returns_null),
 	{}
 };
 

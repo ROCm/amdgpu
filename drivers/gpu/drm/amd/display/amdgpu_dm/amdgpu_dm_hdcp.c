@@ -258,6 +258,30 @@ static void link_lock(struct hdcp_workqueue *work, bool lock)
 	}
 }
 
+STATIC_IFN_KUNIT
+void hdcp_update_display_encryption_control(struct hdcp_workqueue *hdcp_work,
+					    struct hdcp_workqueue *hdcp_w,
+					    unsigned int conn_index,
+					    bool enable_encryption)
+{
+	if (enable_encryption) {
+		/* Explicitly set the saved SRM as sysfs call will be after we already enabled hdcp
+		 * (s3 resume case)
+		 */
+		if (hdcp_work->srm_size > 0)
+			psp_set_srm(hdcp_work->hdcp.config.psp.handle, hdcp_work->srm,
+				    hdcp_work->srm_size,
+				    &hdcp_work->srm_version);
+
+		schedule_delayed_work(&hdcp_w->property_validate_dwork,
+				      msecs_to_jiffies(DRM_HDCP_CHECK_PERIOD_MS));
+	} else {
+		hdcp_w->encryption_status[conn_index] = MOD_HDCP_ENCRYPTION_STATUS_HDCP_OFF;
+		cancel_delayed_work(&hdcp_w->property_validate_dwork);
+	}
+}
+EXPORT_IF_KUNIT(hdcp_update_display_encryption_control);
+
 void hdcp_update_display(struct hdcp_workqueue *hdcp_work,
 			 unsigned int link_index,
 			 struct amdgpu_dm_connector *aconnector,
@@ -281,22 +305,8 @@ void hdcp_update_display(struct hdcp_workqueue *hdcp_work,
 			dc->debug.hdcp_lc_force_fw_enable,
 			dc->debug.hdcp_lc_enable_sw_fallback,
 			&link_adjust, &display_adjust);
-
-	if (enable_encryption) {
-		/* Explicitly set the saved SRM as sysfs call will be after we already enabled hdcp
-		 * (s3 resume case)
-		 */
-		if (hdcp_work->srm_size > 0)
-			psp_set_srm(hdcp_work->hdcp.config.psp.handle, hdcp_work->srm,
-				    hdcp_work->srm_size,
-				    &hdcp_work->srm_version);
-
-		schedule_delayed_work(&hdcp_w->property_validate_dwork,
-				      msecs_to_jiffies(DRM_HDCP_CHECK_PERIOD_MS));
-	} else {
-		hdcp_w->encryption_status[conn_index] = MOD_HDCP_ENCRYPTION_STATUS_HDCP_OFF;
-		cancel_delayed_work(&hdcp_w->property_validate_dwork);
-	}
+	hdcp_update_display_encryption_control(hdcp_work, hdcp_w, conn_index,
+					      enable_encryption);
 
 	mod_hdcp_update_display(&hdcp_w->hdcp, conn_index, &link_adjust, &display_adjust, &hdcp_w->output);
 
@@ -365,6 +375,7 @@ void hdcp_handle_cpirq(struct hdcp_workqueue *hdcp_work, unsigned int link_index
 
 	schedule_work(&hdcp_w->cpirq_work);
 }
+EXPORT_IF_KUNIT(hdcp_handle_cpirq);
 
 static void event_callback(struct work_struct *work)
 {
@@ -383,7 +394,8 @@ static void event_callback(struct work_struct *work)
 	process_output(hdcp_work);
 }
 
-static void event_property_update(struct work_struct *work)
+STATIC_IFN_KUNIT
+void event_property_update(struct work_struct *work)
 {
 	struct hdcp_workqueue *hdcp_work = container_of(work, struct hdcp_workqueue,
 							property_update_work);
@@ -443,6 +455,7 @@ static void event_property_update(struct work_struct *work)
 		drm_modeset_unlock(&dev->mode_config.connection_mutex);
 	}
 }
+EXPORT_IF_KUNIT(event_property_update);
 
 static void event_property_validate(struct work_struct *work)
 {
@@ -885,4 +898,5 @@ fail_alloc_context:
 
 	return NULL;
 }
+EXPORT_IF_KUNIT(hdcp_create_workqueue);
 
