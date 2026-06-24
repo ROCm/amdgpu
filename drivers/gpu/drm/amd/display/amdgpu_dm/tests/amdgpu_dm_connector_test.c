@@ -3199,6 +3199,148 @@ static void dm_test_set_panel_type_default_lcd(struct kunit *test)
 			(uint64_t)DRM_MODE_PANEL_TYPE_LCD);
 }
 
+/* Tests for amdgpu_dm_update_cacp_caps() */
+
+/*
+ * Build an amdgpu_dm_connector wired to a real kunit drm_device embedded in an
+ * amdgpu_device, so drm_to_adev() resolves and drm_dbg_kms() has a valid
+ * device. Defaults are seeded to the fully-supported configuration so each
+ * test only flips a single knob.
+ */
+struct dm_test_cacp_ctx {
+	struct amdgpu_device *adev;
+	struct amdgpu_dm_connector *aconnector;
+	struct dc_link *link;
+};
+
+static struct dm_test_cacp_ctx *dm_test_cacp_ctx_alloc(struct kunit *test)
+{
+	struct dm_test_cacp_ctx *ctx;
+	struct drm_device *drm;
+	struct device *dev;
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	dev = drm_kunit_helper_alloc_device(test);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
+
+	drm = __drm_kunit_helper_alloc_drm_device(test, dev,
+						  sizeof(*ctx->adev),
+						  offsetof(struct amdgpu_device, ddev),
+						  DRIVER_MODESET);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
+	ctx->adev = drm_to_adev(drm);
+
+	ctx->aconnector = kunit_kzalloc(test, sizeof(*ctx->aconnector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->aconnector);
+	ctx->aconnector->base.dev = drm;
+
+	ctx->link = kunit_kzalloc(test, sizeof(*ctx->link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->link);
+	ctx->aconnector->dc_link = ctx->link;
+
+	/* Fully-supported defaults: new enough DCE, eDP, non-LCD panel. */
+	ctx->adev->ip_versions[DCE_HWIP][0] = IP_VERSION(3, 1, 4);
+	ctx->link->connector_signal = SIGNAL_TYPE_EDP;
+	ctx->link->panel_type = PANEL_TYPE_OLED;
+
+	return ctx;
+}
+
+/**
+ * dm_test_cacp_caps_edp_supported - Test CACP supported on a new eDP panel
+ * @test: The KUnit test context
+ */
+static void dm_test_cacp_caps_edp_supported(struct kunit *test)
+{
+	struct dm_test_cacp_ctx *ctx = dm_test_cacp_ctx_alloc(test);
+
+	amdgpu_dm_update_cacp_caps(ctx->aconnector);
+
+	KUNIT_EXPECT_TRUE(test, ctx->link->panel_config.cacp.cacp_supported);
+}
+
+/**
+ * dm_test_cacp_caps_lvds_supported - Test CACP supported on an LVDS panel
+ * @test: The KUnit test context
+ */
+static void dm_test_cacp_caps_lvds_supported(struct kunit *test)
+{
+	struct dm_test_cacp_ctx *ctx = dm_test_cacp_ctx_alloc(test);
+
+	ctx->link->connector_signal = SIGNAL_TYPE_LVDS;
+
+	amdgpu_dm_update_cacp_caps(ctx->aconnector);
+
+	KUNIT_EXPECT_TRUE(test, ctx->link->panel_config.cacp.cacp_supported);
+}
+
+/**
+ * dm_test_cacp_caps_old_ip_unsupported - Test CACP unsupported on old DCE
+ * @test: The KUnit test context
+ *
+ * DCE versions older than 3.1.4 do not support CACP.
+ */
+static void dm_test_cacp_caps_old_ip_unsupported(struct kunit *test)
+{
+	struct dm_test_cacp_ctx *ctx = dm_test_cacp_ctx_alloc(test);
+
+	ctx->adev->ip_versions[DCE_HWIP][0] = IP_VERSION(3, 1, 3);
+
+	amdgpu_dm_update_cacp_caps(ctx->aconnector);
+
+	KUNIT_EXPECT_FALSE(test, ctx->link->panel_config.cacp.cacp_supported);
+}
+
+/**
+ * dm_test_cacp_caps_ip_3_1_6_unsupported - Test CACP unsupported on DCE 3.1.6
+ * @test: The KUnit test context
+ *
+ * DCE 3.1.6 is explicitly excluded even though it is newer than 3.1.4.
+ */
+static void dm_test_cacp_caps_ip_3_1_6_unsupported(struct kunit *test)
+{
+	struct dm_test_cacp_ctx *ctx = dm_test_cacp_ctx_alloc(test);
+
+	ctx->adev->ip_versions[DCE_HWIP][0] = IP_VERSION(3, 1, 6);
+
+	amdgpu_dm_update_cacp_caps(ctx->aconnector);
+
+	KUNIT_EXPECT_FALSE(test, ctx->link->panel_config.cacp.cacp_supported);
+}
+
+/**
+ * dm_test_cacp_caps_non_edp_lvds_unsupported - Test CACP unsupported on a
+ * non-eDP/LVDS signal
+ * @test: The KUnit test context
+ */
+static void dm_test_cacp_caps_non_edp_lvds_unsupported(struct kunit *test)
+{
+	struct dm_test_cacp_ctx *ctx = dm_test_cacp_ctx_alloc(test);
+
+	ctx->link->connector_signal = SIGNAL_TYPE_DISPLAY_PORT;
+
+	amdgpu_dm_update_cacp_caps(ctx->aconnector);
+
+	KUNIT_EXPECT_FALSE(test, ctx->link->panel_config.cacp.cacp_supported);
+}
+
+/**
+ * dm_test_cacp_caps_lcd_unsupported - Test CACP unsupported on an LCD panel
+ * @test: The KUnit test context
+ */
+static void dm_test_cacp_caps_lcd_unsupported(struct kunit *test)
+{
+	struct dm_test_cacp_ctx *ctx = dm_test_cacp_ctx_alloc(test);
+
+	ctx->link->panel_type = PANEL_TYPE_LCD;
+
+	amdgpu_dm_update_cacp_caps(ctx->aconnector);
+
+	KUNIT_EXPECT_FALSE(test, ctx->link->panel_config.cacp.cacp_supported);
+}
+
 static struct kunit_case amdgpu_dm_connector_tests[] = {
 	/* get_subconnector_type */
 	KUNIT_CASE(dm_test_subconnector_type_none),
@@ -3376,6 +3518,13 @@ static struct kunit_case amdgpu_dm_connector_tests[] = {
 	KUNIT_CASE(dm_test_set_panel_type_samsung_miniled),
 	KUNIT_CASE(dm_test_set_panel_type_samsung_below_threshold),
 	KUNIT_CASE(dm_test_set_panel_type_default_lcd),
+	/* amdgpu_dm_update_cacp_caps */
+	KUNIT_CASE(dm_test_cacp_caps_edp_supported),
+	KUNIT_CASE(dm_test_cacp_caps_lvds_supported),
+	KUNIT_CASE(dm_test_cacp_caps_old_ip_unsupported),
+	KUNIT_CASE(dm_test_cacp_caps_ip_3_1_6_unsupported),
+	KUNIT_CASE(dm_test_cacp_caps_non_edp_lvds_unsupported),
+	KUNIT_CASE(dm_test_cacp_caps_lcd_unsupported),
 	{}
 };
 
