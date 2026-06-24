@@ -994,7 +994,7 @@ void amdgpu_multi_ring_reset_helper_begin(const u32 ring_type_mask,
 	 * Give some time for non-guilty rings to finish their
 	 * current submission, to try to minimize collateral damage.
 	 *
-	 * Note that this just a best effort, but really there
+	 * Note that this is just a best effort, but really there
 	 * is no way to really know which ring is actually responsible
 	 * because different rings may share resources, eg. a compute
 	 * ring may hog shader engines, causing a graphics ring to hang.
@@ -1055,12 +1055,12 @@ void amdgpu_multi_ring_reset_helper_begin(const u32 ring_type_mask,
  * @guilty_ring: The ring which is guilty of causing a reset.
  * @ret: Return code from the reset function.
  *
- * After calling amdgpu_multi_ring_reset_helper_end()
+ * After calling amdgpu_multi_ring_reset_helper_begin()
  * and executing the actual reset method, call this
  * function to restore normal operation.
  *
  * In case the reset failed, this function should still
- * be called to restore some state, but it won't attempt to
+ * be called to restore preemption state, but it won't attempt to
  * fully restore the ring contents.
  */
 int amdgpu_multi_ring_reset_helper_end(const u32 ring_type_mask,
@@ -1084,7 +1084,7 @@ int amdgpu_multi_ring_reset_helper_end(const u32 ring_type_mask,
 	/* Flush HDP cache so the GPU can see the updated COND_EXEC values */
 	amdgpu_device_flush_hdp(adev, NULL);
 
-	/* If the reset was unsuccessful, return without restoring anything. */
+	/* If the reset was unsuccessful, return without restoring anything else. */
 	if (ret)
 		return ret;
 
