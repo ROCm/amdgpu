@@ -63,10 +63,14 @@ static int amdgpu_dm_audio_component_get_eld(struct device *kdev, int port,
 			continue;
 
 		*enabled = true;
+#ifdef HAVE_DRM_CONNECTOR_ELD_MUTEX
 		mutex_lock(&connector->eld_mutex);
+#endif
 		ret = drm_eld_size(connector->eld);
 		memcpy(buf, connector->eld, min(max_bytes, ret));
+#ifdef HAVE_DRM_CONNECTOR_ELD_MUTEX
 		mutex_unlock(&connector->eld_mutex);
+#endif
 
 		break;
 	}
