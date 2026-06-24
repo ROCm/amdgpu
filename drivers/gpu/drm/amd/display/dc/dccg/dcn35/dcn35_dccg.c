@@ -1654,7 +1654,7 @@ void dccg35_set_dpstreamclk_root_clock_gating(struct dccg *dccg, int dp_hpo_inst
 
 
 
-static void dccg35_set_hdmistreamclk(
+void dccg35_set_hdmistreamclk(
 		struct dccg *dccg,
 		enum streamclk_source src,
 		uint32_t otg_inst)
