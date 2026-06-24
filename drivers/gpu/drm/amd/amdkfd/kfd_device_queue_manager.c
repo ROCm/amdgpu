@@ -38,7 +38,8 @@
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_reset.h"
 #include "amdgpu_sdma.h"
-#include "mes_v11_api_def.h"
+#include "amdgpu_ring.h"
+#include "amdgpu_mes.h"
 #include "kfd_debug.h"
 
 /* Size of the per-pipe EOP queue */
@@ -209,24 +210,24 @@ static void kfd_hws_hang(struct device_queue_manager *dqm)
 	amdgpu_amdkfd_gpu_reset(dqm->dev->adev);
 }
 
-static int convert_to_mes_queue_type(int queue_type)
+static int convert_to_amdgpu_ring_type(int queue_type)
 {
-	int mes_queue_type;
+	int amdgpu_ring_type;
 
 	switch (queue_type) {
 	case KFD_QUEUE_TYPE_COMPUTE:
-		mes_queue_type = MES_QUEUE_TYPE_COMPUTE;
+		amdgpu_ring_type = AMDGPU_RING_TYPE_COMPUTE;
 		break;
 	case KFD_QUEUE_TYPE_SDMA:
-		mes_queue_type = MES_QUEUE_TYPE_SDMA;
+		amdgpu_ring_type = AMDGPU_RING_TYPE_SDMA;
 		break;
 	default:
 		WARN(1, "Invalid queue type %d", queue_type);
-		mes_queue_type = -EINVAL;
+		amdgpu_ring_type = -EINVAL;
 		break;
 	}
 
-	return mes_queue_type;
+	return amdgpu_ring_type;
 }
 
 static int add_queue_mes(struct device_queue_manager *dqm, struct queue *q,
@@ -276,7 +277,7 @@ static int add_queue_mes(struct device_queue_manager *dqm, struct queue *q,
 						(qpd->pqm->process->debug_trap_enabled ||
 						 kfd_dbg_has_ttmps_always_setup(q->device));
 
-	queue_type = convert_to_mes_queue_type(q->properties.type);
+	queue_type = convert_to_amdgpu_ring_type(q->properties.type);
 	if (queue_type < 0) {
 		dev_err(adev->dev, "Queue type not supported with MES, queue:%d\n",
 			q->properties.type);
@@ -325,7 +326,7 @@ static int remove_queue_mes_on_reset_option(struct device_queue_manager *dqm, st
 	memset(&queue_input, 0x0, sizeof(struct mes_remove_queue_input));
 	queue_input.doorbell_offset = q->properties.doorbell_off;
 	queue_input.gang_context_addr = q->gang_ctx_gpu_addr;
-	queue_input.queue_type = convert_to_mes_queue_type(q->properties.type);
+	queue_input.queue_type = convert_to_amdgpu_ring_type(q->properties.type);
 	queue_input.remove_queue_after_reset = flush_mes_queue;
 	queue_input.xcc_id = ffs(dqm->dev->xcc_mask) - 1;
 
@@ -471,7 +472,7 @@ static int reset_queues_mes(struct device_queue_manager *dqm, struct queue *q)
 	memset(&queue_input, 0x0, sizeof(struct mes_remove_queue_input));
 	queue_input.doorbell_offset = q->properties.doorbell_off;
 	queue_input.gang_context_addr = q->gang_ctx_gpu_addr;
-	queue_input.queue_type = convert_to_mes_queue_type(q->properties.type);
+	queue_input.queue_type = convert_to_amdgpu_ring_type(q->properties.type);
 	queue_input.remove_queue_after_reset = false;
 	queue_input.xcc_id = ffs(dqm->dev->xcc_mask) - 1;
 	/* pass the known bad queue info to the reset function */
