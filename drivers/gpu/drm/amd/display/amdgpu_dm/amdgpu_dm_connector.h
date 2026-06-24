@@ -71,14 +71,22 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 				     int link_index);
 
 enum drm_mode_status amdgpu_dm_connector_mode_valid(struct drm_connector *connector,
+#ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_MODE_VALID_CONST_ARGUMENT
 						    const struct drm_display_mode *mode);
+#else
+							struct drm_display_mode *mode);
+#endif
 
 void dm_restore_drm_connector_state(struct drm_device *dev,
 				    struct drm_connector *connector);
 
 void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 				    const struct drm_edid *drm_edid,
 				    bool do_mccs);
+#else
+				    struct edid *edid, bool do_mccs);
+#endif
 
 void amdgpu_dm_update_connector_after_detect(
 		struct amdgpu_dm_connector *aconnector);
