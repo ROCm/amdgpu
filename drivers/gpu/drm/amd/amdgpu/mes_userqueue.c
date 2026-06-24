@@ -170,6 +170,7 @@ static int mes_userq_unmap(struct amdgpu_usermode_queue *queue)
 	memset(&queue_input, 0x0, sizeof(struct mes_remove_queue_input));
 	queue_input.doorbell_offset = queue->doorbell_index;
 	queue_input.gang_context_addr = ctx->gpu_addr;
+	queue_input.queue_type = queue->queue_type;
 
 	amdgpu_mes_lock(&adev->mes);
 	r = adev->mes.funcs->remove_hw_queue(&adev->mes, &queue_input);

@@ -274,6 +274,7 @@ struct mes_remove_queue_input {
 	uint32_t        xcc_id;
 	uint32_t	doorbell_offset;
 	uint64_t	gang_context_addr;
+	uint32_t	queue_type;
 	bool		remove_queue_after_reset;
 };
 

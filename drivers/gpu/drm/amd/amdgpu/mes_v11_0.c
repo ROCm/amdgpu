@@ -383,6 +383,8 @@ static int mes_v11_0_remove_hw_queue(struct amdgpu_mes *mes,
 
 	mes_remove_queue_pkt.doorbell_offset = input->doorbell_offset;
 	mes_remove_queue_pkt.gang_context_addr = input->gang_context_addr;
+	mes_remove_queue_pkt.queue_type =
+		convert_to_mes_queue_type(input->queue_type);
 
 	if (mes_rev >= 0x60)
 		mes_remove_queue_pkt.remove_queue_after_reset = input->remove_queue_after_reset;
