@@ -514,6 +514,7 @@ void amdgpu_dm_update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 		caps->aux_min_input_signal = 1;
 #endif
 
+#ifdef HAVE_DRM_GET_PANEL_BACKLIGHT_QUIRK
 	panel_backlight_quirk =
 		drm_get_panel_backlight_quirk(aconnector->drm_edid);
 	if (!IS_ERR_OR_NULL(panel_backlight_quirk)) {
@@ -532,6 +533,7 @@ void amdgpu_dm_update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 				panel_backlight_quirk->brightness_mask;
 		}
 	}
+#endif
 }
 
 void amdgpu_dm_setup_backlight_device(struct amdgpu_display_manager *dm,
