@@ -159,6 +159,13 @@ void update_subconnector_property(struct amdgpu_dm_connector *aconnector);
 void amdgpu_dm_fbc_init(struct drm_connector *connector);
 void amdgpu_dm_set_panel_type(struct amdgpu_dm_connector *aconnector);
 void amdgpu_dm_update_cacp_caps(struct amdgpu_dm_connector *aconnector);
+void fill_stream_properties_from_drm_display_mode(
+	struct dc_stream_state *stream,
+	const struct drm_display_mode *mode_in,
+	const struct drm_connector *connector,
+	const struct drm_connector_state *connector_state,
+	const struct dc_stream_state *old_stream,
+	int requested_bpc);
 enum display_content_type
 get_output_content_type(const struct drm_connector_state *connector_state);
 bool adjust_colour_depth_from_display_info(struct dc_crtc_timing *timing_out,

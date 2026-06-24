@@ -3341,6 +3341,269 @@ static void dm_test_cacp_caps_lcd_unsupported(struct kunit *test)
 	KUNIT_EXPECT_FALSE(test, ctx->link->panel_config.cacp.cacp_supported);
 }
 
+/* Tests for fill_stream_properties_from_drm_display_mode() */
+
+/*
+ * Build the inputs for fill_stream_properties_from_drm_display_mode(). The
+ * connector is registered against a real kunit drm_device so that
+ * to_amdgpu_dm_connector(), connector->display_info and the drm debug helpers
+ * all resolve. Large structs are heap-allocated to keep the stack small.
+ *
+ * The stream signal defaults to DisplayPort so the HDMI infoframe paths are
+ * skipped, keeping the exercised behaviour deterministic.
+ */
+struct dm_test_fill_ctx {
+	struct drm_device *drm;
+	struct amdgpu_dm_connector *aconnector;
+	struct drm_connector_state *conn_state;
+	struct dc_stream_state *stream;
+	struct drm_display_mode *mode;
+};
+
+static struct dm_test_fill_ctx *dm_test_fill_ctx_alloc(struct kunit *test)
+{
+	struct dm_test_fill_ctx *ctx;
+	struct device *dev;
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	dev = drm_kunit_helper_alloc_device(test);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
+
+	ctx->drm = __drm_kunit_helper_alloc_drm_device(test, dev,
+						       sizeof(*ctx->drm), 0,
+						       DRIVER_MODESET);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, ctx->drm);
+
+	ctx->aconnector = kunit_kzalloc(test, sizeof(*ctx->aconnector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->aconnector);
+	KUNIT_ASSERT_EQ(test,
+		drmm_connector_init(ctx->drm, &ctx->aconnector->base,
+				    &dm_test_connector_funcs,
+				    DRM_MODE_CONNECTOR_DisplayPort, NULL), 0);
+
+	ctx->conn_state = kunit_kzalloc(test, sizeof(*ctx->conn_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->conn_state);
+	ctx->stream = kunit_kzalloc(test, sizeof(*ctx->stream), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->stream);
+	ctx->mode = kunit_kzalloc(test, sizeof(*ctx->mode), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->mode);
+
+	ctx->stream->signal = SIGNAL_TYPE_DISPLAY_PORT;
+
+	return ctx;
+}
+
+/**
+ * dm_test_fill_stream_borders_zeroed - Test the timing borders are cleared
+ * @test: The KUnit test context
+ */
+static void dm_test_fill_stream_borders_zeroed(struct kunit *test)
+{
+	struct dm_test_fill_ctx *ctx = dm_test_fill_ctx_alloc(test);
+	struct dc_crtc_timing *timing = &ctx->stream->timing;
+
+	/* Pre-seed nonzero borders to prove they get reset. */
+	timing->h_border_left = 5;
+	timing->h_border_right = 6;
+	timing->v_border_top = 7;
+	timing->v_border_bottom = 8;
+
+	fill_stream_properties_from_drm_display_mode(ctx->stream, ctx->mode,
+		&ctx->aconnector->base, ctx->conn_state, NULL, 8);
+
+	KUNIT_EXPECT_EQ(test, (int)timing->h_border_left, 0);
+	KUNIT_EXPECT_EQ(test, (int)timing->h_border_right, 0);
+	KUNIT_EXPECT_EQ(test, (int)timing->v_border_top, 0);
+	KUNIT_EXPECT_EQ(test, (int)timing->v_border_bottom, 0);
+}
+
+/**
+ * dm_test_fill_stream_rgb_defaults - Test the default RGB/sRGB output
+ * @test: The KUnit test context
+ *
+ * A plain DisplayPort sink with no YCbCr color formats produces RGB encoding
+ * and the sRGB color space, with a predefined sRGB transfer function.
+ */
+static void dm_test_fill_stream_rgb_defaults(struct kunit *test)
+{
+	struct dm_test_fill_ctx *ctx = dm_test_fill_ctx_alloc(test);
+	struct dc_crtc_timing *timing = &ctx->stream->timing;
+
+	fill_stream_properties_from_drm_display_mode(ctx->stream, ctx->mode,
+		&ctx->aconnector->base, ctx->conn_state, NULL, 8);
+
+	KUNIT_EXPECT_EQ(test, (int)timing->pixel_encoding, (int)PIXEL_ENCODING_RGB);
+	KUNIT_EXPECT_EQ(test, (int)timing->timing_3d_format,
+			(int)TIMING_3D_FORMAT_NONE);
+	KUNIT_EXPECT_EQ(test, (int)timing->scan_type, (int)SCANNING_TYPE_NODATA);
+	KUNIT_EXPECT_EQ(test, (int)ctx->stream->output_color_space,
+			(int)COLOR_SPACE_SRGB);
+	KUNIT_EXPECT_EQ(test, (int)ctx->stream->out_transfer_func.type,
+			(int)TF_TYPE_PREDEFINED);
+	KUNIT_EXPECT_EQ(test, (int)ctx->stream->out_transfer_func.tf,
+			(int)TRANSFER_FUNCTION_SRGB);
+}
+
+/**
+ * dm_test_fill_stream_sync_polarity_positive - Test sync polarity from mode flags
+ * @test: The KUnit test context
+ */
+static void dm_test_fill_stream_sync_polarity_positive(struct kunit *test)
+{
+	struct dm_test_fill_ctx *ctx = dm_test_fill_ctx_alloc(test);
+	struct dc_crtc_timing *timing = &ctx->stream->timing;
+
+	ctx->mode->flags = DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC;
+
+	fill_stream_properties_from_drm_display_mode(ctx->stream, ctx->mode,
+		&ctx->aconnector->base, ctx->conn_state, NULL, 8);
+
+	KUNIT_EXPECT_EQ(test, (int)timing->flags.HSYNC_POSITIVE_POLARITY, 1);
+	KUNIT_EXPECT_EQ(test, (int)timing->flags.VSYNC_POSITIVE_POLARITY, 1);
+}
+
+/**
+ * dm_test_fill_stream_sync_polarity_negative - Test negative sync polarity default
+ * @test: The KUnit test context
+ */
+static void dm_test_fill_stream_sync_polarity_negative(struct kunit *test)
+{
+	struct dm_test_fill_ctx *ctx = dm_test_fill_ctx_alloc(test);
+	struct dc_crtc_timing *timing = &ctx->stream->timing;
+
+	/* No sync flags set on the mode → polarity stays negative (0). */
+	ctx->mode->flags = 0;
+
+	fill_stream_properties_from_drm_display_mode(ctx->stream, ctx->mode,
+		&ctx->aconnector->base, ctx->conn_state, NULL, 8);
+
+	KUNIT_EXPECT_EQ(test, (int)timing->flags.HSYNC_POSITIVE_POLARITY, 0);
+	KUNIT_EXPECT_EQ(test, (int)timing->flags.VSYNC_POSITIVE_POLARITY, 0);
+}
+
+/**
+ * dm_test_fill_stream_inherits_old_stream - Test vic/polarity copied from old stream
+ * @test: The KUnit test context
+ *
+ * When an old stream is supplied its vic and sync polarities are reused instead
+ * of being derived from the mode.
+ */
+static void dm_test_fill_stream_inherits_old_stream(struct kunit *test)
+{
+	struct dm_test_fill_ctx *ctx = dm_test_fill_ctx_alloc(test);
+	struct dc_crtc_timing *timing = &ctx->stream->timing;
+	struct dc_stream_state *old_stream;
+
+	old_stream = kunit_kzalloc(test, sizeof(*old_stream), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, old_stream);
+	old_stream->timing.vic = 16;
+	old_stream->timing.flags.HSYNC_POSITIVE_POLARITY = 1;
+	old_stream->timing.flags.VSYNC_POSITIVE_POLARITY = 0;
+
+	/* Mode flags would force positive polarity if the old stream were ignored. */
+	ctx->mode->flags = DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC;
+
+	fill_stream_properties_from_drm_display_mode(ctx->stream, ctx->mode,
+		&ctx->aconnector->base, ctx->conn_state, old_stream, 8);
+
+	KUNIT_EXPECT_EQ(test, (int)timing->vic, 16);
+	KUNIT_EXPECT_EQ(test, (int)timing->flags.HSYNC_POSITIVE_POLARITY, 1);
+	KUNIT_EXPECT_EQ(test, (int)timing->flags.VSYNC_POSITIVE_POLARITY, 0);
+}
+
+/**
+ * dm_test_fill_stream_timing_from_crtc - Test timing taken from crtc_* fields
+ * @test: The KUnit test context
+ *
+ * Without a freesync video match the function uses the mode's crtc_* timing
+ * fields and scales the pixel clock to 100Hz units.
+ */
+static void dm_test_fill_stream_timing_from_crtc(struct kunit *test)
+{
+	struct dm_test_fill_ctx *ctx = dm_test_fill_ctx_alloc(test);
+	struct dc_crtc_timing *timing = &ctx->stream->timing;
+
+	ctx->mode->crtc_hdisplay = 1920;
+	ctx->mode->crtc_htotal = 2200;
+	ctx->mode->crtc_hsync_start = 2008;
+	ctx->mode->crtc_hsync_end = 2052;
+	ctx->mode->crtc_vdisplay = 1080;
+	ctx->mode->crtc_vtotal = 1125;
+	ctx->mode->crtc_vsync_start = 1084;
+	ctx->mode->crtc_vsync_end = 1089;
+	ctx->mode->crtc_clock = 148500;
+
+	fill_stream_properties_from_drm_display_mode(ctx->stream, ctx->mode,
+		&ctx->aconnector->base, ctx->conn_state, NULL, 8);
+
+	KUNIT_EXPECT_EQ(test, (int)timing->h_addressable, 1920);
+	KUNIT_EXPECT_EQ(test, (int)timing->h_total, 2200);
+	KUNIT_EXPECT_EQ(test, (int)timing->h_sync_width, 44);
+	KUNIT_EXPECT_EQ(test, (int)timing->h_front_porch, 88);
+	KUNIT_EXPECT_EQ(test, (int)timing->v_addressable, 1080);
+	KUNIT_EXPECT_EQ(test, (int)timing->v_total, 1125);
+	KUNIT_EXPECT_EQ(test, (int)timing->v_sync_width, 5);
+	KUNIT_EXPECT_EQ(test, (int)timing->v_front_porch, 4);
+	KUNIT_EXPECT_EQ(test, (int)timing->pix_clk_100hz, 1485000);
+}
+
+/**
+ * dm_test_fill_stream_color_depth_requested_bpc - Test bpc capping
+ * @test: The KUnit test context
+ *
+ * The requested bpc caps the display bpc and is rounded down to an even value.
+ */
+static void dm_test_fill_stream_color_depth_requested_bpc(struct kunit *test)
+{
+	struct dm_test_fill_ctx *ctx = dm_test_fill_ctx_alloc(test);
+	struct dc_crtc_timing *timing = &ctx->stream->timing;
+
+	ctx->aconnector->base.display_info.bpc = 12;
+
+	fill_stream_properties_from_drm_display_mode(ctx->stream, ctx->mode,
+		&ctx->aconnector->base, ctx->conn_state, NULL, 10);
+
+	KUNIT_EXPECT_EQ(test, (int)timing->display_color_depth,
+			(int)COLOR_DEPTH_101010);
+}
+
+/**
+ * dm_test_fill_stream_content_type - Test content type forwarded from state
+ * @test: The KUnit test context
+ */
+static void dm_test_fill_stream_content_type(struct kunit *test)
+{
+	struct dm_test_fill_ctx *ctx = dm_test_fill_ctx_alloc(test);
+
+	ctx->conn_state->content_type = DRM_MODE_CONTENT_TYPE_GRAPHICS;
+
+	fill_stream_properties_from_drm_display_mode(ctx->stream, ctx->mode,
+		&ctx->aconnector->base, ctx->conn_state, NULL, 8);
+
+	KUNIT_EXPECT_EQ(test, (int)ctx->stream->content_type,
+			(int)DISPLAY_CONTENT_TYPE_GRAPHICS);
+}
+
+/**
+ * dm_test_fill_stream_aspect_ratio - Test aspect ratio mapped from the mode
+ * @test: The KUnit test context
+ */
+static void dm_test_fill_stream_aspect_ratio(struct kunit *test)
+{
+	struct dm_test_fill_ctx *ctx = dm_test_fill_ctx_alloc(test);
+	struct dc_crtc_timing *timing = &ctx->stream->timing;
+
+	ctx->mode->picture_aspect_ratio = HDMI_PICTURE_ASPECT_16_9;
+
+	fill_stream_properties_from_drm_display_mode(ctx->stream, ctx->mode,
+		&ctx->aconnector->base, ctx->conn_state, NULL, 8);
+
+	KUNIT_EXPECT_EQ(test, (int)timing->aspect_ratio,
+			(int)ASPECT_RATIO_16_9);
+}
+
 static struct kunit_case amdgpu_dm_connector_tests[] = {
 	/* get_subconnector_type */
 	KUNIT_CASE(dm_test_subconnector_type_none),
@@ -3525,6 +3788,16 @@ static struct kunit_case amdgpu_dm_connector_tests[] = {
 	KUNIT_CASE(dm_test_cacp_caps_ip_3_1_6_unsupported),
 	KUNIT_CASE(dm_test_cacp_caps_non_edp_lvds_unsupported),
 	KUNIT_CASE(dm_test_cacp_caps_lcd_unsupported),
+	/* fill_stream_properties_from_drm_display_mode */
+	KUNIT_CASE(dm_test_fill_stream_borders_zeroed),
+	KUNIT_CASE(dm_test_fill_stream_rgb_defaults),
+	KUNIT_CASE(dm_test_fill_stream_sync_polarity_positive),
+	KUNIT_CASE(dm_test_fill_stream_sync_polarity_negative),
+	KUNIT_CASE(dm_test_fill_stream_inherits_old_stream),
+	KUNIT_CASE(dm_test_fill_stream_timing_from_crtc),
+	KUNIT_CASE(dm_test_fill_stream_color_depth_requested_bpc),
+	KUNIT_CASE(dm_test_fill_stream_content_type),
+	KUNIT_CASE(dm_test_fill_stream_aspect_ratio),
 	{}
 };
 

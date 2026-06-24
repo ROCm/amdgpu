@@ -876,7 +876,7 @@ STATIC_IFN_KUNIT bool adjust_colour_depth_from_display_info(
 }
 EXPORT_IF_KUNIT(adjust_colour_depth_from_display_info);
 
-static void fill_stream_properties_from_drm_display_mode(
+STATIC_IFN_KUNIT void fill_stream_properties_from_drm_display_mode(
 	struct dc_stream_state *stream,
 	const struct drm_display_mode *mode_in,
 	const struct drm_connector *connector,
@@ -992,6 +992,7 @@ static void fill_stream_properties_from_drm_display_mode(
 	stream->output_color_space = amdgpu_dm_get_output_color_space(timing_out, connector_state);
 	stream->content_type = get_output_content_type(connector_state);
 }
+EXPORT_IF_KUNIT(fill_stream_properties_from_drm_display_mode);
 
 STATIC_IFN_KUNIT void
 copy_crtc_timing_for_drm_display_mode(const struct drm_display_mode *src_mode,
