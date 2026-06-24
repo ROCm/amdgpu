@@ -106,7 +106,9 @@ STATIC_IFN_KUNIT int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 	const struct drm_display_mode *adjusted_mode = &crtc_state->adjusted_mode;
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	struct drm_dp_mst_port *mst_port;
+#if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_INT) || defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION)
 	struct drm_dp_mst_topology_state *mst_state;
+#endif
 	enum dc_color_depth color_depth;
 	int clock, bpp = 0;
 	bool is_y420 = false;
@@ -136,13 +138,16 @@ STATIC_IFN_KUNIT int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 
 	if (!crtc_state->connectors_changed && !crtc_state->mode_changed)
 		return 0;
-
+#if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_INT) || defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION)
 	mst_state = drm_atomic_get_mst_topology_state(state, mst_mgr);
 	if (IS_ERR(mst_state))
 		return PTR_ERR(mst_state);
-
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION
 	mst_state->pbn_div.full = dm_mst_get_pbn_divider(aconnector->mst_root->dc_link);
-
+#else
+	mst_state->pbn_div = dm_mst_get_pbn_divider(aconnector->mst_root->dc_link);
+#endif
+#endif
 	if (!state->duplicated) {
 		int max_bpc = conn_state->max_requested_bpc;
 
@@ -153,12 +158,16 @@ STATIC_IFN_KUNIT int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 								    max_bpc);
 		bpp = amdgpu_dm_convert_dc_color_depth_into_bpc(color_depth) * 3;
 		clock = adjusted_mode->clock;
-		dm_new_connector_state->pbn = drm_dp_calc_pbn_mode(clock, bpp << 4);
+		dm_new_connector_state->pbn = drm_dp_calc_pbn_mode(clock, bpp, false);
 	}
 
 	dm_new_connector_state->vcpi_slots =
 		drm_dp_atomic_find_time_slots(state, mst_mgr, mst_port,
-					      dm_new_connector_state->pbn);
+					      dm_new_connector_state->pbn
+#ifndef HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS
+					      , dm_mst_get_pbn_divider(aconnector->dc_link)
+#endif
+						);
 	if (dm_new_connector_state->vcpi_slots < 0) {
 		drm_dbg_atomic(connector->dev, "failed finding vcpi slots: %d\n", (int)dm_new_connector_state->vcpi_slots);
 		return dm_new_connector_state->vcpi_slots;
@@ -354,8 +363,10 @@ void amdgpu_dm_hdmi_cec_set_edid(struct amdgpu_dm_connector *aconnector)
 	if (!n)
 		return;
 
+#ifdef HAVE_DRM_DISPLAY_INFO_SOURCE_PHYSICAL_ADDRESS
 	cec_notifier_set_phys_addr(n,
 				   connector->display_info.source_physical_address);
+#endif
 }
 EXPORT_IF_KUNIT(amdgpu_dm_hdmi_cec_set_edid);
 
@@ -401,6 +412,7 @@ amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_commit *state,
 }
 EXPORT_IF_KUNIT(amdgpu_dm_find_first_crtc_matching_connector);
 
+#ifdef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
 STATIC_IFN_KUNIT void amdgpu_dm_set_panel_type(struct amdgpu_dm_connector *aconnector)
 {
 	struct drm_connector *connector = &aconnector->base;
@@ -469,6 +481,7 @@ STATIC_IFN_KUNIT void amdgpu_dm_set_panel_type(struct amdgpu_dm_connector *aconn
 	drm_dbg_kms(aconnector->base.dev, "Panel type: %d\n", link->panel_type);
 }
 EXPORT_IF_KUNIT(amdgpu_dm_set_panel_type);
+#endif
 
 STATIC_IFN_KUNIT void amdgpu_dm_update_cacp_caps(struct amdgpu_dm_connector *aconnector)
 {
@@ -544,7 +557,11 @@ void amdgpu_dm_update_connector_after_detect(
 			aconnector->dc_sink = sink;
 			dc_sink_retain(aconnector->dc_sink);
 			amdgpu_dm_update_freesync_caps(connector,
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 					aconnector->drm_edid, true);
+#else
+					aconnector->edid, true);
+#endif
 		} else {
 			amdgpu_dm_update_freesync_caps(connector, NULL, true);
 			if (!aconnector->dc_sink) {
@@ -596,22 +613,34 @@ void amdgpu_dm_update_connector_after_detect(
 
 		aconnector->dc_sink = sink;
 		dc_sink_retain(aconnector->dc_sink);
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		drm_edid_free(aconnector->drm_edid);
 		aconnector->drm_edid = NULL;
+#else
+		aconnector->edid = NULL;
+#endif
 		if (sink->dc_edid.length == 0) {
 			hdmi_cec_unset_edid(aconnector);
 			if (aconnector->dc_link->aux_mode)
 				drm_dp_cec_unset_edid(&aconnector->dm_dp_aux.aux);
 		} else {
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 			const struct edid *edid = (const struct edid *)sink->dc_edid.raw_edid;
 
 			aconnector->drm_edid = drm_edid_alloc(edid, sink->dc_edid.length);
 			drm_edid_connector_update(connector, aconnector->drm_edid);
-
+#else
+			struct edid *edid = (struct edid *)sink->dc_edid.raw_edid;
+			aconnector->edid = edid;
+#endif
 			amdgpu_dm_hdmi_cec_set_edid(aconnector);
 			if (aconnector->dc_link->aux_mode)
+#ifdef HAVE_DRM_DP_CEC_ATTACH
 				drm_dp_cec_attach(&aconnector->dm_dp_aux.aux,
 						  connector->display_info.source_physical_address);
+#else
+				drm_dp_cec_set_edid(&aconnector->dm_dp_aux.aux, edid);
+#endif
 		}
 
 		if (!aconnector->timing_requested) {
@@ -621,10 +650,15 @@ void amdgpu_dm_update_connector_after_detect(
 				drm_err(dev,
 					"failed to create aconnector->requested_timing\n");
 		}
-
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		amdgpu_dm_update_freesync_caps(connector, aconnector->drm_edid, true);
+#else
+		amdgpu_dm_update_freesync_caps(connector, aconnector->edid, true);
+#endif
 		amdgpu_dm_update_connector_ext_caps(aconnector);
+#ifdef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
 		amdgpu_dm_set_panel_type(aconnector);
+#endif
 		amdgpu_dm_update_cacp_caps(aconnector);
 
 		if (aconnector->hdmi_comp_auto) {
@@ -638,8 +672,12 @@ void amdgpu_dm_update_connector_after_detect(
 		aconnector->num_modes = 0;
 		dc_sink_release(aconnector->dc_sink);
 		aconnector->dc_sink = NULL;
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		drm_edid_free(aconnector->drm_edid);
 		aconnector->drm_edid = NULL;
+#else
+		aconnector->edid = NULL;
+#endif
 		kfree(aconnector->timing_requested);
 		aconnector->timing_requested = NULL;
 		/* Set CP to DESIRED if it was ENABLED, so we can re-enable it again on hotplug */
@@ -766,8 +804,10 @@ amdgpu_dm_get_output_color_space(const struct dc_crtc_timing *dc_crtc_timing,
 	default:
 		if (dc_crtc_timing->pixel_encoding == PIXEL_ENCODING_RGB) {
 			color_space = COLOR_SPACE_SRGB;
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDMI_BROADCAST_RGB
 			if (connector_state->hdmi.broadcast_rgb == DRM_HDMI_BROADCAST_RGB_LIMITED)
 				color_space = COLOR_SPACE_SRGB_LIMITED;
+#endif
 		/*
 		 * 27030khz is the separation point between HDTV and SDTV
 		 * according to HDMI spec, we use YCbCr709 and YCbCr601
@@ -1250,8 +1290,15 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 	u32 dsc_sink_bw_in_kbps;
 	u32 max_supported_bw_in_kbps, timing_bw_in_kbps;
 	u32 dsc_max_supported_bw_in_kbps;
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
 	u32 max_dsc_target_bpp_limit_override =
 		drm_connector->display_info.max_dsc_bpp;
+#else
+	u32 max_dsc_target_bpp_limit_override = 0;
+	if (stream->link && stream->link->local_sink)
+		max_dsc_target_bpp_limit_override =
+			stream->link->local_sink->edid_caps.panel_patch.max_dsc_target_bpp_limit;
+#endif
 	struct dc_dsc_config_options dsc_options = {0};
 
 	if (!aconnector->dc_link)
@@ -2029,9 +2076,10 @@ STATIC_IFN_KUNIT void amdgpu_dm_connector_funcs_force(struct drm_connector *conn
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 	struct dc_link *dc_link = aconnector->dc_link;
 	struct dc_sink *dc_em_sink = aconnector->dc_em_sink;
+	struct drm_device *dev = connector->dev;
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	const struct drm_edid *drm_edid;
 	struct i2c_adapter *ddc;
-	struct drm_device *dev = connector->dev;
 
 	if (dc_link && dc_link->aux_mode)
 		ddc = &aconnector->dm_dp_aux.aux.ddc;
@@ -2041,15 +2089,38 @@ STATIC_IFN_KUNIT void amdgpu_dm_connector_funcs_force(struct drm_connector *conn
 	drm_edid = drm_edid_read_ddc(connector, ddc);
 	drm_edid_connector_update(connector, drm_edid);
 	if (!drm_edid) {
+#else
+	struct edid *edid;
+	struct i2c_adapter *ddc;
+
+	if (dc_link && dc_link->aux_mode)
+		ddc = &aconnector->dm_dp_aux.aux.ddc;
+	else
+		ddc = &aconnector->i2c->base;
+
+	/*
+	 * Note: drm_get_edid gets edid in the following order:
+	 * 1) override EDID if set via edid_override debugfs,
+	 * 2) firmware EDID if set via edid_firmware module parameter
+	 * 3) regular DDC read.
+	 */
+	edid = drm_get_edid(connector, ddc);
+	if (!edid) {
+#endif
 		drm_err(dev, "No EDID found on connector: %s.\n", connector->name);
 		return;
 	}
-
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	aconnector->drm_edid = drm_edid;
 	/* Update emulated (virtual) sink's EDID */
+#else
+	aconnector->edid = edid;
+#endif
 	if (dc_em_sink && dc_link) {
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		/* FIXME: Get rid of drm_edid_raw() */
 		const struct edid *edid = drm_edid_raw(drm_edid);
+#endif
 
 		memset(&dc_em_sink->edid_caps, 0, sizeof(struct dc_edid_caps));
 		memmove(dc_em_sink->dc_edid.raw_edid, edid,
@@ -2104,7 +2175,7 @@ STATIC_IFN_KUNIT void create_eml_sink(struct amdgpu_dm_connector *aconnector)
 		drm_err(connector->dev, "No EDID found on connector: %s.\n", connector->name);
 		return;
 	}
-
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	if (connector->display_info.is_hdmi)
 		init_params.sink_signal = SIGNAL_TYPE_HDMI_TYPE_A;
 
@@ -2112,6 +2183,12 @@ STATIC_IFN_KUNIT void create_eml_sink(struct amdgpu_dm_connector *aconnector)
 
 	/* FIXME: Get rid of drm_edid_raw() */
 	edid = drm_edid_raw(drm_edid);
+#else
+	if (drm_detect_hdmi_monitor(edid))
+		init_params.sink_signal = SIGNAL_TYPE_HDMI_TYPE_A;
+
+	aconnector->edid = edid;
+#endif
 	aconnector->dc_em_sink = dc_link_add_remote_sink(
 		aconnector->dc_link,
 		(uint8_t *)edid,
@@ -2459,7 +2536,11 @@ amdgpu_dm_create_validate_stream_for_sink(struct drm_connector *connector,
 EXPORT_IF_KUNIT(amdgpu_dm_create_validate_stream_for_sink);
 
 enum drm_mode_status amdgpu_dm_connector_mode_valid(struct drm_connector *connector,
+#ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_MODE_VALID_CONST_ARGUMENT
 				   const struct drm_display_mode *mode)
+#else
+				   struct drm_display_mode *mode)
+#endif
 {
 	int result = MODE_ERROR;
 	struct dc_sink *dc_sink;
@@ -2591,15 +2672,17 @@ amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
 	trace_amdgpu_dm_connector_atomic_check(new_con_state);
 
 	if (conn->connector_type == DRM_MODE_CONNECTOR_DisplayPort) {
+#ifdef HAVE_DRM_DP_MST_ROOT_CONN_ATOMIC_CHECK
 		ret = drm_dp_mst_root_conn_atomic_check(new_con_state, &aconn->mst_mgr);
 		if (ret < 0)
 			return ret;
+#endif
 	}
 
 	crtc = new_con_state->crtc;
 	if (!crtc)
 		return 0;
-
+#ifdef HAVE_DRM_CONNECTOR_UPDATE_PRIVACY_SCREEN
 	if (new_con_state->privacy_screen_sw_state != old_con_state->privacy_screen_sw_state) {
 		new_crtc_state = drm_atomic_get_crtc_state(state, crtc);
 		if (IS_ERR(new_crtc_state))
@@ -2607,7 +2690,7 @@ amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
 
 		new_crtc_state->mode_changed = true;
 	}
-
+#endif
 	if (new_con_state->colorspace != old_con_state->colorspace) {
 		new_crtc_state = drm_atomic_get_crtc_state(state, crtc);
 		if (IS_ERR(new_crtc_state))
@@ -2727,6 +2810,7 @@ EXPORT_IF_KUNIT(to_drm_connector_type);
 
 STATIC_IFN_KUNIT struct drm_encoder *amdgpu_dm_connector_to_encoder(struct drm_connector *connector)
 {
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
 	struct drm_encoder *encoder;
 
 	/* There is only one encoder per connector */
@@ -2734,6 +2818,9 @@ STATIC_IFN_KUNIT struct drm_encoder *amdgpu_dm_connector_to_encoder(struct drm_c
 		return encoder;
 
 	return NULL;
+#else
+	return drm_encoder_find(connector->dev, NULL, connector->encoder_ids[0]);
+#endif
 }
 EXPORT_IF_KUNIT(amdgpu_dm_connector_to_encoder);
 
@@ -2932,12 +3019,19 @@ static void amdgpu_dm_prune_primary_tile_modes(struct drm_connector *connector)
 }
 
 STATIC_IFN_KUNIT void amdgpu_dm_connector_ddc_get_modes(struct drm_connector *connector,
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 					      const struct drm_edid *drm_edid)
+#else
+					      struct edid *edid)
+#endif
 {
 	struct amdgpu_dm_connector *amdgpu_dm_connector =
 			to_amdgpu_dm_connector(connector);
-
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	if (drm_edid) {
+#else
+	if (edid) {
+#endif
 		/* empty probed_modes */
 		INIT_LIST_HEAD(&connector->probed_modes);
 		amdgpu_dm_connector->num_modes =
@@ -2960,7 +3054,11 @@ STATIC_IFN_KUNIT void amdgpu_dm_connector_ddc_get_modes(struct drm_connector *co
 		 * drm_edid_connector_add_modes() and need to be
 		 * restored here.
 		 */
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		amdgpu_dm_update_freesync_caps(connector, drm_edid, false);
+#else
+		amdgpu_dm_update_freesync_caps(connector, edid, false);
+#endif
 	} else {
 		amdgpu_dm_connector->num_modes = 0;
 	}
@@ -3059,12 +3157,19 @@ STATIC_IFN_KUNIT uint add_fs_modes(struct amdgpu_dm_connector *aconnector)
 EXPORT_IF_KUNIT(add_fs_modes);
 
 STATIC_IFN_KUNIT void amdgpu_dm_connector_add_freesync_modes(struct drm_connector *connector,
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 						   const struct drm_edid *drm_edid)
+#else
+						   struct edid *edid)
+#endif
 {
 	struct amdgpu_dm_connector *amdgpu_dm_connector =
 		to_amdgpu_dm_connector(connector);
-
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	if (!(amdgpu_freesync_vid_mode && drm_edid))
+#else
+	if (!(amdgpu_freesync_vid_mode && edid))
+#endif
 		return;
 
 	if (!amdgpu_dm_connector->dc_sink || !amdgpu_dm_connector->dc_link)
@@ -3089,13 +3194,21 @@ static int amdgpu_dm_connector_get_modes(struct drm_connector *connector)
 			to_amdgpu_dm_connector(connector);
 	struct dc_link *dc_link = amdgpu_dm_connector->dc_link;
 	struct drm_encoder *encoder;
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	const struct drm_edid *drm_edid = amdgpu_dm_connector->drm_edid;
+#else
+	struct edid *edid = amdgpu_dm_connector->edid;
+#endif
 	struct dc_link_settings *verified_link_cap = &dc_link->verified_link_cap;
 	const struct dc *dc = dc_link->dc;
 
 	encoder = amdgpu_dm_connector_to_encoder(connector);
 
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	if (!drm_edid) {
+#else
+	if (!edid) {
+#endif
 		amdgpu_dm_connector->num_modes =
 				drm_add_modes_noedid(connector, 640, 480);
 		if (dc->link_srv->dp_get_encoding_format(verified_link_cap) == DP_128b_132b_ENCODING)
@@ -3113,10 +3226,18 @@ static int amdgpu_dm_connector_get_modes(struct drm_connector *connector)
 					connector, common_modes[i].w, common_modes[i].h);
 		}
 	} else {
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		amdgpu_dm_connector_ddc_get_modes(connector, drm_edid);
+#else
+		amdgpu_dm_connector_ddc_get_modes(connector, edid);
+#endif
 		if (encoder)
 			amdgpu_dm_connector_add_common_modes(encoder, connector);
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		amdgpu_dm_connector_add_freesync_modes(connector, drm_edid);
+#else
+		amdgpu_dm_connector_add_freesync_modes(connector, edid);
+#endif
 	}
 	amdgpu_dm_fbc_init(connector);
 
@@ -3249,9 +3370,11 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 				dm->ddev->mode_config.scaling_mode_property,
 				DRM_MODE_SCALE_NONE);
 
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDMI_BROADCAST_RGB
 	if (connector_type == DRM_MODE_CONNECTOR_HDMIA
 		|| (connector_type == DRM_MODE_CONNECTOR_DisplayPort && !aconnector->mst_root))
 		drm_connector_attach_broadcast_rgb_property(&aconnector->base);
+#endif
 
 	drm_object_attach_property(&aconnector->base.base,
 				adev->mode_info.underscan_property,
@@ -3298,11 +3421,12 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 		if (adev->dm.hdcp_workqueue)
 			drm_connector_attach_content_protection_property(&aconnector->base, true);
 	}
-
+#ifdef HAVE_DRM_CONNECTOR_UPDATE_PRIVACY_SCREEN
 	if (connector_type == DRM_MODE_CONNECTOR_eDP) {
 		struct drm_privacy_screen *privacy_screen;
-
+#if defined(HAVE_STRUCT_DRM_MODE_CONFIG_PANEL_TYPE_PROPERTY)
 		drm_connector_attach_panel_type_property(&aconnector->base);
+#endif
 
 		privacy_screen = drm_privacy_screen_get(adev_to_drm(adev)->dev, NULL);
 		if (!IS_ERR(privacy_screen)) {
@@ -3312,6 +3436,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 			drm_warn(adev_to_drm(adev), "Error getting privacy-screen\n");
 		}
 	}
+#endif
 }
 
 STATIC_IFN_KUNIT int amdgpu_dm_i2c_xfer(struct i2c_adapter *i2c_adap,
@@ -3725,6 +3850,7 @@ static bool parse_edid_cea(struct amdgpu_dm_connector *aconnector,
 	return ret;
 }
 
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
 STATIC_IFN_KUNIT void parse_edid_displayid_vrr(struct drm_connector *connector,
 				     const struct edid *edid)
 {
@@ -3768,7 +3894,9 @@ STATIC_IFN_KUNIT void parse_edid_displayid_vrr(struct drm_connector *connector,
 	}
 }
 EXPORT_IF_KUNIT(parse_edid_displayid_vrr);
+#endif
 
+#ifdef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
 STATIC_IFN_KUNIT int get_amd_vsdb(struct amdgpu_dm_connector *aconnector,
 			struct amdgpu_hdmi_vsdb_info *vsdb_info)
 {
@@ -3780,6 +3908,59 @@ STATIC_IFN_KUNIT int get_amd_vsdb(struct amdgpu_dm_connector *aconnector,
 	return connector->display_info.amd_vsdb.version != 0;
 }
 EXPORT_IF_KUNIT(get_amd_vsdb);
+#else
+static int parse_amd_vsdb(struct amdgpu_dm_connector *aconnector,
+			  const struct edid *edid, struct amdgpu_hdmi_vsdb_info *vsdb_info)
+{
+	u8 *edid_ext = NULL;
+	int i;
+	int j = 0;
+	int total_ext_block_len;
+
+	if (edid == NULL || edid->extensions == 0)
+		return -ENODEV;
+
+	/* Find DisplayID extension */
+	for (i = 0; i < edid->extensions; i++) {
+		edid_ext = (void *)(edid + (i + 1));
+		if (edid_ext[0] == DISPLAYID_EXT)
+			break;
+	}
+
+	total_ext_block_len = EDID_LENGTH * edid->extensions;
+	while (j < total_ext_block_len - sizeof(struct amd_vsdb_block)) {
+		struct amd_vsdb_block *amd_vsdb = (struct amd_vsdb_block *)&edid_ext[j];
+		unsigned int ieeeId = (amd_vsdb->ieee_id[2] << 16) | (amd_vsdb->ieee_id[1] << 8) | (amd_vsdb->ieee_id[0]);
+
+		if (ieeeId == HDMI_AMD_VENDOR_SPECIFIC_DATA_BLOCK_IEEE_REGISTRATION_ID &&
+				amd_vsdb->version == HDMI_AMD_VENDOR_SPECIFIC_DATA_BLOCK_VERSION_3) {
+			u8 panel_type;
+			vsdb_info->replay_mode = (amd_vsdb->feature_caps & AMD_VSDB_VERSION_3_FEATURECAP_REPLAYMODE) ? true : false;
+			vsdb_info->amd_vsdb_version = HDMI_AMD_VENDOR_SPECIFIC_DATA_BLOCK_VERSION_3;
+			drm_dbg_kms(aconnector->base.dev, "Panel supports Replay Mode: %d\n", vsdb_info->replay_mode);
+			panel_type = (amd_vsdb->color_space_eotf_support & AMD_VDSB_VERSION_3_PANEL_TYPE_MASK) >> AMD_VDSB_VERSION_3_PANEL_TYPE_SHIFT;
+			switch (panel_type) {
+			case AMD_VSDB_PANEL_TYPE_OLED:
+				aconnector->dc_link->panel_type = PANEL_TYPE_OLED;
+				break;
+			case AMD_VSDB_PANEL_TYPE_MINILED:
+				aconnector->dc_link->panel_type = PANEL_TYPE_MINILED;
+				break;
+			default:
+				aconnector->dc_link->panel_type = PANEL_TYPE_NONE;
+				break;
+			}
+			drm_dbg_kms(aconnector->base.dev, "Panel type: %d\n",
+				    aconnector->dc_link->panel_type);
+
+			return true;
+		}
+		j++;
+	}
+
+	return false;
+}
+#endif
 
 STATIC_IFN_KUNIT int parse_hdmi_amd_vsdb(struct amdgpu_dm_connector *aconnector,
 			       const struct edid *edid,
@@ -3830,7 +4011,11 @@ EXPORT_IF_KUNIT(parse_hdmi_amd_vsdb);
  * FreeSync parameters.
  */
 void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 				    const struct drm_edid *drm_edid, bool do_mccs)
+#else
+				    struct edid *edid, bool do_mccs)
+#endif
 {
 	int i = 0;
 	struct amdgpu_dm_connector *amdgpu_dm_connector =
@@ -3839,7 +4024,9 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 	struct dc_sink *sink;
 	struct amdgpu_device *adev = drm_to_adev(connector->dev);
 	struct amdgpu_hdmi_vsdb_info vsdb_info = {0};
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	const struct edid *edid;
+#endif
 	bool freesync_capable = false;
 	enum adaptive_sync_type as_type = ADAPTIVE_SYNC_TYPE_NONE;
 
@@ -3852,9 +4039,15 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 		amdgpu_dm_connector->dc_sink :
 		amdgpu_dm_connector->dc_em_sink;
 
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	drm_edid_connector_update(connector, drm_edid);
 
 	if (!drm_edid || !sink) {
+#else
+	drm_connector_update_edid_property(connector, edid);
+
+	if (!edid || !sink) {
+#endif
 		dm_con_state = to_dm_connector_state(connector->state);
 
 		amdgpu_dm_connector->min_vfreq = 0;
@@ -3869,16 +4062,21 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 	if (!adev->dm.freesync_module || !dc_supports_vrr(sink->ctx->dce_version))
 		goto update;
 
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	/* FIXME: Get rid of drm_edid_raw() */
 	edid = drm_edid_raw(drm_edid);
+#endif
 
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
 	/* Some eDP panels only have the refresh rate range info in DisplayID */
 	if ((connector->display_info.monitor_range.min_vfreq == 0 ||
 	     connector->display_info.monitor_range.max_vfreq == 0))
 		parse_edid_displayid_vrr(connector, edid);
+#endif
 
 	if (edid && (sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT ||
 		     sink->sink_signal == SIGNAL_TYPE_EDP)) {
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
 		if (amdgpu_dm_connector->dc_link &&
 		    amdgpu_dm_connector->dc_link->dpcd_caps.allow_invalid_MSA_timing_param) {
 			amdgpu_dm_connector->min_vfreq = connector->display_info.monitor_range.min_vfreq;
@@ -3886,16 +4084,23 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 			if (amdgpu_dm_connector->max_vfreq - amdgpu_dm_connector->min_vfreq > 10)
 				freesync_capable = true;
 		}
-
+#endif
+#ifdef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
 		get_amd_vsdb(amdgpu_dm_connector, &vsdb_info);
+#else
+		parse_amd_vsdb(amdgpu_dm_connector, edid, &vsdb_info);
+#endif
 
 		if (vsdb_info.replay_mode) {
 			amdgpu_dm_connector->vsdb_info.replay_mode = vsdb_info.replay_mode;
 			amdgpu_dm_connector->vsdb_info.amd_vsdb_version = vsdb_info.amd_vsdb_version;
 			amdgpu_dm_connector->as_type = ADAPTIVE_SYNC_TYPE_EDP;
 		}
-
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	} else if (drm_edid && sink->sink_signal == SIGNAL_TYPE_HDMI_TYPE_A) {
+#else
+	} else if (edid && sink->sink_signal == SIGNAL_TYPE_HDMI_TYPE_A) {
+#endif
 		i = parse_hdmi_amd_vsdb(amdgpu_dm_connector, edid, &vsdb_info);
 		if (i >= 0) {
 			amdgpu_dm_connector->vsdb_info = vsdb_info;
@@ -3906,9 +4111,10 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 				amdgpu_dm_connector->max_vfreq = vsdb_info.max_refresh_rate_hz;
 				if (amdgpu_dm_connector->max_vfreq - amdgpu_dm_connector->min_vfreq > 10)
 					freesync_capable = true;
-
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
 				connector->display_info.monitor_range.min_vfreq = vsdb_info.min_refresh_rate_hz;
 				connector->display_info.monitor_range.max_vfreq = vsdb_info.max_refresh_rate_hz;
+#endif
 			}
 		}
 	}
@@ -3930,9 +4136,10 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 				amdgpu_dm_connector->max_vfreq = vsdb_info.max_refresh_rate_hz;
 				if (amdgpu_dm_connector->max_vfreq - amdgpu_dm_connector->min_vfreq > 10)
 					freesync_capable = true;
-
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
 				connector->display_info.monitor_range.min_vfreq = vsdb_info.min_refresh_rate_hz;
 				connector->display_info.monitor_range.max_vfreq = vsdb_info.max_refresh_rate_hz;
+#endif
 			}
 		}
 	}
@@ -3945,8 +4152,10 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 	if (sink->edid_caps.panel_patch.force_freesync_min_hz && freesync_capable) {
 		amdgpu_dm_connector->min_vfreq =
 			sink->edid_caps.panel_patch.force_freesync_min_hz;
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
 		connector->display_info.monitor_range.min_vfreq =
 			amdgpu_dm_connector->min_vfreq;
+#endif
 	}
 
 	/* Handle MCCS */
