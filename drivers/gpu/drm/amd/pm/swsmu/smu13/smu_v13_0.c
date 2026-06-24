@@ -1320,15 +1320,6 @@ int smu_v13_0_get_max_sustainable_clocks_by_dc(struct smu_context *smu,
 	return 0;
 }
 
-int smu_v13_0_set_azalia_d3_pme(struct smu_context *smu)
-{
-	int ret = 0;
-
-	ret = smu_cmn_send_smc_msg(smu, SMU_MSG_BacoAudioD3PME, NULL);
-
-	return ret;
-}
-
 static int smu_v13_0_wait_for_reset_complete(struct smu_context *smu,
 					     uint64_t event_arg)
 {

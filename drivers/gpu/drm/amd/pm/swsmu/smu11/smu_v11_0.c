@@ -1417,11 +1417,6 @@ int smu_v11_0_get_max_sustainable_clocks_by_dc(struct smu_context *smu,
 	return 0;
 }
 
-int smu_v11_0_set_azalia_d3_pme(struct smu_context *smu)
-{
-	return smu_cmn_send_smc_msg(smu, SMU_MSG_BacoAudioD3PME, NULL);
-}
-
 int smu_v11_0_baco_set_armd3_sequence(struct smu_context *smu,
 				      enum smu_baco_seq baco_seq)
 {

@@ -3145,7 +3145,6 @@ static const struct pptable_funcs sienna_cichlid_ppt_funcs = {
 	.set_xgmi_pstate = smu_v11_0_set_xgmi_pstate,
 	.gfx_off_control = smu_v11_0_gfx_off_control,
 	.register_irq_handler = smu_v11_0_register_irq_handler,
-	.set_azalia_d3_pme = smu_v11_0_set_azalia_d3_pme,
 	.get_max_sustainable_clocks_by_dc = smu_v11_0_get_max_sustainable_clocks_by_dc,
 	.get_bamaco_support = smu_v11_0_get_bamaco_support,
 	.baco_enter = sienna_cichlid_baco_enter,
