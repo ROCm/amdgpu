@@ -406,6 +406,7 @@ amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_commit *state,
 
 	return NULL;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_find_first_crtc_matching_connector);
 
 #ifdef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
 STATIC_IFN_KUNIT void amdgpu_dm_set_panel_type(struct amdgpu_dm_connector *aconnector)

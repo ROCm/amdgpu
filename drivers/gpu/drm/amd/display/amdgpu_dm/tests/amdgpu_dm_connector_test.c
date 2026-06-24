@@ -6,10 +6,14 @@
  */
 
 #include <kunit/test.h>
+#include <drm/drm_atomic.h>
 #include <drm/drm_atomic_state_helper.h>
 #include <drm/drm_connector.h>
+#include <drm/drm_crtc.h>
 #include <drm/drm_edid.h>
 #include <drm/drm_kunit_helpers.h>
+#include <drm/drm_mode_object.h>
+#include <drm/drm_property.h>
 #include <linux/hdmi.h>
 
 #include "dc.h"
@@ -2896,6 +2900,305 @@ static void dm_test_detect_mst_branch_without_aux(struct kunit *test)
 		amdgpu_dm_detect_mst_link_for_all_connectors(drm), 0);
 }
 
+/* Tests for amdgpu_dm_find_first_crtc_matching_connector() */
+
+/*
+ * Build a minimal drm_atomic_state holding @count connector slots. The
+ * function under test only reads num_connector, connectors[i].ptr and
+ * connectors[i].new_state, so a hand-rolled state is sufficient.
+ */
+static struct drm_atomic_state *
+dm_test_alloc_atomic_state(struct kunit *test, int count)
+{
+	struct drm_atomic_state *state;
+
+	state = kunit_kzalloc(test, sizeof(*state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, state);
+
+	state->num_connector = count;
+	if (count) {
+		state->connectors = kunit_kcalloc(test, count,
+						  sizeof(*state->connectors),
+						  GFP_KERNEL);
+		KUNIT_ASSERT_NOT_NULL(test, state->connectors);
+	}
+
+	return state;
+}
+
+/**
+ * dm_test_find_first_crtc_match - Test find_first_crtc returns matching connector
+ * @test: The KUnit test context
+ */
+static void dm_test_find_first_crtc_match(struct kunit *test)
+{
+	struct drm_atomic_state *state = dm_test_alloc_atomic_state(test, 1);
+	struct drm_connector *connector;
+	struct drm_connector_state *con_state;
+	struct drm_crtc *crtc;
+
+	connector = kunit_kzalloc(test, sizeof(*connector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, connector);
+	con_state = kunit_kzalloc(test, sizeof(*con_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, con_state);
+	crtc = kunit_kzalloc(test, sizeof(*crtc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, crtc);
+
+	con_state->crtc = crtc;
+	state->connectors[0].ptr = connector;
+	state->connectors[0].new_state = con_state;
+
+	KUNIT_EXPECT_PTR_EQ(test,
+		amdgpu_dm_find_first_crtc_matching_connector(state, crtc),
+		connector);
+}
+
+/**
+ * dm_test_find_first_crtc_no_match - Test find_first_crtc returns NULL when no crtc matches
+ * @test: The KUnit test context
+ */
+static void dm_test_find_first_crtc_no_match(struct kunit *test)
+{
+	struct drm_atomic_state *state = dm_test_alloc_atomic_state(test, 1);
+	struct drm_connector *connector;
+	struct drm_connector_state *con_state;
+	struct drm_crtc *crtc;
+	struct drm_crtc *other_crtc;
+
+	connector = kunit_kzalloc(test, sizeof(*connector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, connector);
+	con_state = kunit_kzalloc(test, sizeof(*con_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, con_state);
+	crtc = kunit_kzalloc(test, sizeof(*crtc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, crtc);
+	other_crtc = kunit_kzalloc(test, sizeof(*other_crtc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, other_crtc);
+
+	con_state->crtc = other_crtc;
+	state->connectors[0].ptr = connector;
+	state->connectors[0].new_state = con_state;
+
+	KUNIT_EXPECT_NULL(test,
+		amdgpu_dm_find_first_crtc_matching_connector(state, crtc));
+}
+
+/**
+ * dm_test_find_first_crtc_empty_state - Test find_first_crtc returns NULL with no connectors
+ * @test: The KUnit test context
+ */
+static void dm_test_find_first_crtc_empty_state(struct kunit *test)
+{
+	struct drm_atomic_state *state = dm_test_alloc_atomic_state(test, 0);
+	struct drm_crtc *crtc;
+
+	crtc = kunit_kzalloc(test, sizeof(*crtc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, crtc);
+
+	KUNIT_EXPECT_NULL(test,
+		amdgpu_dm_find_first_crtc_matching_connector(state, crtc));
+}
+
+/**
+ * dm_test_find_first_crtc_skips_null_ptr - Test find_first_crtc skips empty connector slots
+ * @test: The KUnit test context
+ */
+static void dm_test_find_first_crtc_skips_null_ptr(struct kunit *test)
+{
+	struct drm_atomic_state *state = dm_test_alloc_atomic_state(test, 2);
+	struct drm_connector *connector;
+	struct drm_connector_state *con_state;
+	struct drm_crtc *crtc;
+
+	connector = kunit_kzalloc(test, sizeof(*connector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, connector);
+	con_state = kunit_kzalloc(test, sizeof(*con_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, con_state);
+	crtc = kunit_kzalloc(test, sizeof(*crtc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, crtc);
+
+	/* Slot 0 has no connector (ptr == NULL) and must be skipped. */
+	con_state->crtc = crtc;
+	state->connectors[1].ptr = connector;
+	state->connectors[1].new_state = con_state;
+
+	KUNIT_EXPECT_PTR_EQ(test,
+		amdgpu_dm_find_first_crtc_matching_connector(state, crtc),
+		connector);
+}
+
+/**
+ * dm_test_find_first_crtc_returns_first - Test find_first_crtc returns the first match
+ * @test: The KUnit test context
+ */
+static void dm_test_find_first_crtc_returns_first(struct kunit *test)
+{
+	struct drm_atomic_state *state = dm_test_alloc_atomic_state(test, 2);
+	struct drm_connector *first;
+	struct drm_connector *second;
+	struct drm_connector_state *first_state;
+	struct drm_connector_state *second_state;
+	struct drm_crtc *crtc;
+
+	first = kunit_kzalloc(test, sizeof(*first), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, first);
+	second = kunit_kzalloc(test, sizeof(*second), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, second);
+	first_state = kunit_kzalloc(test, sizeof(*first_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, first_state);
+	second_state = kunit_kzalloc(test, sizeof(*second_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, second_state);
+	crtc = kunit_kzalloc(test, sizeof(*crtc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, crtc);
+
+	/* Both connectors target the same crtc; the first one must win. */
+	first_state->crtc = crtc;
+	second_state->crtc = crtc;
+	state->connectors[0].ptr = first;
+	state->connectors[0].new_state = first_state;
+	state->connectors[1].ptr = second;
+	state->connectors[1].new_state = second_state;
+
+	KUNIT_EXPECT_PTR_EQ(test,
+		amdgpu_dm_find_first_crtc_matching_connector(state, crtc),
+		first);
+}
+
+/* Tests for amdgpu_dm_set_panel_type() */
+
+/*
+ * Build an amdgpu_dm_connector registered against a real kunit drm_device that
+ * is embedded in an amdgpu_device, so drm_to_adev()/adev_to_drm() resolve and
+ * the panel_type property can be created, attached and updated for real.
+ */
+struct dm_test_panel_ctx {
+	struct amdgpu_device *adev;
+	struct drm_device *drm;
+	struct amdgpu_dm_connector *aconnector;
+	struct dc_link *link;
+	struct drm_display_info *display_info;
+};
+
+static struct dm_test_panel_ctx *dm_test_panel_ctx_alloc(struct kunit *test)
+{
+	struct dm_test_panel_ctx *ctx;
+	struct drm_property *prop;
+	struct device *dev;
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	dev = drm_kunit_helper_alloc_device(test);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
+
+	ctx->drm = __drm_kunit_helper_alloc_drm_device(test, dev,
+						       sizeof(*ctx->adev),
+						       offsetof(struct amdgpu_device, ddev),
+						       DRIVER_MODESET);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, ctx->drm);
+	ctx->adev = drm_to_adev(ctx->drm);
+
+	/* The function under test writes through this property. */
+	prop = drm_property_create_range(ctx->drm, DRM_MODE_PROP_IMMUTABLE,
+					 "panel_type", 0, 0xff);
+	KUNIT_ASSERT_NOT_NULL(test, prop);
+	ctx->drm->mode_config.panel_type_property = prop;
+
+	ctx->aconnector = kunit_kzalloc(test, sizeof(*ctx->aconnector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->aconnector);
+	KUNIT_ASSERT_EQ(test,
+		drmm_connector_init(ctx->drm, &ctx->aconnector->base,
+				    &dm_test_connector_funcs,
+				    DRM_MODE_CONNECTOR_eDP, NULL), 0);
+	drm_object_attach_property(&ctx->aconnector->base.base, prop,
+				   DRM_MODE_PANEL_TYPE_UNKNOWN);
+
+	ctx->link = kunit_kzalloc(test, sizeof(*ctx->link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx->link);
+	ctx->aconnector->dc_link = ctx->link;
+
+	ctx->display_info = &ctx->aconnector->base.display_info;
+
+	return ctx;
+}
+
+static uint64_t dm_test_panel_prop_value(struct kunit *test,
+					 struct dm_test_panel_ctx *ctx)
+{
+	uint64_t val = ~0ULL;
+
+	KUNIT_EXPECT_EQ(test,
+		drm_object_property_get_value(&ctx->aconnector->base.base,
+			ctx->drm->mode_config.panel_type_property, &val), 0);
+	return val;
+}
+
+/**
+ * dm_test_set_panel_type_samsung_miniled - Test Samsung luminance heuristic
+ * @test: The KUnit test context
+ *
+ * When no VSDB or DPCD hint is present, a Samsung sink whose first luminance
+ * range is at least 1.5x the second is treated as mini-LED.
+ */
+static void dm_test_set_panel_type_samsung_miniled(struct kunit *test)
+{
+	struct dm_test_panel_ctx *ctx = dm_test_panel_ctx_alloc(test);
+	struct dc_sink *sink;
+
+	sink = kunit_kzalloc(test, sizeof(*sink), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, sink);
+	sink->edid_caps.manufacturer_id = DDC_MANUFACTURERNAME_SAMSUNG;
+	ctx->link->local_sink = sink;
+
+	ctx->display_info->amd_vsdb.version = 1;
+	ctx->display_info->amd_vsdb.luminance_range1.max_luminance = 1500;
+	ctx->display_info->amd_vsdb.luminance_range2.max_luminance = 1000;
+
+	amdgpu_dm_set_panel_type(ctx->aconnector);
+
+	KUNIT_EXPECT_EQ(test, (int)ctx->link->panel_type, (int)PANEL_TYPE_MINILED);
+}
+
+/**
+ * dm_test_set_panel_type_samsung_below_threshold - Test Samsung sink below the
+ * mini-LED luminance threshold falls back to LCD
+ * @test: The KUnit test context
+ */
+static void dm_test_set_panel_type_samsung_below_threshold(struct kunit *test)
+{
+	struct dm_test_panel_ctx *ctx = dm_test_panel_ctx_alloc(test);
+	struct dc_sink *sink;
+
+	sink = kunit_kzalloc(test, sizeof(*sink), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, sink);
+	sink->edid_caps.manufacturer_id = DDC_MANUFACTURERNAME_SAMSUNG;
+	ctx->link->local_sink = sink;
+
+	ctx->display_info->amd_vsdb.version = 1;
+	ctx->display_info->amd_vsdb.luminance_range1.max_luminance = 1000;
+	ctx->display_info->amd_vsdb.luminance_range2.max_luminance = 1000;
+
+	amdgpu_dm_set_panel_type(ctx->aconnector);
+
+	KUNIT_EXPECT_EQ(test, (int)ctx->link->panel_type, (int)PANEL_TYPE_LCD);
+}
+
+/**
+ * dm_test_set_panel_type_default_lcd - Test default fallback is LCD
+ * @test: The KUnit test context
+ *
+ * With no VSDB, DPCD or DID hints the panel type defaults to LCD.
+ */
+static void dm_test_set_panel_type_default_lcd(struct kunit *test)
+{
+	struct dm_test_panel_ctx *ctx = dm_test_panel_ctx_alloc(test);
+
+	amdgpu_dm_set_panel_type(ctx->aconnector);
+
+	KUNIT_EXPECT_EQ(test, (int)ctx->link->panel_type, (int)PANEL_TYPE_LCD);
+	KUNIT_EXPECT_EQ(test, dm_test_panel_prop_value(test, ctx),
+			(uint64_t)DRM_MODE_PANEL_TYPE_LCD);
+}
+
 static struct kunit_case amdgpu_dm_connector_tests[] = {
 	/* get_subconnector_type */
 	KUNIT_CASE(dm_test_subconnector_type_none),
@@ -3063,6 +3366,16 @@ static struct kunit_case amdgpu_dm_connector_tests[] = {
 	KUNIT_CASE(dm_test_detect_mst_skips_writeback),
 	KUNIT_CASE(dm_test_detect_mst_non_mst_link),
 	KUNIT_CASE(dm_test_detect_mst_branch_without_aux),
+	/* amdgpu_dm_find_first_crtc_matching_connector */
+	KUNIT_CASE(dm_test_find_first_crtc_match),
+	KUNIT_CASE(dm_test_find_first_crtc_no_match),
+	KUNIT_CASE(dm_test_find_first_crtc_empty_state),
+	KUNIT_CASE(dm_test_find_first_crtc_skips_null_ptr),
+	KUNIT_CASE(dm_test_find_first_crtc_returns_first),
+	/* amdgpu_dm_set_panel_type */
+	KUNIT_CASE(dm_test_set_panel_type_samsung_miniled),
+	KUNIT_CASE(dm_test_set_panel_type_samsung_below_threshold),
+	KUNIT_CASE(dm_test_set_panel_type_default_lcd),
 	{}
 };
 
