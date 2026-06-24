@@ -482,28 +482,6 @@ static u32 amdgpu_ring_mask_from_ip(const enum amd_ip_block_type ip_type)
 }
 
 /**
- * amdgpu_filter_rings() - Filter rings according to a mask.
- *
- * @adev: amdgpu_device pointer
- * @ring_type_mask: Mask of ring types you are looking for
- * @out_rings: Array of rings which is going to be filled
- * @out_num_rings: Number of rings which were filtered
- */
-static void amdgpu_filter_rings(struct amdgpu_device *adev, const u32 ring_type_mask,
-				struct amdgpu_ring **out_rings, u32 *out_num_rings)
-{
-	u32 num_rings = 0;
-	int i;
-
-	for (i = 0; i < adev->num_rings; ++i) {
-		if (BIT(adev->rings[i]->funcs->type) & ring_type_mask)
-			out_rings[num_rings++] = adev->rings[i];
-	}
-
-	*out_num_rings = num_rings;
-}
-
-/**
  * amdgpu_device_ip_soft_reset() - Perform a graceful soft reset on an IP block.
  *
  * @guilty_ring: The ring which is guilty of causing a reset.
@@ -524,10 +502,9 @@ int amdgpu_device_ip_soft_reset(struct amdgpu_ring *guilty_ring,
 				struct amdgpu_fence *guilty_fence)
 {
 	struct amdgpu_device *adev = guilty_ring->adev;
-	struct amdgpu_ring *rings[AMDGPU_MAX_RINGS];
 	struct amdgpu_ip_block *ip_block;
 	enum amd_ip_block_type ip_type;
-	u32 num_rings, ring_type_mask;
+	u32 ring_type_mask;
 	int r;
 
 	ip_type = amdgpu_ip_from_ring(guilty_ring->funcs->type);
@@ -543,14 +520,13 @@ int amdgpu_device_ip_soft_reset(struct amdgpu_ring *guilty_ring,
 		ip_block->version->funcs->name);
 
 	ring_type_mask = amdgpu_ring_mask_from_ip(ip_type);
-	amdgpu_filter_rings(adev, ring_type_mask, rings, &num_rings);
 
 	amdgpu_device_lock_reset_domain(adev->reset_domain);
-	amdgpu_multi_ring_reset_helper_begin(rings, num_rings, guilty_ring, guilty_fence);
+	amdgpu_multi_ring_reset_helper_begin(ring_type_mask, guilty_ring, guilty_fence);
 
 	r = ip_block->version->funcs->soft_reset(ip_block);
 
-	r = amdgpu_multi_ring_reset_helper_end(rings, num_rings, guilty_ring, r);
+	r = amdgpu_multi_ring_reset_helper_end(ring_type_mask, guilty_ring, r);
 	amdgpu_device_unlock_reset_domain(adev->reset_domain);
 
 	if (r) {

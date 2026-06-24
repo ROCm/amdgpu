@@ -936,8 +936,7 @@ int amdgpu_ring_reset_helper_end(struct amdgpu_ring *ring,
 /**
  * amdgpu_multi_ring_reset_helper_begin() - Prepare multiple rings for a reset.
  *
- * @rings: Pointer to an array of amdgpu rings that are affected.
- * @num_rings: Number of rings in the array.
+ * @ring_type_mask: Bitmask of affected ring types
  * @guilty_ring: The ring which is guilty of causing a reset.
  * @guilty_fence: The fence which didn't signal on the guilty ring.
  *
@@ -956,7 +955,7 @@ int amdgpu_ring_reset_helper_end(struct amdgpu_ring *ring,
  * After the reset is complete, the caller should then call
  * amdgpu_multi_ring_reset_helper_end() to restore the rings.
  */
-void amdgpu_multi_ring_reset_helper_begin(struct amdgpu_ring **rings, u32 num_rings,
+void amdgpu_multi_ring_reset_helper_begin(const u32 ring_type_mask,
 					  struct amdgpu_ring *guilty_ring,
 					  struct amdgpu_fence *guilty_fence)
 {
@@ -967,8 +966,11 @@ void amdgpu_multi_ring_reset_helper_begin(struct amdgpu_ring **rings, u32 num_ri
 	int i;
 	u32 t;
 
-	for (i = 0; i < num_rings; ++i) {
-		ring = rings[i];
+	for (i = 0; i < adev->num_rings; ++i) {
+		ring = adev->rings[i];
+
+		if (!(BIT(ring->funcs->type) & ring_type_mask))
+			continue;
 
 		/* Don't accept new submissions on the ring. */
 		if (amdgpu_ring_sched_ready(ring) && !drm_sched_is_stopped(&ring->sched))
@@ -1001,8 +1003,11 @@ void amdgpu_multi_ring_reset_helper_begin(struct amdgpu_ring **rings, u32 num_ri
 		rings_busy = false;
 
 		/* Check if any of the non-guilty rings are busy */
-		for (i = 0; i < num_rings; ++i) {
-			ring = rings[i];
+		for (i = 0; i < adev->num_rings; ++i) {
+			ring = adev->rings[i];
+
+			if (!(BIT(ring->funcs->type) & ring_type_mask))
+				continue;
 
 			if (ring == guilty_ring)
 				continue;
@@ -1018,8 +1023,11 @@ void amdgpu_multi_ring_reset_helper_begin(struct amdgpu_ring **rings, u32 num_ri
 		mdelay(10);
 	}
 
-	for (i = 0; i < num_rings; ++i) {
-		ring = rings[i];
+	for (i = 0; i < adev->num_rings; ++i) {
+		ring = adev->rings[i];
+
+		if (!(BIT(ring->funcs->type) & ring_type_mask))
+			continue;
 
 		/*
 		 * Find guilty fences, ie. the fences that didn't signal
@@ -1043,8 +1051,7 @@ void amdgpu_multi_ring_reset_helper_begin(struct amdgpu_ring **rings, u32 num_ri
 /**
  * amdgpu_multi_ring_reset_helper_end() - Prepare multiple rings for a reset.
  *
- * @rings: Pointer to an array of amdgpu rings that are affected.
- * @num_rings: Number of rings in the array.
+ * @ring_type_mask: Bitmask of affected ring types
  * @guilty_ring: The ring which is guilty of causing a reset.
  * @ret: Return code from the reset function.
  *
@@ -1056,7 +1063,7 @@ void amdgpu_multi_ring_reset_helper_begin(struct amdgpu_ring **rings, u32 num_ri
  * be called to restore some state, but it won't attempt to
  * fully restore the ring contents.
  */
-int amdgpu_multi_ring_reset_helper_end(struct amdgpu_ring **rings, u32 num_rings,
+int amdgpu_multi_ring_reset_helper_end(const u32 ring_type_mask,
 				       struct amdgpu_ring *guilty_ring, int ret)
 {
 	struct amdgpu_device *adev = guilty_ring->adev;
@@ -1064,8 +1071,11 @@ int amdgpu_multi_ring_reset_helper_end(struct amdgpu_ring **rings, u32 num_rings
 	int i, r;
 
 	/* Set preempt condition, rings are now allowed to execute submissions */
-	for (i = 0; i < num_rings; ++i) {
-		ring = rings[i];
+	for (i = 0; i < adev->num_rings; ++i) {
+		ring = adev->rings[i];
+
+		if (!(BIT(ring->funcs->type) & ring_type_mask))
+			continue;
 
 		if (ring->funcs->init_cond_exec)
 			amdgpu_ring_set_preempt_cond_exec(ring, true);
@@ -1079,9 +1089,13 @@ int amdgpu_multi_ring_reset_helper_end(struct amdgpu_ring **rings, u32 num_rings
 		return ret;
 
 	/* Restore contents of all rings */
-	for (i = 0; i < num_rings; ++i) {
-		ring = rings[i];
+	for (i = 0; i < adev->num_rings; ++i) {
+		ring = adev->rings[i];
 
+		if (!(BIT(ring->funcs->type) & ring_type_mask))
+			continue;
+
+		/* Restore contents of the ring */
 		r = amdgpu_ring_reset_helper_end(ring, ring->guilty_fence);
 		if (r) {
 			dev_err(adev->dev,
@@ -1092,8 +1106,11 @@ int amdgpu_multi_ring_reset_helper_end(struct amdgpu_ring **rings, u32 num_rings
 	}
 
 	/* Accept submissions on all rings again */
-	for (i = 0; i < num_rings; ++i) {
-		ring = rings[i];
+	for (i = 0; i < adev->num_rings; ++i) {
+		ring = adev->rings[i];
+
+		if (!(BIT(ring->funcs->type) & ring_type_mask))
+			continue;
 
 		if (!amdgpu_ring_sched_ready(ring))
 			continue;
