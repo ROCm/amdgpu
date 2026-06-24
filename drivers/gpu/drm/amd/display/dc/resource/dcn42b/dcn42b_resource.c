@@ -134,6 +134,19 @@
 #define regHUBP3_HUBPREQ_DEBUG                0x088d
 #define regHUBP3_HUBPREQ_DEBUG_BASE_IDX       2
 
+#define regDP_SYM32_ENC0_DP_SYM32_ENC_VID_CRC_CONTROL                                                   0x3687
+#define regDP_SYM32_ENC0_DP_SYM32_ENC_VID_CRC_CONTROL_BASE_IDX                                          2
+#define regDP_SYM32_ENC1_DP_SYM32_ENC_VID_CRC_CONTROL                                                   0x375b
+#define regDP_SYM32_ENC1_DP_SYM32_ENC_VID_CRC_CONTROL_BASE_IDX                                          2
+#define regDP_SYM32_ENC2_DP_SYM32_ENC_VID_CRC_CONTROL                                                   0x382f
+#define regDP_SYM32_ENC2_DP_SYM32_ENC_VID_CRC_CONTROL_BASE_IDX                                          2
+#define regDP_SYM32_ENC0_DP_SYM32_ENC_HBLANK_CONTROL                                                    0x366b
+#define regDP_SYM32_ENC0_DP_SYM32_ENC_HBLANK_CONTROL_BASE_IDX                                           2
+#define regDP_SYM32_ENC1_DP_SYM32_ENC_HBLANK_CONTROL                                                    0x373f
+#define regDP_SYM32_ENC1_DP_SYM32_ENC_HBLANK_CONTROL_BASE_IDX                                           2
+#define regDP_SYM32_ENC2_DP_SYM32_ENC_HBLANK_CONTROL                                                    0x3813
+#define regDP_SYM32_ENC2_DP_SYM32_ENC_HBLANK_CONTROL_BASE_IDX                                           2
+
 enum dcn401_clk_src_array_id {
 	DCN401_CLK_SRC_PLL0,
 	DCN401_CLK_SRC_PLL1,
@@ -351,7 +364,7 @@ static const struct dcn10_link_enc_mask le_mask = {
 	LINK_ENCODER_MASK_SH_LIST_DCN42B(_MASK)};
 
 #define hpo_dp_stream_encoder_reg_init(id) \
-	DCN42B_HPO_DP_STREAM_ENC_REG_LIST_RI(id)
+	DCN42_HPO_DP_STREAM_ENC_REG_LIST_RI(id)
 
 static struct dcn31_hpo_dp_stream_encoder_registers hpo_dp_stream_enc_regs[4];
 
