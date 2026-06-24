@@ -3887,6 +3887,7 @@ int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev)
 		break;
 	case IP_VERSION(4, 15, 0):
 	case IP_VERSION(4, 15, 1):
+	case IP_VERSION(5, 0, 2):
 		adev->df.funcs = &df_v4_15_funcs;
 		break;
 	default:
