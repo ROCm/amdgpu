@@ -561,7 +561,6 @@ struct amdgpu_gfx {
 struct amdgpu_gfx_deferred_entry {
 	struct amdgpu_ring	*ring;
 	struct amdgpu_fence	*fence;
-	bool			reinit;
 };
 
 struct amdgpu_gfx_ras_reg_entry {
