@@ -1746,6 +1746,282 @@ static void dm_test_dp_write_hblank_reduction_false(struct kunit *test)
 	KUNIT_EXPECT_FALSE(test, dm_helpers_dp_write_hblank_reduction(NULL, NULL));
 }
 
+/* Tests for get_dsc_max_slices() */
+
+/**
+ * dm_test_get_dsc_max_slices_1_340 - Test 1 slice at 340 MHz
+ * @test: The KUnit test context
+ */
+static void dm_test_get_dsc_max_slices_1_340(struct kunit *test)
+{
+	KUNIT_EXPECT_EQ(test, get_dsc_max_slices(1, 340), 1);
+}
+
+/**
+ * dm_test_get_dsc_max_slices_2_340 - Test 2 slices at 340 MHz
+ * @test: The KUnit test context
+ */
+static void dm_test_get_dsc_max_slices_2_340(struct kunit *test)
+{
+	KUNIT_EXPECT_EQ(test, get_dsc_max_slices(2, 340), 2);
+}
+
+/**
+ * dm_test_get_dsc_max_slices_4_340 - Test 4 slices at 340 MHz
+ * @test: The KUnit test context
+ */
+static void dm_test_get_dsc_max_slices_4_340(struct kunit *test)
+{
+	KUNIT_EXPECT_EQ(test, get_dsc_max_slices(4, 340), 3);
+}
+
+/**
+ * dm_test_get_dsc_max_slices_8_340 - Test 8 slices at 340 MHz
+ * @test: The KUnit test context
+ */
+static void dm_test_get_dsc_max_slices_8_340(struct kunit *test)
+{
+	KUNIT_EXPECT_EQ(test, get_dsc_max_slices(8, 340), 4);
+}
+
+/**
+ * dm_test_get_dsc_max_slices_8_400 - Test 8 slices at 400 MHz
+ * @test: The KUnit test context
+ */
+static void dm_test_get_dsc_max_slices_8_400(struct kunit *test)
+{
+	KUNIT_EXPECT_EQ(test, get_dsc_max_slices(8, 400), 5);
+}
+
+/**
+ * dm_test_get_dsc_max_slices_12_400 - Test 12 slices at 400 MHz
+ * @test: The KUnit test context
+ */
+static void dm_test_get_dsc_max_slices_12_400(struct kunit *test)
+{
+	KUNIT_EXPECT_EQ(test, get_dsc_max_slices(12, 400), 6);
+}
+
+/**
+ * dm_test_get_dsc_max_slices_16_400 - Test 16 slices at 400 MHz
+ * @test: The KUnit test context
+ */
+static void dm_test_get_dsc_max_slices_16_400(struct kunit *test)
+{
+	KUNIT_EXPECT_EQ(test, get_dsc_max_slices(16, 400), 7);
+}
+
+/**
+ * dm_test_get_dsc_max_slices_unknown - Test unknown combination returns 0
+ * @test: The KUnit test context
+ */
+static void dm_test_get_dsc_max_slices_unknown(struct kunit *test)
+{
+	KUNIT_EXPECT_EQ(test, get_dsc_max_slices(3, 340), 0);
+	KUNIT_EXPECT_EQ(test, get_dsc_max_slices(1, 400), 0);
+}
+
+/* Tests for dm_helpers_init_panel_settings() */
+
+/**
+ * dm_test_init_panel_settings_pps - Test panel power sequence settings init
+ * @test: The KUnit test context
+ */
+static void dm_test_init_panel_settings_pps(struct kunit *test)
+{
+	struct dc_panel_config panel_config = {0};
+	struct dc_sink *sink;
+
+	sink = kunit_kzalloc(test, sizeof(*sink), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, sink);
+
+	sink->edid_caps.panel_patch.extra_t3_ms = 100;
+	sink->edid_caps.panel_patch.extra_t7_ms = 200;
+	sink->edid_caps.panel_patch.extra_delay_backlight_off = 50;
+	sink->edid_caps.panel_patch.extra_t12_ms = 300;
+
+	dm_helpers_init_panel_settings(NULL, &panel_config, sink);
+
+	KUNIT_EXPECT_EQ(test, panel_config.pps.extra_t3_ms, 100U);
+	KUNIT_EXPECT_EQ(test, panel_config.pps.extra_t7_ms, 200U);
+	KUNIT_EXPECT_EQ(test, panel_config.pps.extra_delay_backlight_off, 50U);
+	KUNIT_EXPECT_EQ(test, panel_config.pps.extra_post_t7_ms, 0U);
+	KUNIT_EXPECT_EQ(test, panel_config.pps.extra_pre_t11_ms, 0U);
+	KUNIT_EXPECT_EQ(test, panel_config.pps.extra_t12_ms, 300U);
+	KUNIT_EXPECT_EQ(test, panel_config.pps.extra_post_OUI_ms, 0U);
+}
+
+/**
+ * dm_test_init_panel_settings_dsc - Test DSC defaults in panel settings init
+ * @test: The KUnit test context
+ */
+static void dm_test_init_panel_settings_dsc(struct kunit *test)
+{
+	struct dc_panel_config panel_config;
+	struct dc_sink *sink;
+
+	memset(&panel_config, 0xFF, sizeof(panel_config));
+
+	sink = kunit_kzalloc(test, sizeof(*sink), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, sink);
+
+	dm_helpers_init_panel_settings(NULL, &panel_config, sink);
+
+	KUNIT_EXPECT_FALSE(test, panel_config.dsc.disable_dsc_edp);
+	KUNIT_EXPECT_EQ(test, panel_config.dsc.force_dsc_edp_policy, 0U);
+}
+
+/* Tests for dm_helpers_override_panel_settings() */
+
+/**
+ * dm_test_override_panel_settings_debug_mask_disables_dsc - Test DSC mask
+ * @test: The KUnit test context
+ */
+static void dm_test_override_panel_settings_debug_mask_disables_dsc(struct kunit *test)
+{
+	struct dc_context *ctx;
+	struct dc_link *link;
+	struct dc *dc;
+	uint old_debug_mask;
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	link = dm_kunit_alloc_link(test);
+	ctx->dc = dc;
+	link->connector_signal = SIGNAL_TYPE_DISPLAY_PORT;
+
+	old_debug_mask = dm_helpers_get_dc_debug_mask();
+	dm_helpers_set_dc_debug_mask(old_debug_mask | DC_DISABLE_DSC);
+	dm_helpers_override_panel_settings(ctx, link);
+	dm_helpers_set_dc_debug_mask(old_debug_mask);
+
+	KUNIT_EXPECT_TRUE(test, link->panel_config.dsc.disable_dsc_edp);
+}
+
+/**
+ * dm_test_override_panel_settings_second_edp_disables_psr - Test eDP index 1
+ * @test: The KUnit test context
+ */
+static void dm_test_override_panel_settings_second_edp_disables_psr(struct kunit *test)
+{
+	struct dc_context *ctx;
+	struct dc_link *first_link;
+	struct dc_link *second_link;
+	struct dc *dc;
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	first_link = dm_kunit_alloc_link(test);
+	second_link = dm_kunit_alloc_link(test);
+
+	ctx->dc = dc;
+	dc->link_count = 2;
+	dc->links[0] = first_link;
+	dc->links[1] = second_link;
+	first_link->connector_signal = SIGNAL_TYPE_EDP;
+	second_link->connector_signal = SIGNAL_TYPE_EDP;
+
+	dm_helpers_override_panel_settings(ctx, second_link);
+
+	KUNIT_EXPECT_TRUE(test, second_link->panel_config.psr.disable_psr);
+	KUNIT_EXPECT_TRUE(test, second_link->panel_config.psr.disallow_psrsu);
+	KUNIT_EXPECT_TRUE(test, second_link->panel_config.psr.disallow_replay);
+}
+
+/* Tests for fill_dc_mst_payload_table_from_drm() */
+
+/**
+ * dm_test_fill_mst_payload_table_enable - Test payload table fill on enable
+ * @test: The KUnit test context
+ */
+static void dm_test_fill_mst_payload_table_enable(struct kunit *test)
+{
+	struct dc_link *link;
+	struct drm_dp_mst_atomic_payload payload = {0};
+	struct dc_dp_mst_stream_allocation_table table = {0};
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+
+	/* Pre-existing allocation in the link table */
+	link->mst_stream_alloc_table.stream_count = 1;
+	link->mst_stream_alloc_table.stream_allocations[0].vcp_id = 1;
+	link->mst_stream_alloc_table.stream_allocations[0].slot_count = 4;
+
+	/* New payload to add */
+	payload.vcpi = 2;
+	payload.time_slots = 8;
+
+	fill_dc_mst_payload_table_from_drm(link, true, &payload, &table);
+
+	/* Should contain both the pre-existing and new allocation */
+	KUNIT_EXPECT_EQ(test, table.stream_count, 2);
+	KUNIT_EXPECT_EQ(test, table.stream_allocations[0].vcp_id, 1);
+	KUNIT_EXPECT_EQ(test, table.stream_allocations[0].slot_count, 4);
+	KUNIT_EXPECT_EQ(test, table.stream_allocations[1].vcp_id, 2);
+	KUNIT_EXPECT_EQ(test, table.stream_allocations[1].slot_count, 8);
+}
+
+/**
+ * dm_test_fill_mst_payload_table_disable - Test payload table fill on disable
+ * @test: The KUnit test context
+ */
+static void dm_test_fill_mst_payload_table_disable(struct kunit *test)
+{
+	struct dc_link *link;
+	struct drm_dp_mst_atomic_payload payload = {0};
+	struct dc_dp_mst_stream_allocation_table table = {0};
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+
+	/* Two existing allocations in the link table */
+	link->mst_stream_alloc_table.stream_count = 2;
+	link->mst_stream_alloc_table.stream_allocations[0].vcp_id = 1;
+	link->mst_stream_alloc_table.stream_allocations[0].slot_count = 4;
+	link->mst_stream_alloc_table.stream_allocations[1].vcp_id = 2;
+	link->mst_stream_alloc_table.stream_allocations[1].slot_count = 8;
+
+	/* Remove vcp_id 1 */
+	payload.vcpi = 1;
+	payload.time_slots = 4;
+
+	fill_dc_mst_payload_table_from_drm(link, false, &payload, &table);
+
+	/* Only vcp_id 2 should remain */
+	KUNIT_EXPECT_EQ(test, table.stream_count, 1);
+	KUNIT_EXPECT_EQ(test, table.stream_allocations[0].vcp_id, 2);
+	KUNIT_EXPECT_EQ(test, table.stream_allocations[0].slot_count, 8);
+}
+
+/**
+ * dm_test_fill_mst_payload_table_empty - Test payload table fill when empty
+ * @test: The KUnit test context
+ */
+static void dm_test_fill_mst_payload_table_empty(struct kunit *test)
+{
+	struct dc_link *link;
+	struct drm_dp_mst_atomic_payload payload = {0};
+	struct dc_dp_mst_stream_allocation_table table = {0};
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+
+	/* Enable on an empty table */
+	payload.vcpi = 5;
+	payload.time_slots = 12;
+
+	fill_dc_mst_payload_table_from_drm(link, true, &payload, &table);
+
+	KUNIT_EXPECT_EQ(test, table.stream_count, 1);
+	KUNIT_EXPECT_EQ(test, table.stream_allocations[0].vcp_id, 5);
+	KUNIT_EXPECT_EQ(test, table.stream_allocations[0].slot_count, 12);
+}
+
 static struct kunit_case amdgpu_dm_helpers_test_cases[] = {
 	/* edid_extract_panel_id */
 	KUNIT_CASE(dm_test_edid_extract_panel_id_basic),
@@ -1832,6 +2108,25 @@ static struct kunit_case amdgpu_dm_helpers_test_cases[] = {
 	KUNIT_CASE(dm_test_mst_start_top_mgr_boot),
 	/* dm_helpers_dp_write_hblank_reduction */
 	KUNIT_CASE(dm_test_dp_write_hblank_reduction_false),
+	/* get_dsc_max_slices */
+	KUNIT_CASE(dm_test_get_dsc_max_slices_1_340),
+	KUNIT_CASE(dm_test_get_dsc_max_slices_2_340),
+	KUNIT_CASE(dm_test_get_dsc_max_slices_4_340),
+	KUNIT_CASE(dm_test_get_dsc_max_slices_8_340),
+	KUNIT_CASE(dm_test_get_dsc_max_slices_8_400),
+	KUNIT_CASE(dm_test_get_dsc_max_slices_12_400),
+	KUNIT_CASE(dm_test_get_dsc_max_slices_16_400),
+	KUNIT_CASE(dm_test_get_dsc_max_slices_unknown),
+	/* dm_helpers_init_panel_settings */
+	KUNIT_CASE(dm_test_init_panel_settings_pps),
+	KUNIT_CASE(dm_test_init_panel_settings_dsc),
+	/* dm_helpers_override_panel_settings */
+	KUNIT_CASE(dm_test_override_panel_settings_debug_mask_disables_dsc),
+	KUNIT_CASE(dm_test_override_panel_settings_second_edp_disables_psr),
+	/* fill_dc_mst_payload_table_from_drm */
+	KUNIT_CASE(dm_test_fill_mst_payload_table_enable),
+	KUNIT_CASE(dm_test_fill_mst_payload_table_disable),
+	KUNIT_CASE(dm_test_fill_mst_payload_table_empty),
 	{}
 };
 

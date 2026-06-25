@@ -285,7 +285,7 @@ enum dc_edid_status dm_helpers_parse_edid_caps(
 EXPORT_IF_KUNIT(dm_helpers_parse_edid_caps);
 
 #if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS)
-static void
+STATIC_IFN_KUNIT void
 fill_dc_mst_payload_table_from_drm(struct dc_link *link,
 				   bool enable,
 				   struct drm_dp_mst_atomic_payload *target_payload,
@@ -336,7 +336,7 @@ fill_dc_mst_payload_table_from_drm(struct dc_link *link,
 	*table = new_table;
 }
 #else
-static void
+STATIC_IFN_KUNIT void
 fill_dc_mst_payload_table_from_drm(struct amdgpu_dm_connector *aconnector,
                                    struct dc_dp_mst_stream_allocation_table *proposed_table)
 {
@@ -373,6 +373,7 @@ fill_dc_mst_payload_table_from_drm(struct amdgpu_dm_connector *aconnector,
         mutex_unlock(&mst_mgr->payload_lock);
 }
 #endif /*HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS*/
+EXPORT_IF_KUNIT(fill_dc_mst_payload_table_from_drm);
 
 void dm_helpers_dp_update_branch_info(
 	struct dc_context *ctx,
@@ -1385,7 +1386,7 @@ STATIC_IFN_KUNIT uint8_t get_max_frl_rate(uint8_t max_lanes, uint8_t max_rate_pe
 }
 EXPORT_IF_KUNIT(get_max_frl_rate);
 
-static uint8_t get_dsc_max_slices(uint8_t max_slices, int clk_per_slice)
+STATIC_IFN_KUNIT uint8_t get_dsc_max_slices(uint8_t max_slices, int clk_per_slice)
 {
 	uint8_t dsc_max_slices;
 
@@ -1408,6 +1409,7 @@ static uint8_t get_dsc_max_slices(uint8_t max_slices, int clk_per_slice)
 
 	return dsc_max_slices;
 }
+EXPORT_IF_KUNIT(get_dsc_max_slices);
 
 void populate_hdmi_info_from_connector(bool enable_frl, struct drm_hdmi_info *hdmi, struct dc_edid_caps *edid_caps)
 {
@@ -1615,6 +1617,7 @@ void dm_helpers_init_panel_settings(
 	panel_config->dsc.disable_dsc_edp = false;
 	panel_config->dsc.force_dsc_edp_policy = 0;
 }
+EXPORT_IF_KUNIT(dm_helpers_init_panel_settings);
 
 void dm_helpers_override_panel_settings(
 	struct dc_context *ctx,
@@ -1632,6 +1635,7 @@ void dm_helpers_override_panel_settings(
 		link->panel_config.psr.disallow_replay = true;
 	}
 }
+EXPORT_IF_KUNIT(dm_helpers_override_panel_settings);
 
 void *dm_helpers_allocate_gpu_mem(
 		struct dc_context *ctx,

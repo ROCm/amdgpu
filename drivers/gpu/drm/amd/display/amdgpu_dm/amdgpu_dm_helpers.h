@@ -25,9 +25,14 @@ u32 edid_extract_panel_id(struct edid *edid);
 void apply_edid_quirks(struct dc_link *link, struct edid *edid,
 		       struct dc_edid_caps *edid_caps);
 uint8_t get_max_frl_rate(uint8_t max_lanes, uint8_t max_rate_per_lane);
+uint8_t get_dsc_max_slices(uint8_t max_slices, int clk_per_slice);
 bool dm_is_freesync_pcon_whitelist(const uint32_t branch_dev_id);
 extern const uint32_t dm_freesync_pcon_whitelist[];
 uint32_t dm_freesync_pcon_whitelist_count(void);
+void fill_dc_mst_payload_table_from_drm(struct dc_link *link,
+					 bool enable,
+					 struct drm_dp_mst_atomic_payload *target_payload,
+					 struct dc_dp_mst_stream_allocation_table *table);
 bool dm_helpers_dp_write_dsc_enable(struct dc_context *ctx,
 				    const struct dc_stream_state *stream,
 				    bool enable);
