@@ -161,6 +161,14 @@ void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
 				 enum dc_irq_source irq_source);
 void amdgpu_dm_irq_immediate_work(struct amdgpu_device *adev,
 				  enum dc_irq_source irq_source);
+void dm_handle_hpd_rx_offload_work(struct work_struct *work);
+void handle_hpd_irq_helper(struct amdgpu_dm_connector *aconnector,
+			   enum dc_detect_reason reason);
+void handle_hpd_irq(void *param);
+void schedule_hpd_rx_offload_work(struct amdgpu_device *adev,
+				  struct hpd_rx_irq_offload_work_queue *offload_wq,
+				  union hpd_irq_data hpd_irq_data);
+void handle_hpd_rx_irq(void *param);
 #endif
 
 #endif /* __AMDGPU_DM_IRQ_H__ */

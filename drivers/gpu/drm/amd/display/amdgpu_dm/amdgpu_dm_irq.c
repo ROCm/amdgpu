@@ -1075,7 +1075,7 @@ static void force_connector_state(
 	mutex_unlock(&aconnector->hpd_lock);
 }
 
-static void dm_handle_hpd_rx_offload_work(struct work_struct *work)
+STATIC_IFN_KUNIT void dm_handle_hpd_rx_offload_work(struct work_struct *work)
 {
 	struct hpd_rx_irq_offload_work *offload_work;
 	struct amdgpu_dm_connector *aconnector;
@@ -1168,6 +1168,7 @@ skip:
 	kfree(offload_work);
 
 }
+EXPORT_IF_KUNIT(dm_handle_hpd_rx_offload_work);
 
 struct hpd_rx_irq_offload_work_queue *amdgpu_dm_hpd_rx_irq_create_workqueue(struct amdgpu_device *adev)
 {
@@ -1309,8 +1310,9 @@ void amdgpu_dm_hdmi_hpd_debounce_work(struct work_struct *work)
 			dc_allow_idle_optimizations(dc, true);
 	}
 }
+EXPORT_IF_KUNIT(amdgpu_dm_hdmi_hpd_debounce_work);
 
-static void handle_hpd_irq_helper(struct amdgpu_dm_connector *aconnector,
+STATIC_IFN_KUNIT void handle_hpd_irq_helper(struct amdgpu_dm_connector *aconnector,
 				  enum dc_detect_reason reason)
 {
 	struct drm_connector *connector = &aconnector->base;
@@ -1408,16 +1410,18 @@ static void handle_hpd_irq_helper(struct amdgpu_dm_connector *aconnector,
 		}
 	}
 }
+EXPORT_IF_KUNIT(handle_hpd_irq_helper);
 
-static void handle_hpd_irq(void *param)
+STATIC_IFN_KUNIT void handle_hpd_irq(void *param)
 {
 	struct amdgpu_dm_connector *aconnector = (struct amdgpu_dm_connector *)param;
 
 	handle_hpd_irq_helper(aconnector, DETECT_REASON_HPD);
 
 }
+EXPORT_IF_KUNIT(handle_hpd_irq);
 
-static void schedule_hpd_rx_offload_work(struct amdgpu_device *adev, struct hpd_rx_irq_offload_work_queue *offload_wq,
+STATIC_IFN_KUNIT void schedule_hpd_rx_offload_work(struct amdgpu_device *adev, struct hpd_rx_irq_offload_work_queue *offload_wq,
 							union hpd_irq_data hpd_irq_data)
 {
 	struct hpd_rx_irq_offload_work *offload_work =
@@ -1436,8 +1440,9 @@ static void schedule_hpd_rx_offload_work(struct amdgpu_device *adev, struct hpd_
 	queue_work(offload_wq->wq, &offload_work->work);
 	drm_dbg_kms(adev_to_drm(adev), "queue work to handle hpd_rx offload work");
 }
+EXPORT_IF_KUNIT(schedule_hpd_rx_offload_work);
 
-static void handle_hpd_rx_irq(void *param)
+STATIC_IFN_KUNIT void handle_hpd_rx_irq(void *param)
 {
 	struct amdgpu_dm_connector *aconnector = (struct amdgpu_dm_connector *)param;
 	struct drm_connector *connector = &aconnector->base;
@@ -1570,6 +1575,7 @@ out:
 
 	mutex_unlock(&aconnector->hpd_lock);
 }
+EXPORT_IF_KUNIT(handle_hpd_rx_irq);
 
 /**
  * dmub_hpd_callback - DMUB HPD interrupt processing callback.
