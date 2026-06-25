@@ -1915,9 +1915,7 @@ static struct resource_funcs dcn42b_res_pool_funcs = {
 	.update_soc_for_wm_a = dcn30_update_soc_for_wm_a,
 	.add_phantom_pipes = dcn32_add_phantom_pipes,
 	.calculate_mall_ways_from_bytes = dcn32_calculate_mall_ways_from_bytes,
-#ifdef CONFIG_DRM_AMD_DC_DML21
 	.prepare_mcache_programming = dcn42b_prepare_mcache_programming,
-#endif
 	.build_pipe_pix_clk_params = dcn42b_build_pipe_pix_clk_params,
 	.get_power_profile = dcn401_get_power_profile,
 	.get_vstartup_for_pipe = dcn401_get_vstartup_for_pipe,
