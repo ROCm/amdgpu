@@ -2110,6 +2110,83 @@ static const struct i2c_algorithm dm_test_i2c_algorithm = {
 	.master_xfer = dm_test_i2c_master_xfer,
 };
 
+struct dm_test_mccs_i2c_adapter {
+	struct i2c_adapter base;
+	u8 write_data[16];
+	u8 read_reply[11];
+	int write_ret;
+	int read_ret;
+	unsigned int write_len;
+	unsigned int writes;
+	unsigned int reads;
+};
+
+static int dm_test_mccs_i2c_master_xfer(struct i2c_adapter *adapter,
+						struct i2c_msg *msgs,
+						int num)
+{
+	struct dm_test_mccs_i2c_adapter *fake;
+	struct i2c_msg *msg = msgs;
+	size_t copy_len;
+
+	fake = container_of(adapter, struct dm_test_mccs_i2c_adapter, base);
+
+	if (num != 1)
+		return 0;
+
+	if (msg->flags & I2C_M_RD) {
+		fake->reads++;
+		if (fake->read_ret != 1)
+			return fake->read_ret;
+
+		copy_len = min_t(size_t, msg->len, sizeof(fake->read_reply));
+		memcpy(msg->buf, fake->read_reply, copy_len);
+		return 1;
+	}
+
+	fake->writes++;
+	if (fake->write_ret != 1)
+		return fake->write_ret;
+
+	copy_len = min_t(size_t, msg->len, sizeof(fake->write_data));
+	memcpy(fake->write_data, msg->buf, copy_len);
+	fake->write_len = copy_len;
+
+	return 1;
+}
+
+static const struct i2c_algorithm dm_test_mccs_i2c_algorithm = {
+	.master_xfer = dm_test_mccs_i2c_master_xfer,
+};
+
+static struct dm_test_mccs_i2c_adapter *dm_test_alloc_mccs_i2c(struct kunit *test)
+{
+	struct dm_test_mccs_i2c_adapter *fake;
+
+	fake = kunit_kzalloc(test, sizeof(*fake), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, fake);
+
+	fake->base.algo = &dm_test_mccs_i2c_algorithm;
+	fake->base.lock_ops = &dm_test_i2c_lock_ops;
+	fake->write_ret = 1;
+	fake->read_ret = 1;
+	rt_mutex_init(&fake->base.bus_lock);
+	rt_mutex_init(&fake->base.mux_lock);
+
+	return fake;
+}
+
+static u8 dm_test_mccs_checksum(const u8 *data, unsigned int len)
+{
+	u8 checksum = 0x6e;
+	unsigned int i;
+
+	for (i = 0; i < len; i++)
+		checksum ^= data[i];
+
+	return checksum;
+}
+
 static void dm_test_submit_i2c_transfer(struct kunit *test,
 					bool full_transfer)
 {
@@ -2531,6 +2608,334 @@ static void dm_test_enable_periodic_detection_schedules_work(struct kunit *test)
 	KUNIT_EXPECT_TRUE(test, idle_work->ran);
 }
 
+/* Tests for dm_helpers_read_mccs_caps() */
+
+/**
+ * dm_test_read_mccs_caps_null_ctx - Test early return with NULL context
+ * @test: The KUnit test context
+ */
+static void dm_test_read_mccs_caps_null_ctx(struct kunit *test)
+{
+	/* NULL ctx → early return, no crash */
+	dm_helpers_read_mccs_caps(NULL, NULL, NULL);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_read_mccs_caps_null_link - Test early return with NULL link
+ * @test: The KUnit test context
+ */
+static void dm_test_read_mccs_caps_null_link(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc_context *ctx;
+	struct dc_sink *sink;
+
+	adev = dm_kunit_alloc_adev(test);
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	ctx->driver_context = adev;
+	sink = kunit_kzalloc(test, sizeof(*sink), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, sink);
+
+	/* link is NULL → drm_dbg_driver + return */
+	dm_helpers_read_mccs_caps(ctx, NULL, sink);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_read_mccs_caps_no_vcp_code - Test no-vcp-code path clears freesync support
+ * @test: The KUnit test context
+ *
+ * With freesync_vcp_code == 0 the i2c/MCCS path is skipped entirely and the
+ * function only clears sink->mccs_caps.freesync_supported.
+ */
+static void dm_test_read_mccs_caps_no_vcp_code(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc_context *ctx;
+	struct dc_link *link;
+	struct dc_sink *sink;
+
+	adev = dm_kunit_alloc_adev(test);
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	ctx->driver_context = adev;
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+	sink = kunit_kzalloc(test, sizeof(*sink), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, sink);
+
+	sink->edid_caps.freesync_vcp_code = 0;
+	sink->mccs_caps.freesync_supported = true; /* should be cleared */
+
+	dm_helpers_read_mccs_caps(ctx, link, sink);
+
+	KUNIT_EXPECT_FALSE(test, sink->mccs_caps.freesync_supported);
+}
+
+/*
+ * Allocate and wire the adev/ctx/link/sink/connector/i2c objects shared by the
+ * MCCS read/set tests so each test only configures the fields it exercises.
+ */
+struct dm_test_mccs_fixture {
+	struct amdgpu_device *adev;
+	struct dc_context *ctx;
+	struct dc_link *link;
+	struct dc_sink *sink;
+	struct amdgpu_dm_connector *aconnector;
+	struct dm_test_mccs_i2c_adapter *fake;
+};
+
+static struct dm_test_mccs_fixture dm_test_alloc_mccs_fixture(struct kunit *test)
+{
+	struct dm_test_mccs_fixture fixture;
+
+	fixture.adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_NOT_NULL(test, fixture.adev);
+	fixture.ctx = kunit_kzalloc(test, sizeof(*fixture.ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, fixture.ctx);
+	fixture.link = kunit_kzalloc(test, sizeof(*fixture.link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, fixture.link);
+	fixture.sink = kunit_kzalloc(test, sizeof(*fixture.sink), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, fixture.sink);
+	fixture.aconnector = kunit_kzalloc(test, sizeof(*fixture.aconnector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, fixture.aconnector);
+	fixture.fake = dm_test_alloc_mccs_i2c(test);
+
+	fixture.ctx->driver_context = fixture.adev;
+	fixture.aconnector->i2c = (struct amdgpu_i2c_adapter *)fixture.fake;
+	fixture.link->priv = fixture.aconnector;
+
+	return fixture;
+}
+
+/**
+ * dm_test_read_mccs_caps_i2c_vcp_request - Test MCCS VCP request packet
+ * @test: The KUnit test context
+ */
+static void dm_test_read_mccs_caps_i2c_vcp_request(struct kunit *test)
+{
+	static const u8 expected_prefix[] = { 0x51, 0x82, 0x01, 0xe3 };
+	struct dm_test_mccs_fixture fixture = dm_test_alloc_mccs_fixture(test);
+	struct dm_test_mccs_i2c_adapter *fake = fixture.fake;
+	struct dc_context *ctx = fixture.ctx;
+	struct dc_link *link = fixture.link;
+	struct dc_sink *sink = fixture.sink;
+
+	link->connector_signal = SIGNAL_TYPE_DISPLAY_PORT;
+	link->dpcd_caps.dpcd_rev.raw = DP_DPCD_REV_14;
+	link->dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_HDMI_CONVERTER;
+	link->dpcd_caps.branch_dev_id = DP_BRANCH_DEVICE_ID_0060AD;
+	link->dpcd_caps.adaptive_sync_caps.dp_adap_sync_caps.bits.ADAPTIVE_SYNC_SDP_SUPPORT = 1;
+	sink->edid_caps.freesync_vcp_code = 0xe3;
+	fake->read_reply[1] = 0x82;
+	fake->read_reply[9] = 0x01;
+
+	dm_helpers_read_mccs_caps(ctx, link, sink);
+
+	KUNIT_EXPECT_TRUE(test, sink->mccs_caps.freesync_supported);
+	KUNIT_EXPECT_EQ(test, fake->writes, 1U);
+	KUNIT_EXPECT_EQ(test, fake->reads, 1U);
+	KUNIT_EXPECT_EQ(test, fake->write_len, (unsigned int)sizeof(expected_prefix) + 1);
+	KUNIT_EXPECT_EQ(test, memcmp(fake->write_data, expected_prefix,
+					     sizeof(expected_prefix)), 0);
+	KUNIT_EXPECT_EQ(test, fake->write_data[4],
+			dm_test_mccs_checksum(expected_prefix, sizeof(expected_prefix)));
+}
+
+/**
+ * dm_test_read_mccs_caps_hdmi_vcp_request - Test local HDMI MCCS path
+ * @test: The KUnit test context
+ */
+static void dm_test_read_mccs_caps_hdmi_vcp_request(struct kunit *test)
+{
+	struct dm_test_mccs_fixture fixture = dm_test_alloc_mccs_fixture(test);
+	struct dm_test_mccs_i2c_adapter *fake = fixture.fake;
+	struct dc_context *ctx = fixture.ctx;
+	struct dc_link *link = fixture.link;
+	struct dc_sink *sink = fixture.sink;
+
+	link->connector_signal = SIGNAL_TYPE_HDMI_TYPE_A;
+	sink->edid_caps.freesync_vcp_code = 0xe3;
+	fake->read_reply[1] = 0x82;
+	fake->read_reply[9] = 0x01;
+
+	dm_helpers_read_mccs_caps(ctx, link, sink);
+
+	KUNIT_EXPECT_TRUE(test, sink->mccs_caps.freesync_supported);
+	KUNIT_EXPECT_EQ(test, fake->writes, 1U);
+	KUNIT_EXPECT_EQ(test, fake->reads, 1U);
+}
+
+/**
+ * dm_test_read_mccs_caps_legacy_pcon_vcp_request - Test legacy PCON path
+ * @test: The KUnit test context
+ */
+static void dm_test_read_mccs_caps_legacy_pcon_vcp_request(struct kunit *test)
+{
+	struct dm_test_mccs_fixture fixture = dm_test_alloc_mccs_fixture(test);
+	struct dm_test_mccs_i2c_adapter *fake = fixture.fake;
+	struct dc_context *ctx = fixture.ctx;
+	struct dc_link *link = fixture.link;
+	struct dc_sink *sink = fixture.sink;
+
+	link->connector_signal = SIGNAL_TYPE_DISPLAY_PORT;
+	link->dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_DVI_CONVERTER;
+	sink->edid_caps.freesync_vcp_code = 0xe3;
+	fake->read_reply[1] = 0x82;
+	fake->read_reply[9] = 0x01;
+
+	dm_helpers_read_mccs_caps(ctx, link, sink);
+
+	KUNIT_EXPECT_TRUE(test, sink->mccs_caps.freesync_supported);
+	KUNIT_EXPECT_EQ(test, fake->writes, 1U);
+	KUNIT_EXPECT_EQ(test, fake->reads, 1U);
+}
+
+/**
+ * dm_test_read_mccs_caps_i2c_failure - Test VCP request retry failure
+ * @test: The KUnit test context
+ */
+static void dm_test_read_mccs_caps_i2c_failure(struct kunit *test)
+{
+	struct dm_test_mccs_fixture fixture = dm_test_alloc_mccs_fixture(test);
+	struct dm_test_mccs_i2c_adapter *fake = fixture.fake;
+	struct dc_context *ctx = fixture.ctx;
+	struct dc_link *link = fixture.link;
+	struct dc_sink *sink = fixture.sink;
+
+	fixture.aconnector->base.dev = &fixture.adev->ddev;
+	link->connector_signal = SIGNAL_TYPE_DISPLAY_PORT;
+	link->dpcd_caps.dpcd_rev.raw = DP_DPCD_REV_14;
+	link->dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_HDMI_CONVERTER;
+	link->dpcd_caps.branch_dev_id = DP_BRANCH_DEVICE_ID_0060AD;
+	link->dpcd_caps.adaptive_sync_caps.dp_adap_sync_caps.bits.ADAPTIVE_SYNC_SDP_SUPPORT = 1;
+	sink->edid_caps.freesync_vcp_code = 0xe3;
+	fake->write_ret = 0;
+
+	dm_helpers_read_mccs_caps(ctx, link, sink);
+
+	KUNIT_EXPECT_FALSE(test, sink->mccs_caps.freesync_supported);
+	KUNIT_EXPECT_EQ(test, fake->writes, 5U);
+	KUNIT_EXPECT_EQ(test, fake->reads, 0U);
+}
+
+/* Tests for dm_helpers_mccs_vcp_set() */
+
+/**
+ * dm_test_mccs_vcp_set_null_ctx - Test early return with NULL context
+ * @test: The KUnit test context
+ */
+static void dm_test_mccs_vcp_set_null_ctx(struct kunit *test)
+{
+	/* NULL ctx → early return, no crash */
+	dm_helpers_mccs_vcp_set(NULL, NULL, NULL);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_mccs_vcp_set_not_supported - Test early return when freesync unsupported
+ * @test: The KUnit test context
+ */
+static void dm_test_mccs_vcp_set_not_supported(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc_context *ctx;
+	struct dc_link *link;
+	struct dc_sink *sink;
+
+	adev = dm_kunit_alloc_adev(test);
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	ctx->driver_context = adev;
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+	sink = kunit_kzalloc(test, sizeof(*sink), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, sink);
+
+	sink->mccs_caps.freesync_supported = false;
+
+	/* freesync not supported → early return without i2c */
+	dm_helpers_mccs_vcp_set(ctx, link, sink);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_mccs_vcp_set_null_link - Test early return with NULL link
+ * @test: The KUnit test context
+ */
+static void dm_test_mccs_vcp_set_null_link(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc_context *ctx;
+	struct dc_sink *sink;
+
+	adev = dm_kunit_alloc_adev(test);
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	sink = kunit_kzalloc(test, sizeof(*sink), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, sink);
+
+	ctx->driver_context = adev;
+	dm_helpers_mccs_vcp_set(ctx, NULL, sink);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_mccs_vcp_set_i2c_packet - Test MCCS VCP set packet
+ * @test: The KUnit test context
+ */
+static void dm_test_mccs_vcp_set_i2c_packet(struct kunit *test)
+{
+	static const u8 expected_prefix[] = {
+		0x51, 0x84, 0x03, 0xe3, 0x01, 0x01,
+	};
+	struct dm_test_mccs_fixture fixture = dm_test_alloc_mccs_fixture(test);
+	struct dm_test_mccs_i2c_adapter *fake = fixture.fake;
+	struct dc_context *ctx = fixture.ctx;
+	struct dc_link *link = fixture.link;
+	struct dc_sink *sink = fixture.sink;
+
+	sink->mccs_caps.freesync_supported = true;
+	sink->edid_caps.freesync_vcp_code = 0xe3;
+
+	dm_helpers_mccs_vcp_set(ctx, link, sink);
+
+	KUNIT_EXPECT_EQ(test, fake->writes, 1U);
+	KUNIT_EXPECT_EQ(test, fake->reads, 0U);
+	KUNIT_EXPECT_EQ(test, fake->write_len, (unsigned int)sizeof(expected_prefix) + 1);
+	KUNIT_EXPECT_EQ(test, memcmp(fake->write_data, expected_prefix,
+					     sizeof(expected_prefix)), 0);
+	KUNIT_EXPECT_EQ(test, fake->write_data[6],
+			dm_test_mccs_checksum(expected_prefix, sizeof(expected_prefix)));
+}
+
+/**
+ * dm_test_mccs_vcp_set_i2c_failure - Test VCP set retry failure path
+ * @test: The KUnit test context
+ */
+static void dm_test_mccs_vcp_set_i2c_failure(struct kunit *test)
+{
+	struct dm_test_mccs_fixture fixture = dm_test_alloc_mccs_fixture(test);
+	struct dm_test_mccs_i2c_adapter *fake = fixture.fake;
+	struct dc_context *ctx = fixture.ctx;
+	struct dc_link *link = fixture.link;
+	struct dc_sink *sink = fixture.sink;
+
+	sink->mccs_caps.freesync_supported = true;
+	sink->edid_caps.freesync_vcp_code = 0xe3;
+	fake->write_ret = 0;
+
+	dm_helpers_mccs_vcp_set(ctx, link, sink);
+
+	KUNIT_EXPECT_EQ(test, fake->writes, 5U);
+	KUNIT_EXPECT_EQ(test, fake->reads, 0U);
+}
+
 static struct kunit_case amdgpu_dm_helpers_test_cases[] = {
 	/* edid_extract_panel_id */
 	KUNIT_CASE(dm_test_edid_extract_panel_id_basic),
@@ -2668,6 +3073,20 @@ static struct kunit_case amdgpu_dm_helpers_test_cases[] = {
 	KUNIT_CASE(dm_test_enable_periodic_detection_no_workqueue),
 	KUNIT_CASE(dm_test_enable_periodic_detection_updates_enable),
 	KUNIT_CASE(dm_test_enable_periodic_detection_schedules_work),
+	/* dm_helpers_read_mccs_caps */
+	KUNIT_CASE(dm_test_read_mccs_caps_null_ctx),
+	KUNIT_CASE(dm_test_read_mccs_caps_null_link),
+	KUNIT_CASE(dm_test_read_mccs_caps_no_vcp_code),
+	KUNIT_CASE(dm_test_read_mccs_caps_i2c_vcp_request),
+	KUNIT_CASE(dm_test_read_mccs_caps_hdmi_vcp_request),
+	KUNIT_CASE(dm_test_read_mccs_caps_legacy_pcon_vcp_request),
+	KUNIT_CASE(dm_test_read_mccs_caps_i2c_failure),
+	/* dm_helpers_mccs_vcp_set */
+	KUNIT_CASE(dm_test_mccs_vcp_set_null_ctx),
+	KUNIT_CASE(dm_test_mccs_vcp_set_not_supported),
+	KUNIT_CASE(dm_test_mccs_vcp_set_null_link),
+	KUNIT_CASE(dm_test_mccs_vcp_set_i2c_packet),
+	KUNIT_CASE(dm_test_mccs_vcp_set_i2c_failure),
 	{}
 };
 
