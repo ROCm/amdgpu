@@ -1421,6 +1421,14 @@ static ssize_t dm_test_synaptics_aux_transfer(struct drm_dp_aux *aux,
 	return msg->size;
 }
 
+static struct dm_test_synaptics_aux *dm_test_current_aux_recorder;
+
+static ssize_t dm_test_current_aux_transfer(struct drm_dp_aux *aux,
+					    struct drm_dp_aux_msg *msg)
+{
+	return dm_test_synaptics_aux_transfer(&dm_test_current_aux_recorder->aux, msg);
+}
+
 static struct dm_test_synaptics_aux *dm_test_alloc_synaptics_aux_with_dev(struct kunit *test,
 								 struct drm_device *drm_dev)
 {
@@ -2022,6 +2030,507 @@ static void dm_test_fill_mst_payload_table_empty(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, table.stream_allocations[0].slot_count, 12);
 }
 
+/* Tests for dm_helpers_submit_i2c() */
+
+/**
+ * dm_test_submit_i2c_null_priv - Test i2c submit returns false without connector
+ * @test: The KUnit test context
+ */
+static void dm_test_submit_i2c_null_priv(struct kunit *test)
+{
+	struct dc_link *link;
+	struct i2c_command cmd = {0};
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+
+	KUNIT_EXPECT_FALSE(test, dm_helpers_submit_i2c(NULL, link, &cmd));
+}
+
+struct dm_test_i2c_adapter {
+	struct i2c_adapter base;
+	struct kunit *test;
+	struct i2c_payload *expected_payloads;
+	int expected_num;
+	int ret;
+	int calls;
+};
+
+static void dm_test_i2c_lock_bus(struct i2c_adapter *adapter,
+					 unsigned int flags)
+{
+	rt_mutex_lock(&adapter->bus_lock);
+}
+
+static int dm_test_i2c_trylock_bus(struct i2c_adapter *adapter,
+					   unsigned int flags)
+{
+	return rt_mutex_trylock(&adapter->bus_lock);
+}
+
+static void dm_test_i2c_unlock_bus(struct i2c_adapter *adapter,
+					   unsigned int flags)
+{
+	rt_mutex_unlock(&adapter->bus_lock);
+}
+
+static const struct i2c_lock_operations dm_test_i2c_lock_ops = {
+	.lock_bus = dm_test_i2c_lock_bus,
+	.trylock_bus = dm_test_i2c_trylock_bus,
+	.unlock_bus = dm_test_i2c_unlock_bus,
+};
+
+static int dm_test_i2c_master_xfer(struct i2c_adapter *adapter,
+					   struct i2c_msg *msgs,
+					   int num)
+{
+	struct dm_test_i2c_adapter *fake;
+	int i;
+
+	fake = container_of(adapter, struct dm_test_i2c_adapter, base);
+	fake->calls++;
+
+	KUNIT_EXPECT_EQ(fake->test, num, fake->expected_num);
+
+	for (i = 0; i < num; i++) {
+		KUNIT_EXPECT_EQ(fake->test, msgs[i].flags,
+				 fake->expected_payloads[i].write ? 0 : I2C_M_RD);
+		KUNIT_EXPECT_EQ(fake->test, msgs[i].addr,
+				 (u16)fake->expected_payloads[i].address);
+		KUNIT_EXPECT_EQ(fake->test, msgs[i].len,
+				 (u16)fake->expected_payloads[i].length);
+		KUNIT_EXPECT_PTR_EQ(fake->test, msgs[i].buf,
+				    fake->expected_payloads[i].data);
+	}
+
+	return fake->ret;
+}
+
+static const struct i2c_algorithm dm_test_i2c_algorithm = {
+	.master_xfer = dm_test_i2c_master_xfer,
+};
+
+static void dm_test_submit_i2c_transfer(struct kunit *test,
+					bool full_transfer)
+{
+	struct amdgpu_dm_connector *aconnector;
+	struct dm_test_i2c_adapter *fake;
+	struct dc_link *link;
+	u8 write_data[2] = { 0x12, 0x34 };
+	u8 read_data[3] = { 0 };
+	struct i2c_payload payloads[] = {
+		{ true, 0x50, sizeof(write_data), write_data },
+		{ false, 0x51, sizeof(read_data), read_data },
+	};
+	struct i2c_command cmd = {
+		.payloads = payloads,
+		.number_of_payloads = ARRAY_SIZE(payloads),
+	};
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+	aconnector = kunit_kzalloc(test, sizeof(*aconnector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, aconnector);
+	fake = kunit_kzalloc(test, sizeof(*fake), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, fake);
+
+	fake->test = test;
+	fake->expected_payloads = payloads;
+	fake->expected_num = ARRAY_SIZE(payloads);
+	fake->ret = full_transfer ? ARRAY_SIZE(payloads) : 1;
+	fake->base.algo = &dm_test_i2c_algorithm;
+	fake->base.lock_ops = &dm_test_i2c_lock_ops;
+	rt_mutex_init(&fake->base.bus_lock);
+	rt_mutex_init(&fake->base.mux_lock);
+
+	aconnector->i2c = (struct amdgpu_i2c_adapter *)fake;
+	link->priv = aconnector;
+
+	KUNIT_EXPECT_EQ(test, dm_helpers_submit_i2c(NULL, link, &cmd), full_transfer);
+	KUNIT_EXPECT_EQ(test, fake->calls, 1);
+}
+
+/**
+ * dm_test_submit_i2c_success - Test payloads are mapped to i2c_msg array
+ * @test: The KUnit test context
+ */
+static void dm_test_submit_i2c_success(struct kunit *test)
+{
+	dm_test_submit_i2c_transfer(test, true);
+}
+
+/**
+ * dm_test_submit_i2c_partial_transfer - Test short i2c transfer returns false
+ * @test: The KUnit test context
+ */
+static void dm_test_submit_i2c_partial_transfer(struct kunit *test)
+{
+	dm_test_submit_i2c_transfer(test, false);
+}
+
+/* Tests for dm_helper_dmub_aux_transfer_sync() */
+
+/**
+ * dm_test_dmub_aux_transfer_sync_hpd_discon - Test aux transfer with HPD disconnected
+ * @test: The KUnit test context
+ */
+static void dm_test_dmub_aux_transfer_sync_hpd_discon(struct kunit *test)
+{
+	struct dc_link *link;
+	struct dc_context *ctx;
+	struct aux_payload payload = {0};
+	enum aux_return_code_type result = AUX_RET_SUCCESS;
+	int ret;
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	link->hpd_status = false;
+
+	ret = dm_helper_dmub_aux_transfer_sync(ctx, link, &payload, &result);
+
+	KUNIT_EXPECT_EQ(test, ret, -1);
+	KUNIT_EXPECT_EQ(test, (int)result, (int)AUX_RET_ERROR_HPD_DISCON);
+}
+
+/* Tests for empty stub functions (must not crash) */
+
+/**
+ * dm_test_dp_update_branch_info_no_crash - Test empty stub does not crash
+ * @test: The KUnit test context
+ */
+static void dm_test_dp_update_branch_info_no_crash(struct kunit *test)
+{
+	dm_helpers_dp_update_branch_info(NULL, NULL);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_mst_poll_pending_down_reply_no_crash - Test empty stub does not crash
+ * @test: The KUnit test context
+ */
+static void dm_test_mst_poll_pending_down_reply_no_crash(struct kunit *test)
+{
+	dm_helpers_dp_mst_poll_pending_down_reply(NULL, NULL);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_mst_clear_payload_alloc_table_no_crash - Test empty stub does not crash
+ * @test: The KUnit test context
+ */
+static void dm_test_mst_clear_payload_alloc_table_no_crash(struct kunit *test)
+{
+	dm_helpers_dp_mst_clear_payload_allocation_table(NULL, NULL);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_set_dcn_clocks_no_crash - Test empty stub does not crash
+ * @test: The KUnit test context
+ */
+static void dm_test_set_dcn_clocks_no_crash(struct kunit *test)
+{
+	dm_set_dcn_clocks(NULL, NULL);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_dmu_timeout_no_crash - Test empty stub does not crash
+ * @test: The KUnit test context
+ */
+static void dm_test_dmu_timeout_no_crash(struct kunit *test)
+{
+	dm_helpers_dmu_timeout(NULL);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_smu_timeout_no_crash - Test empty stub does not crash
+ * @test: The KUnit test context
+ */
+static void dm_test_smu_timeout_no_crash(struct kunit *test)
+{
+	dm_helpers_smu_timeout(NULL, 0, 0, 0);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_set_phyd32clk_no_crash - Test empty stub does not crash
+ * @test: The KUnit test context
+ */
+static void dm_test_set_phyd32clk_no_crash(struct kunit *test)
+{
+	dm_set_phyd32clk(NULL, 0);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_mst_update_branch_bandwidth_no_crash - Test empty stub does not crash
+ * @test: The KUnit test context
+ */
+static void dm_test_mst_update_branch_bandwidth_no_crash(struct kunit *test)
+{
+	dm_helpers_dp_mst_update_branch_bandwidth(NULL, NULL);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/* Tests for MST functions null-connector early returns */
+
+/**
+ * dm_test_mst_write_payload_alloc_table_null_ctx - Test null connector returns false
+ * @test: The KUnit test context
+ */
+static void dm_test_mst_write_payload_alloc_table_null_ctx(struct kunit *test)
+{
+	struct dc_stream_state *stream;
+
+	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, stream);
+
+	/* dm_stream_context is NULL → aconnector is NULL → return false */
+	KUNIT_EXPECT_FALSE(test,
+			   dm_helpers_dp_mst_write_payload_allocation_table(NULL, stream, NULL, true));
+}
+
+/**
+ * dm_test_mst_poll_for_act_null_ctx - Test null connector returns ACT_FAILED
+ * @test: The KUnit test context
+ */
+static void dm_test_mst_poll_for_act_null_ctx(struct kunit *test)
+{
+	struct dc_stream_state *stream;
+
+	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, stream);
+
+	KUNIT_EXPECT_EQ(test,
+			(int)dm_helpers_dp_mst_poll_for_allocation_change_trigger(NULL, stream),
+			(int)ACT_FAILED);
+}
+
+/**
+ * dm_test_mst_send_payload_alloc_null_ctx - Test null connector does not crash
+ * @test: The KUnit test context
+ */
+static void dm_test_mst_send_payload_alloc_null_ctx(struct kunit *test)
+{
+	struct dc_stream_state *stream;
+
+	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, stream);
+
+	/* Should early-return without crash */
+	dm_helpers_dp_mst_send_payload_allocation(NULL, stream);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_mst_update_mgr_dealloc_null_ctx - Test null connector does not crash
+ * @test: The KUnit test context
+ */
+static void dm_test_mst_update_mgr_dealloc_null_ctx(struct kunit *test)
+{
+	struct dc_stream_state *stream;
+
+	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, stream);
+
+	dm_helpers_dp_mst_update_mst_mgr_for_deallocation(NULL, stream);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_is_dp_sink_present_null_priv - Test null connector returns true
+ * @test: The KUnit test context
+ */
+static void dm_test_is_dp_sink_present_null_priv(struct kunit *test)
+{
+	struct dc_link *link;
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+
+	/* NULL priv → DRM_ERROR + return true */
+	KUNIT_EXPECT_TRUE(test, dm_helpers_is_dp_sink_present(link));
+}
+
+/* Tests for dm_helpers_dmub_outbox_interrupt_control() */
+
+/**
+ * dm_test_dmub_outbox_interrupt_control_null_dc - Test outbox irq control with NULL dc
+ * @test: The KUnit test context
+ *
+ * dc_interrupt_set() is NULL-safe and returns false when dc is NULL, so the
+ * helper returns false without touching real interrupt hardware.
+ */
+static void dm_test_dmub_outbox_interrupt_control_null_dc(struct kunit *test)
+{
+	struct dc_context *ctx;
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+
+	/* ctx->dc is NULL → dc_interrupt_set returns false */
+	KUNIT_EXPECT_FALSE(test, dm_helpers_dmub_outbox_interrupt_control(ctx, true));
+	KUNIT_EXPECT_FALSE(test, dm_helpers_dmub_outbox_interrupt_control(ctx, false));
+}
+
+/* Tests for dm_helpers_mst_enable_stream_features() */
+
+/**
+ * dm_test_mst_enable_stream_features_aux_disabled - Test early return when aux disabled
+ * @test: The KUnit test context
+ */
+static void dm_test_mst_enable_stream_features_aux_disabled(struct kunit *test)
+{
+	struct dc_stream_state *stream;
+	struct dc_link *link;
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, stream);
+
+	stream->link = link;
+	link->aux_access_disabled = true;
+
+	/* aux_access_disabled → early return without DPCD access */
+	dm_helpers_mst_enable_stream_features(stream);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_mst_enable_stream_features_writes_downspread - Test MSA ignore write
+ * @test: The KUnit test context
+ */
+static void dm_test_mst_enable_stream_features_writes_downspread(struct kunit *test)
+{
+	struct dm_test_synaptics_aux *fixture;
+	struct amdgpu_dm_connector *aconnector;
+	struct dc_stream_state *stream;
+	struct amdgpu_device *adev;
+	struct dc_link *link;
+
+	adev = dm_kunit_alloc_adev(test);
+	fixture = dm_test_alloc_synaptics_aux_with_dev(test, &adev->ddev);
+	aconnector = dm_kunit_alloc_connector(test, adev, NULL);
+	link = dm_kunit_alloc_link(test);
+	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, stream);
+
+	dm_test_current_aux_recorder = fixture;
+	aconnector->dm_dp_aux.aux.drm_dev = &adev->ddev;
+	aconnector->dm_dp_aux.aux.transfer = dm_test_current_aux_transfer;
+	drm_dp_aux_init(&aconnector->dm_dp_aux.aux);
+	link->priv = aconnector;
+	stream->link = link;
+	stream->ignore_msa_timing_param = true;
+
+	dm_helpers_mst_enable_stream_features(stream);
+
+	KUNIT_EXPECT_EQ(test, fixture->downspread_reads, 1U);
+	KUNIT_EXPECT_EQ(test, fixture->downspread_writes, 1U);
+	KUNIT_EXPECT_EQ(test, fixture->last_dpcd_write_address,
+			 DP_DOWNSPREAD_CTRL);
+	KUNIT_EXPECT_EQ(test, fixture->dpcd_write_value, (u8)BIT(7));
+}
+
+/* Tests for dm_helpers_enable_periodic_detection() */
+
+struct dm_test_idle_work {
+	struct idle_workqueue base;
+	bool ran;
+};
+
+static void dm_test_idle_work_func(struct work_struct *work)
+{
+	struct dm_test_idle_work *idle_work;
+
+	idle_work = container_of(work, struct dm_test_idle_work, base.work);
+	idle_work->ran = true;
+}
+
+/**
+ * dm_test_enable_periodic_detection_no_workqueue - Test no-op without idle workqueue
+ * @test: The KUnit test context
+ */
+static void dm_test_enable_periodic_detection_no_workqueue(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc_context *ctx;
+
+	adev = dm_kunit_alloc_adev(test);
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	ctx->driver_context = adev;
+
+	/* adev->dm.idle_workqueue is NULL → no-op, no crash */
+	dm_helpers_enable_periodic_detection(ctx, true);
+	KUNIT_EXPECT_TRUE(test, true);
+}
+
+/**
+ * dm_test_enable_periodic_detection_updates_enable - Test idle work enable flag
+ * @test: The KUnit test context
+ *
+ * Keeps idle_workqueue->running set so the helper only updates the enable flag
+ * and does not queue the idle worker.
+ */
+static void dm_test_enable_periodic_detection_updates_enable(struct kunit *test)
+{
+	struct idle_workqueue *idle_work;
+	struct amdgpu_device *adev;
+	struct dc_context *ctx;
+
+	adev = dm_kunit_alloc_adev(test);
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	idle_work = kunit_kzalloc(test, sizeof(*idle_work), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, idle_work);
+
+	ctx->driver_context = adev;
+	adev->dm.idle_workqueue = idle_work;
+	idle_work->running = true;
+
+	dm_helpers_enable_periodic_detection(ctx, true);
+	KUNIT_EXPECT_TRUE(test, idle_work->enable);
+
+	dm_helpers_enable_periodic_detection(ctx, false);
+	KUNIT_EXPECT_FALSE(test, idle_work->enable);
+}
+
+/**
+ * dm_test_enable_periodic_detection_schedules_work - Test headless schedule path
+ * @test: The KUnit test context
+ */
+static void dm_test_enable_periodic_detection_schedules_work(struct kunit *test)
+{
+	struct dm_test_idle_work *idle_work;
+	struct amdgpu_device *adev;
+	struct dc_context *ctx;
+
+	adev = dm_kunit_alloc_adev(test);
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	idle_work = kunit_kzalloc(test, sizeof(*idle_work), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, idle_work);
+
+	ctx->driver_context = adev;
+	adev->dm.ddev = &adev->ddev;
+	adev->dm.idle_workqueue = &idle_work->base;
+	INIT_WORK(&idle_work->base.work, dm_test_idle_work_func);
+
+	dm_helpers_enable_periodic_detection(ctx, true);
+	flush_work(&idle_work->base.work);
+
+	KUNIT_EXPECT_TRUE(test, idle_work->base.enable);
+	KUNIT_EXPECT_TRUE(test, idle_work->ran);
+}
+
 static struct kunit_case amdgpu_dm_helpers_test_cases[] = {
 	/* edid_extract_panel_id */
 	KUNIT_CASE(dm_test_edid_extract_panel_id_basic),
@@ -2127,6 +2636,38 @@ static struct kunit_case amdgpu_dm_helpers_test_cases[] = {
 	KUNIT_CASE(dm_test_fill_mst_payload_table_enable),
 	KUNIT_CASE(dm_test_fill_mst_payload_table_disable),
 	KUNIT_CASE(dm_test_fill_mst_payload_table_empty),
+	/* dm_helpers_submit_i2c */
+	KUNIT_CASE(dm_test_submit_i2c_null_priv),
+	KUNIT_CASE(dm_test_submit_i2c_success),
+	KUNIT_CASE(dm_test_submit_i2c_partial_transfer),
+	/* dm_helper_dmub_aux_transfer_sync */
+	KUNIT_CASE(dm_test_dmub_aux_transfer_sync_hpd_discon),
+	/* Empty stub functions */
+	KUNIT_CASE(dm_test_dp_update_branch_info_no_crash),
+	KUNIT_CASE(dm_test_mst_poll_pending_down_reply_no_crash),
+	KUNIT_CASE(dm_test_mst_clear_payload_alloc_table_no_crash),
+	KUNIT_CASE(dm_test_set_dcn_clocks_no_crash),
+	KUNIT_CASE(dm_test_dmu_timeout_no_crash),
+	KUNIT_CASE(dm_test_smu_timeout_no_crash),
+	KUNIT_CASE(dm_test_set_phyd32clk_no_crash),
+	KUNIT_CASE(dm_test_mst_update_branch_bandwidth_no_crash),
+	/* MST null-connector early returns */
+	KUNIT_CASE(dm_test_mst_write_payload_alloc_table_null_ctx),
+	KUNIT_CASE(dm_test_mst_poll_for_act_null_ctx),
+	/* dm_helpers_dp_mst_poll_for_allocation_change_trigger success/fail */
+	KUNIT_CASE(dm_test_mst_send_payload_alloc_null_ctx),
+	KUNIT_CASE(dm_test_mst_update_mgr_dealloc_null_ctx),
+	/* dm_helpers_is_dp_sink_present */
+	KUNIT_CASE(dm_test_is_dp_sink_present_null_priv),
+	/* dm_helpers_dmub_outbox_interrupt_control */
+	KUNIT_CASE(dm_test_dmub_outbox_interrupt_control_null_dc),
+	/* dm_helpers_mst_enable_stream_features */
+	KUNIT_CASE(dm_test_mst_enable_stream_features_aux_disabled),
+	KUNIT_CASE(dm_test_mst_enable_stream_features_writes_downspread),
+	/* dm_helpers_enable_periodic_detection */
+	KUNIT_CASE(dm_test_enable_periodic_detection_no_workqueue),
+	KUNIT_CASE(dm_test_enable_periodic_detection_updates_enable),
+	KUNIT_CASE(dm_test_enable_periodic_detection_schedules_work),
 	{}
 };
 

@@ -379,6 +379,8 @@ void dm_helpers_dp_update_branch_info(
 	struct dc_context *ctx,
 	const struct dc_link *link)
 {}
+EXPORT_IF_KUNIT(dm_helpers_dp_update_branch_info);
+
 #if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS)
 static void dm_helpers_construct_old_payload(
 			struct drm_dp_mst_topology_mgr *mgr,
@@ -564,6 +566,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 #endif
 	return true;
 }
+EXPORT_IF_KUNIT(dm_helpers_dp_mst_write_payload_allocation_table);
 
 /*
  * poll pending down reply
@@ -572,6 +575,7 @@ void dm_helpers_dp_mst_poll_pending_down_reply(
 	struct dc_context *ctx,
 	const struct dc_link *link)
 {}
+EXPORT_IF_KUNIT(dm_helpers_dp_mst_poll_pending_down_reply);
 
 /*
  * Clear payload allocation table before enable MST DP link.
@@ -580,6 +584,7 @@ void dm_helpers_dp_mst_clear_payload_allocation_table(
 	struct dc_context *ctx,
 	const struct dc_link *link)
 {}
+EXPORT_IF_KUNIT(dm_helpers_dp_mst_clear_payload_allocation_table);
 
 /*
  * Polls for ACT (allocation change trigger) handled and sends
@@ -610,6 +615,7 @@ enum act_return_status dm_helpers_dp_mst_poll_for_allocation_change_trigger(
 
 	return ACT_SUCCESS;
 }
+EXPORT_IF_KUNIT(dm_helpers_dp_mst_poll_for_allocation_change_trigger);
 
 void dm_helpers_dp_mst_send_payload_allocation(
 		struct dc_context *ctx,
@@ -658,6 +664,7 @@ void dm_helpers_dp_mst_send_payload_allocation(
 			clr_flag, false);
 	}
 }
+EXPORT_IF_KUNIT(dm_helpers_dp_mst_send_payload_allocation);
 
 void dm_helpers_dp_mst_update_mst_mgr_for_deallocation(
 		struct dc_context *ctx,
@@ -701,6 +708,7 @@ void dm_helpers_dp_mst_update_mst_mgr_for_deallocation(
 	drm_dp_mst_deallocate_vcpi(mst_mgr, mst_port);
 #endif
  }
+EXPORT_IF_KUNIT(dm_helpers_dp_mst_update_mst_mgr_for_deallocation);
 
 void dm_dtn_log_begin(struct dc_context *ctx,
 	struct dc_log_buffer_ctx *log_ctx)
@@ -920,6 +928,7 @@ bool dm_helpers_submit_i2c(
 
 	return result;
 }
+EXPORT_IF_KUNIT(dm_helpers_submit_i2c);
 
 bool dm_helpers_execute_fused_io(
 		struct dc_context *ctx,
@@ -1257,6 +1266,7 @@ bool dm_helpers_is_dp_sink_present(struct dc_link *link)
 	mutex_unlock(&aconnector->dm_dp_aux.aux.hw_mutex);
 	return dp_sink_present;
 }
+EXPORT_IF_KUNIT(dm_helpers_is_dp_sink_present);
 
 #ifdef HAVE_DRM_DP_MST_EDID_READ
 STATIC_IFN_KUNIT int
@@ -1573,6 +1583,7 @@ int dm_helper_dmub_aux_transfer_sync(
 	return amdgpu_dm_process_dmub_aux_transfer_sync(ctx, link->link_index, payload,
 			operation_result);
 }
+EXPORT_IF_KUNIT(dm_helper_dmub_aux_transfer_sync);
 
 int dm_helpers_dmub_set_config_sync(struct dc_context *ctx,
 		const struct dc_link *link,
@@ -1587,18 +1598,21 @@ void dm_set_dcn_clocks(struct dc_context *ctx, struct dc_clocks *clks)
 {
 	/* TODO: something */
 }
+EXPORT_IF_KUNIT(dm_set_dcn_clocks);
 
 void dm_helpers_dmu_timeout(struct dc_context *ctx)
 {
 	// TODO:
 	//amdgpu_device_gpu_recover(dc_context->driver-context, NULL);
 }
+EXPORT_IF_KUNIT(dm_helpers_dmu_timeout);
 
 void dm_helpers_smu_timeout(struct dc_context *ctx, unsigned int msg_id, unsigned int param, unsigned int timeout_us)
 {
 	// TODO:
 	//amdgpu_device_gpu_recover(dc_context->driver-context, NULL);
 }
+EXPORT_IF_KUNIT(dm_helpers_smu_timeout);
 
 void dm_helpers_init_panel_settings(
 	struct dc_context *ctx,
@@ -1671,6 +1685,7 @@ bool dm_helpers_dmub_outbox_interrupt_control(struct dc_context *ctx, bool enabl
 			 enable ? "en" : "dis", ret);
 	return ret;
 }
+EXPORT_IF_KUNIT(dm_helpers_dmub_outbox_interrupt_control);
 
 void dm_helpers_mst_enable_stream_features(const struct dc_stream_state *stream)
 {
@@ -1696,6 +1711,7 @@ void dm_helpers_mst_enable_stream_features(const struct dc_stream_state *stream)
 					 &new_downspread.raw,
 					 sizeof(new_downspread));
 }
+EXPORT_IF_KUNIT(dm_helpers_mst_enable_stream_features);
 
 bool dm_helpers_dp_handle_test_pattern_request(
 		struct dc_context *ctx,
@@ -1839,6 +1855,7 @@ void dm_set_phyd32clk(struct dc_context *ctx, int freq_khz)
 {
        // TODO
 }
+EXPORT_IF_KUNIT(dm_set_phyd32clk);
 
 void dm_helpers_enable_periodic_detection(struct dc_context *ctx, bool enable)
 {
@@ -1850,6 +1867,7 @@ void dm_helpers_enable_periodic_detection(struct dc_context *ctx, bool enable)
 			schedule_work(&adev->dm.idle_workqueue->work);
 	}
 }
+EXPORT_IF_KUNIT(dm_helpers_enable_periodic_detection);
 
 void dm_helpers_dp_mst_update_branch_bandwidth(
 		struct dc_context *ctx,
@@ -1857,6 +1875,7 @@ void dm_helpers_dp_mst_update_branch_bandwidth(
 {
 	// TODO
 }
+EXPORT_IF_KUNIT(dm_helpers_dp_mst_update_branch_bandwidth);
 
 STATIC_IFN_KUNIT const uint32_t dm_freesync_pcon_whitelist[] = {
 	DP_BRANCH_DEVICE_ID_0060AD,
