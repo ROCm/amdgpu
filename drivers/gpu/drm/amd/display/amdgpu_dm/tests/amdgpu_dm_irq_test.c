@@ -154,6 +154,19 @@ static void dm_test_destroy_hpd_rx_wq(void *data)
 	kfree(ctx->wq);
 }
 
+static const struct drm_connector_funcs dm_test_connector_funcs = {
+	.reset = drm_atomic_helper_connector_reset,
+	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+	.fill_modes = drm_helper_probe_single_connector_modes,
+	.destroy = drm_connector_cleanup,
+};
+
+static void dm_test_connector_cleanup(void *data)
+{
+	drm_connector_cleanup(data);
+}
+
 /* Tests for amdgpu_dm_hpd_to_dal_irq_source() */
 
 /**
@@ -917,11 +930,9 @@ static void dm_test_get_crtc_by_otg_inst_returns_match(struct kunit *test)
 	acrtc_b->otg_inst = 3;
 
 	list_add_tail(&acrtc_a->base.head, &drm->mode_config.crtc_list);
-	KUNIT_ASSERT_EQ(test, kunit_add_action_or_reset(test, dm_test_crtc_list_del,
-							acrtc_a), 0);
+	KUNIT_ASSERT_EQ(test, kunit_add_action_or_reset(test, dm_test_crtc_list_del, acrtc_a), 0);
 	list_add_tail(&acrtc_b->base.head, &drm->mode_config.crtc_list);
-	KUNIT_ASSERT_EQ(test, kunit_add_action_or_reset(test, dm_test_crtc_list_del,
-							acrtc_b), 0);
+	KUNIT_ASSERT_EQ(test, kunit_add_action_or_reset(test, dm_test_crtc_list_del, acrtc_b), 0);
 
 	KUNIT_EXPECT_PTR_EQ(test, amdgpu_dm_get_crtc_by_otg_inst(adev, 3), acrtc_b);
 }
@@ -946,8 +957,7 @@ static void dm_test_get_crtc_by_otg_inst_returns_null(struct kunit *test)
 	acrtc->otg_inst = 2;
 
 	list_add_tail(&acrtc->base.head, &drm->mode_config.crtc_list);
-	KUNIT_ASSERT_EQ(test, kunit_add_action_or_reset(test, dm_test_crtc_list_del,
-							acrtc), 0);
+	KUNIT_ASSERT_EQ(test, kunit_add_action_or_reset(test, dm_test_crtc_list_del, acrtc), 0);
 
 	KUNIT_EXPECT_NULL(test, amdgpu_dm_get_crtc_by_otg_inst(adev, 5));
 }
@@ -1733,6 +1743,165 @@ static void dm_test_outbox_init_null_dc(struct kunit *test)
 	amdgpu_dm_outbox_init(adev);
 }
 
+/* Tests for amdgpu_dm_hpd_init()/amdgpu_dm_hpd_fini() */
+
+/**
+ * dm_test_hpd_init_empty_connectors - Test HPD init with no connectors
+ * @test: The KUnit test context
+ */
+static void dm_test_hpd_init_empty_connectors(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = dm_kunit_alloc_adev(test);
+
+	/*
+	 * With an empty connector list the per-connector loop is skipped and
+	 * the initial clear loop relies on dc_interrupt_set() being a no-op
+	 * for a NULL dc, so init must complete without touching the DC.
+	 */
+	amdgpu_dm_hpd_init(adev);
+}
+
+/**
+ * dm_test_hpd_fini_empty_connectors - Test HPD fini with no connectors
+ * @test: The KUnit test context
+ */
+static void dm_test_hpd_fini_empty_connectors(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = dm_kunit_alloc_adev(test);
+
+	/* Empty connector list and disabled polling: fini is a safe no-op. */
+	amdgpu_dm_hpd_fini(adev);
+}
+
+/**
+ * dm_test_hpd_init_fini_with_connectors - Test HPD init/fini walk connectors
+ * @test: The KUnit test context
+ */
+static void dm_test_hpd_init_fini_with_connectors(struct kunit *test)
+{
+	struct amdgpu_dm_connector *aconn;
+	struct drm_connector *wbconn;
+	struct amdgpu_device *adev;
+	struct dc_link *link;
+
+	adev = dm_kunit_alloc_adev(test);
+
+	/*
+	 * num_hpd = 0 forces irq_type >= num_hpd so the loop takes the HW
+	 * fallback (dc_interrupt_set()) instead of amdgpu_irq_get(); with a
+	 * NULL dc that fallback is a safe no-op.
+	 */
+	adev->mode_info.num_hpd = 0;
+
+	/* A writeback connector must be skipped by the per-connector loop. */
+	wbconn = kunit_kzalloc(test, sizeof(*wbconn), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, wbconn);
+	KUNIT_ASSERT_EQ(test, drm_connector_init(&adev->ddev, wbconn, &dm_test_connector_funcs,
+						 DRM_MODE_CONNECTOR_WRITEBACK), 0);
+	KUNIT_ASSERT_EQ(test,
+			kunit_add_action_or_reset(test, dm_test_connector_cleanup, wbconn), 0);
+
+	/* A DisplayPort connector with a dc_link exercises the loop body. */
+	aconn = kunit_kzalloc(test, sizeof(*aconn), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, aconn);
+	KUNIT_ASSERT_EQ(test, drm_connector_init(&adev->ddev, &aconn->base,
+						 &dm_test_connector_funcs,
+						 DRM_MODE_CONNECTOR_DisplayPort), 0);
+	KUNIT_ASSERT_EQ(test,
+			kunit_add_action_or_reset(test, dm_test_connector_cleanup, &aconn->base), 0);
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+	link->irq_source_hpd = DC_IRQ_SOURCE_HPD1;
+	link->irq_source_hpd_rx = DC_IRQ_SOURCE_HPD1RX;
+	aconn->dc_link = link;
+
+	/* DC is absent (NULL), so the HW writes are NULL-safe no-ops. */
+	amdgpu_dm_hpd_init(adev);
+	amdgpu_dm_hpd_fini(adev);
+}
+
+/**
+ * dm_test_hpd_init_fini_analog_connector - Test HPD init/fini analog polling path
+ * @test: The KUnit test context
+ */
+static void dm_test_hpd_init_fini_analog_connector(struct kunit *test)
+{
+	struct amdgpu_dm_connector *aconn;
+	struct amdgpu_device *adev;
+	struct dc_link *link;
+
+	adev = dm_kunit_alloc_adev(test);
+	adev->mode_info.num_hpd = 0;
+
+	aconn = kunit_kzalloc(test, sizeof(*aconn), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, aconn);
+	KUNIT_ASSERT_EQ(test, drm_connector_init(&adev->ddev, &aconn->base,
+						 &dm_test_connector_funcs,
+						 DRM_MODE_CONNECTOR_VGA), 0);
+	KUNIT_ASSERT_EQ(test,
+			kunit_add_action_or_reset(test, dm_test_connector_cleanup, &aconn->base), 0);
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+	link->irq_source_hpd = DC_IRQ_SOURCE_HPD1;
+	link->irq_source_hpd_rx = DC_IRQ_SOURCE_HPD1RX;
+	/* An analog connector id makes the loop request polling. */
+	link->link_id.id = CONNECTOR_ID_VGA;
+	aconn->dc_link = link;
+
+	/* use_polling becomes true, so init must enable KMS polling. */
+	amdgpu_dm_hpd_init(adev);
+	KUNIT_EXPECT_TRUE(test, adev->ddev.mode_config.poll_enabled);
+
+	/* fini must tear the polling back down. */
+	amdgpu_dm_hpd_fini(adev);
+	KUNIT_EXPECT_FALSE(test, adev->ddev.mode_config.poll_enabled);
+}
+
+/**
+ * dm_test_hpd_init_fini_irq_ref - Test HPD init/fini base-driver irq ref path
+ * @test: The KUnit test context
+ */
+static void dm_test_hpd_init_fini_irq_ref(struct kunit *test)
+{
+	struct amdgpu_dm_connector *aconn;
+	struct amdgpu_device *adev;
+	struct dc_link *link;
+
+	adev = dm_kunit_alloc_adev(test);
+
+	/*
+	 * num_hpd >= 1 makes irq_type (0) < num_hpd, so the loop takes the
+	 * amdgpu_irq_get()/amdgpu_irq_put() branch instead of the
+	 * dc_interrupt_set() fallback. The mock device has irq.installed ==
+	 * false, so both calls fail early with -ENOENT (logging an error)
+	 * without touching the base-driver irq state.
+	 */
+	adev->mode_info.num_hpd = 1;
+
+	aconn = kunit_kzalloc(test, sizeof(*aconn), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, aconn);
+	KUNIT_ASSERT_EQ(test, drm_connector_init(&adev->ddev, &aconn->base,
+						 &dm_test_connector_funcs,
+						 DRM_MODE_CONNECTOR_DisplayPort), 0);
+	KUNIT_ASSERT_EQ(test,
+			kunit_add_action_or_reset(test, dm_test_connector_cleanup, &aconn->base), 0);
+
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link);
+	link->irq_source_hpd = DC_IRQ_SOURCE_HPD1;
+	link->irq_source_hpd_rx = DC_IRQ_SOURCE_INVALID;
+	aconn->dc_link = link;
+
+	amdgpu_dm_hpd_init(adev);
+	amdgpu_dm_hpd_fini(adev);
+}
+
 static struct kunit_case amdgpu_dm_irq_tests[] = {
 	/* amdgpu_dm_hpd_to_dal_irq_source */
 	KUNIT_CASE(dm_test_hpd_to_dal_irq_source_hpd1),
@@ -1829,6 +1998,12 @@ static struct kunit_case amdgpu_dm_irq_tests[] = {
 	KUNIT_CASE(dm_test_set_dmub_trace_irq_state_null_dc),
 	/* amdgpu_dm_outbox_init */
 	KUNIT_CASE(dm_test_outbox_init_null_dc),
+	/* amdgpu_dm_hpd_init/amdgpu_dm_hpd_fini */
+	KUNIT_CASE(dm_test_hpd_init_empty_connectors),
+	KUNIT_CASE(dm_test_hpd_fini_empty_connectors),
+	KUNIT_CASE(dm_test_hpd_init_fini_with_connectors),
+	KUNIT_CASE(dm_test_hpd_init_fini_analog_connector),
+	KUNIT_CASE(dm_test_hpd_init_fini_irq_ref),
 	{}
 };
 

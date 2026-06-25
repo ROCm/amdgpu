@@ -1003,6 +1003,7 @@ void amdgpu_dm_hpd_init(struct amdgpu_device *adev)
 	if (use_polling)
 		drm_kms_helper_poll_init(dev);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_hpd_init);
 
 /**
  * amdgpu_dm_hpd_fini - hpd tear down callback.
@@ -1056,6 +1057,7 @@ void amdgpu_dm_hpd_fini(struct amdgpu_device *adev)
 	if (dev->mode_config.poll_enabled)
 		drm_kms_helper_poll_fini(dev);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_hpd_fini);
 
 /* ========== HPD handling ========== */
 static void force_connector_state(
