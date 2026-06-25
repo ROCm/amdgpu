@@ -1211,6 +1211,475 @@ static void dm_test_dp_write_dpcd_null_priv(struct kunit *test)
 			   dm_helpers_dp_write_dpcd(NULL, link, 0, &data, sizeof(data)));
 }
 
+/*
+ * Stub AUX transfer that ACKs every transaction (zero-filling reads), so
+ * drm_dp_dpcd_read()/drm_dp_dpcd_write() report the full transfer size.
+ */
+static ssize_t dm_test_dpcd_ack_transfer(struct drm_dp_aux *aux,
+					 struct drm_dp_aux_msg *msg)
+{
+	if ((msg->request & ~DP_AUX_I2C_MOT) == DP_AUX_NATIVE_READ)
+		memset(msg->buffer, 0, msg->size);
+	msg->reply = DP_AUX_NATIVE_REPLY_ACK;
+	return msg->size;
+}
+
+/*
+ * Wire a connector-backed link with a working AUX channel so the DPCD
+ * read/write helpers can complete a real transaction.
+ */
+static struct dc_link *dm_test_dpcd_link(struct kunit *test)
+{
+	struct amdgpu_dm_connector *aconnector;
+	struct amdgpu_device *adev;
+	struct dc_link *link;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+
+	link = dm_kunit_alloc_link(test);
+	aconnector = dm_kunit_alloc_connector(test, adev, NULL);
+
+	aconnector->dm_dp_aux.aux.drm_dev = &adev->ddev;
+	aconnector->dm_dp_aux.aux.transfer = dm_test_dpcd_ack_transfer;
+	drm_dp_aux_init(&aconnector->dm_dp_aux.aux);
+
+	link->priv = aconnector;
+
+	return link;
+}
+
+/**
+ * dm_test_dp_read_dpcd_success - Test DPCD read returns true on ACKed transfer
+ * @test: The KUnit test context
+ */
+static void dm_test_dp_read_dpcd_success(struct kunit *test)
+{
+	struct dc_link *link = dm_test_dpcd_link(test);
+	uint8_t data = 0;
+
+	KUNIT_EXPECT_TRUE(test,
+			  dm_helpers_dp_read_dpcd(NULL, link, 0, &data, sizeof(data)));
+}
+
+/**
+ * dm_test_dp_write_dpcd_success - Test DPCD write returns true on ACKed transfer
+ * @test: The KUnit test context
+ */
+static void dm_test_dp_write_dpcd_success(struct kunit *test)
+{
+	struct dc_link *link = dm_test_dpcd_link(test);
+	uint8_t data = 0;
+
+	KUNIT_EXPECT_TRUE(test,
+			  dm_helpers_dp_write_dpcd(NULL, link, 0, &data, sizeof(data)));
+}
+
+/* Tests for dm_helpers_execute_fused_io() */
+
+/**
+ * dm_test_execute_fused_io_null_dmub_srv - Test fused IO fails without DMUB service
+ * @test: The KUnit test context
+ */
+static void dm_test_execute_fused_io_null_dmub_srv(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc_context *ctx;
+	struct dc_link *link;
+	union dmub_rb_cmd *commands;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	mutex_init(&adev->dm.dpia_aux_lock);
+	spin_lock_init(&adev->dm.dmub_lock);
+
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, ctx);
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+	commands = kunit_kzalloc(test, sizeof(*commands), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, commands);
+
+	ctx->driver_context = adev;
+	link->ctx = ctx;
+	commands[0].fused_io.request.u.aux.ddc_line = 0;
+
+	KUNIT_EXPECT_FALSE(test, dm_helpers_execute_fused_io(ctx, link, commands, 1, 1));
+}
+
+struct dm_test_synaptics_aux {
+	struct drm_dp_aux aux;
+	u32 fail_address;
+	u32 last_dpcd_write_address;
+	u8 rc_result;
+	u8 dpcd_read_value;
+	u8 dpcd_write_value;
+	u8 last_rc_data[16];
+	u8 read_rc_data[16];
+	u8 last_rc_command;
+	u8 rc_commands[32];
+	u8 dsc_enable_values[8];
+	u32 last_rc_offset;
+	u32 last_rc_length;
+	unsigned int rc_data_writes;
+	unsigned int rc_data_reads;
+	unsigned int rc_command_reads;
+	unsigned int rc_result_reads;
+	unsigned int rc_command_count;
+	unsigned int downspread_reads;
+	unsigned int downspread_writes;
+	unsigned int dsc_enable_writes;
+};
+
+static ssize_t dm_test_synaptics_aux_transfer(struct drm_dp_aux *aux,
+					      struct drm_dp_aux_msg *msg)
+{
+	struct dm_test_synaptics_aux *fixture;
+	u8 request;
+	u8 *buffer;
+	size_t copy_size;
+	unsigned int index;
+
+	fixture = container_of(aux, struct dm_test_synaptics_aux, aux);
+	request = msg->request & ~DP_AUX_I2C_MOT;
+	buffer = msg->buffer;
+
+	if (fixture->fail_address == msg->address)
+		return -EIO;
+
+	if (request == DP_AUX_NATIVE_WRITE) {
+		switch (msg->address) {
+		case DP_DOWNSPREAD_CTRL:
+			fixture->last_dpcd_write_address = msg->address;
+			if (msg->size)
+				fixture->dpcd_write_value = buffer[0];
+			fixture->downspread_writes++;
+			break;
+		case SYNAPTICS_RC_DATA:
+			copy_size = min_t(size_t, msg->size, sizeof(fixture->last_rc_data));
+			memset(fixture->last_rc_data, 0, sizeof(fixture->last_rc_data));
+			memcpy(fixture->last_rc_data, buffer, copy_size);
+			fixture->rc_data_writes++;
+			break;
+		case SYNAPTICS_RC_OFFSET:
+			if (msg->size >= 4)
+				fixture->last_rc_offset = buffer[0] | buffer[1] << 8 |
+							  buffer[2] << 16 | buffer[3] << 24;
+			break;
+		case SYNAPTICS_RC_LENGTH:
+			if (msg->size >= 2)
+				fixture->last_rc_length = buffer[0] | buffer[1] << 8;
+			break;
+		case SYNAPTICS_RC_COMMAND:
+			fixture->last_rc_command = buffer[0];
+			if (fixture->rc_command_count < ARRAY_SIZE(fixture->rc_commands)) {
+				fixture->rc_commands[fixture->rc_command_count] = buffer[0] & 0x7f;
+				fixture->rc_command_count++;
+			}
+			break;
+		case DP_DSC_ENABLE:
+			if (fixture->dsc_enable_writes < ARRAY_SIZE(fixture->dsc_enable_values)) {
+				fixture->dsc_enable_values[fixture->dsc_enable_writes] = buffer[0];
+				fixture->dsc_enable_writes++;
+			}
+			break;
+		}
+		msg->reply = DP_AUX_NATIVE_REPLY_ACK;
+		return msg->size;
+	}
+
+	if (request == DP_AUX_NATIVE_READ) {
+		memset(buffer, 0, msg->size);
+		switch (msg->address) {
+		case DP_DOWNSPREAD_CTRL:
+			if (msg->size)
+				buffer[0] = fixture->dpcd_read_value;
+			fixture->downspread_reads++;
+			break;
+		case SYNAPTICS_RC_COMMAND:
+			if (msg->size)
+				buffer[0] = fixture->last_rc_command & 0x7f;
+			fixture->rc_command_reads++;
+			break;
+		case SYNAPTICS_RC_RESULT:
+			if (msg->size)
+				buffer[0] = fixture->rc_result;
+			fixture->rc_result_reads++;
+			break;
+		case SYNAPTICS_RC_DATA:
+			copy_size = min_t(size_t, msg->size, sizeof(fixture->read_rc_data));
+			for (index = 0; index < copy_size; index++)
+				buffer[index] = fixture->read_rc_data[index];
+			fixture->rc_data_reads++;
+			break;
+		}
+		msg->reply = DP_AUX_NATIVE_REPLY_ACK;
+		return msg->size;
+	}
+
+	msg->reply = DP_AUX_NATIVE_REPLY_ACK;
+	return msg->size;
+}
+
+static struct dm_test_synaptics_aux *dm_test_alloc_synaptics_aux_with_dev(struct kunit *test,
+								 struct drm_device *drm_dev)
+{
+	struct dm_test_synaptics_aux *fixture;
+	unsigned int index;
+
+	fixture = kunit_kzalloc(test, sizeof(*fixture), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, fixture);
+
+	for (index = 0; index < ARRAY_SIZE(fixture->read_rc_data); index++)
+		fixture->read_rc_data[index] = 0x03;
+
+	fixture->rc_result = 0;
+	fixture->aux.drm_dev = drm_dev;
+	fixture->aux.transfer = dm_test_synaptics_aux_transfer;
+	drm_dp_aux_init(&fixture->aux);
+
+	return fixture;
+}
+
+static struct dm_test_synaptics_aux *dm_test_alloc_synaptics_aux(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = dm_kunit_alloc_adev(test);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+
+	return dm_test_alloc_synaptics_aux_with_dev(test, &adev->ddev);
+}
+
+static void dm_test_expect_synaptics_commands(struct kunit *test,
+					      struct dm_test_synaptics_aux *fixture,
+					      const u8 *expected_commands,
+					      unsigned int expected_count)
+{
+	unsigned int index;
+
+	KUNIT_ASSERT_EQ(test, fixture->rc_command_count, expected_count);
+
+	for (index = 0; index < expected_count; index++)
+		KUNIT_EXPECT_EQ(test, fixture->rc_commands[index], expected_commands[index]);
+}
+
+static void dm_test_setup_synaptics_stream(struct dc_stream_state *stream,
+						  struct dc_link *link)
+{
+	stream->link = link;
+	stream->signal = SIGNAL_TYPE_DISPLAY_PORT_MST;
+	link->dpcd_caps.branch_dev_id = DP_BRANCH_DEVICE_ID_90CC24;
+	link->dpcd_caps.dpcd_rev.raw = DP_DPCD_REV_14;
+	link->dpcd_caps.sink_count.bits.SINK_COUNT = 2;
+	memcpy(link->dpcd_caps.branch_dev_name, "SYNA", 4);
+}
+
+/**
+ * dm_test_execute_synaptics_rc_command_write_success - Test RC write success
+ * @test: The KUnit test context
+ */
+static void dm_test_execute_synaptics_rc_command_write_success(struct kunit *test)
+{
+	struct dm_test_synaptics_aux *fixture;
+	u8 data[5] = { 'P', 'R', 'I', 'U', 'S' };
+
+	fixture = dm_test_alloc_synaptics_aux(test);
+
+	KUNIT_EXPECT_TRUE(test, execute_synaptics_rc_command(&fixture->aux, true,
+							     0x01, sizeof(data), 0x123456,
+							     data));
+	KUNIT_EXPECT_EQ(test, memcmp(fixture->last_rc_data, data, sizeof(data)), 0);
+	KUNIT_EXPECT_EQ(test, fixture->last_rc_offset, 0x123456U);
+	KUNIT_EXPECT_EQ(test, fixture->last_rc_length, (u32)sizeof(data));
+	KUNIT_EXPECT_EQ(test, fixture->last_rc_command, (u8)0x81);
+	KUNIT_EXPECT_EQ(test, fixture->rc_command_reads, 1U);
+	KUNIT_EXPECT_EQ(test, fixture->rc_result_reads, 1U);
+}
+
+/**
+ * dm_test_execute_synaptics_rc_command_read_success - Test RC read success
+ * @test: The KUnit test context
+ */
+static void dm_test_execute_synaptics_rc_command_read_success(struct kunit *test)
+{
+	struct dm_test_synaptics_aux *fixture;
+	u8 data[4] = { 0 };
+	u8 expected[4] = { 0xa5, 0x5a, 0xc3, 0x3c };
+
+	fixture = dm_test_alloc_synaptics_aux(test);
+	memcpy(fixture->read_rc_data, expected, sizeof(expected));
+
+	KUNIT_EXPECT_TRUE(test, execute_synaptics_rc_command(&fixture->aux, false,
+							     0x31, sizeof(data), 0x220998,
+							     data));
+	KUNIT_EXPECT_EQ(test, memcmp(data, expected, sizeof(expected)), 0);
+	KUNIT_EXPECT_EQ(test, fixture->rc_data_writes, 0U);
+	KUNIT_EXPECT_EQ(test, fixture->rc_data_reads, 1U);
+	KUNIT_EXPECT_EQ(test, fixture->last_rc_offset, 0x220998U);
+	KUNIT_EXPECT_EQ(test, fixture->last_rc_length, (u32)sizeof(data));
+}
+
+/**
+ * dm_test_execute_synaptics_rc_command_write_fail - Test RC write failure
+ * @test: The KUnit test context
+ */
+static void dm_test_execute_synaptics_rc_command_write_fail(struct kunit *test)
+{
+	struct dm_test_synaptics_aux *fixture;
+	u8 data = 0;
+
+	fixture = dm_test_alloc_synaptics_aux(test);
+	fixture->fail_address = SYNAPTICS_RC_LENGTH;
+
+	KUNIT_EXPECT_FALSE(test, execute_synaptics_rc_command(&fixture->aux, true,
+							      0x01, sizeof(data), 0, &data));
+	KUNIT_EXPECT_EQ(test, fixture->rc_command_count, 0U);
+}
+
+/**
+ * dm_test_apply_synaptics_fifo_reset_wa_full - Test full FIFO reset sequence
+ * @test: The KUnit test context
+ */
+static void dm_test_apply_synaptics_fifo_reset_wa_full(struct kunit *test)
+{
+	static const u8 expected_commands[] = {
+		0x01, 0x31, 0x21, 0x31, 0x21, 0x31, 0x21,
+		0x31, 0x21, 0x31, 0x31, 0x21, 0x02,
+	};
+	struct dm_test_synaptics_aux *fixture;
+
+	fixture = dm_test_alloc_synaptics_aux(test);
+
+	apply_synaptics_fifo_reset_wa(&fixture->aux);
+
+	dm_test_expect_synaptics_commands(test, fixture, expected_commands,
+					  ARRAY_SIZE(expected_commands));
+	KUNIT_EXPECT_EQ(test, fixture->rc_result_reads, (unsigned int)ARRAY_SIZE(expected_commands));
+}
+
+/**
+ * dm_test_apply_synaptics_fifo_reset_wa_first_fail - Test FIFO reset early exit
+ * @test: The KUnit test context
+ */
+static void dm_test_apply_synaptics_fifo_reset_wa_first_fail(struct kunit *test)
+{
+	struct dm_test_synaptics_aux *fixture;
+
+	fixture = dm_test_alloc_synaptics_aux(test);
+	fixture->rc_result = 0xff;
+
+	apply_synaptics_fifo_reset_wa(&fixture->aux);
+
+	KUNIT_EXPECT_EQ(test, fixture->rc_command_count, 1U);
+	KUNIT_EXPECT_EQ(test, fixture->rc_commands[0], (u8)0x01);
+}
+
+static void dm_test_write_dsc_enable_synaptics(struct kunit *test,
+					       bool link_active,
+					       bool enable,
+					       bool synaptics_branch,
+					       unsigned int expected_dsc_writes,
+					       unsigned int expected_rc_commands)
+{
+	struct dm_test_synaptics_aux *fixture;
+	struct dc_stream_state *stream;
+	struct dc_link *link;
+	u8 ret;
+
+	fixture = dm_test_alloc_synaptics_aux(test);
+	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, stream);
+	link = dm_kunit_alloc_link(test);
+
+	dm_test_setup_synaptics_stream(stream, link);
+	link->link_status.link_active = link_active;
+	if (!synaptics_branch)
+		memcpy(link->dpcd_caps.branch_dev_name, "ABCD", 4);
+
+	ret = write_dsc_enable_synaptics_non_virtual_dpcd_mst(&fixture->aux, stream, enable);
+
+	KUNIT_EXPECT_EQ(test, ret, expected_dsc_writes ? 1 : 0);
+	KUNIT_EXPECT_EQ(test, fixture->dsc_enable_writes, expected_dsc_writes);
+	KUNIT_EXPECT_EQ(test, fixture->rc_command_count, expected_rc_commands);
+	if (expected_dsc_writes)
+		KUNIT_EXPECT_EQ(test, fixture->dsc_enable_values[0], enable ? 1 : 0);
+}
+
+/**
+ * dm_test_write_dsc_enable_synaptics_enable_inactive - Test enable plus FIFO reset
+ * @test: The KUnit test context
+ */
+static void dm_test_write_dsc_enable_synaptics_enable_inactive(struct kunit *test)
+{
+	dm_test_write_dsc_enable_synaptics(test, false, true, true, 1, 13);
+}
+
+/**
+ * dm_test_write_dsc_enable_synaptics_enable_active - Test enable skips FIFO reset
+ * @test: The KUnit test context
+ */
+static void dm_test_write_dsc_enable_synaptics_enable_active(struct kunit *test)
+{
+	dm_test_write_dsc_enable_synaptics(test, true, true, true, 1, 0);
+}
+
+/**
+ * dm_test_write_dsc_enable_synaptics_disable_inactive - Test inactive disable writes DPCD
+ * @test: The KUnit test context
+ */
+static void dm_test_write_dsc_enable_synaptics_disable_inactive(struct kunit *test)
+{
+	dm_test_write_dsc_enable_synaptics(test, false, false, true, 1, 0);
+}
+
+/**
+ * dm_test_write_dsc_enable_synaptics_disable_active - Test active disable skips DPCD
+ * @test: The KUnit test context
+ */
+static void dm_test_write_dsc_enable_synaptics_disable_active(struct kunit *test)
+{
+	dm_test_write_dsc_enable_synaptics(test, true, false, true, 0, 0);
+}
+
+/**
+ * dm_test_write_dsc_enable_synaptics_enable_non_synaptics - Test non-Synaptics enable
+ * @test: The KUnit test context
+ */
+static void dm_test_write_dsc_enable_synaptics_enable_non_synaptics(struct kunit *test)
+{
+	dm_test_write_dsc_enable_synaptics(test, false, true, false, 1, 0);
+}
+
+/**
+ * dm_test_dp_write_dsc_enable_routes_synaptics - Test public DSC helper workaround route
+ * @test: The KUnit test context
+ */
+static void dm_test_dp_write_dsc_enable_routes_synaptics(struct kunit *test)
+{
+	struct dm_test_synaptics_aux *fixture;
+	struct amdgpu_dm_connector *aconnector;
+	struct dc_stream_state *stream;
+	struct dc_link *link;
+
+	fixture = dm_test_alloc_synaptics_aux(test);
+	aconnector = kunit_kzalloc(test, sizeof(*aconnector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, aconnector);
+	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, stream);
+	link = dm_kunit_alloc_link(test);
+
+	dm_test_setup_synaptics_stream(stream, link);
+	stream->dm_stream_context = aconnector;
+	aconnector->dc_link = link;
+	aconnector->dsc_aux = &fixture->aux;
+
+	KUNIT_EXPECT_TRUE(test, dm_helpers_dp_write_dsc_enable(NULL, stream, true));
+	KUNIT_EXPECT_EQ(test, fixture->dsc_enable_writes, 1U);
+	KUNIT_EXPECT_EQ(test, fixture->dsc_enable_values[0], (u8)1);
+	KUNIT_EXPECT_EQ(test, fixture->rc_command_count, 13U);
+}
+
 /* Tests for dm_helpers_dp_mst_start_top_mgr() / dm_helpers_dp_mst_stop_top_mgr() */
 
 /**
@@ -1341,6 +1810,22 @@ static struct kunit_case amdgpu_dm_helpers_test_cases[] = {
 	/* dm_helpers_dp_read_dpcd / dm_helpers_dp_write_dpcd */
 	KUNIT_CASE(dm_test_dp_read_dpcd_null_priv),
 	KUNIT_CASE(dm_test_dp_write_dpcd_null_priv),
+	KUNIT_CASE(dm_test_dp_read_dpcd_success),
+	KUNIT_CASE(dm_test_dp_write_dpcd_success),
+	/* dm_helpers_execute_fused_io */
+	KUNIT_CASE(dm_test_execute_fused_io_null_dmub_srv),
+	/* Synaptics RC/FIFO/DSC helpers */
+	KUNIT_CASE(dm_test_execute_synaptics_rc_command_write_success),
+	KUNIT_CASE(dm_test_execute_synaptics_rc_command_read_success),
+	KUNIT_CASE(dm_test_execute_synaptics_rc_command_write_fail),
+	KUNIT_CASE(dm_test_apply_synaptics_fifo_reset_wa_full),
+	KUNIT_CASE(dm_test_apply_synaptics_fifo_reset_wa_first_fail),
+	KUNIT_CASE(dm_test_write_dsc_enable_synaptics_enable_inactive),
+	KUNIT_CASE(dm_test_write_dsc_enable_synaptics_enable_active),
+	KUNIT_CASE(dm_test_write_dsc_enable_synaptics_disable_inactive),
+	KUNIT_CASE(dm_test_write_dsc_enable_synaptics_disable_active),
+	KUNIT_CASE(dm_test_write_dsc_enable_synaptics_enable_non_synaptics),
+	KUNIT_CASE(dm_test_dp_write_dsc_enable_routes_synaptics),
 	/* dm_helpers_dp_mst_start_top_mgr / dm_helpers_dp_mst_stop_top_mgr */
 	KUNIT_CASE(dm_test_mst_start_top_mgr_null_priv),
 	KUNIT_CASE(dm_test_mst_stop_top_mgr_null_priv),
