@@ -33,6 +33,10 @@ void fill_dc_mst_payload_table_from_drm(struct dc_link *link,
 					 bool enable,
 					 struct drm_dp_mst_atomic_payload *target_payload,
 					 struct dc_dp_mst_stream_allocation_table *table);
+void dm_helpers_construct_old_payload(struct drm_dp_mst_topology_mgr *mgr,
+				      struct drm_dp_mst_topology_state *mst_state,
+				      struct drm_dp_mst_atomic_payload *new_payload,
+				      struct drm_dp_mst_atomic_payload *old_payload);
 bool dm_helpers_dp_write_dsc_enable(struct dc_context *ctx,
 				    const struct dc_stream_state *stream,
 				    bool enable);

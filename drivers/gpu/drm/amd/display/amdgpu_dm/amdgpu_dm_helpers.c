@@ -382,7 +382,7 @@ void dm_helpers_dp_update_branch_info(
 EXPORT_IF_KUNIT(dm_helpers_dp_update_branch_info);
 
 #if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS)
-static void dm_helpers_construct_old_payload(
+STATIC_IFN_KUNIT void dm_helpers_construct_old_payload(
 			struct drm_dp_mst_topology_mgr *mgr,
 			struct drm_dp_mst_topology_state *mst_state,
 			struct drm_dp_mst_atomic_payload *new_payload,
@@ -418,6 +418,7 @@ static void dm_helpers_construct_old_payload(
 	old_payload->time_slots = allocated_time_slots;
 	old_payload->pbn = allocated_time_slots * pbn_per_slot;
 }
+EXPORT_IF_KUNIT(dm_helpers_construct_old_payload);
 #endif
 
 /*
@@ -1850,6 +1851,7 @@ bool dm_helpers_dp_handle_test_pattern_request(
 
 	return false;
 }
+EXPORT_IF_KUNIT(dm_helpers_dp_handle_test_pattern_request);
 
 void dm_set_phyd32clk(struct dc_context *ctx, int freq_khz)
 {
