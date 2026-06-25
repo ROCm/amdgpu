@@ -244,7 +244,7 @@ STATIC_IFN_KUNIT enum drm_mode_subconnector get_subconnector_type(struct dc_link
 }
 EXPORT_IF_KUNIT(get_subconnector_type);
 
-static void update_subconnector_property(struct amdgpu_dm_connector *aconnector)
+STATIC_IFN_KUNIT void update_subconnector_property(struct amdgpu_dm_connector *aconnector)
 {
 	struct dc_link *link = aconnector->dc_link;
 	struct drm_connector *connector = &aconnector->base;
@@ -261,6 +261,7 @@ static void update_subconnector_property(struct amdgpu_dm_connector *aconnector)
 			subconnector);
 #endif
 }
+EXPORT_IF_KUNIT(update_subconnector_property);
 
 static int amdgpu_dm_connector_get_modes(struct drm_connector *connector);
 

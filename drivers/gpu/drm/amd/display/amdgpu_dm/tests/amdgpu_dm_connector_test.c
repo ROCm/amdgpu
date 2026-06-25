@@ -2527,6 +2527,144 @@ static void dm_test_set_panel_type_defaults_to_lcd(struct kunit *test)
 			(int)PANEL_TYPE_LCD);
 }
 
+/* Tests for update_subconnector_property() */
+
+/**
+ * dm_test_update_subconnector_dp_with_sink - Test subconnector property is set
+ * from the dongle type for a DisplayPort connector with a sink
+ * @test: The KUnit test context
+ */
+static void dm_test_update_subconnector_dp_with_sink(struct kunit *test)
+{
+	struct device *dev;
+	struct drm_device *drm;
+	struct amdgpu_dm_connector *aconnector;
+	struct dc_link *link;
+	uint64_t val = 0;
+
+	dev = drm_kunit_helper_alloc_device(test);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
+
+	drm = __drm_kunit_helper_alloc_drm_device(test, dev,
+						   sizeof(*drm), 0,
+						   DRIVER_MODESET);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
+
+	aconnector = kunit_kzalloc(test, sizeof(*aconnector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, aconnector);
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+
+	drmm_connector_init(drm, &aconnector->base, &dm_test_connector_funcs,
+			    DRM_MODE_CONNECTOR_DisplayPort, NULL);
+	drm_connector_attach_dp_subconnector_property(&aconnector->base);
+
+	link->dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_VGA_CONVERTER;
+	aconnector->dc_link = link;
+	/* Any non-NULL sink enables dongle-type resolution */
+	aconnector->dc_sink = kunit_kzalloc(test, sizeof(*aconnector->dc_sink), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, aconnector->dc_sink);
+
+	update_subconnector_property(aconnector);
+
+	KUNIT_EXPECT_EQ(test, drm_object_property_get_value(&aconnector->base.base,
+				aconnector->base.dev->mode_config.dp_subconnector_property,
+				&val), 0);
+	KUNIT_EXPECT_EQ(test, (int)val, (int)DRM_MODE_SUBCONNECTOR_VGA);
+}
+
+/**
+ * dm_test_update_subconnector_dp_no_sink - Test subconnector property stays
+ * unknown for a DisplayPort connector without a sink
+ * @test: The KUnit test context
+ */
+static void dm_test_update_subconnector_dp_no_sink(struct kunit *test)
+{
+	struct device *dev;
+	struct drm_device *drm;
+	struct amdgpu_dm_connector *aconnector;
+	struct dc_link *link;
+	uint64_t val = 0;
+
+	dev = drm_kunit_helper_alloc_device(test);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
+
+	drm = __drm_kunit_helper_alloc_drm_device(test, dev,
+						   sizeof(*drm), 0,
+						   DRIVER_MODESET);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
+
+	aconnector = kunit_kzalloc(test, sizeof(*aconnector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, aconnector);
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+
+	drmm_connector_init(drm, &aconnector->base, &dm_test_connector_funcs,
+			    DRM_MODE_CONNECTOR_DisplayPort, NULL);
+	drm_connector_attach_dp_subconnector_property(&aconnector->base);
+
+	/* Dongle type is set, but no sink means it must not be consulted */
+	link->dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_HDMI_CONVERTER;
+	aconnector->dc_link = link;
+	aconnector->dc_sink = NULL;
+
+	update_subconnector_property(aconnector);
+
+	KUNIT_EXPECT_EQ(test, drm_object_property_get_value(&aconnector->base.base,
+				aconnector->base.dev->mode_config.dp_subconnector_property,
+				&val), 0);
+	KUNIT_EXPECT_EQ(test, (int)val, (int)DRM_MODE_SUBCONNECTOR_Unknown);
+}
+
+/**
+ * dm_test_update_subconnector_non_dp_noop - Test non-DisplayPort connector is
+ * left untouched (early return)
+ * @test: The KUnit test context
+ */
+static void dm_test_update_subconnector_non_dp_noop(struct kunit *test)
+{
+	struct device *dev;
+	struct drm_device *drm;
+	struct amdgpu_dm_connector *aconnector;
+	struct dc_link *link;
+	uint64_t val = 0;
+
+	dev = drm_kunit_helper_alloc_device(test);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
+
+	drm = __drm_kunit_helper_alloc_drm_device(test, dev,
+						   sizeof(*drm), 0,
+						   DRIVER_MODESET);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
+
+	aconnector = kunit_kzalloc(test, sizeof(*aconnector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, aconnector);
+	link = kunit_kzalloc(test, sizeof(*link), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, link);
+
+	drmm_connector_init(drm, &aconnector->base, &dm_test_connector_funcs,
+			    DRM_MODE_CONNECTOR_HDMIA, NULL);
+	drm_connector_attach_dp_subconnector_property(&aconnector->base);
+
+	/* Pre-seed the property to a non-default value */
+	drm_object_property_set_value(&aconnector->base.base,
+			aconnector->base.dev->mode_config.dp_subconnector_property,
+			DRM_MODE_SUBCONNECTOR_VGA);
+
+	link->dpcd_caps.dongle_type = DISPLAY_DONGLE_DP_HDMI_CONVERTER;
+	aconnector->dc_link = link;
+	aconnector->dc_sink = kunit_kzalloc(test, sizeof(*aconnector->dc_sink), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, aconnector->dc_sink);
+
+	update_subconnector_property(aconnector);
+
+	/* Non-DP connector: value must remain what we seeded */
+	KUNIT_EXPECT_EQ(test, drm_object_property_get_value(&aconnector->base.base,
+				aconnector->base.dev->mode_config.dp_subconnector_property,
+				&val), 0);
+	KUNIT_EXPECT_EQ(test, (int)val, (int)DRM_MODE_SUBCONNECTOR_VGA);
+}
+
 static struct kunit_case amdgpu_dm_connector_tests[] = {
 	/* get_subconnector_type */
 	KUNIT_CASE(dm_test_subconnector_type_none),
@@ -2664,6 +2802,10 @@ static struct kunit_case amdgpu_dm_connector_tests[] = {
 	KUNIT_CASE(dm_test_is_freesync_video_mode_null_mode),
 	KUNIT_CASE(dm_test_is_freesync_video_mode_match),
 	KUNIT_CASE(dm_test_is_freesync_video_mode_no_match),
+	/* update_subconnector_property */
+	KUNIT_CASE(dm_test_update_subconnector_dp_with_sink),
+	KUNIT_CASE(dm_test_update_subconnector_dp_no_sink),
+	KUNIT_CASE(dm_test_update_subconnector_non_dp_noop),
 	/* amdgpu_dm_update_cacp_caps */
 	KUNIT_CASE(dm_test_cacp_caps_unsupported_ip),
 	KUNIT_CASE(dm_test_cacp_caps_excluded_ip_316),

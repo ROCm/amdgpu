@@ -155,6 +155,7 @@ int amdgpu_dm_encoder_init(struct drm_device *dev,
 
 #if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 enum drm_mode_subconnector get_subconnector_type(struct dc_link *link);
+void update_subconnector_property(struct amdgpu_dm_connector *aconnector);
 enum display_content_type
 get_output_content_type(const struct drm_connector_state *connector_state);
 bool adjust_colour_depth_from_display_info(struct dc_crtc_timing *timing_out,
