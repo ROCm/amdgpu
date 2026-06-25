@@ -291,6 +291,30 @@ static void dm_test_adjust_colour_depth_420_halves_clk(struct kunit *test)
 }
 
 /**
+ * dm_test_adjust_colour_depth_420_reduces - Test Adjust colour depth 420 reduces
+ * @test: The KUnit test context
+ */
+static void dm_test_adjust_colour_depth_420_reduces(struct kunit *test)
+{
+	struct dc_crtc_timing timing = {};
+	struct drm_display_info info = {};
+
+	/* 4K @ 594000 KHz = 5940000 in 100Hz units */
+	timing.pix_clk_100hz = 5940000;
+	timing.display_color_depth = COLOR_DEPTH_121212;
+	timing.pixel_encoding = PIXEL_ENCODING_YCBCR420;
+	/*
+	 * With 420: effective = 594000/2 = 297000.
+	 * 12bpc = 297000*36/24 = 445500 (exceeds limit),
+	 * 10bpc = 297000*30/24 = 371250 (fits).
+	 */
+	info.max_tmds_clock = 400000;
+
+	KUNIT_EXPECT_TRUE(test, adjust_colour_depth_from_display_info(&timing, &info));
+	KUNIT_EXPECT_EQ(test, (int)timing.display_color_depth, (int)COLOR_DEPTH_101010);
+}
+
+/**
  * dm_test_adjust_colour_depth_reduces_12bpc_to_10bpc - Test Adjust colour
  * depth reduces 12bpc to 10bpc
  * @test: The KUnit test context
@@ -545,6 +569,78 @@ static void dm_test_output_color_space_bt2020_ycc(struct kunit *test)
 
 	timing.pixel_encoding = PIXEL_ENCODING_YCBCR422;
 	state.colorspace = DRM_MODE_COLORIMETRY_BT2020_YCC;
+
+	KUNIT_EXPECT_EQ(test, (int)amdgpu_dm_get_output_color_space(&timing, &state),
+			(int)COLOR_SPACE_2020_YCBCR_LIMITED);
+}
+
+/**
+ * dm_test_output_color_space_default_ycbcr709_y_only - Test Output color space
+ * default ycbcr709 limited via Y_ONLY at high pixel clock
+ * @test: The KUnit test context
+ */
+static void dm_test_output_color_space_default_ycbcr709_y_only(struct kunit *test)
+{
+	struct dc_crtc_timing timing = {};
+	struct drm_connector_state state = {};
+
+	timing.pixel_encoding = PIXEL_ENCODING_YCBCR444;
+	timing.pix_clk_100hz = 300000;
+	timing.flags.Y_ONLY = 1;
+	state.colorspace = DRM_MODE_COLORIMETRY_DEFAULT;
+
+	KUNIT_EXPECT_EQ(test, (int)amdgpu_dm_get_output_color_space(&timing, &state),
+			(int)COLOR_SPACE_YCBCR709_LIMITED);
+}
+
+/**
+ * dm_test_output_color_space_default_ycbcr601 - Test Output color space default
+ * ycbcr601 full range at low pixel clock
+ * @test: The KUnit test context
+ */
+static void dm_test_output_color_space_default_ycbcr601(struct kunit *test)
+{
+	struct dc_crtc_timing timing = {};
+	struct drm_connector_state state = {};
+
+	timing.pixel_encoding = PIXEL_ENCODING_YCBCR444;
+	timing.pix_clk_100hz = 270300;
+	timing.flags.Y_ONLY = 0;
+	state.colorspace = DRM_MODE_COLORIMETRY_DEFAULT;
+
+	KUNIT_EXPECT_EQ(test, (int)amdgpu_dm_get_output_color_space(&timing, &state),
+			(int)COLOR_SPACE_YCBCR601);
+}
+
+/**
+ * dm_test_output_color_space_bt2020_ycc_rgb_encoding - Test Output color space
+ * bt2020 ycc with rgb pixel encoding falls back to full range rgb
+ * @test: The KUnit test context
+ */
+static void dm_test_output_color_space_bt2020_ycc_rgb_encoding(struct kunit *test)
+{
+	struct dc_crtc_timing timing = {};
+	struct drm_connector_state state = {};
+
+	timing.pixel_encoding = PIXEL_ENCODING_RGB;
+	state.colorspace = DRM_MODE_COLORIMETRY_BT2020_YCC;
+
+	KUNIT_EXPECT_EQ(test, (int)amdgpu_dm_get_output_color_space(&timing, &state),
+			(int)COLOR_SPACE_2020_RGB_FULLRANGE);
+}
+
+/**
+ * dm_test_output_color_space_bt2020_rgb_ycc_encoding - Test Output color space
+ * bt2020 rgb with non-rgb pixel encoding falls back to limited ycbcr
+ * @test: The KUnit test context
+ */
+static void dm_test_output_color_space_bt2020_rgb_ycc_encoding(struct kunit *test)
+{
+	struct dc_crtc_timing timing = {};
+	struct drm_connector_state state = {};
+
+	timing.pixel_encoding = PIXEL_ENCODING_YCBCR444;
+	state.colorspace = DRM_MODE_COLORIMETRY_BT2020_RGB;
 
 	KUNIT_EXPECT_EQ(test, (int)amdgpu_dm_get_output_color_space(&timing, &state),
 			(int)COLOR_SPACE_2020_YCBCR_LIMITED);
@@ -830,6 +926,17 @@ static void dm_test_to_connector_type_dual_link_dvii(struct kunit *test)
 static void dm_test_to_connector_type_dvi_dvid(struct kunit *test)
 {
 	int type = to_drm_connector_type(SIGNAL_TYPE_DVI_SINGLE_LINK, CONNECTOR_ID_SINGLE_LINK_DVID);
+
+	KUNIT_EXPECT_EQ(test, type, DRM_MODE_CONNECTOR_DVID);
+}
+
+/**
+ * dm_test_to_connector_type_dual_link_dvid - Test To connector type dual link dvid
+ * @test: The KUnit test context
+ */
+static void dm_test_to_connector_type_dual_link_dvid(struct kunit *test)
+{
+	int type = to_drm_connector_type(SIGNAL_TYPE_DVI_DUAL_LINK, CONNECTOR_ID_DUAL_LINK_DVID);
 
 	KUNIT_EXPECT_EQ(test, type, DRM_MODE_CONNECTOR_DVID);
 }
@@ -1122,6 +1229,76 @@ static void dm_test_aspect_ratio_256_135(struct kunit *test)
 
 	mode.picture_aspect_ratio = HDMI_PICTURE_ASPECT_256_135;
 	KUNIT_EXPECT_EQ(test, (int)get_aspect_ratio(&mode), (int)ASPECT_RATIO_256_135);
+}
+
+/* Tests for copy_crtc_timing_for_drm_display_mode() */
+
+/**
+ * dm_test_copy_crtc_timing_copies_all_fields - Test all crtc timing fields copied
+ * @test: The KUnit test context
+ */
+static void dm_test_copy_crtc_timing_copies_all_fields(struct kunit *test)
+{
+	struct drm_display_mode src = {};
+	struct drm_display_mode dst = {};
+
+	src.crtc_hdisplay = 1920;
+	src.crtc_vdisplay = 1080;
+	src.crtc_clock = 148500;
+	src.crtc_hblank_start = 1920;
+	src.crtc_hblank_end = 2200;
+	src.crtc_hsync_start = 2008;
+	src.crtc_hsync_end = 2052;
+	src.crtc_htotal = 2200;
+	src.crtc_hskew = 1;
+	src.crtc_vblank_start = 1080;
+	src.crtc_vblank_end = 1125;
+	src.crtc_vsync_start = 1084;
+	src.crtc_vsync_end = 1089;
+	src.crtc_vtotal = 1125;
+
+	copy_crtc_timing_for_drm_display_mode(&src, &dst);
+
+	KUNIT_EXPECT_EQ(test, dst.crtc_hdisplay, 1920);
+	KUNIT_EXPECT_EQ(test, dst.crtc_vdisplay, 1080);
+	KUNIT_EXPECT_EQ(test, dst.crtc_clock, 148500);
+	KUNIT_EXPECT_EQ(test, dst.crtc_hblank_start, 1920);
+	KUNIT_EXPECT_EQ(test, dst.crtc_hblank_end, 2200);
+	KUNIT_EXPECT_EQ(test, dst.crtc_hsync_start, 2008);
+	KUNIT_EXPECT_EQ(test, dst.crtc_hsync_end, 2052);
+	KUNIT_EXPECT_EQ(test, dst.crtc_htotal, 2200);
+	KUNIT_EXPECT_EQ(test, dst.crtc_hskew, 1);
+	KUNIT_EXPECT_EQ(test, dst.crtc_vblank_start, 1080);
+	KUNIT_EXPECT_EQ(test, dst.crtc_vblank_end, 1125);
+	KUNIT_EXPECT_EQ(test, dst.crtc_vsync_start, 1084);
+	KUNIT_EXPECT_EQ(test, dst.crtc_vsync_end, 1089);
+	KUNIT_EXPECT_EQ(test, dst.crtc_vtotal, 1125);
+}
+
+/**
+ * dm_test_copy_crtc_timing_leaves_non_crtc_fields - Test non-crtc fields untouched
+ * @test: The KUnit test context
+ */
+static void dm_test_copy_crtc_timing_leaves_non_crtc_fields(struct kunit *test)
+{
+	struct drm_display_mode src = {};
+	struct drm_display_mode dst = {};
+
+	src.crtc_hdisplay = 1280;
+	src.crtc_vdisplay = 720;
+
+	/* Non-crtc geometry on dst must be preserved by the copy */
+	dst.hdisplay = 1920;
+	dst.vdisplay = 1080;
+	dst.clock = 148500;
+
+	copy_crtc_timing_for_drm_display_mode(&src, &dst);
+
+	KUNIT_EXPECT_EQ(test, dst.crtc_hdisplay, 1280);
+	KUNIT_EXPECT_EQ(test, dst.crtc_vdisplay, 720);
+	KUNIT_EXPECT_EQ(test, dst.hdisplay, 1920);
+	KUNIT_EXPECT_EQ(test, dst.vdisplay, 1080);
+	KUNIT_EXPECT_EQ(test, dst.clock, 148500);
 }
 
 /* Tests for decide_crtc_timing_for_drm_display_mode() */
@@ -2372,6 +2549,7 @@ static struct kunit_case amdgpu_dm_connector_tests[] = {
 	KUNIT_CASE(dm_test_adjust_colour_depth_reduces_to_888),
 	KUNIT_CASE(dm_test_adjust_colour_depth_10bpc_passes),
 	KUNIT_CASE(dm_test_adjust_colour_depth_420_halves_clk),
+	KUNIT_CASE(dm_test_adjust_colour_depth_420_reduces),
 	KUNIT_CASE(dm_test_adjust_colour_depth_reduces_12bpc_to_10bpc),
 	KUNIT_CASE(dm_test_adjust_colour_depth_16bpc_no_fallback),
 	KUNIT_CASE(dm_test_adjust_colour_depth_none_fits),
@@ -2388,6 +2566,10 @@ static struct kunit_case amdgpu_dm_connector_tests[] = {
 	KUNIT_CASE(dm_test_output_color_space_oprgb),
 	KUNIT_CASE(dm_test_output_color_space_bt2020_rgb),
 	KUNIT_CASE(dm_test_output_color_space_bt2020_ycc),
+	KUNIT_CASE(dm_test_output_color_space_default_ycbcr709_y_only),
+	KUNIT_CASE(dm_test_output_color_space_default_ycbcr601),
+	KUNIT_CASE(dm_test_output_color_space_bt2020_ycc_rgb_encoding),
+	KUNIT_CASE(dm_test_output_color_space_bt2020_rgb_ycc_encoding),
 	/* Tests for amdgpu_dm_convert_dc_color_depth_into_bpc */
 	KUNIT_CASE(dm_test_convert_color_depth_bpc_mappings),
 	KUNIT_CASE(dm_test_convert_color_depth_bpc_unknown),
@@ -2412,6 +2594,7 @@ static struct kunit_case amdgpu_dm_connector_tests[] = {
 	KUNIT_CASE(dm_test_to_connector_type_dvi_dvii),
 	KUNIT_CASE(dm_test_to_connector_type_dual_link_dvii),
 	KUNIT_CASE(dm_test_to_connector_type_dvi_dvid),
+	KUNIT_CASE(dm_test_to_connector_type_dual_link_dvid),
 	KUNIT_CASE(dm_test_to_connector_type_virtual),
 	KUNIT_CASE(dm_test_to_connector_type_unknown),
 	/* is_duplicate_mode */
@@ -2433,6 +2616,9 @@ static struct kunit_case amdgpu_dm_connector_tests[] = {
 	KUNIT_CASE(dm_test_aspect_ratio_16_9),
 	KUNIT_CASE(dm_test_aspect_ratio_64_27),
 	KUNIT_CASE(dm_test_aspect_ratio_256_135),
+	/* copy_crtc_timing_for_drm_display_mode */
+	KUNIT_CASE(dm_test_copy_crtc_timing_copies_all_fields),
+	KUNIT_CASE(dm_test_copy_crtc_timing_leaves_non_crtc_fields),
 	/* decide_crtc_timing_for_drm_display_mode */
 	KUNIT_CASE(dm_test_decide_crtc_timing_scale_enabled),
 	KUNIT_CASE(dm_test_decide_crtc_timing_matching_mode),

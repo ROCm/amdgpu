@@ -989,7 +989,7 @@ static void fill_stream_properties_from_drm_display_mode(
 	stream->content_type = get_output_content_type(connector_state);
 }
 
-static void
+STATIC_IFN_KUNIT void
 copy_crtc_timing_for_drm_display_mode(const struct drm_display_mode *src_mode,
 				      struct drm_display_mode *dst_mode)
 {
@@ -1008,6 +1008,7 @@ copy_crtc_timing_for_drm_display_mode(const struct drm_display_mode *src_mode,
 	dst_mode->crtc_vsync_end = src_mode->crtc_vsync_end;
 	dst_mode->crtc_vtotal = src_mode->crtc_vtotal;
 }
+EXPORT_IF_KUNIT(copy_crtc_timing_for_drm_display_mode);
 
 STATIC_IFN_KUNIT void
 decide_crtc_timing_for_drm_display_mode(struct drm_display_mode *drm_mode,
