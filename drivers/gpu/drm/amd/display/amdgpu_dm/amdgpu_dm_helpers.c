@@ -133,7 +133,7 @@ STATIC_IFN_KUNIT u32 edid_extract_panel_id(struct edid *edid)
 }
 EXPORT_IF_KUNIT(edid_extract_panel_id);
 
-static void apply_edid_quirks(struct dc_link *link, struct edid *edid,
+STATIC_IFN_KUNIT void apply_edid_quirks(struct dc_link *link, struct edid *edid,
 			      struct dc_edid_caps *edid_caps)
 {
 	struct amdgpu_dm_connector *aconnector = link->priv;
@@ -176,6 +176,7 @@ static void apply_edid_quirks(struct dc_link *link, struct edid *edid,
 		return;
 	}
 }
+EXPORT_IF_KUNIT(apply_edid_quirks);
 
 /**
  * dm_helpers_parse_edid_caps() - Parse edid caps
@@ -281,6 +282,7 @@ enum dc_edid_status dm_helpers_parse_edid_caps(
 
 	return result;
 }
+EXPORT_IF_KUNIT(dm_helpers_parse_edid_caps);
 
 #if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS)
 static void
@@ -1213,6 +1215,20 @@ bool dm_helpers_dp_write_dsc_enable(
 	return ret;
 }
 
+#if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
+uint dm_helpers_get_dc_debug_mask(void)
+{
+	return amdgpu_dc_debug_mask;
+}
+EXPORT_IF_KUNIT(dm_helpers_get_dc_debug_mask);
+
+void dm_helpers_set_dc_debug_mask(uint debug_mask)
+{
+	amdgpu_dc_debug_mask = debug_mask;
+}
+EXPORT_IF_KUNIT(dm_helpers_set_dc_debug_mask);
+#endif
+
 bool dm_helpers_dp_write_hblank_reduction(struct dc_context *ctx, const struct dc_stream_state *stream)
 {
 	// TODO
@@ -1237,7 +1253,7 @@ bool dm_helpers_is_dp_sink_present(struct dc_link *link)
 }
 
 #ifdef HAVE_DRM_DP_MST_EDID_READ
-static int
+STATIC_IFN_KUNIT int
 dm_helpers_probe_acpi_edid(void *data, u8 *buf, unsigned int block, size_t len)
 {
 	struct drm_connector *connector = data;
@@ -1275,8 +1291,9 @@ cleanup:
 
 	return r;
 }
+EXPORT_IF_KUNIT(dm_helpers_probe_acpi_edid);
 
-static const struct drm_edid *
+STATIC_IFN_KUNIT const struct drm_edid *
 dm_helpers_read_acpi_edid(struct amdgpu_dm_connector *aconnector)
 {
 	struct drm_connector *connector = &aconnector->base;
@@ -1297,9 +1314,10 @@ dm_helpers_read_acpi_edid(struct amdgpu_dm_connector *aconnector)
 
 	return drm_edid_read_custom(connector, dm_helpers_probe_acpi_edid, connector);
 }
+EXPORT_IF_KUNIT(dm_helpers_read_acpi_edid);
 #endif
 
-static const struct drm_edid *
+STATIC_IFN_KUNIT const struct drm_edid *
 dm_helpers_read_vbios_hardcoded_edid(struct dc_link *link, struct amdgpu_dm_connector *aconnector)
 {
 	struct dc_bios *bios = link->ctx->dc_bios;
@@ -1337,6 +1355,7 @@ dm_helpers_read_vbios_hardcoded_edid(struct dc_link *link, struct amdgpu_dm_conn
 
 	return edid;
 }
+EXPORT_IF_KUNIT(dm_helpers_read_vbios_hardcoded_edid);
 
 STATIC_IFN_KUNIT uint8_t get_max_frl_rate(uint8_t max_lanes, uint8_t max_rate_per_lane)
 {
