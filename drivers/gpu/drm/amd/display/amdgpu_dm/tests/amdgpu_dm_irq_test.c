@@ -3802,6 +3802,127 @@ static void dm_test_register_outbox_irq_handlers_with_dmub(struct kunit *test)
 	amdgpu_dm_irq_fini(adev);
 }
 
+/* Tests for amdgpu_dm_irq_handler() */
+
+/**
+ * dm_test_irq_handler_dispatches_work - Test the top-level IRQ handler
+ * @test: The KUnit test context
+ *
+ * amdgpu_dm_irq_handler() translates the hardware IRQ entry to a DC IRQ
+ * source, acknowledges it, then dispatches to the high-context (immediate)
+ * and low-context (scheduled) handler lists. A fake dc with a stubbed
+ * irq_service maps the source id to DC_IRQ_SOURCE_VBLANK1 and lets the ack
+ * succeed without touching hardware registers.
+ */
+static void dm_test_irq_handler_dispatches_work(struct kunit *test)
+{
+	struct dc_interrupt_params int_params = { 0 };
+	struct amdgpu_iv_entry entry = { 0 };
+	struct amdgpu_device *adev;
+	int high_count = 0;
+	int low_count = 0;
+	void *handler;
+	struct dc *dc;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	KUNIT_ASSERT_EQ(test, amdgpu_dm_irq_init(adev), 0);
+
+	dc = dm_test_alloc_dc_with_irq_service(test,
+					       &dm_test_irq_service_funcs_dce110);
+	adev->dm.dc = dc;
+
+	/* High-context (immediate) handler on VBLANK1. */
+	int_params.int_context = INTERRUPT_HIGH_IRQ_CONTEXT;
+	int_params.irq_source = DC_IRQ_SOURCE_VBLANK1;
+	handler = amdgpu_dm_irq_register_interrupt(adev, &int_params,
+						   dm_test_irq_handler_count,
+						   &high_count);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, handler);
+
+	/* Low-context (scheduled) handler on VBLANK1. */
+	int_params.int_context = INTERRUPT_LOW_IRQ_CONTEXT;
+	handler = amdgpu_dm_irq_register_interrupt(adev, &int_params,
+						   dm_test_irq_handler_count,
+						   &low_count);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, handler);
+
+	/* src_id maps to DC_IRQ_SOURCE_VBLANK1 via the dce110 stub. */
+	entry.src_id = VISLANDS30_IV_SRCID_D1_VERTICAL_INTERRUPT0;
+	entry.src_data[0] = 0;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_irq_handler(adev, NULL, &entry), 0);
+
+	/* High-context handler runs synchronously in-place. */
+	KUNIT_EXPECT_EQ(test, high_count, 1);
+
+	/*
+	 * Low-context work runs asynchronously; amdgpu_dm_irq_fini() flushes
+	 * each pending work item before freeing, so it has run afterwards.
+	 */
+	amdgpu_dm_irq_fini(adev);
+	KUNIT_EXPECT_EQ(test, low_count, 1);
+}
+
+/* Tests for dm_handle_vmin_vmax_update() */
+
+/**
+ * dm_test_handle_vmin_vmax_update - Test the deferred vmin/vmax worker
+ * @test: The KUnit test context
+ *
+ * The worker applies the cached timing adjust to the stream via
+ * dc_stream_adjust_vmin_vmax(), drops the stream reference taken when the
+ * work was scheduled, and frees the work and its adjust copy. A fake dc with
+ * a current_state lets the adjust walk an empty pipe list without touching
+ * hardware. The work and adjust are kmalloc'd because the worker frees them.
+ */
+static void dm_test_handle_vmin_vmax_update(struct kunit *test)
+{
+	struct dc_crtc_timing_adjust *adjust;
+	struct vupdate_offload_work *work;
+	struct dc_stream_state *stream;
+	struct amdgpu_device *adev;
+	struct dc *dc;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	mutex_init(&adev->dm.dc_lock);
+
+	dc = dm_test_alloc_dc_with_ctx(test);
+	dc->current_state = kunit_kzalloc(test, sizeof(*dc->current_state),
+					  GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc->current_state);
+	adev->dm.dc = dc;
+
+	stream = kunit_kzalloc(test, sizeof(*stream), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, stream);
+	/*
+	 * Start at two references: the worker's dc_stream_release() drops one,
+	 * leaving the kunit-managed allocation intact (no kfree).
+	 */
+	kref_init(&stream->refcount);
+	kref_get(&stream->refcount);
+
+	/* The worker kfree()s both, so they must come from the slab. */
+	work = kzalloc(sizeof(*work), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, work);
+	adjust = kzalloc(sizeof(*adjust), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adjust);
+
+	work->adev = adev;
+	work->stream = stream;
+	work->adjust = adjust;
+	adjust->v_total_min = 1000;
+	adjust->v_total_max = 1100;
+
+	dm_handle_vmin_vmax_update(&work->work);
+
+	/* The adjust was applied and one stream reference was dropped. */
+	KUNIT_EXPECT_EQ(test, stream->adjust.v_total_min, 1000);
+	KUNIT_EXPECT_EQ(test, stream->adjust.v_total_max, 1100);
+	KUNIT_EXPECT_EQ(test, kref_read(&stream->refcount), 1);
+}
+
 static struct kunit_case amdgpu_dm_irq_tests[] = {
 	/* amdgpu_dm_hpd_to_dal_irq_source */
 	KUNIT_CASE(dm_test_hpd_to_dal_irq_source_hpd1),
@@ -3958,6 +4079,10 @@ static struct kunit_case amdgpu_dm_irq_tests[] = {
 	KUNIT_CASE(dm_test_dcn10_register_irq_handlers_one_crtc),
 	KUNIT_CASE(dm_test_register_outbox_irq_handlers_without_dmub),
 	KUNIT_CASE(dm_test_register_outbox_irq_handlers_with_dmub),
+	/* amdgpu_dm_irq_handler */
+	KUNIT_CASE(dm_test_irq_handler_dispatches_work),
+	/* dm_handle_vmin_vmax_update */
+	KUNIT_CASE(dm_test_handle_vmin_vmax_update),
 	{}
 };
 

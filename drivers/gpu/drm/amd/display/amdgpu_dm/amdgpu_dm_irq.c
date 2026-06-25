@@ -679,7 +679,7 @@ EXPORT_IF_KUNIT(amdgpu_dm_irq_immediate_work);
  * Calls all registered high irq work immediately, and schedules work for low
  * irq. The DM IRQ table is used to find the corresponding handlers.
  */
-static int amdgpu_dm_irq_handler(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT int amdgpu_dm_irq_handler(struct amdgpu_device *adev,
 				 struct amdgpu_irq_src *source,
 				 struct amdgpu_iv_entry *entry)
 {
@@ -699,6 +699,7 @@ static int amdgpu_dm_irq_handler(struct amdgpu_device *adev,
 
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_handler);
 
 STATIC_IFN_KUNIT enum dc_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned int type)
 {
@@ -1874,7 +1875,7 @@ STATIC_IFN_KUNIT void dm_pflip_high_irq(void *interrupt_params)
 }
 EXPORT_IF_KUNIT(dm_pflip_high_irq);
 
-static void dm_handle_vmin_vmax_update(struct work_struct *offload_work)
+STATIC_IFN_KUNIT void dm_handle_vmin_vmax_update(struct work_struct *offload_work)
 {
 	struct vupdate_offload_work *work = container_of(offload_work, struct vupdate_offload_work, work);
 	struct amdgpu_device *adev = work->adev;
@@ -1889,6 +1890,7 @@ static void dm_handle_vmin_vmax_update(struct work_struct *offload_work)
 	kfree(work->adjust);
 	kfree(work);
 }
+EXPORT_IF_KUNIT(dm_handle_vmin_vmax_update);
 
 static void schedule_dc_vmin_vmax(struct amdgpu_device *adev,
 	struct dc_stream_state *stream,

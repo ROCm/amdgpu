@@ -124,6 +124,7 @@ int amdgpu_dm_register_outbox_irq_handlers(struct amdgpu_device *adev);
 
 #if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 struct amdgpu_irq_src;
+struct amdgpu_iv_entry;
 enum amdgpu_interrupt_state;
 
 enum dc_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned int type);
@@ -178,6 +179,10 @@ void dm_vupdate_high_irq(void *interrupt_params);
 void dm_crtc_high_irq(void *interrupt_params);
 void dm_handle_hpd_work(struct work_struct *work);
 void dm_dmub_outbox1_low_irq(void *interrupt_params);
+int amdgpu_dm_irq_handler(struct amdgpu_device *adev,
+			  struct amdgpu_irq_src *source,
+			  struct amdgpu_iv_entry *entry);
+void dm_handle_vmin_vmax_update(struct work_struct *offload_work);
 #endif
 
 #endif /* __AMDGPU_DM_IRQ_H__ */
