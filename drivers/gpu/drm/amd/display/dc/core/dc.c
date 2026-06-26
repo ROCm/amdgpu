@@ -1945,6 +1945,13 @@ bool dc_validate_boot_timing(const struct dc *dc,
 		struct display_stream_compressor *dsc = NULL;
 		struct dcn_dsc_state dsc_state = {0};
 
+		if (dc->ctx->dce_version < DCN_VERSION_4_2) {
+			/*vbios enabled eDP dsc for one of DCN315  only but it has known issue,
+			since there is no production bios update, block it there*/
+			DC_LOG_DEBUG("boot timing validation failed due to unsupported DSC on this ASIC\n");
+			return false;
+		}
+
 		/* Find DSC associated with this timing generator */
 		if (tg_inst < (unsigned int)dc->res_pool->res_cap->num_dsc) {
 			dsc = dc->res_pool->dscs[tg_inst];
