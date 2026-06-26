@@ -1313,6 +1313,18 @@ static int dm_test_gfx9_attrs(struct amdgpu_device *adev,
 		plane_size, tiling_info, dcc, address);
 }
 
+static int dm_test_gfx12_attrs(struct amdgpu_device *adev,
+			       const struct amdgpu_framebuffer *afb,
+				       const struct plane_size *plane_size,
+				       struct dc_tiling_info *tiling_info,
+				       struct dc_plane_dcc_param *dcc,
+				       struct dc_plane_address *address)
+{
+	return amdgpu_dm_plane_fill_gfx12_plane_attributes_from_modifiers(adev,
+		afb, SURFACE_PIXEL_FORMAT_GRPH_ARGB8888, ROTATION_ANGLE_0,
+		plane_size, tiling_info, dcc, address);
+}
+
 static int dm_test_plane_attrs(struct amdgpu_device *adev,
 			       const struct amdgpu_framebuffer *afb,
 			       enum surface_pixel_format format,
@@ -2022,6 +2034,153 @@ static void dm_test_fill_gfx9_plane_attributes_dcc_gfx9_unconstrained(struct kun
 }
 
 /**
+ * dm_test_fill_gfx12_plane_attributes_block0() - Verify GFX12 64B max-compressed-block path.
+ * @test: KUnit test context.
+ *
+ * Verify if a zero max-compressed-block modifier selects the 64B independent
+ * block mode on GFX12.
+ */
+static void dm_test_fill_gfx12_plane_attributes_block0(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct amdgpu_framebuffer *afb;
+	struct plane_size plane_size = {0};
+	struct dc_tiling_info tiling_info = {0};
+	struct dc_plane_dcc_param dcc = {0};
+	struct dc_plane_address address = {0};
+	struct dm_test_dcc_cap_ctx ctx = {
+		.callback_ret = true,
+		.capable = true,
+		.output_independent_64b_blks = false,
+	};
+	int ret;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	afb = kunit_kzalloc(test, sizeof(*afb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, afb);
+
+	adev->family = AMDGPU_FAMILY_GC_12_0_0;
+	adev->dm.dc = dc;
+	dc->cap_funcs.get_dcc_compression_cap = dm_test_get_dcc_compression_cap;
+	dm_test_dcc_ctx = &ctx;
+
+	afb->base.modifier = AMD_FMT_MOD |
+			     AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX12_64K_2D) |
+			     AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX12) |
+			     AMD_FMT_MOD_SET(DCC, 1) |
+			     AMD_FMT_MOD_SET(DCC_MAX_COMPRESSED_BLOCK, 0);
+	plane_size.surface_size.width = 1920;
+	plane_size.surface_size.height = 1080;
+
+	ret = dm_test_gfx12_attrs(adev, afb, &plane_size, &tiling_info, &dcc,
+				  &address);
+	KUNIT_EXPECT_EQ(test, ret, 0);
+	KUNIT_EXPECT_TRUE(test, dcc.enable);
+	KUNIT_EXPECT_TRUE(test, dcc.independent_64b_blks);
+	KUNIT_EXPECT_EQ(test, (int)dcc.dcc_ind_blk, (int)hubp_ind_block_64b);
+
+	dm_test_dcc_ctx = NULL;
+}
+
+/**
+ * dm_test_fill_gfx12_plane_attributes_block_unconstrained() - Verify block path.
+ * @test: KUnit test context.
+ *
+ * Verify if a max-compressed-block value above one selects the unconstrained
+ * independent block mode on GFX12.
+ */
+static void dm_test_fill_gfx12_plane_attributes_block_unconstrained(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct amdgpu_framebuffer *afb;
+	struct plane_size plane_size = {0};
+	struct dc_tiling_info tiling_info = {0};
+	struct dc_plane_dcc_param dcc = {0};
+	struct dc_plane_address address = {0};
+	struct dm_test_dcc_cap_ctx ctx = {
+		.callback_ret = true,
+		.capable = true,
+		.output_independent_64b_blks = false,
+	};
+	int ret;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	afb = kunit_kzalloc(test, sizeof(*afb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, afb);
+
+	adev->family = AMDGPU_FAMILY_GC_12_0_0;
+	adev->dm.dc = dc;
+	dc->cap_funcs.get_dcc_compression_cap = dm_test_get_dcc_compression_cap;
+	dm_test_dcc_ctx = &ctx;
+
+	afb->base.modifier = AMD_FMT_MOD |
+			     AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX12_64K_2D) |
+			     AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX12) |
+			     AMD_FMT_MOD_SET(DCC, 1) |
+			     AMD_FMT_MOD_SET(DCC_MAX_COMPRESSED_BLOCK, 2);
+	plane_size.surface_size.width = 1920;
+	plane_size.surface_size.height = 1080;
+
+	ret = dm_test_gfx12_attrs(adev, afb, &plane_size, &tiling_info, &dcc,
+				  &address);
+	KUNIT_EXPECT_EQ(test, ret, 0);
+	KUNIT_EXPECT_TRUE(test, dcc.enable);
+	KUNIT_EXPECT_FALSE(test, dcc.independent_64b_blks);
+	KUNIT_EXPECT_EQ(test, (int)dcc.dcc_ind_blk,
+			(int)hubp_ind_block_unconstrained);
+
+	dm_test_dcc_ctx = NULL;
+}
+
+/**
+ * dm_test_fill_gfx12_plane_attributes_validate_fails() - Verify GFX12 error path.
+ * @test: KUnit test context.
+ *
+ * Verify if GFX12 modifier parsing returns validation errors from the shared
+ * DCC validation helper.
+ */
+static void dm_test_fill_gfx12_plane_attributes_validate_fails(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct amdgpu_framebuffer *afb;
+	struct plane_size plane_size = {0};
+	struct dc_tiling_info tiling_info = {0};
+	struct dc_plane_dcc_param dcc = {0};
+	struct dc_plane_address address = {0};
+	int ret;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	afb = kunit_kzalloc(test, sizeof(*afb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, afb);
+
+	adev->family = AMDGPU_FAMILY_GC_12_0_0;
+	adev->dm.dc = dc;
+	afb->base.modifier = AMD_FMT_MOD |
+			     AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX12_64K_2D) |
+			     AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX12) |
+			     AMD_FMT_MOD_SET(DCC, 1) |
+			     AMD_FMT_MOD_SET(DCC_MAX_COMPRESSED_BLOCK, 1);
+	plane_size.surface_size.width = 1920;
+	plane_size.surface_size.height = 1080;
+
+	ret = dm_test_gfx12_attrs(adev, afb, &plane_size, &tiling_info, &dcc,
+				  &address);
+	KUNIT_EXPECT_EQ(test, ret, -EINVAL);
+}
+
+/**
  * dm_test_fill_plane_buffer_attributes_video() - Verify NV12 attributes.
  * @test: KUnit test context.
  *
@@ -2318,6 +2477,9 @@ static struct kunit_case amdgpu_dm_plane_test_cases[] = {
 	KUNIT_CASE(dm_test_format_mod_supported_d_swizzle_reject),
 	/* amdgpu_dm_plane_fill_gfx12_plane_attributes_from_modifiers() */
 	KUNIT_CASE(dm_test_fill_gfx12_plane_attributes_from_modifiers),
+	KUNIT_CASE(dm_test_fill_gfx12_plane_attributes_block0),
+	KUNIT_CASE(dm_test_fill_gfx12_plane_attributes_block_unconstrained),
+	KUNIT_CASE(dm_test_fill_gfx12_plane_attributes_validate_fails),
 	/* amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers() */
 	KUNIT_CASE(dm_test_fill_gfx9_plane_attributes_from_modifiers),
 	KUNIT_CASE(dm_test_fill_gfx9_plane_attributes_dcc),
