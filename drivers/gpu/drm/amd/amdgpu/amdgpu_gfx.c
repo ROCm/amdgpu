@@ -2733,9 +2733,8 @@ void amdgpu_gfx_profile_ring_begin_use(struct amdgpu_ring *ring)
 	else
 		profile = PP_SMC_POWER_PROFILE_COMPUTE;
 
-	atomic_inc(&adev->gfx.total_submission_cnt);
-
-	cancel_delayed_work_sync(&adev->gfx.idle_work);
+	if (!atomic_fetch_inc(&adev->gfx.total_submission_cnt))
+		cancel_delayed_work_sync(&adev->gfx.idle_work);
 
 	/* We can safely return early here because we've cancelled the
 	 * the delayed work so there is no one else to set it to false
@@ -2763,9 +2762,9 @@ void amdgpu_gfx_profile_ring_end_use(struct amdgpu_ring *ring)
 	if (amdgpu_dpm_is_overdrive_enabled(adev))
 		return;
 
-	atomic_dec(&ring->adev->gfx.total_submission_cnt);
-
-	schedule_delayed_work(&ring->adev->gfx.idle_work, GFX_PROFILE_IDLE_TIMEOUT);
+	if (atomic_dec_and_test(&ring->adev->gfx.total_submission_cnt))
+		schedule_delayed_work(&ring->adev->gfx.idle_work,
+				      GFX_PROFILE_IDLE_TIMEOUT);
 }
 
 /**

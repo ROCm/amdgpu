@@ -506,9 +506,8 @@ void amdgpu_vcn_ring_begin_use(struct amdgpu_ring *ring)
 	struct amdgpu_device *adev = ring->adev;
 	struct amdgpu_vcn_inst *vcn_inst = &adev->vcn.inst[ring->me];
 
-	atomic_inc(&vcn_inst->total_submission_cnt);
-
-	cancel_delayed_work_sync(&vcn_inst->idle_work);
+	if (!atomic_fetch_inc(&vcn_inst->total_submission_cnt))
+		cancel_delayed_work_sync(&vcn_inst->idle_work);
 
 	mutex_lock(&vcn_inst->vcn_pg_lock);
 	vcn_inst->set_pg_state(vcn_inst, AMD_PG_STATE_UNGATE);
@@ -550,10 +549,9 @@ void amdgpu_vcn_ring_end_use(struct amdgpu_ring *ring)
 	    !adev->vcn.inst[ring->me].using_unified_queue)
 		atomic_dec(&ring->adev->vcn.inst[ring->me].dpg_enc_submission_cnt);
 
-	atomic_dec(&ring->adev->vcn.inst[ring->me].total_submission_cnt);
-
-	schedule_delayed_work(&ring->adev->vcn.inst[ring->me].idle_work,
-			      VCN_IDLE_TIMEOUT);
+	if (atomic_dec_and_test(&ring->adev->vcn.inst[ring->me].total_submission_cnt))
+		schedule_delayed_work(&ring->adev->vcn.inst[ring->me].idle_work,
+				      VCN_IDLE_TIMEOUT);
 }
 
 int amdgpu_vcn_dec_ring_test_ring(struct amdgpu_ring *ring)
