@@ -786,6 +786,77 @@ static void dm_test_validate_dcc_missing_cap_func_fails(struct kunit *test)
 }
 
 /**
+ * dm_test_validate_dcc_cap_callback_fails() - Verify callback failure path.
+ * @test: KUnit test context.
+ *
+ * Verify if validation fails when the DCC capability callback returns false.
+ */
+static void dm_test_validate_dcc_cap_callback_fails(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct dc_tiling_info tiling_info = {0};
+	struct dc_plane_dcc_param dcc = {0};
+	struct dc_plane_address address = {0};
+	struct plane_size plane_size = {0};
+	enum surface_pixel_format format = SURFACE_PIXEL_FORMAT_GRPH_ARGB8888;
+	enum dc_rotation_angle rotation = ROTATION_ANGLE_0;
+	struct dm_test_dcc_cap_ctx ctx = {
+		.callback_ret = false,
+		.capable = true,
+	};
+	int ret;
+
+	dm_test_init_validate_dcc_inputs(&adev, &dc, &tiling_info, &dcc, &address,
+					 &plane_size, test);
+	dc->cap_funcs.get_dcc_compression_cap = dm_test_get_dcc_compression_cap;
+	dm_test_dcc_ctx = &ctx;
+
+	ret = amdgpu_dm_plane_validate_dcc(adev, format, rotation, &tiling_info,
+					   &dcc, &address, &plane_size);
+	KUNIT_EXPECT_EQ(test, ret, -EINVAL);
+	KUNIT_EXPECT_TRUE(test, ctx.called);
+
+	dm_test_dcc_ctx = NULL;
+}
+
+/**
+ * dm_test_validate_dcc_not_capable_fails() - Verify not-capable callback output.
+ * @test: KUnit test context.
+ *
+ * Verify if validation fails when the DCC capability callback reports that the
+ * surface is not DCC capable.
+ */
+static void dm_test_validate_dcc_not_capable_fails(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct dc_tiling_info tiling_info = {0};
+	struct dc_plane_dcc_param dcc = {0};
+	struct dc_plane_address address = {0};
+	struct plane_size plane_size = {0};
+	enum surface_pixel_format format = SURFACE_PIXEL_FORMAT_GRPH_ARGB8888;
+	enum dc_rotation_angle rotation = ROTATION_ANGLE_0;
+	struct dm_test_dcc_cap_ctx ctx = {
+		.callback_ret = true,
+		.capable = false,
+	};
+	int ret;
+
+	dm_test_init_validate_dcc_inputs(&adev, &dc, &tiling_info, &dcc, &address,
+					 &plane_size, test);
+	dc->cap_funcs.get_dcc_compression_cap = dm_test_get_dcc_compression_cap;
+	dm_test_dcc_ctx = &ctx;
+
+	ret = amdgpu_dm_plane_validate_dcc(adev, format, rotation, &tiling_info,
+					   &dcc, &address, &plane_size);
+	KUNIT_EXPECT_EQ(test, ret, -EINVAL);
+	KUNIT_EXPECT_TRUE(test, ctx.called);
+
+	dm_test_dcc_ctx = NULL;
+}
+
+/**
  * dm_test_validate_dcc_success_and_scan_mapping() - Verify success path and rotation-to-scan mapping.
  * @test: KUnit test context.
  *
@@ -2401,6 +2472,45 @@ static void dm_test_fill_dc_scaling_info_plane_caps(struct kunit *test)
 }
 
 /**
+ * dm_test_get_cursor_position_bad_size() - Verify oversized cursor rejection.
+ * @test: KUnit test context.
+ *
+ * Verify if a cursor larger than the CRTC maximum is rejected.
+ */
+static void dm_test_get_cursor_position_bad_size(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct amdgpu_crtc *amdgpu_crtc;
+	struct drm_plane *plane;
+	struct drm_plane_state *state;
+	struct drm_framebuffer *fb;
+	struct dc_cursor_position position = {0};
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	amdgpu_crtc = kunit_kzalloc(test, sizeof(*amdgpu_crtc), GFP_KERNEL);
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	state = kunit_kzalloc(test, sizeof(*state), GFP_KERNEL);
+	fb = kunit_kzalloc(test, sizeof(*fb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, amdgpu_crtc);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+	KUNIT_ASSERT_NOT_NULL(test, state);
+	KUNIT_ASSERT_NOT_NULL(test, fb);
+
+	amdgpu_crtc->max_cursor_width = 64;
+	amdgpu_crtc->max_cursor_height = 64;
+	plane->dev = &adev->ddev;
+	plane->state = state;
+	state->fb = fb;
+	state->crtc_w = 128;
+	state->crtc_h = 32;
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_plane_get_cursor_position(plane, &amdgpu_crtc->base, &position),
+			-EINVAL);
+}
+
+/**
  * dm_test_format_mod_supported_d_swizzle_reject() - Verify D swizzle rejection.
  * @test: KUnit test context.
  *
@@ -2472,6 +2582,7 @@ static struct kunit_case amdgpu_dm_plane_test_cases[] = {
 	KUNIT_CASE(dm_test_fill_plane_buffer_attributes_gfx12),
 	/* amdgpu_dm_plane_get_cursor_position() */
 	KUNIT_CASE(dm_test_get_cursor_position),
+	KUNIT_CASE(dm_test_get_cursor_position_bad_size),
 	/* amdgpu_dm_plane_format_mod_supported() */
 	KUNIT_CASE(dm_test_format_mod_supported),
 	KUNIT_CASE(dm_test_format_mod_supported_d_swizzle_reject),
@@ -2510,6 +2621,8 @@ static struct kunit_case amdgpu_dm_plane_test_cases[] = {
 	KUNIT_CASE(dm_test_validate_dcc_disabled_returns_success),
 	KUNIT_CASE(dm_test_validate_dcc_video_non_gfx12_fails),
 	KUNIT_CASE(dm_test_validate_dcc_missing_cap_func_fails),
+	KUNIT_CASE(dm_test_validate_dcc_cap_callback_fails),
+	KUNIT_CASE(dm_test_validate_dcc_not_capable_fails),
 	KUNIT_CASE(dm_test_validate_dcc_success_and_scan_mapping),
 	KUNIT_CASE(dm_test_validate_dcc_independent_64b_mismatch_fails),
 	{}
