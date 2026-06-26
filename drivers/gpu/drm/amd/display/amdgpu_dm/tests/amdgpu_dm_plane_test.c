@@ -2726,6 +2726,446 @@ static void dm_test_format_mod_supported_d_swizzle_reject(struct kunit *test)
 								listed_mod));
 }
 
+/**
+ * dm_test_atomic_async_check_rejects() - Verify async check rejections.
+ * @test: KUnit test context.
+ *
+ * Verify if async flip on non-overlay planes and async cursor update on
+ * non-cursor planes are rejected.
+ */
+static void dm_test_atomic_async_check_rejects(struct kunit *test)
+{
+	struct drm_plane *plane;
+
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+
+	plane->type = DRM_PLANE_TYPE_PRIMARY;
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_plane_atomic_async_check(plane, NULL, true),
+			-EINVAL);
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_plane_atomic_async_check(plane, NULL, false),
+			-EINVAL);
+}
+
+/**
+ * dm_test_atomic_async_check_overlay_cursor() - Verify overlay cursor rejection.
+ * @test: KUnit test context.
+ *
+ * Verify if async cursor updates are rejected while the CRTC is using an
+ * overlay cursor mode.
+ */
+static void dm_test_atomic_async_check_overlay_cursor(struct kunit *test)
+{
+	struct drm_atomic_state *state;
+	struct __drm_planes_state *planes;
+	struct __drm_crtcs_state *crtcs;
+	struct drm_plane *plane;
+	struct drm_plane_state *plane_state;
+	struct drm_crtc *crtc;
+	struct dm_crtc_state *dm_crtc_state;
+
+	state = kunit_kzalloc(test, sizeof(*state), GFP_KERNEL);
+	planes = kunit_kzalloc(test, sizeof(*planes), GFP_KERNEL);
+	crtcs = kunit_kzalloc(test, sizeof(*crtcs), GFP_KERNEL);
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	plane_state = kunit_kzalloc(test, sizeof(*plane_state), GFP_KERNEL);
+	crtc = kunit_kzalloc(test, sizeof(*crtc), GFP_KERNEL);
+	dm_crtc_state = kunit_kzalloc(test, sizeof(*dm_crtc_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, state);
+	KUNIT_ASSERT_NOT_NULL(test, planes);
+	KUNIT_ASSERT_NOT_NULL(test, crtcs);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+	KUNIT_ASSERT_NOT_NULL(test, plane_state);
+	KUNIT_ASSERT_NOT_NULL(test, crtc);
+	KUNIT_ASSERT_NOT_NULL(test, dm_crtc_state);
+
+	plane->type = DRM_PLANE_TYPE_CURSOR;
+	plane->index = 0;
+	crtc->index = 0;
+	plane_state->crtc = crtc;
+	dm_crtc_state->cursor_mode = DM_CURSOR_OVERLAY_MODE;
+	state->planes = planes;
+	state->crtcs = crtcs;
+	state->planes[0].new_state = plane_state;
+	state->crtcs[0].new_state = &dm_crtc_state->base;
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_plane_atomic_async_check(plane, state, false),
+			-EINVAL);
+
+	dm_crtc_state->cursor_mode = DM_CURSOR_NATIVE_MODE;
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_plane_atomic_async_check(plane, state, false),
+			0);
+}
+
+static struct amdgpu_device *dm_test_init_atomic_check_state(struct kunit *test,
+							     struct drm_atomic_state **state,
+							     struct drm_plane **plane,
+							     struct dm_plane_state **dm_plane_state,
+							     struct drm_crtc_state **new_crtc_state,
+							     struct drm_framebuffer **fb)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct __drm_planes_state *planes;
+	struct __drm_crtcs_state *crtcs;
+	struct dc_plane_state *dc_plane_state;
+	struct drm_crtc *crtc;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	*state = kunit_kzalloc(test, sizeof(**state), GFP_KERNEL);
+	planes = kunit_kzalloc(test, sizeof(*planes), GFP_KERNEL);
+	crtcs = kunit_kzalloc(test, sizeof(*crtcs), GFP_KERNEL);
+	*plane = kunit_kzalloc(test, sizeof(**plane), GFP_KERNEL);
+	*dm_plane_state = kunit_kzalloc(test, sizeof(**dm_plane_state), GFP_KERNEL);
+	dc_plane_state = kunit_kzalloc(test, sizeof(*dc_plane_state), GFP_KERNEL);
+	crtc = kunit_kzalloc(test, sizeof(*crtc), GFP_KERNEL);
+	*new_crtc_state = kunit_kzalloc(test, sizeof(**new_crtc_state), GFP_KERNEL);
+	*fb = kunit_kzalloc(test, sizeof(**fb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, *state);
+	KUNIT_ASSERT_NOT_NULL(test, planes);
+	KUNIT_ASSERT_NOT_NULL(test, crtcs);
+	KUNIT_ASSERT_NOT_NULL(test, *plane);
+	KUNIT_ASSERT_NOT_NULL(test, *dm_plane_state);
+	KUNIT_ASSERT_NOT_NULL(test, dc_plane_state);
+	KUNIT_ASSERT_NOT_NULL(test, crtc);
+	KUNIT_ASSERT_NOT_NULL(test, *new_crtc_state);
+	KUNIT_ASSERT_NOT_NULL(test, *fb);
+
+	adev->dm.dc = dc;
+	dc->caps.planes[0].max_upscale_factor.argb8888 = 1000;
+	dc->caps.planes[0].max_downscale_factor.argb8888 = 1000;
+	dc->caps.planes[0].max_upscale_factor.nv12 = 1000;
+	dc->caps.planes[0].max_downscale_factor.nv12 = 1000;
+
+	(*plane)->dev = &adev->ddev;
+	(*plane)->index = 0;
+	(*plane)->type = DRM_PLANE_TYPE_OVERLAY;
+	(*plane)->name = "kunit-plane";
+	crtc->dev = &adev->ddev;
+	crtc->index = 0;
+	(*fb)->width = 100;
+	(*fb)->height = 100;
+	(*fb)->format = drm_format_info(DRM_FORMAT_XRGB8888);
+	KUNIT_ASSERT_NOT_NULL(test, (*fb)->format);
+
+	(*dm_plane_state)->base.plane = *plane;
+	(*dm_plane_state)->base.state = *state;
+	(*dm_plane_state)->base.crtc = crtc;
+	(*dm_plane_state)->base.fb = *fb;
+	(*dm_plane_state)->base.src_w = 100 << 16;
+	(*dm_plane_state)->base.src_h = 100 << 16;
+	(*dm_plane_state)->base.crtc_w = 100;
+	(*dm_plane_state)->base.crtc_h = 100;
+	(*dm_plane_state)->dc_state = dc_plane_state;
+
+	(*new_crtc_state)->crtc = crtc;
+	(*new_crtc_state)->enable = true;
+	(*new_crtc_state)->mode.crtc_hdisplay = 1920;
+	(*new_crtc_state)->mode.crtc_vdisplay = 1080;
+
+	(*state)->planes = planes;
+	(*state)->crtcs = crtcs;
+	(*state)->planes[0].new_state = &(*dm_plane_state)->base;
+	(*state)->crtcs[0].new_state = *new_crtc_state;
+
+	return adev;
+}
+
+/**
+ * dm_test_atomic_check_no_dc_state() - Verify missing DC plane state succeeds.
+ * @test: KUnit test context.
+ *
+ * Verify if atomic_check exits before deeper validation when the DM plane state
+ * has no DC plane state attached.
+ */
+static void dm_test_atomic_check_no_dc_state(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct drm_atomic_state *state;
+	struct __drm_planes_state *planes;
+	struct drm_plane *plane;
+	struct dm_plane_state *dm_plane_state;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	state = kunit_kzalloc(test, sizeof(*state), GFP_KERNEL);
+	planes = kunit_kzalloc(test, sizeof(*planes), GFP_KERNEL);
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	dm_plane_state = kunit_kzalloc(test, sizeof(*dm_plane_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, state);
+	KUNIT_ASSERT_NOT_NULL(test, planes);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+	KUNIT_ASSERT_NOT_NULL(test, dm_plane_state);
+
+	plane->dev = &adev->ddev;
+	plane->index = 0;
+	dm_plane_state->base.plane = plane;
+	state->planes = planes;
+	state->planes[0].new_state = &dm_plane_state->base;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_plane_atomic_check(plane, state), 0);
+}
+
+/**
+ * dm_test_atomic_check_missing_crtc_state() - Verify missing CRTC state fails.
+ * @test: KUnit test context.
+ *
+ * Verify if atomic_check rejects a plane with DC state when the atomic CRTC
+ * state is absent.
+ */
+static void dm_test_atomic_check_missing_crtc_state(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct drm_atomic_state *state;
+	struct __drm_planes_state *planes;
+	struct __drm_crtcs_state *crtcs;
+	struct drm_plane *plane;
+	struct dm_plane_state *dm_plane_state;
+	struct dc_plane_state *dc_plane_state;
+	struct drm_crtc *crtc;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	state = kunit_kzalloc(test, sizeof(*state), GFP_KERNEL);
+	planes = kunit_kzalloc(test, sizeof(*planes), GFP_KERNEL);
+	crtcs = kunit_kzalloc(test, sizeof(*crtcs), GFP_KERNEL);
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	dm_plane_state = kunit_kzalloc(test, sizeof(*dm_plane_state), GFP_KERNEL);
+	dc_plane_state = kunit_kzalloc(test, sizeof(*dc_plane_state), GFP_KERNEL);
+	crtc = kunit_kzalloc(test, sizeof(*crtc), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, state);
+	KUNIT_ASSERT_NOT_NULL(test, planes);
+	KUNIT_ASSERT_NOT_NULL(test, crtcs);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+	KUNIT_ASSERT_NOT_NULL(test, dm_plane_state);
+	KUNIT_ASSERT_NOT_NULL(test, dc_plane_state);
+	KUNIT_ASSERT_NOT_NULL(test, crtc);
+
+	plane->dev = &adev->ddev;
+	plane->index = 0;
+	crtc->index = 0;
+	dm_plane_state->base.plane = plane;
+	dm_plane_state->base.crtc = crtc;
+	dm_plane_state->dc_state = dc_plane_state;
+	state->planes = planes;
+	state->crtcs = crtcs;
+	state->planes[0].new_state = &dm_plane_state->base;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_plane_atomic_check(plane, state), -EINVAL);
+}
+
+/**
+ * dm_test_atomic_check_helper_failure() - Verify helper-check failures return.
+ * @test: KUnit test context.
+ *
+ * Verify if atomic_check returns before DC validation when the DRM helper state
+ * validation rejects the plane.
+ */
+static void dm_test_atomic_check_helper_failure(struct kunit *test)
+{
+	struct drm_atomic_state *state;
+	struct drm_plane *plane;
+	struct dm_plane_state *dm_plane_state;
+	struct drm_crtc_state *new_crtc_state;
+	struct drm_framebuffer *fb;
+
+	dm_test_init_atomic_check_state(test, &state, &plane, &dm_plane_state,
+					&new_crtc_state, &fb);
+	dm_plane_state->base.crtc_w = 10;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_plane_atomic_check(plane, state), -EINVAL);
+}
+
+/**
+ * dm_test_atomic_check_color_pipeline_conflict() - Verify color conflict rejection.
+ * @test: KUnit test context.
+ *
+ * Verify if atomic_check rejects use of both plane COLOR_PIPELINE and CRTC
+ * DEGAMMA_LUT before DC validation.
+ */
+static void dm_test_atomic_check_color_pipeline_conflict(struct kunit *test)
+{
+	struct drm_atomic_state *state;
+	struct drm_plane *plane;
+	struct dm_plane_state *dm_plane_state;
+	struct drm_crtc_state *new_crtc_state;
+	struct drm_framebuffer *fb;
+	void *color_pipeline;
+	void *degamma_lut;
+
+	dm_test_init_atomic_check_state(test, &state, &plane, &dm_plane_state,
+					&new_crtc_state, &fb);
+	color_pipeline = kunit_kzalloc(test, 1, GFP_KERNEL);
+	degamma_lut = kunit_kzalloc(test, 1, GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, color_pipeline);
+	KUNIT_ASSERT_NOT_NULL(test, degamma_lut);
+
+	dm_plane_state->base.color_pipeline = color_pipeline;
+	new_crtc_state->degamma_lut = degamma_lut;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_plane_atomic_check(plane, state), -EINVAL);
+}
+
+/**
+ * dm_test_atomic_check_scaling_failure() - Verify scaling-info failures return.
+ * @test: KUnit test context.
+ *
+ * Verify if atomic_check returns the scaling-info error before DC validation.
+ */
+static void dm_test_atomic_check_scaling_failure(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct drm_atomic_state *state;
+	struct drm_plane *plane;
+	struct dm_plane_state *dm_plane_state;
+	struct drm_crtc_state *new_crtc_state;
+	struct drm_framebuffer *fb;
+
+	adev = dm_test_init_atomic_check_state(test, &state, &plane, &dm_plane_state,
+					       &new_crtc_state, &fb);
+	adev->ip_versions[DCE_HWIP][0] = IP_VERSION(1, 0, 0);
+	fb->width = 200;
+	fb->format = drm_format_info(DRM_FORMAT_NV12);
+	KUNIT_ASSERT_NOT_NULL(test, fb->format);
+	dm_plane_state->base.src_x = 1 << 16;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_plane_atomic_check(plane, state), -EINVAL);
+}
+
+/**
+ * dm_test_panic_flush_no_dc_state() - Verify panic flush exits without DC state.
+ * @test: KUnit test context.
+ *
+ * Verify if panic_flush returns without dereferencing DC state when the current
+ * plane state has no DC plane state attached.
+ */
+static void dm_test_panic_flush_no_dc_state(struct kunit *test)
+{
+	struct drm_plane *plane;
+	struct dm_plane_state *dm_plane_state;
+
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	dm_plane_state = kunit_kzalloc(test, sizeof(*dm_plane_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+	KUNIT_ASSERT_NOT_NULL(test, dm_plane_state);
+
+	plane->state = &dm_plane_state->base;
+
+	amdgpu_dm_plane_panic_flush(plane);
+}
+
+static const struct drm_plane_funcs dm_test_plane_reset_funcs = {
+	.atomic_destroy_state = amdgpu_dm_plane_drm_plane_destroy_state,
+};
+
+/**
+ * dm_test_plane_reset_initializes_state() - Verify reset installs default state.
+ * @test: KUnit test context.
+ *
+ * Verify amdgpu_dm_plane_drm_plane_reset() destroys the existing plane state,
+ * allocates a fresh dm_plane_state, and initializes the AMD-specific transfer
+ * function and HDR multiplier defaults.
+ */
+static void dm_test_plane_reset_initializes_state(struct kunit *test)
+{
+	struct dm_plane_state *old_state;
+	struct dm_plane_state *new_state;
+	struct drm_plane *plane;
+
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+
+	/*
+	 * Provide an existing state plus a funcs table so reset exercises the
+	 * destroy-existing-state path. The destroy hook frees this state, so it
+	 * must be a plain (non-KUnit-managed) allocation.
+	 */
+	old_state = kzalloc(sizeof(*old_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, old_state);
+	plane->funcs = &dm_test_plane_reset_funcs;
+	plane->state = &old_state->base;
+
+	amdgpu_dm_plane_drm_plane_reset(plane);
+
+	KUNIT_ASSERT_NOT_NULL(test, plane->state);
+	new_state = to_dm_plane_state(plane->state);
+	KUNIT_EXPECT_EQ(test, new_state->degamma_tf, AMDGPU_TRANSFER_FUNCTION_DEFAULT);
+	KUNIT_EXPECT_EQ(test, new_state->hdr_mult, AMDGPU_HDR_MULT_DEFAULT);
+	KUNIT_EXPECT_EQ(test, new_state->shaper_tf, AMDGPU_TRANSFER_FUNCTION_DEFAULT);
+	KUNIT_EXPECT_EQ(test, new_state->blend_tf, AMDGPU_TRANSFER_FUNCTION_DEFAULT);
+
+	kfree(new_state);
+}
+
+/**
+ * dm_test_plane_duplicate_state_copies_fields() - Verify state duplication.
+ * @test: KUnit test context.
+ *
+ * Verify amdgpu_dm_plane_drm_plane_duplicate_state() allocates a new state and
+ * copies the transfer-function and HDR-multiplier fields from the current
+ * plane state when no DC state or color blob is attached.
+ */
+static void dm_test_plane_duplicate_state_copies_fields(struct kunit *test)
+{
+	struct dm_plane_state *old_state;
+	struct drm_plane_state *dup_base;
+	struct dm_plane_state *dup_state;
+	struct drm_plane *plane;
+
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	old_state = kunit_kzalloc(test, sizeof(*old_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+	KUNIT_ASSERT_NOT_NULL(test, old_state);
+
+	old_state->degamma_tf = AMDGPU_TRANSFER_FUNCTION_PQ_EOTF;
+	old_state->hdr_mult = 0x123456789ULL;
+	old_state->shaper_tf = AMDGPU_TRANSFER_FUNCTION_IDENTITY;
+	old_state->blend_tf = AMDGPU_TRANSFER_FUNCTION_SRGB_EOTF;
+	plane->state = &old_state->base;
+
+	dup_base = amdgpu_dm_plane_drm_plane_duplicate_state(plane);
+	KUNIT_ASSERT_NOT_NULL(test, dup_base);
+
+	dup_state = to_dm_plane_state(dup_base);
+	KUNIT_EXPECT_EQ(test, dup_state->degamma_tf, AMDGPU_TRANSFER_FUNCTION_PQ_EOTF);
+	KUNIT_EXPECT_EQ(test, dup_state->hdr_mult, 0x123456789ULL);
+	KUNIT_EXPECT_EQ(test, dup_state->shaper_tf, AMDGPU_TRANSFER_FUNCTION_IDENTITY);
+	KUNIT_EXPECT_EQ(test, dup_state->blend_tf, AMDGPU_TRANSFER_FUNCTION_SRGB_EOTF);
+	KUNIT_EXPECT_NULL(test, dup_state->dc_state);
+
+	kfree(dup_state);
+}
+
+/**
+ * dm_test_plane_destroy_state_minimal() - Verify destroy of a minimal state.
+ * @test: KUnit test context.
+ *
+ * Verify amdgpu_dm_plane_drm_plane_destroy_state() tears down a plane state
+ * that has no color blobs or DC plane state attached without dereferencing
+ * NULL resources.
+ */
+static void dm_test_plane_destroy_state_minimal(struct kunit *test)
+{
+	struct dm_plane_state *dm_plane_state;
+	struct drm_plane *plane;
+
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+
+	/* destroy_state frees the state itself, so use a plain allocation. */
+	dm_plane_state = kzalloc(sizeof(*dm_plane_state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, dm_plane_state);
+
+	amdgpu_dm_plane_drm_plane_destroy_state(plane, &dm_plane_state->base);
+}
+
 static struct kunit_case amdgpu_dm_plane_test_cases[] = {
 	/* amdgpu_dm_plane_is_video_format() */
 	KUNIT_CASE(dm_test_plane_is_video_format_known_video),
@@ -2790,6 +3230,23 @@ static struct kunit_case amdgpu_dm_plane_test_cases[] = {
 	KUNIT_CASE(dm_test_helper_check_state_small_viewport_height),
 	KUNIT_CASE(dm_test_helper_check_state_bottom_clipped_height),
 	KUNIT_CASE(dm_test_helper_check_state_scaling_caps),
+	/* amdgpu_dm_plane_atomic_async_check() */
+	KUNIT_CASE(dm_test_atomic_async_check_rejects),
+	KUNIT_CASE(dm_test_atomic_async_check_overlay_cursor),
+	/* amdgpu_dm_plane_atomic_check() */
+	KUNIT_CASE(dm_test_atomic_check_no_dc_state),
+	KUNIT_CASE(dm_test_atomic_check_missing_crtc_state),
+	KUNIT_CASE(dm_test_atomic_check_helper_failure),
+	KUNIT_CASE(dm_test_atomic_check_color_pipeline_conflict),
+	KUNIT_CASE(dm_test_atomic_check_scaling_failure),
+	/* amdgpu_dm_plane_panic_flush() */
+	KUNIT_CASE(dm_test_panic_flush_no_dc_state),
+	/* amdgpu_dm_plane_drm_plane_reset() */
+	KUNIT_CASE(dm_test_plane_reset_initializes_state),
+	/* amdgpu_dm_plane_drm_plane_duplicate_state() */
+	KUNIT_CASE(dm_test_plane_duplicate_state_copies_fields),
+	/* amdgpu_dm_plane_drm_plane_destroy_state() */
+	KUNIT_CASE(dm_test_plane_destroy_state_minimal),
 	/* amdgpu_dm_plane_add_modifier() */
 	KUNIT_CASE(dm_test_add_modifier_appends_value),
 	KUNIT_CASE(dm_test_add_modifier_grows_capacity),
