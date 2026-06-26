@@ -5,13 +5,16 @@
  * Copyright 2026 Advanced Micro Devices, Inc.
  */
 
- #include <kunit/test.h>
- #include <drm/drm_blend.h>
- #include "link_enc_cfg.h"
- #include "amdgpu_dm_plane.h"
- #include <drm/amdgpu_drm.h>
- #include <drm/drm_plane.h>
-
+#include <kunit/test.h>
+#include <drm/drm_atomic.h>
+#include <drm/drm_blend.h>
+#include "link_enc_cfg.h"
+#include "amdgpu_dm_plane.h"
+#include "amdgpu_rlc.h"
+#include "gc/gc_11_0_0_offset.h"
+#include "gc/gc_11_0_0_sh_mask.h"
+#include <drm/amdgpu_drm.h>
+#include <drm/drm_plane.h>
 
 struct dm_test_dcc_cap_ctx {
 	bool callback_ret;
@@ -1162,19 +1165,142 @@ static void dm_test_fill_gfx9_tiling_info_from_modifier_nv(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, tiling_info.gfx9.shaderEnable, 1U);
 }
 
+/**
+ * dm_test_get_format_info() - Verify modifier-based format info lookup.
+ * @test: KUnit test context.
+ *
+ * Verify if non-AMD modifiers return NULL and AMD DCC modifiers resolve a
+ * dedicated format info structure.
+ */
+static void dm_test_get_format_info(struct kunit *test)
+{
+	u64 dcc_mod = AMD_FMT_MOD |
+		      AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX9) |
+		      AMD_FMT_MOD_SET(DCC, 1);
+	const struct drm_format_info *format_info;
+
+	KUNIT_EXPECT_PTR_EQ(test,
+			    (void *)amdgpu_dm_plane_get_format_info(DRM_FORMAT_XRGB8888,
+								    DRM_FORMAT_MOD_LINEAR),
+			    NULL);
+	format_info = amdgpu_dm_plane_get_format_info(DRM_FORMAT_XRGB8888, dcc_mod);
+	KUNIT_EXPECT_NOT_NULL(test, format_info);
+}
+
+/**
+ * dm_test_fill_blending_global_alpha_dcn42() - Verify DCN 4.2 alpha scaling.
+ * @test: KUnit test context.
+ *
+ * Verify if DCN 4.2 scales the 16-bit DRM alpha down by 4 bits instead of 8.
+ */
+static void dm_test_fill_blending_global_alpha_dcn42(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct drm_plane *plane;
+	struct drm_plane_state *state;
+	bool per_pixel_alpha;
+	bool pre_multiplied_alpha;
+	bool global_alpha;
+	int global_alpha_value;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	state = kunit_kzalloc(test, sizeof(*state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+	KUNIT_ASSERT_NOT_NULL(test, state);
+
+	adev->ip_versions[DCE_HWIP][0] = IP_VERSION(4, 2, 0);
+	plane->dev = &adev->ddev;
+	state->plane = plane;
+	state->pixel_blend_mode = DRM_MODE_BLEND_PIXEL_NONE;
+	state->alpha = 0x8000;
+
+	amdgpu_dm_plane_fill_blending_from_plane_state(state,
+						       &per_pixel_alpha,
+						       &pre_multiplied_alpha,
+						       &global_alpha,
+						       &global_alpha_value);
+
+	KUNIT_EXPECT_TRUE(test, global_alpha);
+	KUNIT_EXPECT_EQ(test, global_alpha_value, 0x800);
+}
+
+/**
+ * dm_test_get_plane_formats_overlay_universal_cap() - Verify universal overlay.
+ * @test: KUnit test context.
+ *
+ * Verify if an overlay plane with a DCN universal plane cap reports the RGB
+ * format list instead of the overlay-only list.
+ */
+static void dm_test_get_plane_formats_overlay_universal_cap(struct kunit *test)
+{
+	struct drm_plane *plane;
+	struct dc_plane_cap *cap;
+	u32 formats[32] = {0};
+
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	cap = kunit_kzalloc(test, sizeof(*cap), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+	KUNIT_ASSERT_NOT_NULL(test, cap);
+
+	plane->type = DRM_PLANE_TYPE_OVERLAY;
+	cap->type = DC_PLANE_TYPE_DCN_UNIVERSAL;
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_plane_get_plane_formats(plane, cap, formats, 32),
+			14);
+}
+
+/**
+ * dm_test_format_mod_supported_d_swizzle_reject() - Verify D swizzle rejection.
+ * @test: KUnit test context.
+ *
+ * Verify if a D micro-swizzle modifier is rejected for formats narrower than
+ * 8 bytes per pixel.
+ */
+static void dm_test_format_mod_supported_d_swizzle_reject(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct drm_plane *plane;
+	u64 listed_mod;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+
+	adev->family = AMDGPU_FAMILY_RV;
+	plane->dev = &adev->ddev;
+
+	listed_mod = AMD_FMT_MOD |
+		     AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_D) |
+		     AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX9);
+	plane->modifiers = &listed_mod;
+	plane->modifier_count = 1;
+
+	KUNIT_EXPECT_FALSE(test,
+			   amdgpu_dm_plane_format_mod_supported(plane, DRM_FORMAT_XRGB8888,
+								listed_mod));
+}
+
 static struct kunit_case amdgpu_dm_plane_test_cases[] = {
 	/* amdgpu_dm_plane_is_video_format() */
 	KUNIT_CASE(dm_test_plane_is_video_format_known_video),
+	/* amdgpu_dm_plane_get_format_info() */
+	KUNIT_CASE(dm_test_get_format_info),
 	/* amdgpu_dm_plane_fill_blending_from_plane_state() */
 	KUNIT_CASE(dm_test_fill_blending_defaults),
 	KUNIT_CASE(dm_test_fill_blending_premulti_alpha_format),
 	KUNIT_CASE(dm_test_fill_blending_coverage_alpha_format),
 	KUNIT_CASE(dm_test_fill_blending_global_alpha),
+	KUNIT_CASE(dm_test_fill_blending_global_alpha_dcn42),
 	/* amdgpu_dm_plane_modifier_* helpers() */
 	KUNIT_CASE(dm_test_modifier_has_dcc),
 	KUNIT_CASE(dm_test_modifier_gfx9_swizzle_mode),
 	/* amdgpu_dm_plane_get_plane_formats() */
 	KUNIT_CASE(dm_test_get_plane_formats),
+	KUNIT_CASE(dm_test_get_plane_formats_overlay_universal_cap),
 	/* amdgpu_dm_plane_get_plane_modifiers() */
 	KUNIT_CASE(dm_test_get_plane_modifiers),
 	/* amdgpu_dm_plane_fill_dc_scaling_info() */
@@ -1187,6 +1313,7 @@ static struct kunit_case amdgpu_dm_plane_test_cases[] = {
 	KUNIT_CASE(dm_test_get_cursor_position),
 	/* amdgpu_dm_plane_format_mod_supported() */
 	KUNIT_CASE(dm_test_format_mod_supported),
+	KUNIT_CASE(dm_test_format_mod_supported_d_swizzle_reject),
 	/* amdgpu_dm_plane_fill_gfx12_plane_attributes_from_modifiers() */
 	KUNIT_CASE(dm_test_fill_gfx12_plane_attributes_from_modifiers),
 	/* amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers() */
