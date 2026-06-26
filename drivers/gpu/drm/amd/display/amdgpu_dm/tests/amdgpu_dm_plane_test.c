@@ -1301,6 +1301,41 @@ static u64 *dm_test_get_primary_mods(struct kunit *test, struct amdgpu_device *a
 	return mods;
 }
 
+static int dm_test_plane_attrs(struct amdgpu_device *adev,
+			       const struct amdgpu_framebuffer *afb,
+			       enum surface_pixel_format format,
+			       struct dc_tiling_info *tiling_info,
+			       struct plane_size *plane_size,
+			       struct dc_plane_dcc_param *dcc,
+			       struct dc_plane_address *address)
+{
+	return amdgpu_dm_plane_fill_plane_buffer_attributes(adev, afb, format,
+		ROTATION_ANGLE_0, 0, tiling_info, plane_size, dcc, address,
+		false);
+}
+
+static int dm_test_video_attrs(struct amdgpu_device *adev,
+			       const struct amdgpu_framebuffer *afb,
+			       struct dc_tiling_info *tiling_info,
+			       struct plane_size *plane_size,
+			       struct dc_plane_dcc_param *dcc,
+			       struct dc_plane_address *address)
+{
+	return dm_test_plane_attrs(adev, afb, SURFACE_PIXEL_FORMAT_VIDEO_420_YCbCr,
+		tiling_info, plane_size, dcc, address);
+}
+
+static int dm_test_graphics_attrs(struct amdgpu_device *adev,
+				  const struct amdgpu_framebuffer *afb,
+				  struct dc_tiling_info *tiling_info,
+				  struct plane_size *plane_size,
+				  struct dc_plane_dcc_param *dcc,
+				  struct dc_plane_address *address)
+{
+	return dm_test_plane_attrs(adev, afb, SURFACE_PIXEL_FORMAT_GRPH_ARGB8888,
+		tiling_info, plane_size, dcc, address);
+}
+
 static void dm_test_setup_gfx11_device(struct amdgpu_device *adev,
 				       struct dm_test_gfx11_reg_ctx *ctx,
 				       u32 num_pkrs_log2, u32 num_pipes_log2)
@@ -1643,6 +1678,104 @@ static void dm_test_get_plane_modifiers_gfx12(struct kunit *test)
 }
 
 /**
+ * dm_test_fill_plane_buffer_attributes_video() - Verify NV12 attributes.
+ * @test: KUnit test context.
+ *
+ * Verify if a video pixel format fills chroma plane size and the progressive
+ * video address type on a GFX9 family device.
+ */
+static void dm_test_fill_plane_buffer_attributes_video(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct amdgpu_framebuffer *afb;
+	struct dc_tiling_info tiling_info;
+	struct plane_size plane_size;
+	struct dc_plane_dcc_param dcc;
+	struct dc_plane_address address;
+	int ret;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	afb = kunit_kzalloc(test, sizeof(*afb), GFP_KERNEL);
+	tiling_info = (struct dc_tiling_info){0};
+	plane_size = (struct plane_size){0};
+	dcc = (struct dc_plane_dcc_param){0};
+	address = (struct dc_plane_address){0};
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, afb);
+
+	adev->family = AMDGPU_FAMILY_NV;
+	adev->ip_versions[GC_HWIP][0] = IP_VERSION(10, 3, 0);
+	afb->address = 0x80000000ULL;
+	afb->base.width = 1920;
+	afb->base.height = 1080;
+	afb->base.offsets[0] = 0;
+	afb->base.offsets[1] = 0x200000;
+	afb->base.pitches[0] = 1920;
+	afb->base.pitches[1] = 1920;
+	afb->base.format = drm_format_info(DRM_FORMAT_NV12);
+	afb->base.modifier = DRM_FORMAT_MOD_LINEAR;
+	KUNIT_ASSERT_NOT_NULL(test, afb->base.format);
+
+	ret = dm_test_video_attrs(adev, afb, &tiling_info, &plane_size, &dcc,
+				  &address);
+
+	KUNIT_EXPECT_EQ(test, ret, 0);
+	KUNIT_EXPECT_EQ(test, plane_size.surface_size.width, 1920);
+	KUNIT_EXPECT_EQ(test, plane_size.chroma_size.width, 960U);
+	KUNIT_EXPECT_EQ(test, plane_size.chroma_size.height, 540U);
+	KUNIT_EXPECT_EQ(test, address.type,
+			(int)PLN_ADDR_TYPE_VIDEO_PROGRESSIVE);
+	KUNIT_EXPECT_EQ(test, (int)tiling_info.gfxversion, (int)DcGfxVersion9);
+}
+
+/**
+ * dm_test_fill_plane_buffer_attributes_gfx12() - Verify GFX12 dispatch path.
+ * @test: KUnit test context.
+ *
+ * Verify if a GFX12 family device fills graphics attributes via the GFX12
+ * modifier path and reports the GFX addr3 version.
+ */
+static void dm_test_fill_plane_buffer_attributes_gfx12(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct amdgpu_framebuffer *afb;
+	struct dc_tiling_info tiling_info;
+	struct plane_size plane_size;
+	struct dc_plane_dcc_param dcc;
+	struct dc_plane_address address;
+	int ret;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	afb = kunit_kzalloc(test, sizeof(*afb), GFP_KERNEL);
+	tiling_info = (struct dc_tiling_info){0};
+	plane_size = (struct plane_size){0};
+	dcc = (struct dc_plane_dcc_param){0};
+	address = (struct dc_plane_address){0};
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, afb);
+
+	adev->family = AMDGPU_FAMILY_GC_12_0_0;
+	adev->dm.dc = dc;
+	afb->address = 0x80000000ULL;
+	afb->base.width = 1920;
+	afb->base.height = 1080;
+	afb->base.pitches[0] = 7680;
+	afb->base.format = drm_format_info(DRM_FORMAT_XRGB8888);
+	afb->base.modifier = DRM_FORMAT_MOD_LINEAR;
+	KUNIT_ASSERT_NOT_NULL(test, afb->base.format);
+
+	ret = dm_test_graphics_attrs(adev, afb, &tiling_info, &plane_size, &dcc,
+				     &address);
+
+	KUNIT_EXPECT_EQ(test, ret, 0);
+	KUNIT_EXPECT_EQ(test, address.type, (int)PLN_ADDR_TYPE_GRAPHICS);
+	KUNIT_EXPECT_EQ(test, (int)tiling_info.gfxversion, (int)DcGfxAddr3);
+}
+
+/**
  * dm_test_get_min_max_dc_plane_scaling_fp16() - Verify fp16 cap selection.
  * @test: KUnit test context.
  *
@@ -1832,6 +1965,8 @@ static struct kunit_case amdgpu_dm_plane_test_cases[] = {
 	KUNIT_CASE(dm_test_get_min_max_dc_plane_scaling_fp16),
 	/* amdgpu_dm_plane_fill_plane_buffer_attributes() */
 	KUNIT_CASE(dm_test_fill_plane_buffer_attributes_gfx8),
+	KUNIT_CASE(dm_test_fill_plane_buffer_attributes_video),
+	KUNIT_CASE(dm_test_fill_plane_buffer_attributes_gfx12),
 	/* amdgpu_dm_plane_get_cursor_position() */
 	KUNIT_CASE(dm_test_get_cursor_position),
 	/* amdgpu_dm_plane_format_mod_supported() */
