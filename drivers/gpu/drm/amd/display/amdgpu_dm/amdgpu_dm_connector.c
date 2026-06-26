@@ -514,6 +514,8 @@ void amdgpu_dm_update_connector_after_detect(
 	struct drm_connector *connector = &aconnector->base;
 	struct dc_sink *sink __free(sink_release) = NULL;
 	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = drm_to_adev(dev);
+	int inst;
 
 	/* MST handled by drm_mst framework */
 	if (aconnector->mst_mgr.mst_state)
@@ -677,6 +679,13 @@ void amdgpu_dm_update_connector_after_detect(
 		/* Set CP to DESIRED if it was ENABLED, so we can re-enable it again on hotplug */
 		if (connector->state->content_protection == DRM_MODE_CONTENT_PROTECTION_ENABLED)
 			connector->state->content_protection = DRM_MODE_CONTENT_PROTECTION_DESIRED;
+
+		mutex_lock(&adev->dm.audio_lock);
+		inst = aconnector->audio_inst;
+		aconnector->audio_inst = -1;
+		mutex_unlock(&adev->dm.audio_lock);
+		if (inst != -1)
+			amdgpu_dm_audio_eld_notify(adev, inst);
 	}
 
 	update_subconnector_property(aconnector);

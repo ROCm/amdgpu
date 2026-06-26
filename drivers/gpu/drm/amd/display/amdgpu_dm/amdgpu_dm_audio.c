@@ -186,7 +186,7 @@ void amdgpu_dm_audio_fini(struct amdgpu_device *adev)
 }
 EXPORT_IF_KUNIT(amdgpu_dm_audio_fini);
 
-STATIC_IFN_KUNIT void amdgpu_dm_audio_eld_notify(struct amdgpu_device *adev, int pin)
+void amdgpu_dm_audio_eld_notify(struct amdgpu_device *adev, int pin)
 {
 	struct drm_audio_component *acomp = adev->dm.audio_component;
 
