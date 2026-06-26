@@ -1954,7 +1954,13 @@ int smu_link_reset(struct smu_context *smu);
 
 extern const struct amd_ip_funcs smu_ip_funcs;
 
-bool is_support_sw_smu(struct amdgpu_device *adev);
+void amdgpu_smu_early_init(struct amdgpu_device *adev);
+
+static inline bool is_support_sw_smu(struct amdgpu_device *adev)
+{
+	return adev->is_sw_smu;
+}
+
 bool is_support_cclk_dpm(struct amdgpu_device *adev);
 int smu_write_watermarks_table(struct smu_context *smu);
 

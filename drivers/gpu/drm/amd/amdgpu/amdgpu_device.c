@@ -76,6 +76,7 @@
 #include "amdgpu_ras.h"
 #include "amdgpu_ras_mgr.h"
 #include "amdgpu_pmu.h"
+#include "amdgpu_smu.h"
 #include "amdgpu_fru_eeprom.h"
 #include "amdgpu_reset.h"
 #include "amdgpu_virt.h"
@@ -2171,6 +2172,8 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 
 	adev->cg_flags &= amdgpu_cg_mask;
 	adev->pg_flags &= amdgpu_pg_mask;
+
+	amdgpu_smu_early_init(adev);
 
 	return 0;
 }
