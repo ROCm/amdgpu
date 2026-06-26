@@ -3857,7 +3857,14 @@ int amdgpu_ras_init_badpage_info(struct amdgpu_device *adev)
 	if (!con || amdgpu_sriov_vf(adev))
 		return 0;
 
-	if (amdgpu_uniras_enabled(adev))
+	/*
+	 * For the reset-on-init path (e.g. an NPS memory partition,
+	 * switch) the RAS IP block hw_init has not been enabled and
+	 * the amdgpu_uniras_enabled return false, check amdgpu ras
+	 * context uniras_enabled flag, eeprom init will be called
+	 * during RAS IP block hw_init.
+	 */
+	if (amdgpu_uniras_enabled(adev) || con->uniras_enabled)
 		return 0;
 
 	control = &con->eeprom_control;
@@ -5858,4 +5865,9 @@ void amdgpu_ras_post_reset(struct amdgpu_device *adev,
 		if (amdgpu_uniras_enabled(tmp_adev))
 			amdgpu_ras_mgr_post_reset(tmp_adev);
 	}
+}
+
+void amdgpu_ras_resume_after_reset(struct amdgpu_device *adev)
+{
+	amdgpu_ras_mgr_resume_after_reset(adev);
 }

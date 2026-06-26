@@ -1669,6 +1669,16 @@ static void amdgpu_xgmi_reset_on_init_work(struct work_struct *work)
 		if (r && r != -EHWPOISON)
 			dev_err(tmp_adev->dev,
 				"error during bad page data initialization");
+
+		/*
+		 * For the reset-on-init path (e.g. an NPS memory partition
+		 * switch) the RAS IP block hw_init was skipped under the
+		 * minimal init level, so uniras was never enabled. Bring it
+		 * up now that the reset domain has been unlocked. This is a
+		 * no-op for any other reset path where RAS is already
+		 * initialized, and for non-uniras devices.
+		 */
+		amdgpu_ras_resume_after_reset(tmp_adev);
 	}
 }
 

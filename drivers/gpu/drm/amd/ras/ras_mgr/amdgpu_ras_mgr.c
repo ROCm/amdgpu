@@ -465,6 +465,28 @@ static int amdgpu_ras_mgr_hw_fini(struct amdgpu_ip_block *ip_block)
 	return 0;
 }
 
+int amdgpu_ras_mgr_resume_after_reset(struct amdgpu_device *adev)
+{
+	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
+	struct amdgpu_ras_mgr *ras_mgr = amdgpu_ras_mgr_get_context(adev);
+	struct amdgpu_ip_block *ip_block;
+
+	if (!con || !con->uniras_enabled)
+		return 0;
+
+	if (!ras_mgr || !ras_mgr->ras_core)
+		return -EINVAL;
+
+	if (ras_mgr->ras_is_ready)
+		return 0;
+
+	ip_block = amdgpu_device_ip_get_ip_block(adev, AMD_IP_BLOCK_TYPE_RAS);
+	if (!ip_block)
+		return -EINVAL;
+
+	return amdgpu_ras_mgr_hw_init(ip_block);
+}
+
 struct amdgpu_ras_mgr *amdgpu_ras_mgr_get_context(struct amdgpu_device *adev)
 {
 	if (!adev || !adev->psp.ras_context.ras)
