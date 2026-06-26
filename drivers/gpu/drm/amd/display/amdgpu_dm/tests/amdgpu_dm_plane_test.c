@@ -1301,6 +1301,18 @@ static u64 *dm_test_get_primary_mods(struct kunit *test, struct amdgpu_device *a
 	return mods;
 }
 
+static int dm_test_gfx9_attrs(struct amdgpu_device *adev,
+			      const struct amdgpu_framebuffer *afb,
+				      const struct plane_size *plane_size,
+				      struct dc_tiling_info *tiling_info,
+				      struct dc_plane_dcc_param *dcc,
+				      struct dc_plane_address *address)
+{
+	return amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(adev,
+		afb, SURFACE_PIXEL_FORMAT_GRPH_ARGB8888, ROTATION_ANGLE_0,
+		plane_size, tiling_info, dcc, address);
+}
+
 static int dm_test_plane_attrs(struct amdgpu_device *adev,
 			       const struct amdgpu_framebuffer *afb,
 			       enum surface_pixel_format format,
@@ -1334,6 +1346,34 @@ static int dm_test_graphics_attrs(struct amdgpu_device *adev,
 {
 	return dm_test_plane_attrs(adev, afb, SURFACE_PIXEL_FORMAT_GRPH_ARGB8888,
 		tiling_info, plane_size, dcc, address);
+}
+
+static void dm_test_setup_gfx9_dcc_device(struct amdgpu_device *adev,
+					  struct dc *dc,
+					  struct dm_test_dcc_cap_ctx *ctx,
+					  bool output_independent_64b_blks)
+{
+	adev->family = AMDGPU_FAMILY_NV;
+	adev->dm.dc = dc;
+	adev->gfx.config.gb_addr_config_fields.num_pipes = 2;
+	adev->gfx.config.gb_addr_config_fields.num_pkrs = 2;
+	adev->ip_versions[GC_HWIP][0] = IP_VERSION(10, 3, 0);
+	dc->cap_funcs.get_dcc_compression_cap = dm_test_get_dcc_compression_cap;
+	ctx->callback_ret = true;
+	ctx->capable = true;
+	ctx->output_independent_64b_blks = output_independent_64b_blks;
+	dm_test_dcc_ctx = ctx;
+}
+
+static u64 dm_test_gfx9_dcc_modifier(u64 tile_version, bool independent_64b_blks,
+				     bool independent_128b_blks)
+{
+	return AMD_FMT_MOD |
+	       AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S_X) |
+	       AMD_FMT_MOD_SET(TILE_VERSION, tile_version) |
+	       AMD_FMT_MOD_SET(DCC, 1) |
+	       AMD_FMT_MOD_SET(DCC_INDEPENDENT_64B, independent_64b_blks) |
+	       AMD_FMT_MOD_SET(DCC_INDEPENDENT_128B, independent_128b_blks);
 }
 
 static void dm_test_setup_gfx11_device(struct amdgpu_device *adev,
@@ -1678,6 +1718,310 @@ static void dm_test_get_plane_modifiers_gfx12(struct kunit *test)
 }
 
 /**
+ * dm_test_fill_gfx9_plane_attributes_dcc() - Verify GFX9 DCC modifier path.
+ * @test: KUnit test context.
+ *
+ * Verify if a GFX10-RBPLUS DCC modifier enables DCC and selects the 64B
+ * independent block mode.
+ */
+static void dm_test_fill_gfx9_plane_attributes_dcc(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct amdgpu_framebuffer *afb;
+	struct plane_size plane_size = {0};
+	struct dc_tiling_info tiling_info = {0};
+	struct dc_plane_dcc_param dcc = {0};
+	struct dc_plane_address address = {0};
+	struct dm_test_dcc_cap_ctx ctx = {
+		.callback_ret = true,
+		.capable = true,
+		.output_independent_64b_blks = true,
+	};
+	int ret;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	afb = kunit_kzalloc(test, sizeof(*afb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, afb);
+
+	adev->family = AMDGPU_FAMILY_NV;
+	adev->dm.dc = dc;
+	adev->gfx.config.gb_addr_config_fields.num_pipes = 2;
+	adev->gfx.config.gb_addr_config_fields.num_pkrs = 2;
+	adev->ip_versions[GC_HWIP][0] = IP_VERSION(10, 3, 0);
+	dc->cap_funcs.get_dcc_compression_cap = dm_test_get_dcc_compression_cap;
+	dm_test_dcc_ctx = &ctx;
+
+	afb->base.pitches[1] = 256;
+	afb->base.modifier = AMD_FMT_MOD |
+			     AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S_X) |
+			     AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX10_RBPLUS) |
+			     AMD_FMT_MOD_SET(DCC, 1) |
+			     AMD_FMT_MOD_SET(DCC_INDEPENDENT_64B, 1);
+	plane_size.surface_size.width = 1920;
+	plane_size.surface_size.height = 1080;
+
+	ret = dm_test_gfx9_attrs(adev, afb, &plane_size, &tiling_info, &dcc,
+				 &address);
+	KUNIT_EXPECT_EQ(test, ret, 0);
+	KUNIT_EXPECT_EQ(test, (int)tiling_info.gfxversion, (int)DcGfxVersion9);
+	KUNIT_EXPECT_TRUE(test, dcc.enable);
+	KUNIT_EXPECT_EQ(test, (int)dcc.dcc_ind_blk, (int)hubp_ind_block_64b);
+	KUNIT_EXPECT_EQ(test, dcc.meta_pitch, 256U);
+
+	dm_test_dcc_ctx = NULL;
+}
+
+/**
+ * dm_test_fill_gfx9_plane_attributes_validate_fails() - Verify GFX9 error path.
+ * @test: KUnit test context.
+ *
+ * Verify if GFX9 modifier parsing returns validation errors from the shared DCC
+ * validation helper.
+ */
+static void dm_test_fill_gfx9_plane_attributes_validate_fails(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct amdgpu_framebuffer *afb;
+	struct plane_size plane_size = {0};
+	struct dc_tiling_info tiling_info = {0};
+	struct dc_plane_dcc_param dcc = {0};
+	struct dc_plane_address address = {0};
+	u64 tile_version = AMD_FMT_MOD_TILE_VER_GFX10_RBPLUS;
+	int ret;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	afb = kunit_kzalloc(test, sizeof(*afb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, afb);
+
+	adev->family = AMDGPU_FAMILY_NV;
+	adev->dm.dc = dc;
+	adev->ip_versions[GC_HWIP][0] = IP_VERSION(10, 3, 0);
+	afb->base.modifier = dm_test_gfx9_dcc_modifier(tile_version, true, false);
+	plane_size.surface_size.width = 1920;
+	plane_size.surface_size.height = 1080;
+
+	ret = dm_test_gfx9_attrs(adev, afb, &plane_size, &tiling_info, &dcc,
+				 &address);
+	KUNIT_EXPECT_EQ(test, ret, -EINVAL);
+}
+
+/**
+ * dm_test_fill_gfx9_plane_attributes_dcc_rbplus_64b_no_128bcl() - Verify block mode.
+ * @test: KUnit test context.
+ *
+ * Verify if a GFX10-RBPLUS modifier with both 64B and 128B independent block
+ * bits selects the 64B-no-128BCL block mode.
+ */
+static void dm_test_fill_gfx9_plane_attributes_dcc_rbplus_64b_no_128bcl(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct amdgpu_framebuffer *afb;
+	struct plane_size plane_size = {0};
+	struct dc_tiling_info tiling_info = {0};
+	struct dc_plane_dcc_param dcc = {0};
+	struct dc_plane_address address = {0};
+	struct dm_test_dcc_cap_ctx ctx = {0};
+	u64 tile_version = AMD_FMT_MOD_TILE_VER_GFX10_RBPLUS;
+	int ret;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	afb = kunit_kzalloc(test, sizeof(*afb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, afb);
+
+	dm_test_setup_gfx9_dcc_device(adev, dc, &ctx, true);
+	afb->base.modifier = dm_test_gfx9_dcc_modifier(tile_version, true, true);
+	plane_size.surface_size.width = 1920;
+	plane_size.surface_size.height = 1080;
+
+	ret = dm_test_gfx9_attrs(adev, afb, &plane_size, &tiling_info, &dcc,
+				 &address);
+	KUNIT_EXPECT_EQ(test, ret, 0);
+	KUNIT_EXPECT_TRUE(test, dcc.enable);
+	KUNIT_EXPECT_EQ(test, (int)dcc.dcc_ind_blk,
+			(int)hubp_ind_block_64b_no_128bcl);
+
+	dm_test_dcc_ctx = NULL;
+}
+
+/**
+ * dm_test_fill_gfx9_plane_attributes_dcc_rbplus_128b() - Verify 128B block mode.
+ * @test: KUnit test context.
+ *
+ * Verify if a GFX10-RBPLUS modifier with only the 128B independent block bit
+ * selects the 128B block mode.
+ */
+static void dm_test_fill_gfx9_plane_attributes_dcc_rbplus_128b(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct amdgpu_framebuffer *afb;
+	struct plane_size plane_size = {0};
+	struct dc_tiling_info tiling_info = {0};
+	struct dc_plane_dcc_param dcc = {0};
+	struct dc_plane_address address = {0};
+	struct dm_test_dcc_cap_ctx ctx = {0};
+	u64 tile_version = AMD_FMT_MOD_TILE_VER_GFX10_RBPLUS;
+	int ret;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	afb = kunit_kzalloc(test, sizeof(*afb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, afb);
+
+	dm_test_setup_gfx9_dcc_device(adev, dc, &ctx, false);
+	afb->base.modifier = dm_test_gfx9_dcc_modifier(tile_version, false, true);
+	plane_size.surface_size.width = 1920;
+	plane_size.surface_size.height = 1080;
+
+	ret = dm_test_gfx9_attrs(adev, afb, &plane_size, &tiling_info, &dcc,
+				 &address);
+	KUNIT_EXPECT_EQ(test, ret, 0);
+	KUNIT_EXPECT_TRUE(test, dcc.enable);
+	KUNIT_EXPECT_EQ(test, (int)dcc.dcc_ind_blk, (int)hubp_ind_block_128b);
+
+	dm_test_dcc_ctx = NULL;
+}
+
+/**
+ * dm_test_fill_gfx9_plane_attributes_dcc_rbplus_unconstrained() - Verify block mode.
+ * @test: KUnit test context.
+ *
+ * Verify if a GFX10-RBPLUS modifier without independent block bits selects the
+ * unconstrained block mode.
+ */
+static void dm_test_fill_gfx9_plane_attributes_dcc_rbplus_unconstrained(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct amdgpu_framebuffer *afb;
+	struct plane_size plane_size = {0};
+	struct dc_tiling_info tiling_info = {0};
+	struct dc_plane_dcc_param dcc = {0};
+	struct dc_plane_address address = {0};
+	struct dm_test_dcc_cap_ctx ctx = {0};
+	u64 tile_version = AMD_FMT_MOD_TILE_VER_GFX10_RBPLUS;
+	int ret;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	afb = kunit_kzalloc(test, sizeof(*afb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, afb);
+
+	dm_test_setup_gfx9_dcc_device(adev, dc, &ctx, false);
+	afb->base.modifier = dm_test_gfx9_dcc_modifier(tile_version, false, false);
+	plane_size.surface_size.width = 1920;
+	plane_size.surface_size.height = 1080;
+
+	ret = dm_test_gfx9_attrs(adev, afb, &plane_size, &tiling_info, &dcc,
+				 &address);
+	KUNIT_EXPECT_EQ(test, ret, 0);
+	KUNIT_EXPECT_TRUE(test, dcc.enable);
+	KUNIT_EXPECT_EQ(test, (int)dcc.dcc_ind_blk,
+			(int)hubp_ind_block_unconstrained);
+
+	dm_test_dcc_ctx = NULL;
+}
+
+/**
+ * dm_test_fill_gfx9_plane_attributes_dcc_gfx9_64b() - Verify legacy 64B mode.
+ * @test: KUnit test context.
+ *
+ * Verify if a pre-RBPLUS GFX9 modifier with the 64B independent block bit
+ * selects the 64B block mode.
+ */
+static void dm_test_fill_gfx9_plane_attributes_dcc_gfx9_64b(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct amdgpu_framebuffer *afb;
+	struct plane_size plane_size = {0};
+	struct dc_tiling_info tiling_info = {0};
+	struct dc_plane_dcc_param dcc = {0};
+	struct dc_plane_address address = {0};
+	struct dm_test_dcc_cap_ctx ctx = {0};
+	int ret;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	afb = kunit_kzalloc(test, sizeof(*afb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, afb);
+
+	dm_test_setup_gfx9_dcc_device(adev, dc, &ctx, true);
+	afb->base.modifier = dm_test_gfx9_dcc_modifier(AMD_FMT_MOD_TILE_VER_GFX9,
+						       true, false);
+	plane_size.surface_size.width = 1920;
+	plane_size.surface_size.height = 1080;
+
+	ret = dm_test_gfx9_attrs(adev, afb, &plane_size, &tiling_info, &dcc,
+				 &address);
+	KUNIT_EXPECT_EQ(test, ret, 0);
+	KUNIT_EXPECT_TRUE(test, dcc.enable);
+	KUNIT_EXPECT_EQ(test, (int)dcc.dcc_ind_blk, (int)hubp_ind_block_64b);
+
+	dm_test_dcc_ctx = NULL;
+}
+
+/**
+ * dm_test_fill_gfx9_plane_attributes_dcc_gfx9_unconstrained() - Verify legacy mode.
+ * @test: KUnit test context.
+ *
+ * Verify if a pre-RBPLUS GFX9 modifier without the 64B independent block bit
+ * selects the unconstrained block mode.
+ */
+static void dm_test_fill_gfx9_plane_attributes_dcc_gfx9_unconstrained(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct amdgpu_framebuffer *afb;
+	struct plane_size plane_size = {0};
+	struct dc_tiling_info tiling_info = {0};
+	struct dc_plane_dcc_param dcc = {0};
+	struct dc_plane_address address = {0};
+	struct dm_test_dcc_cap_ctx ctx = {0};
+	int ret;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	afb = kunit_kzalloc(test, sizeof(*afb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, afb);
+
+	dm_test_setup_gfx9_dcc_device(adev, dc, &ctx, false);
+	afb->base.modifier = dm_test_gfx9_dcc_modifier(AMD_FMT_MOD_TILE_VER_GFX9,
+						       false, false);
+	plane_size.surface_size.width = 1920;
+	plane_size.surface_size.height = 1080;
+
+	ret = dm_test_gfx9_attrs(adev, afb, &plane_size, &tiling_info, &dcc,
+				 &address);
+	KUNIT_EXPECT_EQ(test, ret, 0);
+	KUNIT_EXPECT_TRUE(test, dcc.enable);
+	KUNIT_EXPECT_EQ(test, (int)dcc.dcc_ind_blk,
+			(int)hubp_ind_block_unconstrained);
+
+	dm_test_dcc_ctx = NULL;
+}
+
+/**
  * dm_test_fill_plane_buffer_attributes_video() - Verify NV12 attributes.
  * @test: KUnit test context.
  *
@@ -1976,6 +2320,13 @@ static struct kunit_case amdgpu_dm_plane_test_cases[] = {
 	KUNIT_CASE(dm_test_fill_gfx12_plane_attributes_from_modifiers),
 	/* amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers() */
 	KUNIT_CASE(dm_test_fill_gfx9_plane_attributes_from_modifiers),
+	KUNIT_CASE(dm_test_fill_gfx9_plane_attributes_dcc),
+	KUNIT_CASE(dm_test_fill_gfx9_plane_attributes_validate_fails),
+	KUNIT_CASE(dm_test_fill_gfx9_plane_attributes_dcc_rbplus_64b_no_128bcl),
+	KUNIT_CASE(dm_test_fill_gfx9_plane_attributes_dcc_rbplus_128b),
+	KUNIT_CASE(dm_test_fill_gfx9_plane_attributes_dcc_rbplus_unconstrained),
+	KUNIT_CASE(dm_test_fill_gfx9_plane_attributes_dcc_gfx9_64b),
+	KUNIT_CASE(dm_test_fill_gfx9_plane_attributes_dcc_gfx9_unconstrained),
 	/* amdgpu_dm_plane_helper_check_state() */
 	KUNIT_CASE(dm_test_helper_check_state_viewport_reject),
 	/* amdgpu_dm_plane_add_modifier() */
