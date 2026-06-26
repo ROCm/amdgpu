@@ -2282,6 +2282,7 @@ int amdgpu_gfx_reset_mes_compute(struct amdgpu_device *adev,
 	struct mes_remove_queue_input *queue_input = (struct mes_remove_queue_input *)faulty_queue_input;
 	struct amdgpu_gfx_deferred_entry deferred_end[AMDGPU_MAX_COMPUTE_RINGS + 1];
 	int n_deferred = 0;
+	int ring_err;
 
 	guard(mutex)(&adev->gfx.mec.reset_mutex);
 	/* stop the drm schedulers for all compute queues */
@@ -2375,17 +2376,23 @@ out:
 	/* Now CP is running again — replay backed-up commands and ring
 	 * doorbells on each reset queue.
 	 */
+	ring_err = r;
 	for (i = 0; i < n_deferred; i++) {
 		int er = amdgpu_ring_reset_helper_end(deferred_end[i].ring,
 						      deferred_end[i].fence);
-		if (er && !r)
-			r = er;
+
+		if (er && !ring_err)
+			ring_err = er;
 	}
 
-	if (!r)
+	if (!ring_err)
 		amdgpu_gfx_reset_start_compute_scheds(adev, ring);
 
-	return r;
+	/* If this reset is triggered by non-KCQ, the KCQ result after resume must
+	 * not override the reset result; otherwise a false reset failure is returned
+	 * to the non-KCQ caller
+	 */
+	return ring ? ring_err : r;
 }
 
 int amdgpu_gfx_cleaner_shader_sw_init(struct amdgpu_device *adev,
