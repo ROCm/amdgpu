@@ -26,6 +26,39 @@ struct dm_test_dcc_cap_ctx {
 
 static struct dm_test_dcc_cap_ctx *dm_test_dcc_ctx;
 
+struct dm_test_gfx11_reg_ctx {
+	u32 gb_addr_config;
+	u32 gc_reg_offsets[1];
+	u32 expected_reg;
+	u32 captured_reg;
+	u32 captured_acc_flags;
+	u32 captured_hwip;
+	u32 captured_xcc_id;
+	bool called;
+};
+
+static struct dm_test_gfx11_reg_ctx *dm_test_gfx11_reg_ctx;
+
+static u32 dm_test_gfx11_rreg32(struct amdgpu_device *adev,
+				u32 reg, u32 acc_flags, u32 hwip,
+				u32 xcc_id)
+{
+	if (!dm_test_gfx11_reg_ctx)
+		return 0;
+
+	dm_test_gfx11_reg_ctx->called = true;
+	dm_test_gfx11_reg_ctx->captured_reg = reg;
+	dm_test_gfx11_reg_ctx->captured_acc_flags = acc_flags;
+	dm_test_gfx11_reg_ctx->captured_hwip = hwip;
+	dm_test_gfx11_reg_ctx->captured_xcc_id = xcc_id;
+
+	return dm_test_gfx11_reg_ctx->gb_addr_config;
+}
+
+static const struct amdgpu_rlc_reg_funcs dm_test_gfx11_reg_funcs = {
+	.rreg32 = dm_test_gfx11_rreg32,
+};
+
 static bool dm_test_get_dcc_compression_cap(const struct dc *dc,
 					    const struct dc_dcc_surface_param *input,
 					    struct dc_surface_dcc_cap *output)
@@ -1268,6 +1301,48 @@ static u64 *dm_test_get_primary_mods(struct kunit *test, struct amdgpu_device *a
 	return mods;
 }
 
+static void dm_test_setup_gfx11_device(struct amdgpu_device *adev,
+				       struct dm_test_gfx11_reg_ctx *ctx,
+				       u32 num_pkrs_log2, u32 num_pipes_log2)
+{
+	ctx->gb_addr_config =
+		REG_SET_FIELD(0, GB_ADDR_CONFIG, NUM_PKRS, num_pkrs_log2) |
+		REG_SET_FIELD(0, GB_ADDR_CONFIG, NUM_PIPES, num_pipes_log2);
+	ctx->gc_reg_offsets[regGB_ADDR_CONFIG_BASE_IDX] = 0;
+	ctx->expected_reg = ctx->gc_reg_offsets[regGB_ADDR_CONFIG_BASE_IDX] +
+			    regGB_ADDR_CONFIG;
+	dm_test_gfx11_reg_ctx = ctx;
+
+	adev->family = AMDGPU_FAMILY_GC_11_0_0;
+	adev->reg_offset[GC_HWIP][0] = ctx->gc_reg_offsets;
+	adev->gfx.rlc.reg_funcs = &dm_test_gfx11_reg_funcs;
+}
+
+static u64 dm_test_gfx11_dcc_best_modifier(u32 pipe_xor_bits, u32 pkrs, u32 tile)
+{
+	return AMD_FMT_MOD |
+	       AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX11) |
+	       AMD_FMT_MOD_SET(PIPE_XOR_BITS, pipe_xor_bits) |
+	       AMD_FMT_MOD_SET(TILE, tile) |
+	       AMD_FMT_MOD_SET(PACKERS, pkrs) |
+	       AMD_FMT_MOD_SET(DCC, 1) |
+	       AMD_FMT_MOD_SET(DCC_INDEPENDENT_128B, 1) |
+	       AMD_FMT_MOD_SET(DCC_MAX_COMPRESSED_BLOCK, AMD_FMT_MOD_DCC_BLOCK_128B);
+}
+
+static u64 dm_test_gfx11_dcc_4k_modifier(u32 pipe_xor_bits, u32 pkrs, u32 tile)
+{
+	return AMD_FMT_MOD |
+	       AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX11) |
+	       AMD_FMT_MOD_SET(PIPE_XOR_BITS, pipe_xor_bits) |
+	       AMD_FMT_MOD_SET(TILE, tile) |
+	       AMD_FMT_MOD_SET(PACKERS, pkrs) |
+	       AMD_FMT_MOD_SET(DCC, 1) |
+	       AMD_FMT_MOD_SET(DCC_INDEPENDENT_64B, 1) |
+	       AMD_FMT_MOD_SET(DCC_INDEPENDENT_128B, 1) |
+	       AMD_FMT_MOD_SET(DCC_MAX_COMPRESSED_BLOCK, AMD_FMT_MOD_DCC_BLOCK_64B);
+}
+
 /**
  * dm_test_get_plane_formats_overlay_universal_cap() - Verify universal overlay.
  * @test: KUnit test context.
@@ -1467,6 +1542,107 @@ static void dm_test_get_plane_modifiers_gfx10_3(struct kunit *test)
 }
 
 /**
+ * dm_test_get_plane_modifiers_gfx11_64k_first() - Verify GFX11 small-pipe order.
+ * @test: KUnit test context.
+ *
+ * Verify if GFX11 modifier generation reads GB_ADDR_CONFIG through the RLC
+ * register callback and prefers 64K_R_X when the pipe count is 16 or lower.
+ */
+static void dm_test_get_plane_modifiers_gfx11_64k_first(struct kunit *test)
+{
+	struct dm_test_gfx11_reg_ctx ctx = {0};
+	struct amdgpu_device *adev;
+	u64 *mods;
+	u32 pipe_xor_bits = 4;
+	u32 pkrs = 1;
+	u32 tile = AMD_FMT_MOD_TILE_GFX9_64K_R_X;
+	u64 dcc_best;
+	u64 dcc_4k;
+	u64 d_mod;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	dm_test_setup_gfx11_device(adev, &ctx, pkrs, pipe_xor_bits);
+
+	mods = dm_test_get_primary_mods(test, adev);
+	dcc_best = dm_test_gfx11_dcc_best_modifier(pipe_xor_bits, pkrs, tile);
+	dcc_4k = dm_test_gfx11_dcc_4k_modifier(pipe_xor_bits, pkrs, tile);
+	d_mod = AMD_FMT_MOD |
+		AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX11) |
+		AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_D);
+
+	KUNIT_EXPECT_TRUE(test, ctx.called);
+	KUNIT_EXPECT_EQ(test, ctx.captured_reg, ctx.expected_reg);
+	KUNIT_EXPECT_EQ(test, ctx.captured_acc_flags, 0U);
+	KUNIT_EXPECT_EQ(test, ctx.captured_hwip, (u32)GC_HWIP);
+	KUNIT_EXPECT_EQ(test, ctx.captured_xcc_id, 0U);
+	KUNIT_EXPECT_EQ(test, mods[0], dcc_best);
+	KUNIT_EXPECT_TRUE(test, dm_test_mods_contain(mods, dcc_4k));
+	KUNIT_EXPECT_TRUE(test,
+			  dm_test_mods_contain(mods,
+					       dcc_best | AMD_FMT_MOD_SET(DCC_RETILE, 1)));
+	KUNIT_EXPECT_TRUE(test, dm_test_mods_contain(mods, d_mod));
+
+	dm_test_gfx11_reg_ctx = NULL;
+	kfree(mods);
+}
+
+/**
+ * dm_test_get_plane_modifiers_gfx11_256k_first() - Verify GFX11 large-pipe order.
+ * @test: KUnit test context.
+ *
+ * Verify if GFX11 modifier generation prefers 256K_R_X when more than 16 pipes
+ * are reported by GB_ADDR_CONFIG.
+ */
+static void dm_test_get_plane_modifiers_gfx11_256k_first(struct kunit *test)
+{
+	struct dm_test_gfx11_reg_ctx ctx = {0};
+	struct amdgpu_device *adev;
+	u64 *mods;
+	u32 pipe_xor_bits = 5;
+	u32 pkrs = 2;
+	u32 tile = AMD_FMT_MOD_TILE_GFX11_256K_R_X;
+	u32 fallback_tile = AMD_FMT_MOD_TILE_GFX9_64K_R_X;
+	u64 dcc_best;
+	u64 fallback_dcc_best = dm_test_gfx11_dcc_best_modifier(pipe_xor_bits, pkrs,
+								  fallback_tile);
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	dm_test_setup_gfx11_device(adev, &ctx, pkrs, pipe_xor_bits);
+
+	mods = dm_test_get_primary_mods(test, adev);
+	dcc_best = dm_test_gfx11_dcc_best_modifier(pipe_xor_bits, pkrs, tile);
+
+	KUNIT_EXPECT_TRUE(test, ctx.called);
+	KUNIT_EXPECT_EQ(test, ctx.captured_reg, ctx.expected_reg);
+	KUNIT_EXPECT_EQ(test, mods[0], dcc_best);
+	KUNIT_EXPECT_TRUE(test, dm_test_mods_contain(mods, fallback_dcc_best));
+
+	dm_test_gfx11_reg_ctx = NULL;
+	kfree(mods);
+}
+
+/**
+ * dm_test_get_plane_modifiers_gfx12() - Verify GFX12 modifier list generation.
+ * @test: KUnit test context.
+ *
+ * Verify if the GFX12 family dispatches to the GFX12 modifier builder and
+ * produces a terminated list.
+ */
+static void dm_test_get_plane_modifiers_gfx12(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+
+	adev->family = AMDGPU_FAMILY_GC_12_0_0;
+
+	dm_test_expect_mods_terminated(test, adev);
+}
+
+/**
  * dm_test_format_mod_supported_d_swizzle_reject() - Verify D swizzle rejection.
  * @test: KUnit test context.
  *
@@ -1522,6 +1698,9 @@ static struct kunit_case amdgpu_dm_plane_test_cases[] = {
 	KUNIT_CASE(dm_test_get_plane_modifiers_rv_constant_encode),
 	KUNIT_CASE(dm_test_get_plane_modifiers_gfx10_1),
 	KUNIT_CASE(dm_test_get_plane_modifiers_gfx10_3),
+	KUNIT_CASE(dm_test_get_plane_modifiers_gfx11_64k_first),
+	KUNIT_CASE(dm_test_get_plane_modifiers_gfx11_256k_first),
+	KUNIT_CASE(dm_test_get_plane_modifiers_gfx12),
 	/* amdgpu_dm_plane_fill_dc_scaling_info() */
 	KUNIT_CASE(dm_test_fill_dc_scaling_info),
 	/* amdgpu_dm_plane_get_min_max_dc_plane_scaling() */
