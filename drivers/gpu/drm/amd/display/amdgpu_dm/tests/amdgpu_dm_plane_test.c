@@ -1643,6 +1643,128 @@ static void dm_test_get_plane_modifiers_gfx12(struct kunit *test)
 }
 
 /**
+ * dm_test_get_min_max_dc_plane_scaling_fp16() - Verify fp16 cap selection.
+ * @test: KUnit test context.
+ *
+ * Verify if 64bpp fp16 formats use the fp16 scaling caps.
+ */
+static void dm_test_get_min_max_dc_plane_scaling_fp16(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct drm_framebuffer *fb;
+	int min_downscale = 0;
+	int max_upscale = 0;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	fb = kunit_kzalloc(test, sizeof(*fb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, fb);
+
+	adev->dm.dc = dc;
+	dc->caps.planes[0].max_upscale_factor.fp16 = 2000;
+	dc->caps.planes[0].max_downscale_factor.fp16 = 500;
+
+	fb->format = drm_format_info(DRM_FORMAT_ARGB16161616F);
+	KUNIT_ASSERT_NOT_NULL(test, fb->format);
+	amdgpu_dm_plane_get_min_max_dc_plane_scaling(&adev->ddev, fb,
+						     &min_downscale, &max_upscale);
+	KUNIT_EXPECT_EQ(test, min_downscale, 500);
+	KUNIT_EXPECT_EQ(test, max_upscale, 2000);
+}
+
+/**
+ * dm_test_fill_dc_scaling_info_nv12_dcn1x() - Verify NV12 DCN1x rejection.
+ * @test: KUnit test context.
+ *
+ * Verify if a non-zero NV12 source origin is rejected on DCN 1.0 to avoid the
+ * known DCN1x hang.
+ */
+static void dm_test_fill_dc_scaling_info_nv12_dcn1x(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct drm_plane_state state = {0};
+	struct drm_framebuffer fb = {0};
+	struct dc_scaling_info info = {0};
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+
+	adev->ip_versions[DCE_HWIP][0] = IP_VERSION(1, 0, 0);
+	fb.format = drm_format_info(DRM_FORMAT_NV12);
+	KUNIT_ASSERT_NOT_NULL(test, fb.format);
+
+	state.fb = &fb;
+	state.src_x = 10 << 16;
+	state.src_y = 0;
+	state.src_w = 100 << 16;
+	state.src_h = 100 << 16;
+	state.crtc_w = 100;
+	state.crtc_h = 100;
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_plane_fill_dc_scaling_info(adev, &state, &info),
+			-EINVAL);
+
+	state.src_x = 0;
+	state.src_y = 10 << 16;
+	memset(&info, 0, sizeof(info));
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_plane_fill_dc_scaling_info(adev, &state, &info),
+			-EINVAL);
+}
+
+/**
+ * dm_test_fill_dc_scaling_info_plane_caps() - Verify scaling caps path.
+ * @test: KUnit test context.
+ *
+ * Verify if scaling info uses plane caps when the state references a plane,
+ * device, and framebuffer.
+ */
+static void dm_test_fill_dc_scaling_info_plane_caps(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct drm_plane *plane;
+	struct drm_plane_state *state;
+	struct drm_framebuffer *fb;
+	struct dc_scaling_info info = {0};
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	plane = kunit_kzalloc(test, sizeof(*plane), GFP_KERNEL);
+	state = kunit_kzalloc(test, sizeof(*state), GFP_KERNEL);
+	fb = kunit_kzalloc(test, sizeof(*fb), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, adev);
+	KUNIT_ASSERT_NOT_NULL(test, dc);
+	KUNIT_ASSERT_NOT_NULL(test, plane);
+	KUNIT_ASSERT_NOT_NULL(test, state);
+	KUNIT_ASSERT_NOT_NULL(test, fb);
+
+	adev->dm.dc = dc;
+	dc->caps.planes[0].max_upscale_factor.argb8888 = 16000;
+	dc->caps.planes[0].max_downscale_factor.argb8888 = 250;
+
+	plane->dev = &adev->ddev;
+	fb->format = drm_format_info(DRM_FORMAT_XRGB8888);
+	KUNIT_ASSERT_NOT_NULL(test, fb->format);
+
+	state->plane = plane;
+	state->fb = fb;
+	state->src_w = 100 << 16;
+	state->src_h = 100 << 16;
+	state->crtc_w = 100;
+	state->crtc_h = 100;
+
+	KUNIT_EXPECT_EQ(test,
+			amdgpu_dm_plane_fill_dc_scaling_info(adev, state, &info),
+			0);
+}
+
+/**
  * dm_test_format_mod_supported_d_swizzle_reject() - Verify D swizzle rejection.
  * @test: KUnit test context.
  *
@@ -1703,8 +1825,11 @@ static struct kunit_case amdgpu_dm_plane_test_cases[] = {
 	KUNIT_CASE(dm_test_get_plane_modifiers_gfx12),
 	/* amdgpu_dm_plane_fill_dc_scaling_info() */
 	KUNIT_CASE(dm_test_fill_dc_scaling_info),
+	KUNIT_CASE(dm_test_fill_dc_scaling_info_nv12_dcn1x),
+	KUNIT_CASE(dm_test_fill_dc_scaling_info_plane_caps),
 	/* amdgpu_dm_plane_get_min_max_dc_plane_scaling() */
 	KUNIT_CASE(dm_test_get_min_max_dc_plane_scaling),
+	KUNIT_CASE(dm_test_get_min_max_dc_plane_scaling_fp16),
 	/* amdgpu_dm_plane_fill_plane_buffer_attributes() */
 	KUNIT_CASE(dm_test_fill_plane_buffer_attributes_gfx8),
 	/* amdgpu_dm_plane_get_cursor_position() */
