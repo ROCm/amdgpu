@@ -6804,6 +6804,19 @@ static int dm_crtc_get_cursor_mode(struct amdgpu_device *adev,
 			break;
 		}
 
+		/*
+		 * A plane moving or resizing (without a scale change) changes how
+		 * much of the CRTC it covers. This can create/remove holes under
+		 * the cursor and thus flip the required cursor mode (native vs
+		 * overlay), so the destination rect must be re-evaluated too.
+		 */
+		if (old_plane_state->crtc_x != plane_state->crtc_x ||
+		    old_plane_state->crtc_y != plane_state->crtc_y ||
+		    old_plane_state->crtc_w != plane_state->crtc_w ||
+		    old_plane_state->crtc_h != plane_state->crtc_h) {
+			consider_mode_change = true;
+			break;
+		}
 #ifdef HAVE_DRM_DRM_COLOROP_H
 		if (dm_plane_color_pipeline_active(state, plane, true) !=
 		    dm_plane_color_pipeline_active(state, plane, false)) {
