@@ -37,6 +37,7 @@
 #ifndef HAVE_DMA_RESV_FENCES
 
 #include <linux/dma-resv.h>
+#include <kcl/backport/kcl_dma-resv.h>
 #include <linux/dma-fence-array.h>
 #include <linux/dma-fence-chain.h>
 #include <linux/export.h>
@@ -435,6 +436,7 @@ static void dma_resv_iter_walk_unlocked(struct dma_resv_iter *cursor)
 					chain = to_dma_fence_chain(f);
 					if (!chain) {
 						dma_fence_put(f);
+						cursor->kernel_iter = NULL;
 						break;
 					}
 
@@ -573,6 +575,7 @@ struct dma_fence *dma_resv_iter_first(struct dma_resv_iter *cursor)
 			chain = to_dma_fence_chain(f);
 			if (!chain) {
 				dma_fence_put(f);
+				cursor->kernel_iter = NULL;
 				break;
 			}
 
@@ -616,6 +619,7 @@ struct dma_fence *dma_resv_iter_next(struct dma_resv_iter *cursor)
 			chain = to_dma_fence_chain(f);
 			if (!chain) {
 				dma_fence_put(f);
+				cursor->kernel_iter = NULL;
 				break;
 			}
 
