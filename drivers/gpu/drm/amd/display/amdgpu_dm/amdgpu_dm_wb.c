@@ -86,7 +86,7 @@ STATIC_IFN_KUNIT int amdgpu_dm_wb_connector_get_modes(struct drm_connector *conn
 EXPORT_IF_KUNIT(amdgpu_dm_wb_connector_get_modes);
 
 #ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_PREPARE_WRITEBACK_JOB
-static int amdgpu_dm_wb_prepare_job(struct drm_writeback_connector *wb_connector,
+STATIC_IFN_KUNIT int amdgpu_dm_wb_prepare_job(struct drm_writeback_connector *wb_connector,
 			       struct drm_writeback_job *job)
 {
 	struct amdgpu_framebuffer *afb;
@@ -147,8 +147,9 @@ error_unlock:
 	amdgpu_bo_unreserve(rbo);
 	return r;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_wb_prepare_job);
 
-static void amdgpu_dm_wb_cleanup_job(struct drm_writeback_connector *connector,
+STATIC_IFN_KUNIT void amdgpu_dm_wb_cleanup_job(struct drm_writeback_connector *connector,
 				struct drm_writeback_job *job)
 {
 	struct amdgpu_bo *rbo;
@@ -168,6 +169,7 @@ static void amdgpu_dm_wb_cleanup_job(struct drm_writeback_connector *connector,
 	amdgpu_bo_unreserve(rbo);
 	amdgpu_bo_unref(&rbo);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_wb_cleanup_job);
 #endif
 
 static const struct drm_encoder_helper_funcs amdgpu_dm_wb_encoder_helper_funcs = {
