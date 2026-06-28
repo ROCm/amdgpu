@@ -32,6 +32,7 @@
 #include <linux/atomic.h>
 #include <linux/workqueue.h>
 #include <linux/spinlock.h>
+#include <linux/iosys-map.h>
 #include <uapi/linux/kfd_ioctl.h>
 #include <linux/idr.h>
 #include <linux/kfifo.h>
@@ -786,7 +787,7 @@ struct qcm_process_device {
 
 	/* CWSR memory */
 	struct kgd_mem *cwsr_mem;
-	void *cwsr_kaddr;
+	struct iosys_map cwsr_map;
 	uint64_t cwsr_base;
 	uint64_t tba_addr;
 	uint64_t tma_addr;
