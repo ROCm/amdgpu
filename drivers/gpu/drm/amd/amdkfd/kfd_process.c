@@ -1771,9 +1771,23 @@ void kfd_process_set_trap_debug_flag(struct qcm_process_device *qpd,
 				     bool enabled)
 {
 	if (!iosys_map_is_null(&qpd->cwsr_map)) {
-		iosys_map_wr(&qpd->cwsr_map,
-			     KFD_CWSR_TMA_OFFSET + 2 * sizeof(uint64_t),
-			     uint64_t, enabled);
+		uint64_t val;
+		size_t offset = KFD_CWSR_TMA_OFFSET + 2 * sizeof(uint64_t);
+
+		/* Read current value */
+		if (qpd->cwsr_map.is_iomem)
+			val = readq(qpd->cwsr_map.vaddr_iomem + offset);
+		else
+			val = READ_ONCE(*(uint64_t *)(qpd->cwsr_map.vaddr + offset));
+
+		/* Modify bit */
+		if (enabled)
+			val |= (1ULL << KFD_TRAP_TYPE_DEBUG);
+		else
+			val &= ~(1ULL << KFD_TRAP_TYPE_DEBUG);
+
+		/* Write back */
+		iosys_map_wr(&qpd->cwsr_map, offset, uint64_t, val);
 	}
 }
 
