@@ -250,11 +250,16 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 				goto error_doorbell;
 			}
 		}
-	}
 
-	adev->gfx.mec.mes_hung_db_array =
-		kcalloc(amdgpu_mes_get_hung_queue_db_array_size(adev),
-			sizeof(u32), GFP_KERNEL);
+		adev->gfx.mec.mes_hung_db_array =
+			kcalloc(amdgpu_mes_get_hung_queue_db_array_size(adev),
+				sizeof(u32), GFP_KERNEL);
+
+		if (!adev->gfx.mec.mes_hung_db_array) {
+			r = -ENOMEM;
+			goto error_doorbell;
+		}
+	}
 
 	return 0;
 
