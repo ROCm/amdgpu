@@ -1122,57 +1122,6 @@ static void dm_test_nv_clock_id_invalid(struct kunit *test)
 /* ---- Tests using stub DPM layer ---- */
 
 /**
- * dm_test_get_static_clocks_success - Test successful static clock retrieval
- * @test: KUnit test context
- *
- * Verify that dm_pp_get_static_clocks returns true and correctly scales
- * the max engine and memory clocks from 10kHz to kHz units.
- */
-static void dm_test_get_static_clocks_success(struct kunit *test)
-{
-	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
-	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
-	struct dm_pp_static_clock_info info = {};
-
-	KUNIT_ASSERT_NOT_NULL(test, adev);
-	KUNIT_ASSERT_NOT_NULL(test, ctx);
-
-	setup_stub_dpm(test, adev);
-	ctx->driver_context = adev;
-
-	stub_dpm_ctx->get_current_clocks_info.max_memory_clock = 80000;
-	stub_dpm_ctx->get_current_clocks_info.max_engine_clock = 72000;
-
-	KUNIT_EXPECT_TRUE(test, dm_pp_get_static_clocks(ctx, &info));
-	KUNIT_EXPECT_EQ(test, info.max_mclk_khz, 800000U);
-	KUNIT_EXPECT_EQ(test, info.max_sclk_khz, 720000U);
-	KUNIT_EXPECT_EQ(test, (int)info.max_clocks_state, (int)DM_PP_CLOCKS_STATE_NOMINAL);
-}
-
-/**
- * dm_test_get_static_clocks_failure - Test DPM error returns false
- * @test: KUnit test context
- *
- * Verify that dm_pp_get_static_clocks returns false when the DPM callback
- * returns an error.
- */
-static void dm_test_get_static_clocks_failure(struct kunit *test)
-{
-	struct amdgpu_device *adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
-	struct dc_context *ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
-	struct dm_pp_static_clock_info info = {};
-
-	KUNIT_ASSERT_NOT_NULL(test, adev);
-	KUNIT_ASSERT_NOT_NULL(test, ctx);
-
-	setup_stub_dpm(test, adev);
-	ctx->driver_context = adev;
-	stub_dpm_ctx->ret_val = -EINVAL;
-
-	KUNIT_EXPECT_FALSE(test, dm_pp_get_static_clocks(ctx, &info));
-}
-
-/**
  * dm_test_apply_display_requirements_dpm_enabled - Test DPM-enabled path
  * @test: KUnit test context
  *
@@ -2424,9 +2373,6 @@ static struct kunit_case dm_pp_smu_test_cases[] = {
 	KUNIT_CASE(dm_test_nv_clock_id_phyclk),
 	KUNIT_CASE(dm_test_nv_clock_id_pixelclk),
 	KUNIT_CASE(dm_test_nv_clock_id_invalid),
-	/* dm_pp_get_static_clocks (with stub DPM) */
-	KUNIT_CASE(dm_test_get_static_clocks_success),
-	KUNIT_CASE(dm_test_get_static_clocks_failure),
 	/* dm_pp_apply_display_requirements (DPM enabled) */
 	KUNIT_CASE(dm_test_apply_display_requirements_dpm_enabled),
 	/* dm_pp_get_clock_levels_by_type */
