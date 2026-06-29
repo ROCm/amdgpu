@@ -799,8 +799,8 @@ static void dm_test_backlight_fill_props_ac_linear(struct kunit *test)
 	amdgpu_dm_backlight_fill_props(&caps, true, false, &props);
 
 	KUNIT_EXPECT_EQ(test, props.brightness,
-			 DIV_ROUND_CLOSEST((max - min) * caps.ac_level, 100));
-	KUNIT_EXPECT_EQ(test, props.max_brightness, max - min);
+			 DIV_ROUND_CLOSEST(max * caps.ac_level, 100));
+	KUNIT_EXPECT_EQ(test, props.max_brightness, max);
 	KUNIT_EXPECT_EQ(test, props.scale, BACKLIGHT_SCALE_LINEAR);
 	KUNIT_EXPECT_EQ(test, props.type, BACKLIGHT_RAW);
 }
@@ -825,8 +825,8 @@ static void dm_test_backlight_fill_props_dc_nonlinear(struct kunit *test)
 	amdgpu_dm_backlight_fill_props(&caps, false, true, &props);
 
 	KUNIT_EXPECT_EQ(test, props.brightness,
-			 DIV_ROUND_CLOSEST((max - min) * caps.dc_level, 100));
-	KUNIT_EXPECT_EQ(test, props.max_brightness, max - min);
+			 DIV_ROUND_CLOSEST(max * caps.dc_level, 100));
+	KUNIT_EXPECT_EQ(test, props.max_brightness, max);
 	KUNIT_EXPECT_EQ(test, props.scale, BACKLIGHT_SCALE_NON_LINEAR);
 	KUNIT_EXPECT_EQ(test, props.type, BACKLIGHT_RAW);
 }

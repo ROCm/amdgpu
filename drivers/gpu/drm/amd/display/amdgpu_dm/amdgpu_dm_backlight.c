@@ -407,12 +407,12 @@ void amdgpu_dm_backlight_fill_props(const struct amdgpu_dm_backlight_caps *caps,
 
 	if (get_brightness_range(caps, &min, &max)) {
 		if (is_system_supplied)
-			props->brightness = DIV_ROUND_CLOSEST((max - min) * caps->ac_level,
+			props->brightness = DIV_ROUND_CLOSEST(max * caps->ac_level,
 							       100);
 		else
-			props->brightness = DIV_ROUND_CLOSEST((max - min) * caps->dc_level,
+			props->brightness = DIV_ROUND_CLOSEST(max * caps->dc_level,
 							       100);
-		props->max_brightness = max - min;
+		props->max_brightness = max;
 	} else {
 		props->brightness = MAX_BACKLIGHT_LEVEL;
 		props->max_brightness = MAX_BACKLIGHT_LEVEL;
