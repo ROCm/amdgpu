@@ -195,6 +195,9 @@ static struct list_head *remove_irq_handler(struct amdgpu_device *adev,
 		return NULL;
 	}
 
+	if (int_params->int_context == INTERRUPT_LOW_IRQ_CONTEXT)
+		cancel_work_sync(&handler->work);
+
 	kfree(handler);
 
 	DRM_DEBUG_KMS(
@@ -202,55 +205,6 @@ static struct list_head *remove_irq_handler(struct amdgpu_device *adev,
 		ih, int_params->irq_source, int_params->int_context);
 
 	return hnd_list;
-}
-
-/**
- * unregister_all_irq_handlers() - Cleans up handlers from the DM IRQ table
- * @adev: The base driver device containing the DM device
- *
- * Go through low and high context IRQ tables and deallocate handlers.
- */
-static void unregister_all_irq_handlers(struct amdgpu_device *adev)
-{
-	struct list_head *hnd_list_low;
-	struct list_head *hnd_list_high;
-	struct list_head *entry, *tmp;
-	struct amdgpu_dm_irq_handler_data *handler;
-	unsigned long irq_table_flags;
-	int i;
-
-	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
-
-	for (i = 0; i < DAL_IRQ_SOURCES_NUMBER; i++) {
-		hnd_list_low = &adev->dm.irq_handler_list_low_tab[i];
-		hnd_list_high = &adev->dm.irq_handler_list_high_tab[i];
-
-		list_for_each_safe(entry, tmp, hnd_list_low) {
-
-			handler = list_entry(entry, struct amdgpu_dm_irq_handler_data,
-					     list);
-
-			if (handler == NULL || handler->handler == NULL)
-				continue;
-
-			list_del(&handler->list);
-			kfree(handler);
-		}
-
-		list_for_each_safe(entry, tmp, hnd_list_high) {
-
-			handler = list_entry(entry, struct amdgpu_dm_irq_handler_data,
-					     list);
-
-			if (handler == NULL || handler->handler == NULL)
-				continue;
-
-			list_del(&handler->list);
-			kfree(handler);
-		}
-	}
-
-	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 }
 
 static bool
@@ -459,38 +413,71 @@ EXPORT_IF_KUNIT(amdgpu_dm_irq_init);
  * amdgpu_dm_irq_fini() - Tear down DM IRQ management
  * @adev: The base driver device containing the DM device
  *
- * Flush all work within the low context IRQ table.
+ * Removes all handlers from the IRQ tables under the spinlock, cancels
+ * pending work items, and deallocates all handler data.
  */
 void amdgpu_dm_irq_fini(struct amdgpu_device *adev)
 {
 	int src;
-	struct list_head *lh;
+	LIST_HEAD(low_handlers);
+	LIST_HEAD(high_handlers);
 	struct list_head *entry, *tmp;
 	struct amdgpu_dm_irq_handler_data *handler;
 	unsigned long irq_table_flags;
 
 	DRM_DEBUG_KMS("DM_IRQ: releasing resources.\n");
+
 	for (src = 0; src < DAL_IRQ_SOURCES_NUMBER; src++) {
 		DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
-		/* The handler was removed from the table,
-		 * it means it is safe to flush all the 'work'
-		 * (because no code can schedule a new one).
+
+		/*
+		 * Move all handlers from the low and high context tables to
+		 * temporary lists under the lock. This prevents the ISR from
+		 * finding them while we process them outside the lock.
 		 */
-		lh = &adev->dm.irq_handler_list_low_tab[src];
+		list_splice_init(&adev->dm.irq_handler_list_low_tab[src],
+				 &low_handlers);
+		list_splice_init(&adev->dm.irq_handler_list_high_tab[src],
+				 &high_handlers);
+
 		DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 
-		if (!list_empty(lh)) {
-			list_for_each_safe(entry, tmp, lh) {
-				handler = list_entry(
-					entry,
-					struct amdgpu_dm_irq_handler_data,
-					list);
-				flush_work(&handler->work);
-			}
+		/*
+		 * Cancel all pending work for the low-context handlers
+		 * outside the lock. cancel_work_sync() may sleep and waits
+		 * until any running work completes, preventing UAF.
+		 */
+		list_for_each_safe(entry, tmp, &low_handlers) {
+			handler = list_entry(entry,
+					    struct amdgpu_dm_irq_handler_data,
+					    list);
+			cancel_work_sync(&handler->work);
 		}
+
+		/*
+		 * High-context handlers are executed synchronously within ISR
+		 * context (see amdgpu_dm_irq_immediate_work()) and have no
+		 * work_struct, so there is no pending work to cancel here.
+		 * They will be freed along with low_handlers after the loop.
+		 */
 	}
-	/* Deallocate handlers from the table. */
-	unregister_all_irq_handlers(adev);
+
+	/* Deallocate all handlers. */
+	list_for_each_safe(entry, tmp, &low_handlers) {
+		handler = list_entry(entry,
+				     struct amdgpu_dm_irq_handler_data,
+				     list);
+		list_del(&handler->list);
+		kfree(handler);
+	}
+
+	list_for_each_safe(entry, tmp, &high_handlers) {
+		handler = list_entry(entry,
+				     struct amdgpu_dm_irq_handler_data,
+				     list);
+		list_del(&handler->list);
+		kfree(handler);
+	}
 }
 EXPORT_IF_KUNIT(amdgpu_dm_irq_fini);
 
@@ -498,7 +485,6 @@ void amdgpu_dm_irq_suspend(struct amdgpu_device *adev)
 {
 	struct drm_device *dev = adev_to_drm(adev);
 	int src;
-	struct list_head *hnd_list_h;
 	struct list_head *hnd_list_l;
 	unsigned long irq_table_flags;
 	struct list_head *entry, *tmp;
@@ -511,12 +497,15 @@ void amdgpu_dm_irq_suspend(struct amdgpu_device *adev)
 	/**
 	 * Disable HW interrupt  for HPD and HPDRX only since FLIP and VBLANK
 	 * will be disabled from manage_dm_interrupts on disable CRTC.
+	 *
+	 * Disable the HW interrupt first, then flush any pending work. Since
+	 * the HW interrupt is disabled under the lock, no new IRQ can be
+	 * generated after the disable completes. Any work already queued by an
+	 * in-flight ISR will be flushed below.
 	 */
 	for (src = DC_IRQ_SOURCE_HPD1; src <= DC_IRQ_SOURCE_HPD6RX; src++) {
 		hnd_list_l = &adev->dm.irq_handler_list_low_tab[src];
-		hnd_list_h = &adev->dm.irq_handler_list_high_tab[src];
-		if (!list_empty(hnd_list_l) || !list_empty(hnd_list_h))
-			dc_interrupt_set(adev->dm.dc, src, false);
+		dc_interrupt_set(adev->dm.dc, src, false);
 
 		DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 
@@ -600,9 +589,12 @@ STATIC_IFN_KUNIT void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
 	struct  list_head *handler_list = &adev->dm.irq_handler_list_low_tab[irq_source];
 	struct  amdgpu_dm_irq_handler_data *handler_data;
 	bool    work_queued = false;
+	unsigned long irq_table_flags;
+
+	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
 
 	if (list_empty(handler_list))
-		return;
+		goto out_unlock;
 
 	list_for_each_entry(handler_data, handler_list, list) {
 		if (queue_work(system_highpri_wq, &handler_data->work)) {
@@ -620,7 +612,7 @@ STATIC_IFN_KUNIT void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
 		handler_data_add = kzalloc_obj(*handler_data, GFP_ATOMIC);
 		if (!handler_data_add) {
 			DRM_ERROR("DM_IRQ: failed to allocate irq handler!\n");
-			return;
+			goto out_unlock;
 		}
 
 		/*copy new amdgpu_dm_irq_handler_data members from handler_data*/
@@ -642,6 +634,9 @@ STATIC_IFN_KUNIT void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
 				  "from display for IRQ source %d\n",
 				  irq_source);
 	}
+
+out_unlock:
+	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 }
 EXPORT_IF_KUNIT(amdgpu_dm_irq_schedule_work);
 

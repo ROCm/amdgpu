@@ -1041,14 +1041,11 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 		adev->dm.hpd_rx_offload_wq = NULL;
 	}
 
+	amdgpu_dm_irq_fini(adev);
+
 	/* DC Destroy TODO: Replace destroy DAL */
 	if (adev->dm.dc)
 		dc_destroy(&adev->dm.dc);
-	/*
-	 * TODO: pageflip, vlank interrupt
-	 *
-	 * amdgpu_dm_irq_fini(adev);
-	 */
 
 	if (adev->dm.cgs_device) {
 		amdgpu_cgs_destroy_device(adev->dm.cgs_device);
@@ -1571,7 +1568,6 @@ static int dm_hw_fini(struct amdgpu_ip_block *ip_block)
 
 	amdgpu_dm_hpd_fini(adev);
 
-	amdgpu_dm_irq_fini(adev);
 	amdgpu_dm_fini(adev);
 	return 0;
 }
