@@ -1775,17 +1775,23 @@ void kfd_process_set_trap_pc_sampling_flag(struct qcm_process_device *qpd,
 				     enum kfd_ioctl_pc_sample_method method, bool enabled)
 {
 	if (!iosys_map_is_null(&qpd->cwsr_map)) {
-		volatile unsigned long *tma;
+		uint64_t val;
+		size_t offset = KFD_CWSR_TMA_OFFSET + 2 * sizeof(uint64_t);
 
+		/* Read current value */
 		if (qpd->cwsr_map.is_iomem)
-			tma = (volatile unsigned long *)(qpd->cwsr_map.vaddr_iomem + KFD_CWSR_TMA_OFFSET);
+			val = readq(qpd->cwsr_map.vaddr_iomem + offset);
 		else
-			tma = (volatile unsigned long *)(qpd->cwsr_map.vaddr + KFD_CWSR_TMA_OFFSET);
+			val = READ_ONCE(*(uint64_t *)(qpd->cwsr_map.vaddr + offset));
 
+		/* Modify bit */
 		if (enabled)
-			set_bit(method, &tma[2]);
+			val |= (1ULL << method);
 		else
-			clear_bit(method, &tma[2]);
+			val &= ~(1ULL << method);
+
+		/* Write back */
+		iosys_map_wr(&qpd->cwsr_map, offset, uint64_t, val);
 	}
 }
 
