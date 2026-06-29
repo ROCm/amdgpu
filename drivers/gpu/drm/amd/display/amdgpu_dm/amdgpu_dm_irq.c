@@ -397,6 +397,21 @@ int amdgpu_dm_irq_init(struct amdgpu_device *adev)
 
 	spin_lock_init(&adev->dm.irq_handler_list_table_lock);
 
+	adev->dm.irq_wq = alloc_workqueue("amdgpu_dm_irq",
+		WQ_UNBOUND | WQ_HIGHPRI, 0);
+
+	if (!adev->dm.irq_wq)
+		return -ENOMEM;
+
+	adev->dm.vmin_vmax_wq = alloc_workqueue("amdgpu_dm_vmin_vmax",
+		WQ_UNBOUND, 0);
+
+	if (!adev->dm.vmin_vmax_wq) {
+		destroy_workqueue(adev->dm.irq_wq);
+		adev->dm.irq_wq = NULL;
+		return -ENOMEM;
+	}
+
 	for (src = 0; src < DAL_IRQ_SOURCES_NUMBER; src++) {
 		/* low context handler list init */
 		lh = &adev->dm.irq_handler_list_low_tab[src];
@@ -477,6 +492,16 @@ void amdgpu_dm_irq_fini(struct amdgpu_device *adev)
 				     list);
 		list_del(&handler->list);
 		kfree(handler);
+	}
+
+	if (adev->dm.vmin_vmax_wq) {
+		destroy_workqueue(adev->dm.vmin_vmax_wq);
+		adev->dm.vmin_vmax_wq = NULL;
+	}
+
+	if (adev->dm.irq_wq) {
+		destroy_workqueue(adev->dm.irq_wq);
+		adev->dm.irq_wq = NULL;
 	}
 }
 EXPORT_IF_KUNIT(amdgpu_dm_irq_fini);
@@ -597,7 +622,7 @@ STATIC_IFN_KUNIT void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
 		goto out_unlock;
 
 	list_for_each_entry(handler_data, handler_list, list) {
-		if (queue_work(system_highpri_wq, &handler_data->work)) {
+		if (queue_work(adev->dm.irq_wq, &handler_data->work)) {
 			work_queued = true;
 			break;
 		}
@@ -625,7 +650,7 @@ STATIC_IFN_KUNIT void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
 
 		INIT_WORK(&handler_data_add->work, dm_irq_work_func);
 
-		if (queue_work(system_highpri_wq, &handler_data_add->work))
+		if (queue_work(adev->dm.irq_wq, &handler_data_add->work))
 			DRM_DEBUG("Queued work for handling interrupt from "
 				  "display for IRQ source %d\n",
 				  irq_source);
@@ -1913,7 +1938,7 @@ static void schedule_dc_vmin_vmax(struct amdgpu_device *adev,
 	offload_work->stream = stream;
 	offload_work->adjust = adjust_copy;
 
-	queue_work(system_percpu_wq, &offload_work->work);
+	queue_work(adev->dm.vmin_vmax_wq, &offload_work->work);
 }
 
 STATIC_IFN_KUNIT void dm_vupdate_high_irq(void *interrupt_params)
