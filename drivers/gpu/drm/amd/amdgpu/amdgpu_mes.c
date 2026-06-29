@@ -921,6 +921,50 @@ int amdgpu_mes_update_enforce_isolation(struct amdgpu_device *adev)
 	return r;
 }
 
+/**
+ * amdgpu_mes_rs64mem_init - initialize RS64 local memory context arrays
+ *
+ * @mes: MES instance
+ *
+ * Returns 0 on success, negative errno on failure.
+ */
+int amdgpu_mes_rs64mem_init(struct amdgpu_mes *mes)
+{
+	struct amdgpu_device *adev = container_of(mes, struct amdgpu_device, mes);
+	int r;
+
+	if (!mes->use_rs64mem)
+		return 0;
+
+	r = amdgpu_bo_create_kernel(adev, PAGE_SIZE, PAGE_SIZE,
+				    AMDGPU_GEM_DOMAIN_GTT,
+				    &mes->ctx_array_size_bo,
+				    &mes->ctx_array_size_gpu_addr,
+				    (void **)&mes->ctx_array_size_cpu_ptr);
+	if (r) {
+		dev_err(adev->dev,
+			"Failed to allocate ctx array size BO, r=%d\n", r);
+		return r;
+	}
+
+	memset(mes->ctx_array_size_cpu_ptr, 0, PAGE_SIZE);
+
+	return 0;
+}
+
+/**
+ * amdgpu_mes_rs64mem_fini - tear down RS64 local memory management
+ */
+void amdgpu_mes_rs64mem_fini(struct amdgpu_mes *mes)
+{
+	if (mes->ctx_array_size_bo) {
+		amdgpu_bo_free_kernel(&mes->ctx_array_size_bo,
+				      &mes->ctx_array_size_gpu_addr,
+				      (void **)&mes->ctx_array_size_cpu_ptr);
+	}
+	mes->use_rs64mem = false;
+}
+
 #if defined(CONFIG_DEBUG_FS)
 
 static int amdgpu_debugfs_mes_event_log_show(struct seq_file *m, void *unused)

@@ -171,6 +171,11 @@ struct amdgpu_mes {
 
 	bool			compute_pipe_reset_enabled;
 	bool			gfx_pipe_reset_enabled;
+
+	bool				use_rs64mem;
+	struct amdgpu_bo		*ctx_array_size_bo;
+	uint64_t			ctx_array_size_gpu_addr;
+	uint32_t			*ctx_array_size_cpu_ptr;
 };
 
 struct amdgpu_mes_hung_queue_hqd_info {
@@ -617,4 +622,6 @@ bool amdgpu_mes_queue_reset_by_mes_supported(struct amdgpu_device *adev);
 
 int amdgpu_mes_update_enforce_isolation(struct amdgpu_device *adev);
 
+int amdgpu_mes_rs64mem_init(struct amdgpu_mes *mes);
+void amdgpu_mes_rs64mem_fini(struct amdgpu_mes *mes);
 #endif /* __AMDGPU_MES_H__ */
