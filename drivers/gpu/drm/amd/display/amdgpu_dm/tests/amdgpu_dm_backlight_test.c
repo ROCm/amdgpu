@@ -8,6 +8,11 @@
 #include <kunit/test.h>
 #include <linux/backlight.h>
 
+#include <drm/drm_atomic_helper.h>
+#include <drm/drm_connector.h>
+#include <drm/drm_mode_config.h>
+#include <drm/drm_property.h>
+
 #include "dc.h"
 #include "dc_dmub_srv.h"
 #include "amdgpu.h"
@@ -456,6 +461,171 @@ static void dm_test_register_backlight_device_negative_index(struct kunit *test)
 
 	amdgpu_dm_register_backlight_device(aconnector);
 	KUNIT_EXPECT_NULL(test, adev->dm.backlight_dev[0]);
+}
+
+static struct drm_connector *setup_panel_power_savings_connector(struct kunit *test,
+							 struct device **device_out,
+							 struct dm_connector_state **state_out)
+{
+	struct dm_connector_state *state;
+	struct drm_connector *connector;
+	struct amdgpu_device *adev;
+	struct device *device;
+	int ret;
+
+	adev = dm_kunit_alloc_adev(test);
+	ret = drmm_mode_config_init(&adev->ddev);
+	KUNIT_ASSERT_EQ(test, ret, 0);
+
+	connector = kunit_kzalloc(test, sizeof(*connector), GFP_KERNEL);
+	device = kunit_kzalloc(test, sizeof(*device), GFP_KERNEL);
+	state = kunit_kzalloc(test, sizeof(*state), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, connector);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, device);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, state);
+
+	connector->dev = &adev->ddev;
+	connector->state = &state->base;
+	dev_set_drvdata(device, connector);
+	*device_out = device;
+	*state_out = state;
+
+	return connector;
+}
+
+static void dm_test_free_sysfs_buf(void *data)
+{
+	free_page((unsigned long)data);
+}
+
+static char *dm_test_alloc_sysfs_buf(struct kunit *test)
+{
+	char *buf;
+
+	buf = (char *)get_zeroed_page(GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, buf);
+	KUNIT_ASSERT_EQ(test, kunit_add_action_or_reset(test, dm_test_free_sysfs_buf, buf), 0);
+
+	return buf;
+}
+
+/* Tests for panel_power_savings_show()/panel_power_savings_store() */
+
+/**
+ * dm_test_panel_power_savings_show_maps_disable_to_zero - Test show output
+ * @test: The KUnit test context
+ */
+static void dm_test_panel_power_savings_show_maps_disable_to_zero(struct kunit *test)
+{
+	struct dm_connector_state *state;
+	struct device *device;
+	char *buf;
+
+	setup_panel_power_savings_connector(test, &device, &state);
+	buf = dm_test_alloc_sysfs_buf(test);
+	state->abm_level = ABM_LEVEL_IMMEDIATE_DISABLE;
+
+	KUNIT_EXPECT_EQ(test, panel_power_savings_show(device, NULL, buf), 2);
+	KUNIT_EXPECT_STREQ(test, buf, "0\n");
+}
+
+/**
+ * dm_test_panel_power_savings_show_reports_level - Test show output for active level
+ * @test: The KUnit test context
+ *
+ * When abm_level is not the immediate-disable sentinel, show() reports the
+ * raw level value.
+ */
+static void dm_test_panel_power_savings_show_reports_level(struct kunit *test)
+{
+	struct dm_connector_state *state;
+	struct device *device;
+	char *buf;
+
+	setup_panel_power_savings_connector(test, &device, &state);
+	buf = dm_test_alloc_sysfs_buf(test);
+	state->abm_level = 3;
+
+	KUNIT_EXPECT_EQ(test, panel_power_savings_show(device, NULL, buf), 2);
+	KUNIT_EXPECT_STREQ(test, buf, "3\n");
+}
+
+/**
+ * dm_test_panel_power_savings_store_sets_disable - Test zero maps to disable
+ * @test: The KUnit test context
+ */
+static void dm_test_panel_power_savings_store_sets_disable(struct kunit *test)
+{
+	struct dm_connector_state *state;
+	struct device *device;
+	size_t count = strlen("0");
+
+	setup_panel_power_savings_connector(test, &device, &state);
+
+	KUNIT_EXPECT_EQ(test, panel_power_savings_store(device, NULL, "0", count),
+			 (ssize_t)count);
+	KUNIT_EXPECT_EQ(test, state->abm_level, ABM_LEVEL_IMMEDIATE_DISABLE);
+}
+
+/**
+ * dm_test_panel_power_savings_store_forbidden - Test forbidden update
+ * @test: The KUnit test context
+ */
+static void dm_test_panel_power_savings_store_forbidden(struct kunit *test)
+{
+	struct dm_connector_state *state;
+	struct device *device;
+
+	setup_panel_power_savings_connector(test, &device, &state);
+	state->abm_sysfs_forbidden = true;
+
+	KUNIT_EXPECT_EQ(test, panel_power_savings_store(device, NULL, "1", 1), -EBUSY);
+}
+
+/**
+ * dm_test_panel_power_savings_store_rejects_invalid_text - Test parse failure
+ * @test: The KUnit test context
+ */
+static void dm_test_panel_power_savings_store_rejects_invalid_text(struct kunit *test)
+{
+	struct drm_connector *connector;
+	struct drm_device *drm;
+	struct device *device;
+
+	connector = kunit_kzalloc(test, sizeof(*connector), GFP_KERNEL);
+	drm = kunit_kzalloc(test, sizeof(*drm), GFP_KERNEL);
+	device = kunit_kzalloc(test, sizeof(*device), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, connector);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, device);
+
+	connector->dev = drm;
+	dev_set_drvdata(device, connector);
+
+	KUNIT_EXPECT_LT(test, panel_power_savings_store(device, NULL, "bad", 3), 0);
+}
+
+/**
+ * dm_test_panel_power_savings_store_rejects_out_of_range - Test range failure
+ * @test: The KUnit test context
+ */
+static void dm_test_panel_power_savings_store_rejects_out_of_range(struct kunit *test)
+{
+	struct drm_connector *connector;
+	struct drm_device *drm;
+	struct device *device;
+
+	connector = kunit_kzalloc(test, sizeof(*connector), GFP_KERNEL);
+	drm = kunit_kzalloc(test, sizeof(*drm), GFP_KERNEL);
+	device = kunit_kzalloc(test, sizeof(*device), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, connector);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, drm);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, device);
+
+	connector->dev = drm;
+	dev_set_drvdata(device, connector);
+
+	KUNIT_EXPECT_EQ(test, panel_power_savings_store(device, NULL, "5", 1), -EINVAL);
 }
 
 /* Tests for amdgpu_dm_backlight_get_device_index() */
@@ -1636,6 +1806,13 @@ static struct kunit_case dm_backlight_test_cases[] = {
 	KUNIT_CASE(dm_test_backlight_get_brightness_uses_device_index),
 	/* amdgpu_dm_register_backlight_device */
 	KUNIT_CASE(dm_test_register_backlight_device_negative_index),
+	/* panel_power_savings_show / store */
+	KUNIT_CASE(dm_test_panel_power_savings_show_maps_disable_to_zero),
+	KUNIT_CASE(dm_test_panel_power_savings_show_reports_level),
+	KUNIT_CASE(dm_test_panel_power_savings_store_sets_disable),
+	KUNIT_CASE(dm_test_panel_power_savings_store_forbidden),
+	KUNIT_CASE(dm_test_panel_power_savings_store_rejects_invalid_text),
+	KUNIT_CASE(dm_test_panel_power_savings_store_rejects_out_of_range),
 	/* amdgpu_dm_backlight_get_device_index */
 	KUNIT_CASE(dm_test_backlight_device_index_matches_second),
 	KUNIT_CASE(dm_test_backlight_device_index_missing_fallback),

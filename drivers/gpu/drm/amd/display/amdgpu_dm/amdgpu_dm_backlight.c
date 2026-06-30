@@ -617,9 +617,10 @@ EXPORT_IF_KUNIT(amdgpu_dm_setup_backlight_device);
  * carefully.
  */
 
-static ssize_t panel_power_savings_show(struct device *device,
-					struct device_attribute *attr,
-					char *buf)
+STATIC_IFN_KUNIT
+ssize_t panel_power_savings_show(struct device *device,
+				 struct device_attribute *attr,
+				 char *buf)
 {
 	struct drm_connector *connector = dev_get_drvdata(device);
 	struct drm_device *dev = connector->dev;
@@ -633,10 +634,12 @@ static ssize_t panel_power_savings_show(struct device *device,
 
 	return sysfs_emit(buf, "%u\n", val);
 }
+EXPORT_IF_KUNIT(panel_power_savings_show);
 
-static ssize_t panel_power_savings_store(struct device *device,
-					 struct device_attribute *attr,
-					 const char *buf, size_t count)
+STATIC_IFN_KUNIT
+ssize_t panel_power_savings_store(struct device *device,
+				 struct device_attribute *attr,
+				 const char *buf, size_t count)
 {
 	struct drm_connector *connector = dev_get_drvdata(device);
 	struct drm_device *dev = connector->dev;
@@ -666,6 +669,7 @@ static ssize_t panel_power_savings_store(struct device *device,
 
 	return count;
 }
+EXPORT_IF_KUNIT(panel_power_savings_store);
 
 static DEVICE_ATTR_RW(panel_power_savings);
 
