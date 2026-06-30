@@ -362,8 +362,8 @@ int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 }
 EXPORT_IF_KUNIT(amdgpu_dm_backlight_update_status);
 
-static u32 amdgpu_dm_backlight_get_level(struct amdgpu_display_manager *dm,
-					 int bl_idx)
+STATIC_IFN_KUNIT
+u32 amdgpu_dm_backlight_get_level(struct amdgpu_display_manager *dm, int bl_idx)
 {
 	int ret;
 	struct amdgpu_dm_backlight_caps caps;
@@ -387,14 +387,17 @@ static u32 amdgpu_dm_backlight_get_level(struct amdgpu_display_manager *dm,
 
 	return convert_brightness_to_user(&caps, ret);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_backlight_get_level);
 
-static int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
+STATIC_IFN_KUNIT
+int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
 {
 	struct amdgpu_display_manager *dm = bl_get_data(bd);
 	int i = amdgpu_dm_backlight_get_device_index(dm, bd);
 
 	return amdgpu_dm_backlight_get_level(dm, i);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_backlight_get_brightness);
 
 static const struct backlight_ops amdgpu_dm_backlight_ops = {
 	.options = BL_CORE_SUSPENDRESUME,

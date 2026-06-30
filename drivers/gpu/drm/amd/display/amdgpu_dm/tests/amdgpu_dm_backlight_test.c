@@ -16,6 +16,7 @@
 #include "amdgpu_dm_backlight.h"
 #include "amdgpu_dm_kunit_test_helpers.h"
 #include "amd_shared.h"
+#include "link_service.h"
 #include "dc/inc/hw/panel_cntl.h"
 
 struct dm_backlight_connector_fixture {
@@ -288,6 +289,155 @@ static void dm_test_backlight_update_status_no_stream(struct kunit *test)
 
 	KUNIT_EXPECT_EQ(test, amdgpu_dm_backlight_update_status(bd), 0);
 	KUNIT_EXPECT_EQ(test, dm->brightness[1], 3456U);
+}
+
+static void setup_test_link_service(struct kunit *test, struct dc_link *link)
+{
+	struct link_service *link_srv;
+	struct dc_context *ctx;
+	struct dc *dc;
+
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	link_srv = kunit_kzalloc(test, sizeof(*link_srv), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, ctx);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, link_srv);
+
+	dc->ctx = ctx;
+	dc->link_srv = link_srv;
+	ctx->dc = dc;
+	link->dc = dc;
+	link->ctx = ctx;
+}
+
+static int dm_test_get_backlight_level_mid(const struct dc_link *link)
+{
+	return (0x101 * AMDGPU_DM_DEFAULT_MIN_BACKLIGHT) + 1000;
+}
+
+static int dm_test_get_backlight_level_error(const struct dc_link *link)
+{
+	return DC_ERROR_UNEXPECTED;
+}
+
+static bool dm_test_get_backlight_level_nits(struct dc_link *link,
+					     uint32_t *avg,
+					     uint32_t *peak)
+{
+	*avg = 250000;
+	*peak = 300000;
+
+	return true;
+}
+
+static bool dm_test_get_backlight_level_nits_fail(struct dc_link *link,
+						  uint32_t *avg,
+						  uint32_t *peak)
+{
+	return false;
+}
+
+/* Tests for amdgpu_dm_backlight_get_level()/get_brightness() */
+
+/**
+ * dm_test_backlight_get_level_pwm_success - Test PWM brightness readback
+ * @test: The KUnit test context
+ */
+static void dm_test_backlight_get_level_pwm_success(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
+	u32 hw_level = dm_test_get_backlight_level_mid(link);
+
+	setup_test_link_service(test, link);
+	link->dc->link_srv->edp_get_backlight_level = dm_test_get_backlight_level_mid;
+	dm->backlight_link[0] = link;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_backlight_get_level(dm, 0),
+			 convert_brightness_to_user(&dm->backlight_caps[0], hw_level));
+}
+
+/**
+ * dm_test_backlight_get_level_pwm_error - Test PWM readback fallback
+ * @test: The KUnit test context
+ */
+static void dm_test_backlight_get_level_pwm_error(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
+
+	setup_test_link_service(test, link);
+	link->dc->link_srv->edp_get_backlight_level = dm_test_get_backlight_level_error;
+	dm->brightness[0] = 4321;
+	dm->backlight_link[0] = link;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_backlight_get_level(dm, 0), 4321U);
+}
+
+/**
+ * dm_test_backlight_get_level_aux_success - Test AUX brightness readback
+ * @test: The KUnit test context
+ */
+static void dm_test_backlight_get_level_aux_success(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
+	struct amdgpu_dm_backlight_caps *caps = &dm->backlight_caps[0];
+
+	setup_test_link_service(test, link);
+	link->dc->link_srv->edp_get_backlight_level_nits = dm_test_get_backlight_level_nits;
+	dm->backlight_link[0] = link;
+	caps->caps_valid = true;
+	caps->aux_support = true;
+	caps->aux_min_input_signal = 1;
+	caps->aux_max_input_signal = 512;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_backlight_get_level(dm, 0),
+			 convert_brightness_to_user(caps, 250000));
+}
+
+/**
+ * dm_test_backlight_get_level_aux_error - Test AUX readback fallback
+ * @test: The KUnit test context
+ */
+static void dm_test_backlight_get_level_aux_error(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
+	struct amdgpu_dm_backlight_caps *caps = &dm->backlight_caps[0];
+
+	setup_test_link_service(test, link);
+	link->dc->link_srv->edp_get_backlight_level_nits = dm_test_get_backlight_level_nits_fail;
+	dm->brightness[0] = 6789;
+	dm->backlight_link[0] = link;
+	caps->caps_valid = true;
+	caps->aux_support = true;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_backlight_get_level(dm, 0), 6789U);
+}
+
+/**
+ * dm_test_backlight_get_brightness_uses_device_index - Test get_brightness wrapper
+ * @test: The KUnit test context
+ */
+static void dm_test_backlight_get_brightness_uses_device_index(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
+	struct backlight_device *bd;
+
+	setup_test_link_service(test, link);
+	link->dc->link_srv->edp_get_backlight_level = dm_test_get_backlight_level_error;
+	bd = kunit_kzalloc(test, sizeof(*bd), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, bd);
+	dev_set_drvdata(&bd->dev, dm);
+	dm->num_of_edps = 2;
+	dm->backlight_dev[1] = bd;
+	dm->brightness[1] = 2468;
+	dm->backlight_link[1] = link;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_backlight_get_brightness(bd), 2468);
 }
 
 /* Tests for amdgpu_dm_backlight_get_device_index() */
@@ -1460,6 +1610,12 @@ static struct kunit_case dm_backlight_test_cases[] = {
 	KUNIT_CASE(dm_test_backlight_set_level_pwm_programs_power_module),
 	KUNIT_CASE(dm_test_backlight_set_level_reallows_idle),
 	KUNIT_CASE(dm_test_backlight_update_status_no_stream),
+	/* amdgpu_dm_backlight_get_level / get_brightness */
+	KUNIT_CASE(dm_test_backlight_get_level_pwm_success),
+	KUNIT_CASE(dm_test_backlight_get_level_pwm_error),
+	KUNIT_CASE(dm_test_backlight_get_level_aux_success),
+	KUNIT_CASE(dm_test_backlight_get_level_aux_error),
+	KUNIT_CASE(dm_test_backlight_get_brightness_uses_device_index),
 	/* amdgpu_dm_backlight_get_device_index */
 	KUNIT_CASE(dm_test_backlight_device_index_matches_second),
 	KUNIT_CASE(dm_test_backlight_device_index_missing_fallback),
