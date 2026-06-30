@@ -962,7 +962,76 @@ void amdgpu_mes_rs64mem_fini(struct amdgpu_mes *mes)
 				      &mes->ctx_array_size_gpu_addr,
 				      (void **)&mes->ctx_array_size_cpu_ptr);
 	}
+	bitmap_free(mes->proc_ctx_bitmap);
+	bitmap_free(mes->gang_ctx_bitmap);
 	mes->use_rs64mem = false;
+}
+
+/**
+ * amdgpu_mes_rs64mem_setup_bitmaps - allocate bitmaps after querying MES
+ *
+ * Called after QUERY_SCHEDULER_STATUS returns and MES has written
+ * the array sizes to the GPU buffer. Reads the sizes and allocates
+ * the tracking bitmaps.
+ *
+ * @mes: MES instance
+ *
+ * Returns 0 on success, negative errno on failure.
+ */
+int amdgpu_mes_rs64mem_setup_bitmaps(struct amdgpu_mes *mes)
+{
+	struct amdgpu_device *adev = container_of(mes, struct amdgpu_device, mes);
+
+	if (!mes->use_rs64mem || !mes->ctx_array_size_cpu_ptr)
+		return 0;
+
+	/*
+	 * MES FW wrote the sizes to the GPU buffer:
+	 *   ctx_array_size_cpu_ptr[0] = proc_ctx_array_size (N)
+	 *   ctx_array_size_cpu_ptr[1] = gang_ctx_array_size (M)
+	 */
+	mes->proc_ctx_array_size = mes->ctx_array_size_cpu_ptr[0];
+	mes->gang_ctx_array_size = mes->ctx_array_size_cpu_ptr[1];
+
+	/* Sanity check - MES FW typically returns N=50, M=300 */
+	if (mes->proc_ctx_array_size == 0 || mes->gang_ctx_array_size == 0) {
+		dev_warn(adev->dev,
+			 "MES returned zero ctx array sizes (proc=%u, gang=%u), "
+			 "disabling RS64 local memory optimization\n",
+			 mes->proc_ctx_array_size, mes->gang_ctx_array_size);
+		mes->use_rs64mem = false;
+		return 0;
+	}
+
+	/* Cap to safety limits */
+	if (mes->proc_ctx_array_size > AMDGPU_MES_PROC_CTX_ARRAY_MAX)
+		mes->proc_ctx_array_size = AMDGPU_MES_PROC_CTX_ARRAY_MAX;
+	if (mes->gang_ctx_array_size > AMDGPU_MES_GANG_CTX_ARRAY_MAX)
+		mes->gang_ctx_array_size = AMDGPU_MES_GANG_CTX_ARRAY_MAX;
+
+	dev_info(adev->dev,
+		 "MES RS64 local memory: proc_ctx_array_size:%u, "
+		 "gang_ctx_array_size:%u\n",
+		 mes->proc_ctx_array_size, mes->gang_ctx_array_size);
+
+	/* Allocate bitmaps */
+	mes->proc_ctx_bitmap = bitmap_zalloc(mes->proc_ctx_array_size,
+					     GFP_KERNEL);
+	if (!mes->proc_ctx_bitmap) {
+		mes->use_rs64mem = false;
+		return -ENOMEM;
+	}
+
+	mes->gang_ctx_bitmap = bitmap_zalloc(mes->gang_ctx_array_size,
+					     GFP_KERNEL);
+	if (!mes->gang_ctx_bitmap) {
+		bitmap_free(mes->proc_ctx_bitmap);
+		mes->proc_ctx_bitmap = NULL;
+		mes->use_rs64mem = false;
+		return -ENOMEM;
+	}
+
+	return 0;
 }
 
 #if defined(CONFIG_DEBUG_FS)
