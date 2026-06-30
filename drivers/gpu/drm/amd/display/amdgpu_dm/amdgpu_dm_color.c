@@ -1550,8 +1550,7 @@ __set_colorop_in_tf_1d_curve(struct dc_plane_state *dc_plane_state,
 }
 EXPORT_IF_KUNIT(__set_colorop_in_tf_1d_curve);
 
-
-static int
+STATIC_IFN_KUNIT int
 __set_dm_plane_colorop_degamma(struct drm_plane_state *plane_state,
 			       struct dc_plane_state *dc_plane_state,
 			       struct drm_colorop *colorop)
@@ -1577,8 +1576,9 @@ __set_dm_plane_colorop_degamma(struct drm_plane_state *plane_state,
 
 	return __set_colorop_in_tf_1d_curve(dc_plane_state, colorop_state);
 }
+EXPORT_IF_KUNIT(__set_dm_plane_colorop_degamma);
 
-static int
+STATIC_IFN_KUNIT int
 __set_dm_plane_colorop_3x4_matrix(struct drm_plane_state *plane_state,
 				  struct dc_plane_state *dc_plane_state,
 				  struct drm_colorop *colorop)
@@ -1618,8 +1618,9 @@ __set_dm_plane_colorop_3x4_matrix(struct drm_plane_state *plane_state,
 
 	return 0;
 }
+EXPORT_IF_KUNIT(__set_dm_plane_colorop_3x4_matrix);
 
-static int
+STATIC_IFN_KUNIT int
 __set_dm_plane_colorop_multiplier(struct drm_plane_state *plane_state,
 				  struct dc_plane_state *dc_plane_state,
 				  struct drm_colorop *colorop)
@@ -1647,6 +1648,7 @@ __set_dm_plane_colorop_multiplier(struct drm_plane_state *plane_state,
 
 	return 0;
 }
+EXPORT_IF_KUNIT(__set_dm_plane_colorop_multiplier);
 
 static int
 __set_dm_plane_colorop_shaper(struct drm_plane_state *plane_state,
