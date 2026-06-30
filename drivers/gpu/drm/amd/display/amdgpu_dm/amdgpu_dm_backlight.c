@@ -219,7 +219,8 @@ u32 convert_brightness_to_user(const struct amdgpu_dm_backlight_caps *caps,
 }
 EXPORT_IF_KUNIT(convert_brightness_to_user);
 
-static struct dc_stream_state *dm_find_stream_with_link(
+STATIC_IFN_KUNIT
+struct dc_stream_state *dm_find_stream_with_link(
 	struct amdgpu_display_manager *dm,
 	struct dc_link *link)
 {
@@ -235,6 +236,7 @@ static struct dc_stream_state *dm_find_stream_with_link(
 
 	return NULL;
 }
+EXPORT_IF_KUNIT(dm_find_stream_with_link);
 
 STATIC_IFN_KUNIT
 int amdgpu_dm_backlight_get_device_index(struct amdgpu_display_manager *dm,
@@ -346,8 +348,10 @@ void amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 	if (rc)
 		dm->actual_brightness[bl_idx] = user_brightness;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_backlight_set_level);
 
-static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
+STATIC_IFN_KUNIT
+int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 {
 	struct amdgpu_display_manager *dm = bl_get_data(bd);
 	int i = amdgpu_dm_backlight_get_device_index(dm, bd);
@@ -356,6 +360,7 @@ static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_backlight_update_status);
 
 static u32 amdgpu_dm_backlight_get_level(struct amdgpu_display_manager *dm,
 					 int bl_idx)

@@ -9,6 +9,7 @@
 #include <linux/backlight.h>
 
 #include "dc.h"
+#include "dc_dmub_srv.h"
 #include "amdgpu.h"
 #include "amdgpu_mode.h"
 #include "amdgpu_dm.h"
@@ -38,6 +39,255 @@ static void setup_test_connector(struct kunit *test,
 	fixture->aconnector->dc_link = fixture->link;
 	fixture->aconnector->base.dev = &fixture->adev->ddev;
 	fixture->link->connector_signal = signal;
+}
+
+static void setup_test_dm_ddev(struct kunit *test, struct amdgpu_display_manager *dm)
+{
+	struct drm_device *ddev;
+
+	ddev = kunit_kzalloc(test, sizeof(*ddev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, ddev);
+
+	INIT_LIST_HEAD(&ddev->mode_config.connector_list);
+	spin_lock_init(&ddev->mode_config.connector_list_lock);
+	dm->ddev = ddev;
+}
+
+/* Tests for dm_find_stream_with_link() */
+
+/**
+ * dm_test_find_stream_with_link_returns_match - Test matching stream lookup
+ * @test: The KUnit test context
+ */
+static void dm_test_find_stream_with_link_returns_match(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
+	struct dc_link *other_link = dm_kunit_alloc_link(test);
+	struct dc_link *target_link = dm_kunit_alloc_link(test);
+	struct dc_stream_state *stream;
+
+	dm_kunit_add_stream_to_state(test, dm->dc->current_state, 0, other_link);
+	dm_kunit_add_stream_to_state(test, dm->dc->current_state, 1, target_link);
+	stream = dm_find_stream_with_link(dm, target_link);
+
+	KUNIT_ASSERT_NOT_NULL(test, stream);
+	KUNIT_EXPECT_PTR_EQ(test, stream->link, target_link);
+}
+
+/**
+ * dm_test_find_stream_with_link_missing - Test missing stream lookup
+ * @test: The KUnit test context
+ */
+static void dm_test_find_stream_with_link_missing(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
+	struct dc_link *stream_link = dm_kunit_alloc_link(test);
+	struct dc_link *missing_link = dm_kunit_alloc_link(test);
+
+	dm_kunit_add_stream_to_state(test, dm->dc->current_state, 0, stream_link);
+
+	KUNIT_EXPECT_NULL(test, dm_find_stream_with_link(dm, missing_link));
+}
+
+/* Tests for amdgpu_dm_backlight_set_level() */
+
+/**
+ * dm_test_backlight_set_level_connector_off - Test connector-off cache path
+ * @test: The KUnit test context
+ *
+ * If the matching connector has no encoder, set_level() must cache the
+ * requested brightness and return before touching DC or backlight hardware.
+ */
+static void dm_test_backlight_set_level_connector_off(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
+	struct amdgpu_dm_connector *aconnector;
+
+	setup_test_dm_ddev(test, dm);
+	aconnector = kunit_kzalloc(test, sizeof(*aconnector), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, aconnector);
+	INIT_LIST_HEAD(&aconnector->base.head);
+	aconnector->bl_idx = 1;
+	aconnector->base.encoder = NULL;
+	list_add_tail(&aconnector->base.head, &dm->ddev->mode_config.connector_list);
+
+	amdgpu_dm_backlight_set_level(dm, 1, 1234);
+
+	KUNIT_EXPECT_EQ(test, dm->brightness[1], 1234U);
+	KUNIT_EXPECT_EQ(test, dm->actual_brightness[1], 0U);
+}
+
+/**
+ * dm_test_backlight_set_level_no_stream - Test no-stream early return
+ * @test: The KUnit test context
+ *
+ * With no stream for the backlight link, set_level() records the requested
+ * brightness and exits before calling the power-module programming path.
+ */
+static void dm_test_backlight_set_level_no_stream(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
+
+	setup_test_dm_ddev(test, dm);
+	dm->backlight_caps[1].caps_valid = true;
+	dm->backlight_caps[1].min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	dm->backlight_caps[1].max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
+	dm->backlight_link[1] = link;
+
+	amdgpu_dm_backlight_set_level(dm, 1, 2000);
+
+	KUNIT_EXPECT_EQ(test, dm->brightness[1], 2000U);
+	KUNIT_EXPECT_EQ(test, dm->actual_brightness[1], 0U);
+}
+
+/**
+ * dm_test_backlight_set_level_aux_programs_power_module - Test AUX programming path
+ * @test: The KUnit test context
+ *
+ * With a matching stream present, set_level() walks into the DC programming
+ * path. A NULL power_module makes mod_power_set_backlight_nits() a safe
+ * early-false, and ips_support disabled leaves idle optimizations untouched.
+ * A non-matching connector exercises the connector-list skip, and a non-zero
+ * brightness_mask exercises the quirk-OR path.
+ */
+static void dm_test_backlight_set_level_aux_programs_power_module(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
+	struct amdgpu_dm_connector *other;
+
+	setup_test_dm_ddev(test, dm);
+	mutex_init(&dm->dc_lock);
+	dm->power_module = NULL;
+
+	/* Non-matching connector exercises the bl_idx skip (continue). */
+	other = kunit_kzalloc(test, sizeof(*other), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, other);
+	INIT_LIST_HEAD(&other->base.head);
+	other->bl_idx = 0;
+	list_add_tail(&other->base.head, &dm->ddev->mode_config.connector_list);
+
+	dm->backlight_caps[1].caps_valid = true;
+	dm->backlight_caps[1].aux_support = true;
+	dm->backlight_caps[1].brightness_mask = 0x3;
+	dm->backlight_caps[1].aux_min_input_signal = 1;
+	dm->backlight_caps[1].aux_max_input_signal = 512;
+	dm->backlight_caps[1].min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	dm->backlight_caps[1].max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
+	dm->backlight_link[1] = link;
+	dm_kunit_add_stream_to_state(test, dm->dc->current_state, 0, link);
+
+	amdgpu_dm_backlight_set_level(dm, 1, 2000);
+
+	/* power_module is NULL so programming fails; actual stays unchanged. */
+	KUNIT_EXPECT_EQ(test, dm->brightness[1], 2000U);
+	KUNIT_EXPECT_EQ(test, dm->actual_brightness[1], 0U);
+}
+
+/**
+ * dm_test_backlight_set_level_pwm_programs_power_module - Test PWM programming path
+ * @test: The KUnit test context
+ *
+ * With aux_support cleared, set_level() takes the millipercent branch:
+ * get_brightness_range() + mod_power_set_backlight_percent(). A NULL
+ * power_module keeps the call a safe early-false.
+ */
+static void dm_test_backlight_set_level_pwm_programs_power_module(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
+
+	setup_test_dm_ddev(test, dm);
+	mutex_init(&dm->dc_lock);
+	dm->power_module = NULL;
+
+	dm->backlight_caps[1].caps_valid = true;
+	dm->backlight_caps[1].aux_support = false;
+	dm->backlight_caps[1].min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	dm->backlight_caps[1].max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
+	dm->backlight_link[1] = link;
+	dm_kunit_add_stream_to_state(test, dm->dc->current_state, 0, link);
+
+	amdgpu_dm_backlight_set_level(dm, 1, 2000);
+
+	KUNIT_EXPECT_EQ(test, dm->brightness[1], 2000U);
+	KUNIT_EXPECT_EQ(test, dm->actual_brightness[1], 0U);
+}
+
+/**
+ * dm_test_backlight_set_level_reallows_idle - Test idle-optimization toggle path
+ * @test: The KUnit test context
+ *
+ * When ips_support is set and dmub idle is allowed, set_level() disables idle
+ * optimizations around the programming call and re-enables them afterwards.
+ * disable_idle_power_optimizations keeps dc_allow_idle_optimizations() a safe
+ * early return, and ctx->logger is wired because DC_LOG_* dereferences it.
+ */
+static void dm_test_backlight_set_level_reallows_idle(struct kunit *test)
+{
+	struct amdgpu_device *adev = dm_kunit_alloc_adev(test);
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
+	struct dc_link *link = dm_kunit_alloc_link(test);
+	struct dc_dmub_srv *dmub_srv;
+	struct dal_logger *logger;
+	struct dc_context *ctx;
+
+	setup_test_dm_ddev(test, dm);
+	mutex_init(&dm->dc_lock);
+	dm->power_module = NULL;
+
+	/* dm_kunit_alloc_dm() leaves dc->ctx NULL; the idle path dereferences it. */
+	ctx = kunit_kzalloc(test, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, ctx);
+	dm->dc->ctx = ctx;
+
+	logger = kunit_kzalloc(test, sizeof(*logger), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, logger);
+	logger->dev = &adev->ddev;
+	dm->dc->ctx->logger = logger;
+
+	dmub_srv = kunit_kzalloc(test, sizeof(*dmub_srv), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dmub_srv);
+	dmub_srv->idle_allowed = true;
+	dm->dc->ctx->dmub_srv = dmub_srv;
+	dm->dc->caps.ips_support = true;
+	/* Keep dc_allow_idle_optimizations() a safe early return. */
+	dm->dc->debug.disable_idle_power_optimizations = true;
+
+	dm->backlight_caps[1].caps_valid = true;
+	dm->backlight_caps[1].aux_support = true;
+	dm->backlight_caps[1].aux_min_input_signal = 1;
+	dm->backlight_caps[1].aux_max_input_signal = 512;
+	dm->backlight_caps[1].min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	dm->backlight_caps[1].max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
+	dm->backlight_link[1] = link;
+	dm_kunit_add_stream_to_state(test, dm->dc->current_state, 0, link);
+
+	amdgpu_dm_backlight_set_level(dm, 1, 2000);
+
+	KUNIT_EXPECT_EQ(test, dm->brightness[1], 2000U);
+}
+
+/**
+ * dm_test_backlight_update_status_no_stream - Test update_status wrapper
+ * @test: The KUnit test context
+ */
+static void dm_test_backlight_update_status_no_stream(struct kunit *test)
+{
+	struct amdgpu_display_manager *dm = dm_kunit_alloc_dm(test);
+	struct backlight_device *bd;
+
+	setup_test_dm_ddev(test, dm);
+	bd = kunit_kzalloc(test, sizeof(*bd), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, bd);
+	dev_set_drvdata(&bd->dev, dm);
+	bd->props.brightness = 3456;
+	dm->num_of_edps = 2;
+	dm->backlight_dev[1] = bd;
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_backlight_update_status(bd), 0);
+	KUNIT_EXPECT_EQ(test, dm->brightness[1], 3456U);
 }
 
 /* Tests for amdgpu_dm_backlight_get_device_index() */
@@ -1200,6 +1450,16 @@ static void dm_test_setup_backlight_device_oled_success(struct kunit *test)
 }
 
 static struct kunit_case dm_backlight_test_cases[] = {
+	/* dm_find_stream_with_link */
+	KUNIT_CASE(dm_test_find_stream_with_link_returns_match),
+	KUNIT_CASE(dm_test_find_stream_with_link_missing),
+	/* amdgpu_dm_backlight_set_level / update_status */
+	KUNIT_CASE(dm_test_backlight_set_level_connector_off),
+	KUNIT_CASE(dm_test_backlight_set_level_no_stream),
+	KUNIT_CASE(dm_test_backlight_set_level_aux_programs_power_module),
+	KUNIT_CASE(dm_test_backlight_set_level_pwm_programs_power_module),
+	KUNIT_CASE(dm_test_backlight_set_level_reallows_idle),
+	KUNIT_CASE(dm_test_backlight_update_status_no_stream),
 	/* amdgpu_dm_backlight_get_device_index */
 	KUNIT_CASE(dm_test_backlight_device_index_matches_second),
 	KUNIT_CASE(dm_test_backlight_device_index_missing_fallback),
