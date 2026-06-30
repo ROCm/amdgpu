@@ -16,6 +16,7 @@
 #include "dc.h"
 #include "dc_dmub_srv.h"
 #include "amdgpu.h"
+#include "amdgpu_display.h"
 #include "amdgpu_mode.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_backlight.h"
@@ -28,6 +29,12 @@ struct dm_backlight_connector_fixture {
 	struct amdgpu_device *adev;
 	struct amdgpu_dm_connector *aconnector;
 	struct dc_link *link;
+};
+
+static const struct drm_connector_funcs dm_backlight_test_connector_funcs = {
+	.reset = drm_atomic_helper_connector_reset,
+	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 };
 
 static void setup_test_connector(struct kunit *test,
@@ -1787,6 +1794,61 @@ static void dm_test_setup_backlight_device_oled_success(struct kunit *test)
 	amdgpu_dm_set_abm_level_param(saved_abm_level);
 }
 
+/**
+ * dm_test_setup_backlight_device_attaches_abm_property - Test ABM property path
+ * @test: The KUnit test context
+ */
+static void dm_test_setup_backlight_device_attaches_abm_property(struct kunit *test)
+{
+	struct amdgpu_dm_connector *aconnector;
+	struct amdgpu_display_manager *dm;
+	struct amdgpu_device *adev;
+	struct drm_property *prop;
+	struct dc_link *link;
+	int saved_abm_level = amdgpu_dm_get_abm_level_param();
+	int saved_backlight = amdgpu_dm_get_backlight_param();
+	int old_count;
+	int ret;
+
+	amdgpu_dm_set_abm_level_param(-1);
+	amdgpu_dm_set_backlight_param(-1);
+	adev = dm_kunit_alloc_adev(test);
+	ret = drmm_mode_config_init(&adev->ddev);
+	KUNIT_ASSERT_EQ(test, ret, 0);
+
+	prop = drm_property_create_range(&adev->ddev, 0, "abm level", 0, 4);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, prop);
+	adev->mode_info.abm_level_property = prop;
+
+	aconnector = dm_kunit_alloc_connector(test, adev, NULL);
+	ret = drmm_connector_init(&adev->ddev, &aconnector->base,
+				   &dm_backlight_test_connector_funcs,
+				   DRM_MODE_CONNECTOR_eDP, NULL);
+	KUNIT_ASSERT_EQ(test, ret, 0);
+
+	link = dm_kunit_alloc_link(test);
+	link->connector_signal = SIGNAL_TYPE_EDP;
+	link->type = dc_connection_single;
+	aconnector->dc_link = link;
+	aconnector->bl_idx = -1;
+	dm = &adev->dm;
+	dm->adev = adev;
+	dm->ddev = &adev->ddev;
+	old_count = aconnector->base.base.properties->count;
+
+	amdgpu_dm_setup_backlight_device(dm, aconnector);
+
+	KUNIT_EXPECT_EQ(test, dm->num_of_edps, 1);
+	KUNIT_EXPECT_EQ(test, aconnector->bl_idx, 0);
+	KUNIT_EXPECT_EQ(test, aconnector->base.base.properties->count, old_count + 1);
+	KUNIT_EXPECT_PTR_EQ(test, aconnector->base.base.properties->properties[old_count], prop);
+	KUNIT_EXPECT_EQ(test, aconnector->base.base.properties->values[old_count],
+			 (uint64_t)ABM_SYSFS_CONTROL);
+
+	amdgpu_dm_set_backlight_param(saved_backlight);
+	amdgpu_dm_set_abm_level_param(saved_abm_level);
+}
+
 static struct kunit_case dm_backlight_test_cases[] = {
 	/* dm_find_stream_with_link */
 	KUNIT_CASE(dm_test_find_stream_with_link_returns_match),
@@ -1872,6 +1934,7 @@ static struct kunit_case dm_backlight_test_cases[] = {
 	KUNIT_CASE(dm_test_setup_backlight_device_connection_none),
 	KUNIT_CASE(dm_test_setup_backlight_device_max_edps),
 	KUNIT_CASE(dm_test_setup_backlight_device_oled_success),
+	KUNIT_CASE(dm_test_setup_backlight_device_attaches_abm_property),
 	{}
 };
 
