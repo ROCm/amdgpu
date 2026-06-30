@@ -440,6 +440,24 @@ static void dm_test_backlight_get_brightness_uses_device_index(struct kunit *tes
 	KUNIT_EXPECT_EQ(test, amdgpu_dm_backlight_get_brightness(bd), 2468);
 }
 
+/* Tests for amdgpu_dm_register_backlight_device() */
+
+/**
+ * dm_test_register_backlight_device_negative_index - Test invalid index no-op
+ * @test: The KUnit test context
+ */
+static void dm_test_register_backlight_device_negative_index(struct kunit *test)
+{
+	struct amdgpu_device *adev = dm_kunit_alloc_adev(test);
+	struct amdgpu_dm_connector *aconnector;
+
+	aconnector = dm_kunit_alloc_connector(test, adev, NULL);
+	aconnector->bl_idx = -1;
+
+	amdgpu_dm_register_backlight_device(aconnector);
+	KUNIT_EXPECT_NULL(test, adev->dm.backlight_dev[0]);
+}
+
 /* Tests for amdgpu_dm_backlight_get_device_index() */
 
 /**
@@ -1616,6 +1634,8 @@ static struct kunit_case dm_backlight_test_cases[] = {
 	KUNIT_CASE(dm_test_backlight_get_level_aux_success),
 	KUNIT_CASE(dm_test_backlight_get_level_aux_error),
 	KUNIT_CASE(dm_test_backlight_get_brightness_uses_device_index),
+	/* amdgpu_dm_register_backlight_device */
+	KUNIT_CASE(dm_test_register_backlight_device_negative_index),
 	/* amdgpu_dm_backlight_get_device_index */
 	KUNIT_CASE(dm_test_backlight_device_index_matches_second),
 	KUNIT_CASE(dm_test_backlight_device_index_missing_fallback),

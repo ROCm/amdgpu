@@ -496,6 +496,7 @@ amdgpu_dm_register_backlight_device(struct amdgpu_dm_connector *aconnector)
 		drm_dbg_driver(drm, "DM: Registered Backlight device: %s\n", bl_name);
 	}
 }
+EXPORT_IF_KUNIT(amdgpu_dm_register_backlight_device);
 
 void amdgpu_dm_update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 {
