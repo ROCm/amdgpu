@@ -3564,6 +3564,11 @@ static int kfd_ioctl_create_process(struct file *filep, struct kfd_process *p, v
 	}
 
 	filep->private_data = process;
+	ret = kfd_debugfs_add_process(process);
+	if (ret)
+		pr_warn("Failed to create debugfs entry for the kfd_process, ret = %d\n",
+			ret);
+
 	mutex_unlock(&kfd_processes_mutex);
 
 	ret = kfd_create_process_sysfs(process);

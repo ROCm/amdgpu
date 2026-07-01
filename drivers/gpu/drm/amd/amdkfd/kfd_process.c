@@ -1050,7 +1050,10 @@ struct kfd_process *kfd_create_process(struct task_struct *thread)
 		if (ret)
 			pr_warn("Failed to create sysfs entry for the kfd_process");
 
-		kfd_debugfs_add_process(process);
+		ret = kfd_debugfs_add_process(process);
+		if (ret)
+			pr_warn("Failed to create debugfs entry for the kfd_process, ret = %d\n",
+				ret);
 
 		init_waitqueue_head(&process->wait_irq_drain);
 	}
