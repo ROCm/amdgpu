@@ -3359,10 +3359,15 @@ static void fill_dc_dirty_rects(struct drm_plane *plane,
 	if (new_plane_state->rotation != DRM_MODE_ROTATE_0)
 		goto ffu;
 
+#ifdef HAVE_DRM_PLANE_STATE_IGNORE_DAMAGE_CLIPS
 	if (!new_plane_state->ignore_damage_clips) {
 		num_clips = drm_plane_get_damage_clips_count(new_plane_state);
 		clips = drm_plane_get_damage_clips(new_plane_state);
 	}
+#else
+	num_clips = drm_plane_get_damage_clips_count(new_plane_state);
+	clips = drm_plane_get_damage_clips(new_plane_state);
+#endif
 
 	if (num_clips && (!amdgpu_damage_clips || (amdgpu_damage_clips < 0 &&
 						   is_psr_su)))
