@@ -141,12 +141,16 @@ int smu7_send_msg_to_smc(struct pp_hwmgr *hwmgr, uint16_t msg)
 
 	ret = PHM_READ_FIELD(hwmgr->device, SMC_RESP_0, SMC_RESP);
 
-	if (ret == 0xFE)
+	switch (ret) {
+	case 1:
+		return 0;
+	case 0xFE:
 		dev_dbg(adev->dev, "SMU message %#x was not supported\n", msg);
-	else if (ret != 1)
+		return -EOPNOTSUPP;
+	default:
 		dev_info(adev->dev, "SMU message %#x failed: response is %d\n", msg, ret);
-
-	return 0;
+		return ret != 0xFFFF ? -EIO : -ENXIO;
+	}
 }
 
 int smu7_send_msg_to_smc_with_parameter(struct pp_hwmgr *hwmgr, uint16_t msg, uint32_t parameter)
