@@ -1721,8 +1721,9 @@ u64 amdgpu_bo_print_info(int id, struct amdgpu_bo *bo, struct seq_file *m)
 	if (dma_resv_trylock(amdkcl_ttm_resvp(&bo->tbo))) {
 		dma_resv_describe(amdkcl_ttm_resvp(&bo->tbo), m);
 		dma_resv_unlock(amdkcl_ttm_resvp(&bo->tbo));
+	} else {
+		seq_puts(m, "\n");
 	}
-	seq_puts(m, "\n");
 
 	return size;
 }
