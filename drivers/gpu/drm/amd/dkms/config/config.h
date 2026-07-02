@@ -778,6 +778,9 @@
 /* drm_plane_helper_destroy() is available */
 #define HAVE_DRM_PLANE_HELPER_DESTROY 1
 
+/* drm_plane_state->ignore_damage_clips is available */
+#define HAVE_DRM_PLANE_STATE_IGNORE_DAMAGE_CLIPS 1
+
 /* drm_prime_pages_to_sg() wants 3 arguments */
 #define HAVE_DRM_PRIME_PAGES_TO_SG_3ARGS 1
 
