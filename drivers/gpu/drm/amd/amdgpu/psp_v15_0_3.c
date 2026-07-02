@@ -653,6 +653,126 @@ static int psp_v15_0_3_vbflash_status(struct psp_context *psp)
 	return RREG32_SOC15(MP0, 0, regMPASP_PCRU0_MPASP_C2PMSG_115);
 }
 
+static int psp_v15_0_3_get_fw_type(struct amdgpu_firmware_info *ucode,
+			   enum psp_gfx_fw_type *type)
+{
+	switch (ucode->ucode_id) {
+	case AMDGPU_UCODE_ID_CAP:
+		*type = GFX_FW_TYPE_CAP;
+		break;
+	case AMDGPU_UCODE_ID_SDMA_RS64:
+		*type = GFX_FW_TYPE_SDMA0;
+		break;
+	case AMDGPU_UCODE_ID_CP_MES:
+		*type = GFX_FW_TYPE_CP_MES;
+		break;
+	case AMDGPU_UCODE_ID_CP_MES_DATA:
+		*type = GFX_FW_TYPE_MES_STACK;
+		break;
+	case AMDGPU_UCODE_ID_CP_MES1:
+		*type = GFX_FW_TYPE_CP_MES_KIQ;
+		break;
+	case AMDGPU_UCODE_ID_CP_MES1_DATA:
+		*type = GFX_FW_TYPE_MES_KIQ_STACK;
+		break;
+	case AMDGPU_UCODE_ID_RLC_V:
+		*type = GFX_FW_TYPE_RLC_V;
+		break;
+	case AMDGPU_UCODE_ID_RLC_G:
+		*type = GFX_FW_TYPE_RLC_G;
+		break;
+	case AMDGPU_UCODE_ID_RLC_RESTORE_LIST_CNTL:
+		*type = GFX_FW_TYPE_RLC_RESTORE_LIST_SRM_CNTL;
+		break;
+	case AMDGPU_UCODE_ID_RLC_RESTORE_LIST_GPM_MEM:
+		*type = GFX_FW_TYPE_RLC_RESTORE_LIST_GPM_MEM;
+		break;
+	case AMDGPU_UCODE_ID_RLC_RESTORE_LIST_SRM_MEM:
+		*type = GFX_FW_TYPE_RLC_RESTORE_LIST_SRM_MEM;
+		break;
+	case AMDGPU_UCODE_ID_RLC_IRAM:
+		*type = GFX_FW_TYPE_RLC_IRAM;
+		break;
+	case AMDGPU_UCODE_ID_RLC_DRAM:
+		*type = GFX_FW_TYPE_RLC_DRAM_BOOT;
+		break;
+	case AMDGPU_UCODE_ID_SMC:
+		*type = GFX_FW_TYPE_SMU;
+		break;
+	case AMDGPU_UCODE_ID_PPTABLE:
+		*type = GFX_FW_TYPE_PPTABLE;
+		break;
+	case AMDGPU_UCODE_ID_DMCUB:
+		*type = GFX_FW_TYPE_DMUB;
+		break;
+	case AMDGPU_UCODE_ID_IMU_I:
+		*type = GFX_FW_TYPE_IMU_I;
+		break;
+	case AMDGPU_UCODE_ID_IMU_D:
+		*type = GFX_FW_TYPE_IMU_D;
+		break;
+	case AMDGPU_UCODE_ID_CP_RS64_PFP:
+		*type = GFX_FW_TYPE_RS64_PFP;
+		break;
+	case AMDGPU_UCODE_ID_CP_RS64_ME:
+		*type = GFX_FW_TYPE_RS64_ME;
+		break;
+	case AMDGPU_UCODE_ID_CP_RS64_MEC:
+		*type = GFX_FW_TYPE_RS64_MEC;
+		break;
+	case AMDGPU_UCODE_ID_CP_RS64_PFP_P0_STACK:
+		*type = GFX_FW_TYPE_RS64_PFP_P0_STACK;
+		break;
+	case AMDGPU_UCODE_ID_CP_RS64_PFP_P1_STACK:
+		*type = GFX_FW_TYPE_RS64_PFP_P1_STACK;
+		break;
+	case AMDGPU_UCODE_ID_CP_RS64_ME_P0_STACK:
+		*type = GFX_FW_TYPE_RS64_ME_P0_STACK;
+		break;
+	case AMDGPU_UCODE_ID_CP_RS64_ME_P1_STACK:
+		*type = GFX_FW_TYPE_RS64_ME_P1_STACK;
+		break;
+	case AMDGPU_UCODE_ID_CP_RS64_MEC_P0_STACK:
+		*type = GFX_FW_TYPE_RS64_MEC_P0_STACK;
+		break;
+	case AMDGPU_UCODE_ID_CP_RS64_MEC_P1_STACK:
+		*type = GFX_FW_TYPE_RS64_MEC_P1_STACK;
+		break;
+	case AMDGPU_UCODE_ID_CP_RS64_MEC_P2_STACK:
+		*type = GFX_FW_TYPE_RS64_MEC_P2_STACK;
+		break;
+	case AMDGPU_UCODE_ID_CP_RS64_MEC_P3_STACK:
+		*type = GFX_FW_TYPE_RS64_MEC_P3_STACK;
+		break;
+	case AMDGPU_UCODE_ID_VPE_CTX:
+		*type = GFX_FW_TYPE_VPEC_FW1;
+		break;
+	case AMDGPU_UCODE_ID_VPE_CTL:
+		*type = GFX_FW_TYPE_VPEC_FW2;
+		break;
+	case AMDGPU_UCODE_ID_VPE:
+		*type = GFX_FW_TYPE_VPE;
+		break;
+	case AMDGPU_UCODE_ID_UMSCH_MM_UCODE:
+		*type = GFX_FW_TYPE_UMSCH_UCODE;
+		break;
+	case AMDGPU_UCODE_ID_UMSCH_MM_DATA:
+		*type = GFX_FW_TYPE_UMSCH_DATA;
+		break;
+	case AMDGPU_UCODE_ID_UMSCH_MM_CMD_BUFFER:
+		*type = GFX_FW_TYPE_UMSCH_CMD_BUFFER;
+		break;
+	case AMDGPU_UCODE_ID_MP5:
+		*type = GFX_FW_TYPE_MP5;
+		break;
+	case AMDGPU_UCODE_ID_MAXIMUM:
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static const struct psp_funcs psp_v15_0_3_funcs = {
 	.init_microcode = psp_v15_0_3_init_microcode,
 	.bootloader_load_kdb = psp_v15_0_3_bootloader_load_kdb,
@@ -673,7 +793,8 @@ static const struct psp_funcs psp_v15_0_3_funcs = {
 	.load_usbc_pd_fw = psp_v15_0_3_load_usbc_pd_fw,
 	.read_usbc_pd_fw = psp_v15_0_3_read_usbc_pd_fw,
 	.update_spirom = psp_v15_0_3_update_spirom,
-	.vbflash_stat = psp_v15_0_3_vbflash_status
+	.vbflash_stat = psp_v15_0_3_vbflash_status,
+	.get_fw_type = psp_v15_0_3_get_fw_type,
 };
 
 void psp_v15_0_3_set_psp_funcs(struct psp_context *psp)
