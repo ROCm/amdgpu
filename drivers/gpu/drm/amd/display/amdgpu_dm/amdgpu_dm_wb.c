@@ -108,13 +108,15 @@ STATIC_IFN_KUNIT int amdgpu_dm_wb_prepare_job(struct drm_writeback_connector *wb
 
 	r = amdgpu_bo_reserve(rbo, true);
 	if (r) {
-		drm_err(adev_to_drm(adev), "fail to reserve bo (%d)\n", r);
+		drm_err(adev_to_drm(adev), "fail to reserve bo: %pe\n", ERR_PTR(r));
 		return r;
 	}
 
 	r = dma_resv_reserve_fences(amdkcl_ttm_resvp(&rbo->tbo), TTM_NUM_MOVE_FENCES);
-	if (r)
+	if (r) {
+		drm_err(adev_to_drm(adev), "reserving fence slot failed: %pe\n", ERR_PTR(r));
 		goto error_unlock;
+	}
 
 	domain = amdgpu_display_supported_domains(adev, rbo->flags);
 
@@ -122,13 +124,13 @@ STATIC_IFN_KUNIT int amdgpu_dm_wb_prepare_job(struct drm_writeback_connector *wb
 	r = amdgpu_bo_pin(rbo, domain);
 	if (unlikely(r != 0)) {
 		if (r != -ERESTARTSYS)
-			DRM_ERROR("Failed to pin framebuffer with error %d\n", r);
+			DRM_ERROR("Failed to pin framebuffer: %pe\n", ERR_PTR(r));
 		goto error_unlock;
 	}
 
 	r = amdgpu_ttm_alloc_gart(&rbo->tbo);
 	if (unlikely(r != 0)) {
-		DRM_ERROR("%p bind failed\n", rbo);
+		DRM_ERROR("%p bind failed: %pe\n", rbo, ERR_PTR(r));
 		goto error_unpin;
 	}
 
@@ -161,7 +163,7 @@ STATIC_IFN_KUNIT void amdgpu_dm_wb_cleanup_job(struct drm_writeback_connector *c
 	rbo = gem_to_amdgpu_bo(job->fb->obj[0]);
 	r = amdgpu_bo_reserve(rbo, false);
 	if (unlikely(r)) {
-		DRM_ERROR("failed to reserve rbo before unpin\n");
+		DRM_ERROR("failed to reserve rbo before unpin: %pe\n", ERR_PTR(r));
 		return;
 	}
 
