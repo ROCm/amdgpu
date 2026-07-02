@@ -134,14 +134,6 @@ int smu7_send_msg_to_smc(struct pp_hwmgr *hwmgr, uint16_t msg)
 
 	PHM_WAIT_FIELD_UNEQUAL(hwmgr, SMC_RESP_0, SMC_RESP, 0);
 
-	ret = PHM_READ_FIELD(hwmgr->device, SMC_RESP_0, SMC_RESP);
-
-	if (ret == 0xFE)
-		dev_dbg(adev->dev, "last message was not supported\n");
-	else if (ret != 1)
-		dev_info(adev->dev,
-			"\nlast message was failed ret is %d\n", ret);
-
 	cgs_write_register(hwmgr->device, mmSMC_RESP_0, 0);
 	cgs_write_register(hwmgr->device, mmSMC_MESSAGE_0, msg);
 
@@ -150,10 +142,9 @@ int smu7_send_msg_to_smc(struct pp_hwmgr *hwmgr, uint16_t msg)
 	ret = PHM_READ_FIELD(hwmgr->device, SMC_RESP_0, SMC_RESP);
 
 	if (ret == 0xFE)
-		dev_dbg(adev->dev, "message %x was not supported\n", msg);
+		dev_dbg(adev->dev, "SMU message %#x was not supported\n", msg);
 	else if (ret != 1)
-		dev_dbg(adev->dev,
-			"failed to send message %x ret is %d \n",  msg, ret);
+		dev_info(adev->dev, "SMU message %#x failed: response is %d\n", msg, ret);
 
 	return 0;
 }
