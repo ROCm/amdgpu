@@ -837,6 +837,58 @@ static int mes_v11_0_query_sched_status(struct amdgpu_mes *mes)
 			offsetof(union MESAPI__QUERY_MES_STATUS, api_status));
 }
 
+/*
+ * QUERY_SCHEDULER_STATUS: get proc/gang context array sizes
+ */
+static int mes_v11_0_query_ctx_array_sizes(struct amdgpu_mes *mes)
+{
+	struct amdgpu_device *adev = mes->adev;
+	union MESAPI__QUERY_MES_STATUS mes_query_pkt;
+	int r;
+
+	if (!mes->ctx_array_size_cpu_ptr)
+		return -EINVAL;
+
+	/* Clear the output buffer */
+	mes->ctx_array_size_cpu_ptr[0] = 0;  /* proc_ctx_array_size */
+	mes->ctx_array_size_cpu_ptr[1] = 0;  /* gang_ctx_array_size */
+
+	memset(&mes_query_pkt, 0, sizeof(mes_query_pkt));
+
+	mes_query_pkt.header.type = MES_API_TYPE_SCHEDULER;
+	mes_query_pkt.header.opcode = MES_SCH_API_QUERY_SCHEDULER_STATUS;
+	mes_query_pkt.header.dwsize = API_FRAME_SIZE_IN_DWORDS;
+
+	mes_query_pkt.subopcode = MES_API_QUERY_MES__GET_CTX_ARRAY_SIZE;
+
+	/*
+	 * MES FW will write the array sizes to these GPU addresses:
+	 *   proc_ctx_array_size_addr -> uint32_t N (e.g., 50)
+	 *   gang_ctx_array_size_addr -> uint32_t M (e.g., 300)
+	 */
+	mes_query_pkt.ctx_array_size.proc_ctx_array_size_addr =
+		mes->ctx_array_size_gpu_addr;
+	mes_query_pkt.ctx_array_size.gang_ctx_array_size_addr =
+		mes->ctx_array_size_gpu_addr + sizeof(uint32_t);
+
+	mes_query_pkt.api_status.api_completion_fence_addr =
+		mes->ring[0].fence_drv.gpu_addr;
+	mes_query_pkt.api_status.api_completion_fence_value =
+		++mes->ring[0].fence_drv.sync_seq;
+
+	r = mes_v11_0_submit_pkt_and_poll_completion(mes,
+			&mes_query_pkt, sizeof(mes_query_pkt),
+			offsetof(union MESAPI__QUERY_MES_STATUS, api_status));
+	if (r) {
+		dev_err(adev->dev,
+			"MES QUERY_SCHEDULER_STATUS (GET_CTX_ARRAY_SIZE) failed, r=%d\n", r);
+		return r;
+	}
+
+	/* MES has written the sizes - now set up bitmaps */
+	return amdgpu_mes_rs64mem_setup_bitmaps(mes);
+}
+
 static int mes_v11_0_misc_op(struct amdgpu_mes *mes,
 			     struct mes_misc_op_input *input)
 {
@@ -1910,9 +1962,32 @@ static int mes_v11_0_hw_init(struct amdgpu_ip_block *ip_block)
 	if (r)
 		goto failure;
 
+	/* Allocate GPU buffer for array size query results */
+	r = amdgpu_mes_rs64mem_init(&adev->mes);
+	if (r)
+		dev_warn(adev->dev,
+			 "RS64 local memory init failed (%d),"
+			 "falling back to system memory path\n", r);
+
 	r = mes_v11_0_set_hw_resources(&adev->mes);
+
 	if (r)
 		goto failure;
+
+	/*
+	 * QUERY_SCHEDULER_STATUS to get array sizes (N, M).
+	 * MES writes the sizes to the GPU buffer, then we allocate bitmaps.
+	 */
+	if (adev->mes.use_rs64mem) {
+		r = mes_v11_0_query_ctx_array_sizes(&adev->mes);
+		if (r) {
+			dev_warn(adev->dev,
+				 "Failed to query ctx array sizes (%d),"
+				 "disabling RS64 local memory\n", r);
+			/* Continue without optimization - not fatal */
+		}
+	}
+
 
 	if ((adev->mes.sched_version & AMDGPU_MES_VERSION_MASK) >= 0x52) {
 		r = mes_v11_0_set_hw_resources_1(&adev->mes);
@@ -1951,6 +2026,10 @@ failure:
 
 static int mes_v11_0_hw_fini(struct amdgpu_ip_block *ip_block)
 {
+	struct amdgpu_device *adev = ip_block->adev;
+
+	if (adev->mes.use_rs64mem)
+		amdgpu_mes_rs64mem_fini(&adev->mes);
 	return 0;
 }
 
