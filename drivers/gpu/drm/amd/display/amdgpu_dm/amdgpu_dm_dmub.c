@@ -800,8 +800,8 @@ int amdgpu_dm_process_dmub_aux_transfer_sync(
 	/*write req may receive a byte indicating partially written number as well*/
 	if (p_notify->aux_reply.length && payload->data) {
 		/* Bound the reply to the scratch buffer it was read into. */
-		ret = min((uint32_t)p_notify->aux_reply.length,
-			  (uint32_t)sizeof(p_notify->aux_reply.data));
+		ret = min_t(uint32_t, p_notify->aux_reply.length,
+			    sizeof(p_notify->aux_reply.data));
 
 		/*
 		 * During a write-status-update retry the caller zeroes
@@ -810,7 +810,7 @@ int amdgpu_dm_process_dmub_aux_transfer_sync(
 		 * so only clamp to payload->length for regular transfers.
 		 */
 		if (!payload->write_status_update)
-			ret = min(ret, payload->length);
+			ret = min_t(int, ret, payload->length);
 
 		memcpy(payload->data, p_notify->aux_reply.data, ret);
 	} else {
