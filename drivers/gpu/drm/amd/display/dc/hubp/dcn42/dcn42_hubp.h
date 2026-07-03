@@ -97,4 +97,7 @@ void hubp42_setup(
 		union dml2_global_sync_programming *pipe_global_sync,
 		struct dc_crtc_timing *timing);
 
+void hubp42_setup_interdependent(
+		struct hubp *hubp,
+		struct dml2_dchub_per_pipe_register_set *pipe_regs);
 #endif /* __DC_HUBP_DCN42_H__ */
