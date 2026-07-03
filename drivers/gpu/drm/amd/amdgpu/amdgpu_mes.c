@@ -1034,6 +1034,52 @@ int amdgpu_mes_rs64mem_setup_bitmaps(struct amdgpu_mes *mes)
 	return 0;
 }
 
+/**
+ * amdgpu_mes_alloc_proc_ctx_index - allocate a process context slot
+ *
+ * @mes: MES instance
+ *
+ * Returns 0 on success, -ENOSPC if all slots are used (caller should
+ * fall back to system memory path).
+ */
+int amdgpu_mes_alloc_proc_ctx_index(struct amdgpu_mes *mes,
+				    struct amdgpu_usermode_queue *queue)
+{
+	unsigned long bit;
+
+	if (!mes->use_rs64mem || !mes->proc_ctx_bitmap)
+		return -EOPNOTSUPP;
+
+	amdgpu_mes_lock(mes);
+	bit = find_first_zero_bit(mes->proc_ctx_bitmap,
+				  mes->proc_ctx_array_size);
+	if (bit >= mes->proc_ctx_array_size) {
+		amdgpu_mes_unlock(mes);
+		return -ENOSPC;
+	}
+	set_bit(bit, mes->proc_ctx_bitmap);
+	queue->proc_ctx_array_index = (uint32_t)bit;
+	amdgpu_mes_unlock(mes);
+
+	return 0;
+}
+
+/**
+ * amdgpu_mes_free_proc_ctx_index - free a process context slot
+ */
+void amdgpu_mes_free_proc_ctx_index(struct amdgpu_mes *mes,
+				    struct amdgpu_usermode_queue *queue)
+{
+	if (!mes->use_rs64mem || !mes->proc_ctx_bitmap)
+		return;
+	if (queue->proc_ctx_array_index >= mes->proc_ctx_array_size)
+		return;
+
+	amdgpu_mes_lock(mes);
+	clear_bit(queue->proc_ctx_array_index, mes->proc_ctx_bitmap);
+	amdgpu_mes_unlock(mes);
+}
+
 #if defined(CONFIG_DEBUG_FS)
 
 static int amdgpu_debugfs_mes_event_log_show(struct seq_file *m, void *unused)

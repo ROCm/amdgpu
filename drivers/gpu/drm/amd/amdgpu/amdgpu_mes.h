@@ -279,6 +279,7 @@ struct mes_add_queue_input {
 	uint32_t	exclusively_scheduled;
 	uint32_t	sh_mem_config_data;
 	uint32_t	vm_cntx_cntl;
+	uint32_t	process_context_array_index;
 };
 
 struct mes_remove_queue_input {
@@ -631,4 +632,8 @@ int amdgpu_mes_update_enforce_isolation(struct amdgpu_device *adev);
 int amdgpu_mes_rs64mem_init(struct amdgpu_mes *mes);
 void amdgpu_mes_rs64mem_fini(struct amdgpu_mes *mes);
 int amdgpu_mes_rs64mem_setup_bitmaps(struct amdgpu_mes *mes);
+int amdgpu_mes_alloc_proc_ctx_index(struct amdgpu_mes *mes,
+				    struct amdgpu_usermode_queue *queue);
+void amdgpu_mes_free_proc_ctx_index(struct amdgpu_mes *mes,
+				    struct amdgpu_usermode_queue *queue);
 #endif /* __AMDGPU_MES_H__ */

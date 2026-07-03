@@ -121,6 +121,7 @@ static int mes_userq_map(struct amdgpu_usermode_queue *queue)
 	struct amdgpu_userq_obj *ctx = &queue->fw_obj;
 	struct amdgpu_mqd_prop *userq_props = queue->userq_prop;
 	struct mes_add_queue_input queue_input;
+	struct amdgpu_mes *mes = &adev->mes;
 	int r;
 
 	memset(&queue_input, 0x0, sizeof(struct mes_add_queue_input));
@@ -146,7 +147,10 @@ static int mes_userq_map(struct amdgpu_usermode_queue *queue)
 	queue_input.doorbell_offset = userq_props->doorbell_index;
 	queue_input.page_table_base_addr = amdgpu_gmc_pd_addr(queue->vm->root.bo);
 	queue_input.wptr_mc_addr = queue->wptr_obj.gpu_addr;
-
+	if (mes->use_rs64mem) {
+		amdgpu_mes_alloc_proc_ctx_index(mes, queue);
+		queue_input.process_context_array_index = queue->proc_ctx_array_index;
+	}
 	amdgpu_mes_lock(&adev->mes);
 	r = adev->mes.funcs->add_hw_queue(&adev->mes, &queue_input);
 	amdgpu_mes_unlock(&adev->mes);
@@ -165,6 +169,7 @@ static int mes_userq_unmap(struct amdgpu_usermode_queue *queue)
 	struct amdgpu_device *adev = uq_mgr->adev;
 	struct mes_remove_queue_input queue_input;
 	struct amdgpu_userq_obj *ctx = &queue->fw_obj;
+	struct amdgpu_mes *mes = &adev->mes;
 	int r;
 
 	memset(&queue_input, 0x0, sizeof(struct mes_remove_queue_input));
@@ -175,6 +180,8 @@ static int mes_userq_unmap(struct amdgpu_usermode_queue *queue)
 	amdgpu_mes_lock(&adev->mes);
 	r = adev->mes.funcs->remove_hw_queue(&adev->mes, &queue_input);
 	amdgpu_mes_unlock(&adev->mes);
+	if (mes->use_rs64mem)
+		amdgpu_mes_free_proc_ctx_index(mes, queue);
 	if (r)
 		DRM_ERROR("Failed to unmap queue in HW, err (%d)\n", r);
 	return r;

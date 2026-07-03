@@ -335,6 +335,7 @@ static int mes_v11_0_add_hw_queue(struct amdgpu_mes *mes,
 	mes_add_queue_pkt.process_va_end = input->process_va_end;
 	mes_add_queue_pkt.process_quantum = input->process_quantum;
 	mes_add_queue_pkt.process_context_addr = input->process_context_addr;
+	mes_add_queue_pkt.process_context_array_index = input->process_context_array_index;
 	mes_add_queue_pkt.gang_quantum = input->gang_quantum;
 	mes_add_queue_pkt.gang_context_addr = input->gang_context_addr;
 	mes_add_queue_pkt.inprocess_gang_priority =
