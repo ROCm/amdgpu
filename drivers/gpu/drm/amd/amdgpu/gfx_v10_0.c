@@ -4995,11 +4995,11 @@ static int gfx_v10_0_sw_init(struct amdgpu_ip_block *ip_block)
 
 	gfx_v10_0_gpu_early_init(adev);
 
-	gfx_v10_0_alloc_ip_dump(adev);
-
 	r = amdgpu_gfx_sysfs_init(adev);
 	if (r)
 		return r;
+
+	gfx_v10_0_alloc_ip_dump(adev);
 
 	return 0;
 }
