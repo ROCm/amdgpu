@@ -3532,6 +3532,7 @@ void amdgpu_dm_update_stream_scaling_settings(struct drm_device *dev,
 		    dst.x, dst.y, dst.width, dst.height);
 
 }
+EXPORT_IF_KUNIT(amdgpu_dm_update_stream_scaling_settings);
 
 #if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_commit *state,
