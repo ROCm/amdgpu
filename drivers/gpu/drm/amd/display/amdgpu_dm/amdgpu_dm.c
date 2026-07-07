@@ -6825,15 +6825,26 @@ static int dm_crtc_get_cursor_mode(struct amdgpu_device *adev,
 		}
 
 		/*
-		 * A plane moving or resizing (without a scale change) changes how
-		 * much of the CRTC it covers. This can create/remove holes under
-		 * the cursor and thus flip the required cursor mode (native vs
-		 * overlay), so the destination rect must be re-evaluated too.
+		 * A non-cursor plane moving or resizing (without a scale change)
+		 * changes how much of the CRTC it covers. This can create or
+		 * remove a hole under the cursor and thus flip the required
+		 * cursor mode (native vs overlay), so its destination rect must
+		 * be re-evaluated too.
+		 *
+		 * The cursor plane itself is deliberately excluded: the cursor
+		 * mode depends on the underlying planes' coverage, not on the
+		 * cursor's position (see the entire_crtc_covered logic below).
+		 * Triggering on cursor movement would force every legacy cursor
+		 * update off its fast path, and in a cursor-only commit - where
+		 * the underlying planes are not part of the state - the coverage
+		 * loop would see no covering plane and misevaluate the mode as
+		 * overlay, regressing flip-vs-cursor-legacy.
 		 */
-		if (old_plane_state->crtc_x != plane_state->crtc_x ||
-		    old_plane_state->crtc_y != plane_state->crtc_y ||
-		    old_plane_state->crtc_w != plane_state->crtc_w ||
-		    old_plane_state->crtc_h != plane_state->crtc_h) {
+		if (plane->type != DRM_PLANE_TYPE_CURSOR &&
+		    (old_plane_state->crtc_x != plane_state->crtc_x ||
+		     old_plane_state->crtc_y != plane_state->crtc_y ||
+		     old_plane_state->crtc_w != plane_state->crtc_w ||
+		     old_plane_state->crtc_h != plane_state->crtc_h)) {
 			consider_mode_change = true;
 			break;
 		}
