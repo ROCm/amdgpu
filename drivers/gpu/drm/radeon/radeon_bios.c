@@ -596,6 +596,45 @@ static bool radeon_read_disabled_bios(struct radeon_device *rdev)
 		return legacy_read_disabled_bios(rdev);
 }
 
+/**
+ * radeon_acpi_vfct_match() - Check if a VFCT entry matches the device
+ * @rdev: Radeon device
+ * @vhdr: VFCT image header to check
+ *
+ * VFCT entries contain the PCI bus number as recorded during BIOS POST.
+ * On systems where the kernel renumbers PCI buses (e.g. pci=realloc or
+ * resource conflicts), the runtime bus number may differ from the POST
+ * value.  Match by device identity (vendor + device + function) and use
+ * the bus number as a preference: exact bus match is preferred, but when
+ * the bus numbers disagree we accept the entry if the device identity
+ * matches.
+ *
+ * Returns: 0 on match, -ENODEV on no match
+ */
+static int radeon_acpi_vfct_match(struct radeon_device *rdev,
+				  VFCT_IMAGE_HEADER *vhdr)
+{
+	/* Vendor and device IDs must always match */
+	if (vhdr->VendorID != rdev->pdev->vendor ||
+	    vhdr->DeviceID != rdev->pdev->device)
+		return -ENODEV;
+
+	if (vhdr->PCIDevice != PCI_SLOT(rdev->pdev->devfn) ||
+	    vhdr->PCIFunction != PCI_FUNC(rdev->pdev->devfn))
+		return -ENODEV;
+
+	/* Exact bus number match - preferred */
+	if (vhdr->PCIBus == rdev->pdev->bus->number)
+		return 0;
+
+	/* Bus mismatch but device identity matches (PCI renumbering case) */
+	dev_notice(&rdev->pdev->dev,
+		   "VFCT bus number mismatch: table %u != runtime %u, matching by device identity (vendor 0x%04x device 0x%04x)\n",
+		   vhdr->PCIBus, rdev->pdev->bus->number,
+		   rdev->pdev->vendor, rdev->pdev->device);
+	return 0;
+}
+
 #ifdef CONFIG_ACPI
 static bool radeon_acpi_vfct_bios(struct radeon_device *rdev)
 {
@@ -633,11 +672,7 @@ static bool radeon_acpi_vfct_bios(struct radeon_device *rdev)
 		}
 
 		if (vhdr->ImageLength &&
-		    vhdr->PCIBus == rdev->pdev->bus->number &&
-		    vhdr->PCIDevice == PCI_SLOT(rdev->pdev->devfn) &&
-		    vhdr->PCIFunction == PCI_FUNC(rdev->pdev->devfn) &&
-		    vhdr->VendorID == rdev->pdev->vendor &&
-		    vhdr->DeviceID == rdev->pdev->device) {
+		    !radeon_acpi_vfct_match(rdev, vhdr)) {
 			rdev->bios = kmemdup(&vbios->VbiosContent,
 					     vhdr->ImageLength,
 					     GFP_KERNEL);
