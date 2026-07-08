@@ -40,14 +40,15 @@
  * RHEL 10.2 keeps EXPORT_SYMBOL_GPL(list_lru_add) in source but does not export
  * the symbol; a source-grep export check would false-positive and leave amdttm
  * with an undefined list_lru_add at modpost.
+ *
+ * The list_lru_add() name override that hijacks the kernel symbol lives in
+ * <kcl/backport/kcl_list_lru_backport.h>, which is force-included via the
+ * consuming module's backport/backport.h. This header only declares the
+ * function pointer it resolves to.
  */
 #ifndef HAVE_4ARGS_LIST_LRU_ADD
 extern bool (*_kcl_list_lru_add)(struct list_lru *lru, struct list_head *item,
 				 int nid, struct mem_cgroup *memcg);
-
-/* Drop-in for the upstream 4-arg list_lru_add(lru, item, nid, memcg). */
-#define list_lru_add(lru, item, nid, memcg) \
-	_kcl_list_lru_add((lru), (item), (nid), (memcg))
 #endif /* !HAVE_4ARGS_LIST_LRU_ADD */
 
 #endif /* AMDKCL_LIST_LRU_H */
