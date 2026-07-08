@@ -676,9 +676,14 @@ static bool radeon_acpi_vfct_bios(struct radeon_device *rdev)
 			rdev->bios = kmemdup(&vbios->VbiosContent,
 					     vhdr->ImageLength,
 					     GFP_KERNEL);
-			if (rdev->bios)
-				r = true;
 
+			if (!rdev->bios ||
+			    rdev->bios[0] != 0x55 || rdev->bios[1] != 0xaa) {
+				kfree(rdev->bios);
+				rdev->bios = NULL;
+				goto out;
+			}
+			r = true;
 			goto out;
 		}
 	}
