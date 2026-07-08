@@ -602,14 +602,14 @@ static bool radeon_acpi_vfct_bios(struct radeon_device *rdev)
 	struct acpi_table_header *hdr;
 	acpi_size tbl_size;
 	UEFI_ACPI_VFCT *vfct;
-	unsigned offset;
+	unsigned int offset;
 	bool r = false;
 
 	if (!ACPI_SUCCESS(acpi_get_table("VFCT", 1, &hdr)))
 		return false;
 	tbl_size = hdr->length;
 	if (tbl_size < sizeof(UEFI_ACPI_VFCT)) {
-		DRM_ERROR("ACPI VFCT table present but broken (too short #1)\n");
+		dev_warn(&rdev->pdev->dev, "ACPI VFCT table present but broken (too short #1),skipping\n");
 		goto out;
 	}
 
@@ -622,13 +622,13 @@ static bool radeon_acpi_vfct_bios(struct radeon_device *rdev)
 
 		offset += sizeof(VFCT_IMAGE_HEADER);
 		if (offset > tbl_size) {
-			DRM_ERROR("ACPI VFCT image header truncated\n");
+			dev_warn(&rdev->pdev->dev, "ACPI VFCT image header truncated,skipping\n");
 			goto out;
 		}
 
 		offset += vhdr->ImageLength;
 		if (offset > tbl_size) {
-			DRM_ERROR("ACPI VFCT image truncated\n");
+			dev_warn(&rdev->pdev->dev, "ACPI VFCT image truncated,skipping\n");
 			goto out;
 		}
 
@@ -648,7 +648,7 @@ static bool radeon_acpi_vfct_bios(struct radeon_device *rdev)
 		}
 	}
 
-	DRM_ERROR("ACPI VFCT table present but broken (too short #2)\n");
+	dev_warn(&rdev->pdev->dev, "ACPI VFCT table present but broken (too short #2),skipping\n");
 
 out:
 	acpi_put_table(hdr);
