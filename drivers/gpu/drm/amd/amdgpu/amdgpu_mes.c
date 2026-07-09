@@ -1080,6 +1080,47 @@ void amdgpu_mes_free_proc_ctx_index(struct amdgpu_mes *mes,
 	amdgpu_mes_unlock(mes);
 }
 
+/**
+ * amdgpu_mes_alloc_gang_ctx_index - allocate a gang context slot
+ */
+int amdgpu_mes_alloc_gang_ctx_index(struct amdgpu_mes *mes,
+				    struct amdgpu_usermode_queue *queue)
+{
+	unsigned long bit;
+
+	if (!mes->use_rs64mem || !mes->gang_ctx_bitmap)
+		return -EOPNOTSUPP;
+
+	amdgpu_mes_lock(mes);
+	bit = find_first_zero_bit(mes->gang_ctx_bitmap,
+				  mes->gang_ctx_array_size);
+	if (bit >= mes->gang_ctx_array_size) {
+		amdgpu_mes_unlock(mes);
+		return -ENOSPC;
+	}
+	set_bit(bit, mes->gang_ctx_bitmap);
+	queue->gang_ctx_array_index = bit;
+	amdgpu_mes_unlock(mes);
+
+	return 0;
+}
+
+/**
+ * amdgpu_mes_free_gang_ctx_index - free a gang context slot
+ */
+void amdgpu_mes_free_gang_ctx_index(struct amdgpu_mes *mes,
+				    struct amdgpu_usermode_queue *queue)
+{
+	if (!mes->use_rs64mem || !mes->gang_ctx_bitmap)
+		return;
+	if (queue->gang_ctx_array_index >= mes->gang_ctx_array_size)
+		return;
+
+	amdgpu_mes_lock(mes);
+	clear_bit(queue->gang_ctx_array_index, mes->gang_ctx_bitmap);
+	amdgpu_mes_unlock(mes);
+}
+
 #if defined(CONFIG_DEBUG_FS)
 
 static int amdgpu_debugfs_mes_event_log_show(struct seq_file *m, void *unused)

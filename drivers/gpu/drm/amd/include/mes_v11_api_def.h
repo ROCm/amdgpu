@@ -360,6 +360,7 @@ union MESAPI__REMOVE_QUEUE {
 
 		enum MES_QUEUE_TYPE         queue_type;
 		uint64_t                    timestamp;
+		uint32_t                    gang_context_array_index;
 	};
 
 	uint32_t	max_dwords_in_api[API_FRAME_SIZE_IN_DWORDS];

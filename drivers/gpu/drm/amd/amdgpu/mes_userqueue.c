@@ -150,6 +150,8 @@ static int mes_userq_map(struct amdgpu_usermode_queue *queue)
 	if (mes->use_rs64mem) {
 		amdgpu_mes_alloc_proc_ctx_index(mes, queue);
 		queue_input.process_context_array_index = queue->proc_ctx_array_index;
+		amdgpu_mes_alloc_gang_ctx_index(mes, queue);
+		queue_input.gang_context_array_index = queue->gang_ctx_array_index;
 	}
 	amdgpu_mes_lock(&adev->mes);
 	r = adev->mes.funcs->add_hw_queue(&adev->mes, &queue_input);
@@ -173,6 +175,7 @@ static int mes_userq_unmap(struct amdgpu_usermode_queue *queue)
 	int r;
 
 	memset(&queue_input, 0x0, sizeof(struct mes_remove_queue_input));
+	queue_input.gang_context_array_index = queue->gang_ctx_array_index;
 	queue_input.doorbell_offset = queue->doorbell_index;
 	queue_input.gang_context_addr = ctx->gpu_addr;
 	queue_input.queue_type = queue->queue_type;
@@ -180,8 +183,10 @@ static int mes_userq_unmap(struct amdgpu_usermode_queue *queue)
 	amdgpu_mes_lock(&adev->mes);
 	r = adev->mes.funcs->remove_hw_queue(&adev->mes, &queue_input);
 	amdgpu_mes_unlock(&adev->mes);
-	if (mes->use_rs64mem)
+	if (mes->use_rs64mem) {
 		amdgpu_mes_free_proc_ctx_index(mes, queue);
+		amdgpu_mes_free_gang_ctx_index(mes, queue);
+	}
 	if (r)
 		DRM_ERROR("Failed to unmap queue in HW, err (%d)\n", r);
 	return r;

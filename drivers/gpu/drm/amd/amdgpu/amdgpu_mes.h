@@ -181,6 +181,7 @@ struct amdgpu_mes {
 	uint32_t			proc_ctx_array_size;
 	unsigned long			*proc_ctx_bitmap;
 	uint32_t			gang_ctx_array_size;
+	uint32_t			gang_ctx_array_index;
 	unsigned long			*gang_ctx_bitmap;
 };
 
@@ -280,6 +281,7 @@ struct mes_add_queue_input {
 	uint32_t	sh_mem_config_data;
 	uint32_t	vm_cntx_cntl;
 	uint32_t	process_context_array_index;
+	uint32_t	gang_context_array_index;
 };
 
 struct mes_remove_queue_input {
@@ -288,6 +290,7 @@ struct mes_remove_queue_input {
 	uint64_t	gang_context_addr;
 	uint32_t	queue_type;
 	bool		remove_queue_after_reset;
+	uint32_t	gang_context_array_index;
 };
 
 struct mes_map_legacy_queue_input {
@@ -635,5 +638,9 @@ int amdgpu_mes_rs64mem_setup_bitmaps(struct amdgpu_mes *mes);
 int amdgpu_mes_alloc_proc_ctx_index(struct amdgpu_mes *mes,
 				    struct amdgpu_usermode_queue *queue);
 void amdgpu_mes_free_proc_ctx_index(struct amdgpu_mes *mes,
+				    struct amdgpu_usermode_queue *queue);
+int amdgpu_mes_alloc_gang_ctx_index(struct amdgpu_mes *mes,
+				    struct amdgpu_usermode_queue *queue);
+void amdgpu_mes_free_gang_ctx_index(struct amdgpu_mes *mes,
 				    struct amdgpu_usermode_queue *queue);
 #endif /* __AMDGPU_MES_H__ */
