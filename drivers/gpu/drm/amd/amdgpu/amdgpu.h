@@ -227,6 +227,7 @@ extern int amdgpu_use_xgmi_p2p;
 extern int amdgpu_ais_disabled;
 extern bool pcie_p2p;
 extern int amdgpu_mtype_local;
+extern int amdgpu_mtype_remote;
 extern int amdgpu_enforce_isolation;
 extern uint amdgpu_debug_mask;
 #ifdef CONFIG_HSA_AMD
