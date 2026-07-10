@@ -468,7 +468,8 @@ void event_property_update(struct work_struct *work)
 }
 EXPORT_IF_KUNIT(event_property_update);
 
-static void event_property_validate(struct work_struct *work)
+STATIC_IFN_KUNIT
+void event_property_validate(struct work_struct *work)
 {
 	struct hdcp_workqueue *hdcp_work =
 		container_of(to_delayed_work(work), struct hdcp_workqueue, property_validate_dwork);
@@ -517,6 +518,7 @@ static void event_property_validate(struct work_struct *work)
 		}
 	}
 }
+EXPORT_IF_KUNIT(event_property_validate);
 
 static void event_watchdog_timer(struct work_struct *work)
 {
