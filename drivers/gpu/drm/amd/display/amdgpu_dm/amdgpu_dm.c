@@ -413,38 +413,6 @@ static void mmhub_read_system_context(struct amdgpu_device *adev, struct dc_phy_
 	pa_config->is_hvm_enabled = adev->mode_info.gpu_vm_support;
 
 }
-struct amdgpu_stutter_quirk {
-	u16 chip_vendor;
-	u16 chip_device;
-	u16 subsys_vendor;
-	u16 subsys_device;
-	u8 revision;
-};
-
-static const struct amdgpu_stutter_quirk amdgpu_stutter_quirk_list[] = {
-	/* https://bugzilla.kernel.org/show_bug.cgi?id=214417 */
-	{ 0x1002, 0x15dd, 0x1002, 0x15dd, 0xc8 },
-	{ 0, 0, 0, 0, 0 },
-};
-
-STATIC_IFN_KUNIT bool dm_should_disable_stutter(struct pci_dev *pdev)
-{
-	const struct amdgpu_stutter_quirk *p = amdgpu_stutter_quirk_list;
-
-	while (p && p->chip_device != 0) {
-		if (pdev->vendor == p->chip_vendor &&
-		    pdev->device == p->chip_device &&
-		    pdev->subsystem_vendor == p->subsys_vendor &&
-		    pdev->subsystem_device == p->subsys_device &&
-		    pdev->revision == p->revision) {
-			return true;
-		}
-		++p;
-	}
-	return false;
-}
-EXPORT_IF_KUNIT(dm_should_disable_stutter);
-
 
 void*
 dm_allocate_gpu_mem(
