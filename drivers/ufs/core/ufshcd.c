@@ -7865,6 +7865,36 @@ static int ufshcd_eh_device_reset_handler(struct scsi_cmnd *cmd)
 	return err;
 }
 
+/*
+ * ufshcd_abort_and_requeue_cmd - Aborts in-flight commands
+ * @hba: UFS host
+ *
+ * Waits for in-flight commands to complete; if any remain, aborts them so
+ * the block layer can requeue them.
+ *
+ * Return: 0 if clean/aborted, -EBUSY if I/O could not be aborted
+ */
+int ufshcd_abort_and_requeue_cmd(struct ufs_hba *hba)
+{
+	int ret;
+
+	ret = ufshcd_wait_for_pending_cmds(hba, USEC_PER_SEC);
+	if (!ret) {
+		dev_dbg(hba->dev, "no I/O inflight after 1s wait\n");
+		return 0;
+	}
+
+	dev_dbg(hba->dev, "pending inflight: %d, outstanding reqs: %lx after wait\n",
+		 scsi_host_busy(hba->host), hba->outstanding_reqs);
+
+	if (ufshcd_abort_all(hba)) {
+		dev_err(hba->dev, "%s: abort all failed\n", __func__);
+		return -EBUSY;
+	}
+
+	return 0;
+}
+
 static void ufshcd_set_req_abort_skip(struct ufs_hba *hba, unsigned long bitmap)
 {
 	int tag;

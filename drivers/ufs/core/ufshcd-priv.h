@@ -85,6 +85,7 @@ void ufshcd_release_scsi_cmd(struct ufs_hba *hba, struct scsi_cmnd *cmd);
 int ufshcd_pause_command_processing(struct ufs_hba *hba, u64 timeout_us);
 void ufshcd_resume_command_processing(struct ufs_hba *hba);
 int ufshcd_scale_clks(struct ufs_hba *hba, unsigned long freq, bool scale_up);
+int ufshcd_abort_and_requeue_cmd(struct ufs_hba *hba);
 
 /**
  * enum ufs_descr_fmt - UFS string descriptor format

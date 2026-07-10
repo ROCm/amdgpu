@@ -1059,12 +1059,152 @@ static ssize_t link_state_show(struct device *dev,
 	return sysfs_emit(buf, "%s\n", ufshcd_uic_link_state_to_string(hba->uic_link_state));
 }
 
+static ssize_t tx_gear_show(struct device *dev, struct device_attribute *attr,
+			    char *buf)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, "%s\n", hba->pwr_info.hs_rate ?
+			  ufs_hs_gear_to_string(hba->pwr_info.gear_tx) :
+			  ufs_pwm_gear_to_string(hba->pwr_info.gear_tx));
+}
+
+static ssize_t rx_gear_show(struct device *dev, struct device_attribute *attr,
+			    char *buf)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, "%s\n", hba->pwr_info.hs_rate ?
+			  ufs_hs_gear_to_string(hba->pwr_info.gear_rx) :
+			  ufs_pwm_gear_to_string(hba->pwr_info.gear_rx));
+}
+
+static bool ufshcd_is_valid_gear(struct ufs_hba *hba, u32 gear, bool tx)
+{
+	u32 max_gear = tx ? hba->max_pwr_info.info.gear_tx
+			: hba->max_pwr_info.info.gear_rx;
+
+	return hba->max_pwr_info.is_valid && gear >= 1 && gear <= max_gear;
+}
+
+static void ufshcd_quiesce(struct ufs_hba *hba)
+{
+	mutex_lock(&hba->host->scan_mutex);
+	down_write(&hba->clk_scaling_lock);
+	blk_mq_quiesce_tagset(&hba->host->tag_set);
+}
+
+static void ufshcd_unquiesce(struct ufs_hba *hba)
+{
+	blk_mq_unquiesce_tagset(&hba->host->tag_set);
+	up_write(&hba->clk_scaling_lock);
+	mutex_unlock(&hba->host->scan_mutex);
+}
+
+static ssize_t tx_gear_store(struct device *dev, struct device_attribute *attr,
+			     const char *buf, size_t count)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+	struct ufs_pa_layer_attr new_pwr;
+	u32 val;
+	int ret;
+
+	if (kstrtou32(buf, 0, &val))
+		return -EINVAL;
+
+	ufshcd_rpm_get_sync(hba);
+
+	if (!ufshcd_is_valid_gear(hba, val, true)) {
+		ret = -EINVAL;
+		goto put;
+	}
+
+	dev_dbg(hba->dev, "TX gear change to %u\n", val);
+
+	ufshcd_quiesce(hba);
+
+	ret = ufshcd_abort_and_requeue_cmd(hba);
+	if (ret) {
+		dev_err(hba->dev, "TX gear change prerequisites failed %d\n", ret);
+		ufshcd_unquiesce(hba);
+		goto put;
+	}
+
+	ufshcd_hold(hba);
+
+	memcpy(&new_pwr, &hba->pwr_info, sizeof(new_pwr));
+	new_pwr.gear_tx = val;
+
+	ret = ufshcd_config_pwr_mode(hba, &new_pwr, UFSHCD_PMC_POLICY_DONT_FORCE);
+	if (ret)
+		dev_err(hba->dev, "TX gear change failed %d\n", ret);
+	else
+		dev_dbg(hba->dev, "TX gear change success\n");
+
+	ufshcd_release(hba);
+	ufshcd_unquiesce(hba);
+put:
+	ufshcd_rpm_put_sync(hba);
+
+	return ret ? ret : count;
+}
+
+static ssize_t rx_gear_store(struct device *dev, struct device_attribute *attr,
+			     const char *buf, size_t count)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+	struct ufs_pa_layer_attr new_pwr;
+	u32 val;
+	int ret;
+
+	if (kstrtou32(buf, 0, &val))
+		return -EINVAL;
+
+	ufshcd_rpm_get_sync(hba);
+
+	if (!ufshcd_is_valid_gear(hba, val, false)) {
+		ret = -EINVAL;
+		goto put;
+	}
+
+	dev_dbg(hba->dev, "RX gear change to %u\n", val);
+
+	ufshcd_quiesce(hba);
+
+	ret = ufshcd_abort_and_requeue_cmd(hba);
+	if (ret) {
+		dev_err(hba->dev, "RX gear change prerequisites failed %d\n", ret);
+		ufshcd_unquiesce(hba);
+		goto put;
+	}
+
+	ufshcd_hold(hba);
+
+	memcpy(&new_pwr, &hba->pwr_info, sizeof(new_pwr));
+	new_pwr.gear_rx = val;
+
+	ret = ufshcd_config_pwr_mode(hba, &new_pwr, UFSHCD_PMC_POLICY_DONT_FORCE);
+	if (ret)
+		dev_err(hba->dev, "RX gear change failed %d\n", ret);
+	else
+		dev_dbg(hba->dev, "RX gear change success\n");
+
+	ufshcd_release(hba);
+	ufshcd_unquiesce(hba);
+put:
+	ufshcd_rpm_put_sync(hba);
+
+	return ret ? ret : count;
+}
+
 static DEVICE_ATTR_RO(lane);
 static DEVICE_ATTR_RO(mode);
 static DEVICE_ATTR_RO(rate);
 static DEVICE_ATTR_RO(gear);
 static DEVICE_ATTR_RO(dev_pm);
 static DEVICE_ATTR_RO(link_state);
+static DEVICE_ATTR_RW(tx_gear);
+static DEVICE_ATTR_RW(rx_gear);
 
 static struct attribute *ufs_power_info_attrs[] = {
 	&dev_attr_lane.attr,
@@ -1073,6 +1213,8 @@ static struct attribute *ufs_power_info_attrs[] = {
 	&dev_attr_gear.attr,
 	&dev_attr_dev_pm.attr,
 	&dev_attr_link_state.attr,
+	&dev_attr_tx_gear.attr,
+	&dev_attr_rx_gear.attr,
 	NULL
 };
 
