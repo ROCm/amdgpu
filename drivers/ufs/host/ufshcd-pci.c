@@ -20,6 +20,7 @@
 #include <linux/uuid.h>
 #include <linux/acpi.h>
 #include <linux/gpio/consumer.h>
+#include "ufs-amd.h"
 
 #define MAX_SUPP_MAC 64
 
@@ -531,6 +532,34 @@ static struct ufs_hba_variant_ops ufs_intel_mtl_hba_vops = {
 	.device_reset		= ufs_intel_device_reset,
 };
 
+int ufs_amd_mcq_config_resource(struct ufs_hba *hba)
+{
+	/* MCQ registers are at an offset from the MMIO base */
+	hba->mcq_base = hba->mmio_base + ufshcd_mcq_queue_cfg_addr(hba);
+	return 0;
+}
+
+int ufs_amd_op_runtime_config(struct ufs_hba *hba)
+{
+	struct ufshcd_mcq_opr_info_t *opr;
+	int i;
+
+	/* Store offsets for each operation type */
+	hba->mcq_opr[OPR_SQD].offset = REG_UFS_AMD_SQD;
+	hba->mcq_opr[OPR_SQIS].offset = REG_UFS_AMD_SQIS;
+	hba->mcq_opr[OPR_CQD].offset = REG_UFS_AMD_CQD;
+	hba->mcq_opr[OPR_CQIS].offset = REG_UFS_AMD_CQIS;
+
+	/* Configure stride and base address for each operation type */
+	for (i = 0; i < OPR_MAX; i++) {
+		opr = &hba->mcq_opr[i];
+		opr->stride = REG_UFS_AMD_MCQ_STRIDE;
+		opr->base = hba->mmio_base + opr->offset;
+	}
+
+	return 0;
+}
+
 #ifdef CONFIG_PM_SLEEP
 static int ufshcd_pci_restore(struct device *dev)
 {
@@ -695,7 +724,7 @@ static const struct pci_device_id ufshcd_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, 0xE447), (kernel_ulong_t)&ufs_intel_mtl_hba_vops },
 	{ PCI_VDEVICE(INTEL, 0x4D47), (kernel_ulong_t)&ufs_intel_mtl_hba_vops },
 	{ PCI_VDEVICE(INTEL, 0xD335), (kernel_ulong_t)&ufs_intel_mtl_hba_vops },
-	{ PCI_VDEVICE(AMD, 0x1B29), .driver_data = 0 },
+	{ PCI_VDEVICE(AMD, 0x1B29), (kernel_ulong_t)&ufs_amd_hba_vops },
 	{ }	/* terminate list */
 };
 
