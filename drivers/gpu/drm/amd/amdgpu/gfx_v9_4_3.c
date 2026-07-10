@@ -2440,7 +2440,7 @@ err_compute:
 		}
 	}
 	for (xcc_id--; xcc_id >= 0; xcc_id--) {
-		for (m = adev->gfx.mec.num_mec - 1; m <= 0; m--) {
+		for (m = adev->gfx.mec.num_mec - 1; m >= 0; m--) {
 			for (p = adev->gfx.mec.num_pipe_per_mec - 1; p >= 0; p--) {
 				irq_type = AMDGPU_CP_IRQ_COMPUTE_MEC1_PIPE0_EOP
 					+ (m * adev->gfx.mec.num_pipe_per_mec) + p;
