@@ -1015,6 +1015,7 @@ static void dm_mst_test_detect_unregistered(struct kunit *test)
 			(int)connector_status_disconnected);
 }
 
+#if !defined(CONFIG_DRM_AMD_DC_FP)
 /**
  * dm_mst_test_fp_guarded_public_stubs - Test FP-off public fallbacks
  * @test: KUnit test context
@@ -1027,6 +1028,7 @@ static void dm_mst_test_fp_guarded_public_stubs(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, dm_dp_mst_is_port_support_mode(NULL, NULL),
 			(enum dc_status)DC_OK);
 }
+#endif
 
 static struct kunit_case dm_mst_types_test_cases[] = {
 	/* needs_dsc_aux_workaround tests */
@@ -1077,7 +1079,9 @@ static struct kunit_case dm_mst_types_test_cases[] = {
 	/* dm_dp_mst_detect tests */
 	KUNIT_CASE(dm_mst_test_detect_unregistered),
 	/* CONFIG_DRM_AMD_DC_FP disabled public paths */
+#if !defined(CONFIG_DRM_AMD_DC_FP)
 	KUNIT_CASE(dm_mst_test_fp_guarded_public_stubs),
+#endif
 	{}
 };
 
