@@ -12,11 +12,13 @@
 #define REG_UFS_AMD_CQIS        0x2224  /* CQ Interrupt Status base */
 #define REG_UFS_AMD_MCQ_STRIDE  0x40    /* 64 bytes per queue */
 
+int ufs_amd_init(struct ufs_hba *hba);
 int ufs_amd_mcq_config_resource(struct ufs_hba *hba);
 int ufs_amd_op_runtime_config(struct ufs_hba *hba);
 
 static struct ufs_hba_variant_ops ufs_amd_hba_vops = {
 	.name                   = "amd-pci",
+	.init                   = ufs_amd_init,
 	.mcq_config_resource    = ufs_amd_mcq_config_resource,
 	.op_runtime_config      = ufs_amd_op_runtime_config,
 };

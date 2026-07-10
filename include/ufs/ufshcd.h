@@ -813,6 +813,11 @@ enum ufshcd_quirks {
 	 * allowed by M-PHY spec ver 6.0.
 	 */
 	UFSHCD_QUIRK_EXTENDED_TX_EQTR_ADAPT_LENGTH_L0L1L2L3	= 1 << 28,
+
+	/*
+	 * This quirk enables WB buffer flush via exception event notification.
+	 */
+	UFSHCI_QUIRK_ENABLE_WB_EXCEPTION_EVENT_CTRL	= 1 << 29,
 };
 
 enum ufshcd_caps {

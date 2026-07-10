@@ -532,6 +532,14 @@ static struct ufs_hba_variant_ops ufs_intel_mtl_hba_vops = {
 	.device_reset		= ufs_intel_device_reset,
 };
 
+int ufs_amd_init(struct ufs_hba *hba)
+{
+	hba->caps |= UFSHCD_CAP_WB_EN | UFSHCD_CAP_RPM_AUTOSUSPEND;
+	hba->quirks |= UFSHCI_QUIRK_ENABLE_WB_EXCEPTION_EVENT_CTRL;
+
+	return 0;
+}
+
 int ufs_amd_mcq_config_resource(struct ufs_hba *hba)
 {
 	/* MCQ registers are at an offset from the MMIO base */
