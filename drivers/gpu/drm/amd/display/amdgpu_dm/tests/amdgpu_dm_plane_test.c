@@ -615,7 +615,7 @@ static void dm_test_fill_gfx12_plane_attributes_from_modifiers(struct kunit *tes
 	plane_size.surface_size.height = 1080;
 
 	KUNIT_EXPECT_EQ(test,
-			amdgpu_dm_plane_fill_gfx12_plane_attributes_from_modifiers(
+			amdgpu_dm_plane_fill_gfx12_attrs_from_modifiers(
 			adev, afb, SURFACE_PIXEL_FORMAT_GRPH_ARGB8888,
 			ROTATION_ANGLE_0, &plane_size, &tiling_info, &dcc, &address),
 			0);
@@ -659,7 +659,7 @@ static void dm_test_fill_gfx9_plane_attributes_from_modifiers(struct kunit *test
 	afb->base.modifier = DRM_FORMAT_MOD_LINEAR;
 
 	KUNIT_EXPECT_EQ(test,
-			amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(
+			amdgpu_dm_plane_fill_gfx9_attrs_from_modifiers(
 			adev, afb, SURFACE_PIXEL_FORMAT_GRPH_ARGB8888,
 			ROTATION_ANGLE_0, &plane_size, &tiling_info, &dcc, &address),
 			0);
@@ -1379,7 +1379,7 @@ static int dm_test_gfx9_attrs(struct amdgpu_device *adev,
 				      struct dc_plane_dcc_param *dcc,
 				      struct dc_plane_address *address)
 {
-	return amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(adev,
+	return amdgpu_dm_plane_fill_gfx9_attrs_from_modifiers(adev,
 		afb, SURFACE_PIXEL_FORMAT_GRPH_ARGB8888, ROTATION_ANGLE_0,
 		plane_size, tiling_info, dcc, address);
 }
@@ -1391,7 +1391,7 @@ static int dm_test_gfx12_attrs(struct amdgpu_device *adev,
 				       struct dc_plane_dcc_param *dcc,
 				       struct dc_plane_address *address)
 {
-	return amdgpu_dm_plane_fill_gfx12_plane_attributes_from_modifiers(adev,
+	return amdgpu_dm_plane_fill_gfx12_attrs_from_modifiers(adev,
 		afb, SURFACE_PIXEL_FORMAT_GRPH_ARGB8888, ROTATION_ANGLE_0,
 		plane_size, tiling_info, dcc, address);
 }
@@ -3210,12 +3210,12 @@ static struct kunit_case amdgpu_dm_plane_test_cases[] = {
 	/* amdgpu_dm_plane_format_mod_supported() */
 	KUNIT_CASE(dm_test_format_mod_supported),
 	KUNIT_CASE(dm_test_format_mod_supported_d_swizzle_reject),
-	/* amdgpu_dm_plane_fill_gfx12_plane_attributes_from_modifiers() */
+	/* amdgpu_dm_plane_fill_gfx12_attrs_from_modifiers() */
 	KUNIT_CASE(dm_test_fill_gfx12_plane_attributes_from_modifiers),
 	KUNIT_CASE(dm_test_fill_gfx12_plane_attributes_block0),
 	KUNIT_CASE(dm_test_fill_gfx12_plane_attributes_block_unconstrained),
 	KUNIT_CASE(dm_test_fill_gfx12_plane_attributes_validate_fails),
-	/* amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers() */
+	/* amdgpu_dm_plane_fill_gfx9_attrs_from_modifiers() */
 	KUNIT_CASE(dm_test_fill_gfx9_plane_attributes_from_modifiers),
 	KUNIT_CASE(dm_test_fill_gfx9_plane_attributes_dcc),
 	KUNIT_CASE(dm_test_fill_gfx9_plane_attributes_validate_fails),
