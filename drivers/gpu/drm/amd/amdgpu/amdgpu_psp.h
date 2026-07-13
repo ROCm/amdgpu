@@ -296,6 +296,7 @@ struct psp_memory_training_context {
 #define PSP_RUNTIME_DB_COOKIE_ID		0x0ed5
 #define PSP_RUNTIME_DB_VER_1			0x0100
 #define PSP_RUNTIME_DB_DIAG_ENTRY_MAX_COUNT	0x40
+#define PSP_RUNTIME_DB_OFFSET_FROM_IP_DISCOVERY_TABLE 0x10000
 
 enum psp_runtime_entry_type {
 	PSP_RUNTIME_ENTRY_TYPE_INVALID		= 0x0,

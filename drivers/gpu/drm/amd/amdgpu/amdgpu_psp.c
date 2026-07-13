@@ -383,6 +383,22 @@ Err_out:
 	return ret;
 }
 
+static uint64_t psp_get_runtime_db_header_pos(struct amdgpu_device *adev)
+{
+	uint64_t pos;
+
+	switch (amdgpu_ip_version(adev, MP0_HWIP, 0)) {
+	case IP_VERSION(15, 0, 3):
+		pos = adev->discovery.offset + PSP_RUNTIME_DB_OFFSET_FROM_IP_DISCOVERY_TABLE;
+		break;
+	default:
+		pos = adev->gmc.mc_vram_size - PSP_RUNTIME_DB_OFFSET;
+		break;
+	}
+
+	return pos;
+}
+
 /*
  * Helper funciton to query psp runtime database entry
  *
@@ -415,7 +431,7 @@ static bool psp_get_runtime_db_entry(struct amdgpu_device *adev,
 		amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(13, 0, 15))
 		return false;
 
-	db_header_pos = adev->gmc.mc_vram_size - PSP_RUNTIME_DB_OFFSET;
+	db_header_pos = psp_get_runtime_db_header_pos(adev);
 	db_dir_pos = db_header_pos + sizeof(struct psp_runtime_data_header);
 
 	/* read runtime db header from vram */
