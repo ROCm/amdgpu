@@ -609,7 +609,8 @@ bool enable_assr(void *handle, struct dc_link *link)
 }
 EXPORT_IF_KUNIT(enable_assr);
 
-static void update_config(void *handle, struct cp_psp_stream_config *config)
+STATIC_IFN_KUNIT
+void update_config(void *handle, struct cp_psp_stream_config *config)
 {
 	struct hdcp_workqueue *hdcp_work = handle;
 	struct amdgpu_dm_connector *aconnector;
@@ -697,6 +698,7 @@ static void update_config(void *handle, struct cp_psp_stream_config *config)
 	process_output(hdcp_w);
 #endif
 }
+EXPORT_IF_KUNIT(update_config);
 
 /**
  * DOC: Add sysfs interface for set/get srm
