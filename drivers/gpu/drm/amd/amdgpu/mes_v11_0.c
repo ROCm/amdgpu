@@ -770,6 +770,11 @@ static int mes_v11_0_unmap_legacy_queue(struct amdgpu_mes *mes,
 			convert_to_mes_queue_type(input->queue_type);
 	}
 
+	if (input->action == RESET_QUEUES &&
+	   (mes->sched_version & AMDGPU_MES_VERSION_MASK) >= 0x60)
+		mes_remove_queue_pkt.remove_queue_after_reset = 1;
+
+
 	return mes_v11_0_submit_pkt_and_poll_completion(mes,
 			&mes_remove_queue_pkt, sizeof(mes_remove_queue_pkt),
 			offsetof(union MESAPI__REMOVE_QUEUE, api_status));
