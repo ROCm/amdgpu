@@ -11336,7 +11336,58 @@ static void amdgpu_dm_commit_streams(struct drm_atomic_state *state,
 	dm_enable_per_frame_crtc_master_sync(dc_state);
 	mutex_lock(&dm->dc_lock);
 	dc_exit_ips_for_hw_access(dm->dc);
-	WARN_ON(!dc_commit_streams(dm->dc, &params));
+
+	/* if commit_status isn't DC_OK, the cable has been pushed to its limits */
+	enum dc_status commit_status = dc_commit_streams(dm->dc, &params);
+
+	if (commit_status != DC_OK) {
+		struct drm_plane *plane;
+		struct drm_plane_state *new_plane_state;
+
+		drm_err(dev, "Display Core failed to commit streams due to link failure! Rolling back pinned framebuffers.\n");
+		WARN_ON(1);
+
+		/* release planes, unpin GTT memory */
+		for_each_new_plane_in_state(state, plane, new_plane_state, i) {
+			const struct drm_plane_helper_funcs *funcs = plane->helper_private;
+
+			if (funcs && funcs->cleanup_fb && new_plane_state->fb) {
+				drm_dbg_atomic(dev,
+					"Manually freeing stranded plane framebuffer allocation [ID: %d]\n",
+					plane->base.id);
+				funcs->cleanup_fb(plane, new_plane_state);
+			}
+		}
+
+		/* release streams and vram */
+		for (i = 0; i < state->num_connector; i++) {
+			struct drm_connector_state *new_con_state = state->connectors[i].new_state;
+
+			if (new_con_state && new_con_state->crtc) {
+				struct amdgpu_crtc *acrtc = to_amdgpu_crtc(new_con_state->crtc);
+				struct dm_crtc_state *dm_new_state = to_dm_crtc_state(
+					drm_atomic_get_new_crtc_state(state, &acrtc->base)
+				);
+
+				if (dm_new_state && dm_new_state->stream) {
+					dc_stream_release(dm_new_state->stream);
+					dm_new_state->stream = NULL;
+				}
+			}
+		}
+
+		/* release dc state */
+		struct dm_atomic_state *dm_state = dm_atomic_get_new_state(state);
+
+		if (dm_state && dm_state->context) {
+			dc_state_release(dm_state->context);
+			dm_state->context = NULL;
+		}
+
+		/* Release the engine lock safely and abandon the rest of the configuration */
+		mutex_unlock(&dm->dc_lock);
+		return;
+	}
 
 	bool frl_stream_found = false;
 
