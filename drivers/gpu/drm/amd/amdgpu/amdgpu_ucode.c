@@ -751,6 +751,14 @@ const char *amdgpu_ucode_name(enum AMDGPU_UCODE_ID ucode_id)
 		return "RS64_MEC_P2_STACK";
 	case AMDGPU_UCODE_ID_CP_RS64_MEC_P3_STACK:
 		return "RS64_MEC_P3_STACK";
+	case AMDGPU_UCODE_ID_CP_RS64_MEC_P4_STACK:
+		return "RS64_MEC_P4_STACK";
+	case AMDGPU_UCODE_ID_CP_RS64_MEC_P5_STACK:
+		return "RS64_MEC_P5_STACK";
+	case AMDGPU_UCODE_ID_CP_RS64_MEC_P6_STACK:
+		return "RS64_MEC_P6_STACK";
+	case AMDGPU_UCODE_ID_CP_RS64_MEC_P7_STACK:
+		return "RS64_MEC_P7_STACK";
 	case AMDGPU_UCODE_ID_ISP:
 		return "ISP";
 	case AMDGPU_UCODE_ID_MP5:
@@ -1090,6 +1098,26 @@ static int amdgpu_ucode_init_single_fw(struct amdgpu_device *adev,
 				le32_to_cpu(cpv2_hdr->data_offset_bytes);
 			break;
 		case AMDGPU_UCODE_ID_CP_RS64_MEC_P3_STACK:
+			ucode->ucode_size = le32_to_cpu(cpv2_hdr->data_size_bytes);
+			ucode_addr = (u8 *)ucode->fw->data +
+				le32_to_cpu(cpv2_hdr->data_offset_bytes);
+			break;
+		case AMDGPU_UCODE_ID_CP_RS64_MEC_P4_STACK:
+			ucode->ucode_size = le32_to_cpu(cpv2_hdr->data_size_bytes);
+			ucode_addr = (u8 *)ucode->fw->data +
+				le32_to_cpu(cpv2_hdr->data_offset_bytes);
+			break;
+		case AMDGPU_UCODE_ID_CP_RS64_MEC_P5_STACK:
+			ucode->ucode_size = le32_to_cpu(cpv2_hdr->data_size_bytes);
+			ucode_addr = (u8 *)ucode->fw->data +
+				le32_to_cpu(cpv2_hdr->data_offset_bytes);
+			break;
+		case AMDGPU_UCODE_ID_CP_RS64_MEC_P6_STACK:
+			ucode->ucode_size = le32_to_cpu(cpv2_hdr->data_size_bytes);
+			ucode_addr = (u8 *)ucode->fw->data +
+				le32_to_cpu(cpv2_hdr->data_offset_bytes);
+			break;
+		case AMDGPU_UCODE_ID_CP_RS64_MEC_P7_STACK:
 			ucode->ucode_size = le32_to_cpu(cpv2_hdr->data_size_bytes);
 			ucode_addr = (u8 *)ucode->fw->data +
 				le32_to_cpu(cpv2_hdr->data_offset_bytes);

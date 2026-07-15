@@ -1599,6 +1599,10 @@ void amdgpu_gfx_cp_init_microcode(struct amdgpu_device *adev,
 	case AMDGPU_UCODE_ID_CP_RS64_MEC_P1_STACK:
 	case AMDGPU_UCODE_ID_CP_RS64_MEC_P2_STACK:
 	case AMDGPU_UCODE_ID_CP_RS64_MEC_P3_STACK:
+	case AMDGPU_UCODE_ID_CP_RS64_MEC_P4_STACK:
+	case AMDGPU_UCODE_ID_CP_RS64_MEC_P5_STACK:
+	case AMDGPU_UCODE_ID_CP_RS64_MEC_P6_STACK:
+	case AMDGPU_UCODE_ID_CP_RS64_MEC_P7_STACK:
 		cp_hdr_v2_0 = (const struct gfx_firmware_header_v2_0 *)
 			adev->gfx.mec_fw->data;
 		ucode_fw = adev->gfx.mec_fw;
