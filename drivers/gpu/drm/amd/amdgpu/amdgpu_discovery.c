@@ -697,7 +697,7 @@ static int amdgpu_discovery_table_check(struct amdgpu_device *adev,
 		break;
 	}
 
-	if (check_table && offset) {
+	if (check_table && offset && table_size) {
 		if (act_val != exp_val) {
 			dev_err(adev->dev, "invalid ip discovery %s signature\n", table_name);
 			return -EINVAL;
@@ -2219,7 +2219,7 @@ static int amdgpu_discovery_get_mall_info(struct amdgpu_device *adev)
 	union mall_info *mall_info;
 	u32 u, mall_size_per_umc, m_s_present, half_use;
 	u64 mall_size;
-	u16 offset;
+	u16 offset, size;
 
 	if (!discovery_bin) {
 		DRM_ERROR("ip discovery uninitialized\n");
@@ -2229,8 +2229,9 @@ static int amdgpu_discovery_get_mall_info(struct amdgpu_device *adev)
 	if (amdgpu_discovery_get_table_info(adev, &info, MALL_INFO))
 		return -EINVAL;
 	offset = le16_to_cpu(info->offset);
+	size = le16_to_cpu(info->size);
 
-	if (!offset)
+	if (!offset || !size)
 		return 0;
 
 	mall_info = (union mall_info *)(discovery_bin + offset);
@@ -2275,7 +2276,7 @@ static int amdgpu_discovery_get_vcn_info(struct amdgpu_device *adev)
 	uint8_t *discovery_bin = adev->discovery.bin;
 	struct table_info *info;
 	union vcn_info *vcn_info;
-	u16 offset;
+	u16 offset, size;
 	int v;
 
 	if (!discovery_bin) {
@@ -2296,8 +2297,9 @@ static int amdgpu_discovery_get_vcn_info(struct amdgpu_device *adev)
 	if (amdgpu_discovery_get_table_info(adev, &info, VCN_INFO))
 		return -EINVAL;
 	offset = le16_to_cpu(info->offset);
+	size = le16_to_cpu(info->size);
 
-	if (!offset)
+	if (!offset || !size)
 		return 0;
 
 	vcn_info = (union vcn_info *)(discovery_bin + offset);
