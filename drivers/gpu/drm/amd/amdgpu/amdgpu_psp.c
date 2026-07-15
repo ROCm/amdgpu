@@ -174,6 +174,9 @@ static int psp_init_sriov_microcode(struct psp_context *psp)
 	case IP_VERSION(13, 0, 12):
 		ret = psp_init_ta_microcode(psp, ucode_prefix);
 		break;
+	case IP_VERSION(15, 0, 3):
+		adev->virt.autoload_ucode_id = AMDGPU_UCODE_ID_CP_MES1_DATA;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -4010,6 +4013,8 @@ static int psp_load_non_psp_fw(struct psp_context *psp)
 			     IP_VERSION(11, 0, 12) ||
 		     amdgpu_ip_version(adev, MP0_HWIP, 0) ==
 			     IP_VERSION(15, 0, 0) ||
+			amdgpu_ip_version(adev, MP0_HWIP, 0) ==
+				 IP_VERSION(15, 0, 3) ||
 		     amdgpu_ip_version(adev, MP0_HWIP, 0) ==
 			     IP_VERSION(15, 0, 5) ||
 		     amdgpu_ip_version(adev, MP0_HWIP, 0) ==

@@ -1369,6 +1369,29 @@ bool amdgpu_virt_fw_load_skip_check(struct amdgpu_device *adev, uint32_t ucode_i
 			return false;
 		else
 			return true;
+	case IP_VERSION(15, 0, 3):
+		if (ucode_id == AMDGPU_UCODE_ID_CP_RS64_PFP
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_ME
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_MEC
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_PFP_P0_STACK
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_PFP_P1_STACK
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_ME_P0_STACK
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_ME_P1_STACK
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_MEC_P0_STACK
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_MEC_P1_STACK
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_MEC_P2_STACK
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_MEC_P3_STACK
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_MEC_P4_STACK
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_MEC_P5_STACK
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_MEC_P6_STACK
+			|| ucode_id == AMDGPU_UCODE_ID_CP_RS64_MEC_P7_STACK
+			|| ucode_id == AMDGPU_UCODE_ID_CP_MES
+			|| ucode_id == AMDGPU_UCODE_ID_CP_MES_DATA
+			|| ucode_id == AMDGPU_UCODE_ID_CP_MES1
+			|| ucode_id == AMDGPU_UCODE_ID_CP_MES1_DATA)
+			return false;
+		else
+			return true;
 	default:
 		/* lagacy black list */
 		if (ucode_id == AMDGPU_UCODE_ID_SDMA0
