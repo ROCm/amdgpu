@@ -997,14 +997,15 @@ amdgpu_userq_vm_validate_and_restore_queue(struct amdgpu_userq_mgr *uq_mgr)
 	struct amdgpu_device *adev = uq_mgr->adev;
 	struct amdgpu_vm *vm = &fpriv->vm;
 	struct amdgpu_bo_va *bo_va;
+	unsigned long key, tmp_key;
+	struct amdgpu_usermode_queue *queue;
+	struct amdgpu_bo *bo;
 	struct drm_exec exec;
 	int ret;
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	bool invalidated = false, new_addition = false;
 	struct ttm_operation_ctx ctx = { true, false };
 	struct amdgpu_hmm_range *range;
-	unsigned long key, tmp_key;
-	struct amdgpu_bo *bo;
 	struct xarray xa;
 
 	xa_init(&xa);
@@ -1126,6 +1127,24 @@ retry_lock:
 	list_for_each_entry(bo_va, &vm->always_valid.idle, base.vm_status)
 		dma_fence_wait(bo_va->last_pt_update, false);
 	dma_fence_wait(vm->last_update, false);
+
+	xa_for_each(&uq_mgr->userq_xa, tmp_key, queue) {
+		bo = queue->wptr_obj.obj;
+		if (!bo) {
+			ret = -EINVAL;
+			goto unlock_all;
+		}
+
+		ret = amdgpu_ttm_alloc_gart(&bo->tbo);
+		if (unlikely(ret)) {
+			drm_file_err(uq_mgr->file,
+				     "failed to bind wptr bo to gart on resume, qid=%lu ret=%d\n",
+				     tmp_key, ret);
+			goto unlock_all;
+		}
+
+		queue->wptr_obj.gpu_addr = amdgpu_bo_gpu_offset(bo);
+	}
 
 	ret = amdgpu_evf_mgr_rearm(&fpriv->evf_mgr, &exec);
 	if (ret) {
