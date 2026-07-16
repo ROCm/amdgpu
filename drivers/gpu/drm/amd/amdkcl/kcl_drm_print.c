@@ -74,24 +74,16 @@ EXPORT_SYMBOL(drm_print_bits);
 /*
  * NULL-safe devcoredump printer.
  *
- * amdgpu's devcoredump code (amdgpu_devcoredump_format) runs the coredump
- * printer once with a NULL output buffer to compute the required size, then
- * a second time with a real buffer to print. This relies on the devcoredump
- * printer skipping writes when iterator->data == NULL, which was only added
- * upstream in v6.12 commit 53369581dc0c ("drm/printer: Allow NULL data in
- * devcoredump printer"). On older kernels (e.g. RHEL 9.x's drm.ko) the
- * in-kernel __drm_printfn_coredump unconditionally writes to iterator->data,
- * so the sizing pass dereferences NULL and crashes.
- *
- * That change only touched the function bodies in drm_print.c -- no symbol,
- * prototype or struct change -- so it is invisible to configure feature
- * tests. Always provide a NULL-safe copy here and route
- * drm_coredump_printer() through it (see kcl_drm_print.h /
- * backport/kcl_drm_print.h) so amdgpu never depends on the host drm.ko's
- * behaviour.
+ * amdgpu runs the coredump printer once with a NULL buffer to size the output.
+ * The guard that skips writes when iterator->data == NULL only landed upstream
+ * in v6.12 (commit 53369581dc0c); on older kernels the native printer
+ * dereferences NULL and crashes. That change only touched function bodies, so
+ * gate on the kernel version: on >= 6.13 the native printer is used and this
+ * copy is not compiled (AMDKCL_DRM_COREDUMP_PRINTER_NEED_KCL undefined).
  *
  * Copied from v6.12 drivers/gpu/drm/drm_print.c.
  */
+#ifdef AMDKCL_DRM_COREDUMP_PRINTER_NEED_KCL
 void _kcl_drm_puts_coredump(struct drm_printer *p, const char *str)
 {
 	struct drm_print_iterator *iterator = p->arg;
@@ -182,3 +174,4 @@ void _kcl_drm_printfn_coredump(struct drm_printer *p, struct va_format *vaf)
 	kfree(buf);
 }
 EXPORT_SYMBOL(_kcl_drm_printfn_coredump);
+#endif /* AMDKCL_DRM_COREDUMP_PRINTER_NEED_KCL */
