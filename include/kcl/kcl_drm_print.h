@@ -25,9 +25,20 @@
 #ifndef AMDKCL_DRM_PRINT_H
 #define AMDKCL_DRM_PRINT_H
 
+#include <linux/version.h>
 #include <drm/drm_print.h>
 #include <drm/drm_drv.h>
 #include <drm/drm_device.h>
+
+/*
+ * The devcoredump printer gained a NULL-data guard in v6.12 (commit
+ * 53369581dc0c), which amdgpu's NULL-buffer sizing pass depends on. It only
+ * touched function bodies, so gate on the kernel version: on < 6.13 redirect
+ * to the NULL-safe KCL copy, otherwise use the native printer.
+ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
+#define AMDKCL_DRM_COREDUMP_PRINTER_NEED_KCL
+#endif
 
 #ifndef _DRM_PRINTK
 #define _DRM_PRINTK(once, level, fmt, ...)				\
@@ -224,26 +235,11 @@ enum drm_debug_category {
 #endif
 
 /*
- * NULL-safe devcoredump printer. See kcl_drm_print.c for the rationale.
- * drm_coredump_printer() is redirected to _kcl_drm_coredump_printer() in
- * backport/kcl_drm_print.h so amdgpu always uses these NULL-safe variants
- * instead of the host drm.ko's (possibly NULL-unsafe) implementation.
+ * NULL-safe devcoredump printer copy; only used on kernels < 6.13
+ * (AMDKCL_DRM_COREDUMP_PRINTER_NEED_KCL defined). See kcl_drm_print.c.
  */
+#ifdef AMDKCL_DRM_COREDUMP_PRINTER_NEED_KCL
 void _kcl_drm_puts_coredump(struct drm_printer *p, const char *str);
 void _kcl_drm_printfn_coredump(struct drm_printer *p, struct va_format *vaf);
-
-static inline struct drm_printer
-_kcl_drm_coredump_printer(struct drm_print_iterator *iter)
-{
-	struct drm_printer p = {
-		.printfn = _kcl_drm_printfn_coredump,
-		.puts = _kcl_drm_puts_coredump,
-		.arg = iter,
-	};
-
-	/* Set the internal offset of the iterator to zero */
-	iter->offset = 0;
-
-	return p;
-}
+#endif
 #endif
