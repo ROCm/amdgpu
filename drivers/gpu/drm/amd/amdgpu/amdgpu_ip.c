@@ -369,27 +369,6 @@ int amdgpu_device_ip_wait_for_idle(struct amdgpu_device *adev,
 }
 
 /**
- * amdgpu_device_ip_is_hw - is the hardware IP enabled
- *
- * @adev: amdgpu_device pointer
- * @block_type: Type of hardware IP (SMU, GFX, UVD, etc.)
- *
- * Check if the hardware IP is enable or not.
- * Returns true if it the IP is enable, false if not.
- */
-bool amdgpu_device_ip_is_hw(struct amdgpu_device *adev,
-			    enum amd_ip_block_type block_type)
-{
-	struct amdgpu_ip_block *ip_block;
-
-	ip_block = amdgpu_device_ip_get_ip_block(adev, block_type);
-	if (ip_block)
-		return ip_block->status.hw;
-
-	return false;
-}
-
-/**
  * amdgpu_device_ip_is_valid - is the hardware IP valid
  *
  * @adev: amdgpu_device pointer
@@ -510,7 +489,13 @@ int amdgpu_device_ip_soft_reset(struct amdgpu_ring *guilty_ring,
 	ip_type = amdgpu_ip_from_ring(guilty_ring->funcs->type);
 	ip_block = amdgpu_device_ip_get_ip_block(adev, ip_type);
 
-	if (!ip_block || !ip_block->version->funcs->soft_reset) {
+	if (unlikely(!ip_block)) {
+		dev_warn(adev->dev, "IP block not found for ring %s\n",
+			 guilty_ring->name);
+		return -EOPNOTSUPP;
+	}
+
+	if (!ip_block->version->funcs->soft_reset) {
 		dev_warn(adev->dev, "IP block soft reset not supported on %s\n",
 			 ip_block->version->funcs->name);
 		return -EOPNOTSUPP;

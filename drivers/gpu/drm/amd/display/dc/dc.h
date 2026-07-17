@@ -65,7 +65,7 @@ struct dcn_dsc_reg_state;
 struct dcn_optc_reg_state;
 struct dcn_dccg_reg_state;
 
-#define DC_VER "3.2.385"
+#define DC_VER "3.2.388"
 
 /**
  * MAX_SURFACES - representative of the upper bound of surfaces that can be piped to a single CRTC
@@ -591,7 +591,6 @@ struct dc_config {
 	bool enable_mipi_converter_optimization;
 	bool enable_frl;
 	bool force_hdmi21_frl_enc_enable;
-	bool skip_frl_pretraining;
 	bool use_default_clock_table;
 	bool force_bios_enable_lttpr;
 	uint8_t force_bios_fixed_vs;
@@ -1150,7 +1149,6 @@ struct dc_debug_options {
 	bool validate_dml_output;
 	bool enable_dmcub_surface_flip;
 	bool usbc_combo_phy_reset_wa;
-	bool force_vrr;
 	bool force_fva;
 	int max_frl_rate;
 	unsigned int  force_frl_rate;
@@ -1292,6 +1290,7 @@ struct dc_debug_options {
 	unsigned int force_odm2to1_for_edp_pixclk_mhz;
 	bool enable_replay_esd_recovery;
 	uint8_t iommu_mismatch_temp_wka;
+	bool disable_dynamic_expansion_for_test_pattern;
 };
 
 
@@ -1543,46 +1542,119 @@ struct dc_plane_status {
 	struct cm_hist cm_hist;
 };
 
-union surface_update_flags {
-
-	struct {
-		uint32_t addr_update:1;
-		/* Medium updates */
-		uint32_t dcc_change:1;
-		uint32_t color_space_change:1;
-		uint32_t horizontal_mirror_change:1;
-		uint32_t per_pixel_alpha_change:1;
-		uint32_t global_alpha_change:1;
-		uint32_t hdr_mult:1;
-		uint32_t rotation_change:1;
-		uint32_t swizzle_change:1;
-		uint32_t scaling_change:1;
-		uint32_t position_change:1;
-		uint32_t in_transfer_func_change:1;
-		uint32_t input_csc_change:1;
-		uint32_t coeff_reduction_change:1;
-		uint32_t pixel_format_change:1;
-		uint32_t plane_size_change:1;
-		uint32_t gamut_remap_change:1;
-		uint32_t cursor_csc_color_matrix_change:1;
-
-		/* Full updates */
-		uint32_t new_plane:1;
-		uint32_t bpp_change:1;
-		uint32_t gamma_change:1;
-		uint32_t bandwidth_change:1;
-		uint32_t clock_change:1;
-		uint32_t stereo_format_change:1;
-		uint32_t lut_3d:1;
-		uint32_t tmz_changed:1;
-		uint32_t mcm_transfer_function_enable_change:1; /* disable or enable MCM transfer func */
-		uint32_t full_update:1;
-		uint32_t sdr_white_level_nits:1;
-		uint32_t cm_hist_change:1;
-	} bits;
-
-	uint32_t raw;
+struct pipe_update_bits {
+	uint32_t addr_update:1;
+	uint32_t dcc_change:1;
+	uint32_t color_space_change:1;
+	uint32_t horizontal_mirror_change:1;
+	uint32_t per_pixel_alpha_change:1;
+	uint32_t global_alpha_change:1;
+	uint32_t hdr_mult:1;
+	uint32_t rotation_change:1;
+	uint32_t swizzle_change:1;
+	uint32_t scaling_change:1;
+	uint32_t position_change:1;
+	uint32_t in_transfer_func_change:1;
+	uint32_t input_csc_change:1;
+	uint32_t coeff_reduction_change:1;
+	uint32_t pixel_format_change:1;
+	uint32_t plane_size_change:1;
+	uint32_t gamut_remap_change:1;
+	uint32_t cursor_csc_color_matrix_change:1;
+	uint32_t new_plane:1;
+	uint32_t bpp_change:1;
+	uint32_t gamma_change:1;
+	uint32_t bandwidth_change:1;
+	uint32_t clock_change:1;
+	uint32_t stereo_format_change:1;
+	uint32_t lut_3d:1;
+	uint32_t tmz_changed:1;
+	uint32_t mcm_transfer_function_enable_change:1; /* disable or enable MCM transfer func */
+	uint32_t full_update:1;
+	uint32_t sdr_white_level_nits:1;
+	uint32_t cm_hist_change:1;
+	/* NOTE: When adding a new field, also update:
+	 *   - dc_pipe_update_bits_set_full()
+	 *   - dc_pipe_update_bits_is_any_set()
+	 */
 };
+
+static inline void dc_pipe_update_bits_clear(struct pipe_update_bits *flags)
+{
+	/* memset ensures padding bits are zeroed */
+	memset(flags, 0, sizeof(*flags));
+}
+
+static inline void dc_pipe_update_bits_set_full(struct pipe_update_bits *flags)
+{
+	dc_pipe_update_bits_clear(flags);
+	flags->addr_update = 1;
+	flags->dcc_change = 1;
+	flags->color_space_change = 1;
+	flags->horizontal_mirror_change = 1;
+	flags->per_pixel_alpha_change = 1;
+	flags->global_alpha_change = 1;
+	flags->hdr_mult = 1;
+	flags->rotation_change = 1;
+	flags->swizzle_change = 1;
+	flags->scaling_change = 1;
+	flags->position_change = 1;
+	flags->in_transfer_func_change = 1;
+	flags->input_csc_change = 1;
+	flags->coeff_reduction_change = 1;
+	flags->pixel_format_change = 1;
+	flags->plane_size_change = 1;
+	flags->gamut_remap_change = 1;
+	flags->cursor_csc_color_matrix_change = 1;
+	flags->new_plane = 1;
+	flags->bpp_change = 1;
+	flags->gamma_change = 1;
+	flags->bandwidth_change = 1;
+	flags->clock_change = 1;
+	flags->stereo_format_change = 1;
+	flags->lut_3d = 1;
+	flags->tmz_changed = 1;
+	flags->mcm_transfer_function_enable_change = 1;
+	flags->full_update = 1;
+	flags->sdr_white_level_nits = 1;
+	flags->cm_hist_change = 1;
+}
+
+static inline bool dc_pipe_update_bits_is_any_set(const struct pipe_update_bits *flags)
+{
+	return flags->addr_update ||
+		flags->dcc_change ||
+		flags->color_space_change ||
+		flags->horizontal_mirror_change ||
+		flags->per_pixel_alpha_change ||
+		flags->global_alpha_change ||
+		flags->hdr_mult ||
+		flags->rotation_change ||
+		flags->swizzle_change ||
+		flags->scaling_change ||
+		flags->position_change ||
+		flags->in_transfer_func_change ||
+		flags->input_csc_change ||
+		flags->coeff_reduction_change ||
+		flags->pixel_format_change ||
+		flags->plane_size_change ||
+		flags->gamut_remap_change ||
+		flags->cursor_csc_color_matrix_change ||
+		flags->new_plane ||
+		flags->bpp_change ||
+		flags->gamma_change ||
+		flags->bandwidth_change ||
+		flags->clock_change ||
+		flags->stereo_format_change ||
+		flags->lut_3d ||
+		flags->tmz_changed ||
+		flags->mcm_transfer_function_enable_change ||
+		flags->full_update ||
+		flags->sdr_white_level_nits ||
+		flags->cm_hist_change;
+}
+
+bool dc_check_address_only_update(struct pipe_update_bits update_bits);
 
 #define DC_REMOVE_PLANE_POINTERS 1
 
@@ -1640,7 +1712,7 @@ struct dc_plane_state {
 	bool horizontal_mirror;
 	unsigned int layer_index;
 
-	union surface_update_flags update_flags;
+	struct pipe_update_bits update_bits;
 	bool flip_int_enabled;
 	bool skip_manual_trigger;
 
@@ -1773,6 +1845,10 @@ struct dc_scratch_space {
 	 * of ddc_pin to know which aux instance is associated with link.
 	 */
 	bool no_ddc_pin;
+	/** When set, forces all native I2C communication on this DP connector
+	 *  to use the I2C-over-AUX protocol instead of native I2C signaling.
+	 */
+	bool force_to_use_aux;
 	enum gpio_ddc_line aux_hw_inst;
 
 	enum gpio_ddc_line ddc_hw_inst;

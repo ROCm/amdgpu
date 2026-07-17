@@ -606,8 +606,14 @@ static ssize_t amdgpu_ras_debugfs_ctrl_write(struct file *f,
 		ret = amdgpu_ras_feature_enable(adev, &data.head, 1);
 		break;
 	case 2:
-		/* umc ce/ue error injection for a bad page is not allowed */
-		if (data.head.block == AMDGPU_RAS_BLOCK__UMC)
+		/*
+		 * UMC ce/ue error injection for a bad page is not allowed. For
+		 * uniras (SMU v13+) devices the injection address is validated by
+		 * the ras_mgr inject handler, so only run the legacy bad page
+		 * check for the legacy RAS path.
+		 */
+		if (data.head.block == AMDGPU_RAS_BLOCK__UMC &&
+		    !amdgpu_uniras_enabled(adev))
 			ret = amdgpu_ras_check_bad_page(adev, data.inject.address);
 		if (ret == -EINVAL) {
 			dev_warn(adev->dev, "RAS WARN: input address 0x%llx is invalid.",

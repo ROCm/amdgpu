@@ -70,9 +70,19 @@ void dcn401_wait_for_dcc_meta_propagation(const struct dc *dc,
 void dcn401_prepare_bandwidth(struct dc *dc,
 		struct dc_state *context);
 
+struct block_sequence_state;
+
+void dcn401_prepare_bandwidth_sequence(struct dc *dc,
+		struct dc_state *context,
+		struct block_sequence_state *seq_state);
+
 void dcn401_optimize_bandwidth(
 		struct dc *dc,
 		struct dc_state *context);
+
+void dcn401_optimize_bandwidth_sequence(struct dc *dc,
+		struct dc_state *context,
+		struct block_sequence_state *seq_state);
 
 void dcn401_dmub_hw_control_lock(struct dc *dc,
 		struct dc_state *context,

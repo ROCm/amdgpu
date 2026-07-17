@@ -876,7 +876,7 @@ static int gfx_v8_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 	uint32_t tmp;
 	long r;
 
-	r = amdgpu_device_wb_get(adev, &index);
+	r = amdgpu_wb_get(adev, &index);
 	if (r)
 		return r;
 
@@ -917,7 +917,7 @@ err2:
 	amdgpu_ib_free(&ib, NULL);
 	dma_fence_put(f);
 err1:
-	amdgpu_device_wb_free(adev, index);
+	amdgpu_wb_free(adev, index);
 	return r;
 }
 
@@ -5254,7 +5254,7 @@ static const struct spm_funcs gfx_v8_0_spm_funcs = {
 	.stop = &gfx_v8_0_spm_stop,
 	.set_rdptr = &gfx_v8_0_spm_set_rdptr,
 	.set_spm_perfmon_ring_buf = &gfx_v8_0_set_spm_perfmon_ring_buf,
-	.set_spm_config_size = 30,
+	.set_spm_config_size = 38,
 };
 
 static void gfx_v8_0_set_spm_funcs(struct amdgpu_device *adev)

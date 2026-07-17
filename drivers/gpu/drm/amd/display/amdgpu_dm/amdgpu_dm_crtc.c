@@ -34,6 +34,7 @@
 #include "amdgpu_dm_plane.h"
 #include "amdgpu_dm_trace.h"
 #include "amdgpu_dm_debugfs.h"
+#include "amdgpu_dm_kunit_helpers.h"
 #include "modules/inc/mod_power.h"
 
 #define HPD_DETECTION_PERIOD_uS 2000000
@@ -65,6 +66,7 @@ bool amdgpu_dm_crtc_modeset_required(struct drm_crtc_state *crtc_state,
 {
 	return crtc_state->active && drm_atomic_crtc_needs_modeset(crtc_state);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_crtc_modeset_required);
 
 bool amdgpu_dm_crtc_vrr_active_irq(struct amdgpu_crtc *acrtc)
 
@@ -74,6 +76,7 @@ bool amdgpu_dm_crtc_vrr_active_irq(struct amdgpu_crtc *acrtc)
 	       acrtc->dm_irq_params.freesync_config.state ==
 		       VRR_STATE_ACTIVE_FIXED;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_crtc_vrr_active_irq);
 
 int amdgpu_dm_crtc_set_vupdate_irq(struct drm_crtc *crtc, bool enable)
 {
@@ -93,12 +96,14 @@ int amdgpu_dm_crtc_set_vupdate_irq(struct drm_crtc *crtc, bool enable)
 		      acrtc->crtc_id, enable ? "en" : "dis", rc);
 	return rc;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_crtc_set_vupdate_irq);
 
 bool amdgpu_dm_crtc_vrr_active(const struct dm_crtc_state *dm_state)
 {
 	return dm_state->freesync_config.state == VRR_STATE_ACTIVE_VARIABLE ||
 	       dm_state->freesync_config.state == VRR_STATE_ACTIVE_FIXED;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_crtc_vrr_active);
 
 /**
  * amdgpu_dm_crtc_set_static_screen_optimze() - Toggle static screen optimizations.
@@ -156,6 +161,7 @@ bool amdgpu_dm_is_headless(struct amdgpu_device *adev)
 	drm_connector_list_iter_end(&iter);
 	return is_headless;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_is_headless);
 
 static void amdgpu_dm_idle_worker(struct work_struct *work)
 {
@@ -207,6 +213,7 @@ struct idle_workqueue *idle_create_workqueue(struct amdgpu_device *adev)
 
 	return idle_work;
 }
+EXPORT_IF_KUNIT(idle_create_workqueue);
 
 static void amdgpu_dm_crtc_vblank_control_worker(struct work_struct *work)
 {
@@ -439,12 +446,12 @@ static void amdgpu_dm_crtc_reset_state(struct drm_crtc *crtc)
 {
 	struct dm_crtc_state *state;
 
+	state = kzalloc(sizeof(*state), GFP_KERNEL);
+	if (!state)
+		return;
+
 	if (crtc->state)
 		amdgpu_dm_crtc_destroy_state(crtc, crtc->state);
-
-	state = kzalloc_obj(*state);
-	if (WARN_ON(!state))
-		return;
 
 	__drm_atomic_helper_crtc_reset(crtc, &state->base);
 }
@@ -602,12 +609,13 @@ static void amdgpu_dm_crtc_update_crtc_active_planes(struct drm_crtc *crtc,
 		amdgpu_dm_crtc_count_crtc_active_planes(new_crtc_state);
 }
 
-static bool amdgpu_dm_crtc_helper_mode_fixup(struct drm_crtc *crtc,
-				      const struct drm_display_mode *mode,
-				      struct drm_display_mode *adjusted_mode)
+STATIC_IFN_KUNIT bool amdgpu_dm_crtc_helper_mode_fixup(struct drm_crtc *crtc,
+					       const struct drm_display_mode *mode,
+					       struct drm_display_mode *adjusted_mode)
 {
 	return true;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_crtc_helper_mode_fixup);
 
 static int amdgpu_dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
 #ifdef HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE

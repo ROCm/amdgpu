@@ -591,17 +591,13 @@ static int smu_get_power_num_states(void *handle,
 	return 0;
 }
 
-bool is_support_sw_smu(struct amdgpu_device *adev)
+void amdgpu_smu_early_init(struct amdgpu_device *adev)
 {
 	/* vega20 is 11.0.2, but it's supported via the powerplay code */
-	if (adev->asic_type == CHIP_VEGA20)
-		return false;
-
-	if ((amdgpu_ip_version(adev, MP1_HWIP, 0) >= IP_VERSION(11, 0, 0)) &&
-	    amdgpu_device_ip_is_valid(adev, AMD_IP_BLOCK_TYPE_SMC))
-		return true;
-
-	return false;
+	adev->is_sw_smu = adev->asic_type != CHIP_VEGA20 &&
+			  (amdgpu_ip_version(adev, MP1_HWIP, 0) >=
+			   IP_VERSION(11, 0, 0) &&
+			   amdgpu_device_ip_is_valid(adev, AMD_IP_BLOCK_TYPE_SMC));
 }
 
 bool is_support_cclk_dpm(struct amdgpu_device *adev)
@@ -805,6 +801,7 @@ static int smu_set_funcs(struct amdgpu_device *adev)
 		break;
 	case IP_VERSION(15, 0, 0):
 	case IP_VERSION(15, 0, 5):
+	case IP_VERSION(15, 0, 9):
 		smu_v15_0_0_set_ppt_funcs(smu);
 		break;
 	case IP_VERSION(15, 0, 8):
@@ -1369,6 +1366,14 @@ static void smu_feature_cap_init(struct smu_context *smu)
 	bitmap_zero(fea_cap->cap_map, SMU_FEATURE_CAP_ID__COUNT);
 }
 
+static int smu_set_power_dep(struct smu_context *smu, bool enable)
+{
+	if (!smu->ppt_funcs->set_power_dep)
+		return 0;
+
+	return smu->ppt_funcs->set_power_dep(smu, enable);
+}
+
 static int smu_sw_init(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
@@ -1430,6 +1435,8 @@ static int smu_sw_init(struct amdgpu_ip_block *ip_block)
 	if (!smu->ppt_funcs->get_fan_control_mode)
 		smu->adev->pm.no_fan = true;
 
+	smu_set_power_dep(smu, true);
+
 	return 0;
 }
 
@@ -1451,6 +1458,8 @@ static int smu_sw_fini(struct amdgpu_ip_block *ip_block)
 	}
 
 	smu_fini_microcode(smu);
+
+	smu_set_power_dep(smu, false);
 
 	return 0;
 }

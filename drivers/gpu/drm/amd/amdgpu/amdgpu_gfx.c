@@ -1170,7 +1170,7 @@ uint32_t amdgpu_kiq_rreg(struct amdgpu_device *adev, uint32_t reg, uint32_t xcc_
 	BUG_ON(!ring->funcs->emit_rreg);
 
 	spin_lock_irqsave(&kiq->ring_lock, flags);
-	if (amdgpu_device_wb_get(adev, &reg_val_offs)) {
+	if (amdgpu_wb_get(adev, &reg_val_offs)) {
 		pr_err("critical bug! too many kiq readers\n");
 		goto failed_unlock;
 	}
@@ -1213,7 +1213,7 @@ uint32_t amdgpu_kiq_rreg(struct amdgpu_device *adev, uint32_t reg, uint32_t xcc_
 
 	mb();
 	value = adev->wb.wb[reg_val_offs];
-	amdgpu_device_wb_free(adev, reg_val_offs);
+	amdgpu_wb_free(adev, reg_val_offs);
 	return value;
 
 failed_undo:
@@ -1222,7 +1222,7 @@ failed_unlock:
 	spin_unlock_irqrestore(&kiq->ring_lock, flags);
 failed_kiq_read:
 	if (reg_val_offs)
-		amdgpu_device_wb_free(adev, reg_val_offs);
+		amdgpu_wb_free(adev, reg_val_offs);
 	dev_err(adev->dev, "failed to read reg:%x\n", reg);
 	return ~0;
 }
@@ -2733,9 +2733,8 @@ void amdgpu_gfx_profile_ring_begin_use(struct amdgpu_ring *ring)
 	else
 		profile = PP_SMC_POWER_PROFILE_COMPUTE;
 
-	atomic_inc(&adev->gfx.total_submission_cnt);
-
-	cancel_delayed_work_sync(&adev->gfx.idle_work);
+	if (!atomic_fetch_inc(&adev->gfx.total_submission_cnt))
+		cancel_delayed_work_sync(&adev->gfx.idle_work);
 
 	/* We can safely return early here because we've cancelled the
 	 * the delayed work so there is no one else to set it to false
@@ -2763,9 +2762,9 @@ void amdgpu_gfx_profile_ring_end_use(struct amdgpu_ring *ring)
 	if (amdgpu_dpm_is_overdrive_enabled(adev))
 		return;
 
-	atomic_dec(&ring->adev->gfx.total_submission_cnt);
-
-	schedule_delayed_work(&ring->adev->gfx.idle_work, GFX_PROFILE_IDLE_TIMEOUT);
+	if (atomic_dec_and_test(&ring->adev->gfx.total_submission_cnt))
+		schedule_delayed_work(&ring->adev->gfx.idle_work,
+				      GFX_PROFILE_IDLE_TIMEOUT);
 }
 
 /**

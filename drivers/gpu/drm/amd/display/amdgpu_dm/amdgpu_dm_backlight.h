@@ -26,8 +26,15 @@
 
 struct amdgpu_display_manager;
 struct amdgpu_dm_connector;
+struct backlight_device;
+struct backlight_properties;
 struct drm_connector;
 struct attribute_group;
+
+#define AMDGPU_DM_DEFAULT_MIN_BACKLIGHT 12
+#define AMDGPU_DM_DEFAULT_MAX_BACKLIGHT 255
+#define AMDGPU_DM_MIN_SPREAD ((AMDGPU_DM_DEFAULT_MAX_BACKLIGHT - AMDGPU_DM_DEFAULT_MIN_BACKLIGHT) / 2)
+#define AUX_BL_DEFAULT_TRANSITION_TIME_MS 50
 
 void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm,
 				     int bl_idx);
@@ -40,5 +47,29 @@ void amdgpu_dm_update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 bool amdgpu_dm_should_create_sysfs(struct amdgpu_dm_connector *aconnector);
 
 extern const struct attribute_group amdgpu_group;
+
+#if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
+int get_brightness_range(const struct amdgpu_dm_backlight_caps *caps,
+			 unsigned int *min, unsigned int *max);
+void convert_custom_brightness(const struct amdgpu_dm_backlight_caps *caps,
+			       unsigned int min, unsigned int max,
+			       uint32_t *user_brightness);
+u32 convert_brightness_from_user(const struct amdgpu_dm_backlight_caps *caps,
+				 uint32_t brightness);
+u32 convert_brightness_to_user(const struct amdgpu_dm_backlight_caps *caps,
+			       uint32_t brightness);
+int amdgpu_dm_backlight_get_device_index(struct amdgpu_display_manager *dm,
+					 struct backlight_device *bd);
+void amdgpu_dm_backlight_fill_props(const struct amdgpu_dm_backlight_caps *caps,
+				    bool is_system_supplied,
+				    bool custom_curve_enabled,
+				    struct backlight_properties *props);
+uint amdgpu_dm_get_dc_debug_mask(void);
+void amdgpu_dm_set_dc_debug_mask(uint val);
+int amdgpu_dm_get_abm_level_param(void);
+void amdgpu_dm_set_abm_level_param(int val);
+int amdgpu_dm_get_backlight_param(void);
+void amdgpu_dm_set_backlight_param(int val);
+#endif
 
 #endif /* __AMDGPU_DM_BACKLIGHT_H__ */

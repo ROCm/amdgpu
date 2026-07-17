@@ -337,6 +337,8 @@ bool kfd_dqm_is_queue_in_process(struct device_queue_manager *dqm,
 				 int doorbell_off, u32 *queue_format);
 int kfd_reset_queue_mes(struct device_queue_manager *dqm, int queue_type,
 			int pipe, int queue, unsigned int db);
+size_t mqd_size_from_queue_type(struct device_queue_manager *dqm,
+				enum kfd_queue_type type);
 
 void remap_queue(struct device_queue_manager *dqm,
 				enum kfd_unmap_queues_filter filter,

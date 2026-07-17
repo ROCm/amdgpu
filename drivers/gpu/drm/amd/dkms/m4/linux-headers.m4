@@ -198,4 +198,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #tools: Add xdrgen
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/sunrpc/xdrgen/_defs.h])
+
+	dnl #v6.8-rc1-35-gd84f31791517
+	dnl #locking/mutex: split out mutex_types.h
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/mutex_types.h])
 ])

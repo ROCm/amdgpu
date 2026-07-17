@@ -203,11 +203,31 @@ void dc_dmub_srv_fams2_passthrough_flip(
 		int surface_count);
 
 bool dmub_lsdma_init(struct dc_dmub_srv *dc_dmub_srv);
+
+struct lsdma_linear_copy_params {
+	uint32_t src_lo;
+	uint32_t src_hi;
+
+	uint32_t dst_lo;
+	uint32_t dst_hi;
+
+	uint32_t count            : 30;
+	uint32_t read_compress    : 2;
+
+	uint32_t tmz              : 4;
+	uint32_t cache_policy_src : 3;
+	uint32_t cache_policy_dst : 3;
+	uint32_t data_format      : 6;
+	uint32_t num_type         : 3;
+	uint32_t write_compress   : 2;
+	uint32_t max_com          : 2;
+	uint32_t max_uncom        : 1;
+	uint32_t reserved0        : 8;
+};
+
 bool dmub_lsdma_send_linear_copy_command(
 	struct dc_dmub_srv *dc_dmub_srv,
-	uint64_t src_addr,
-	uint64_t dst_addr,
-	uint32_t count);
+	struct lsdma_linear_copy_params copy_data);
 
 struct lsdma_linear_sub_window_copy_params {
 	uint32_t src_lo;
@@ -235,7 +255,13 @@ struct lsdma_linear_sub_window_copy_params {
 	uint32_t element_size     : 3;
 	uint32_t src_cache_policy : 3;
 	uint32_t dst_cache_policy : 3;
-	uint32_t padding          : 19;
+	uint32_t data_format      : 6;
+	uint32_t num_type         : 3;
+	uint32_t read_compress    : 2;
+	uint32_t write_compress   : 2;
+	uint32_t max_com          : 2;
+	uint32_t max_uncom        : 1;
+	uint32_t reserved0        : 3;
 };
 
 bool dmub_lsdma_send_linear_sub_window_copy_command(

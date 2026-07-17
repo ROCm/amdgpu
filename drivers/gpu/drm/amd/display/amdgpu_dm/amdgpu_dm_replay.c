@@ -128,6 +128,7 @@ bool amdgpu_dm_set_replay_caps(struct dc_link *link, struct amdgpu_dm_connector 
 
 	return true;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_set_replay_caps);
 
 /*
  * amdgpu_dm_link_setup_replay() - config replay settings
@@ -166,6 +167,7 @@ bool amdgpu_dm_link_setup_replay(struct dc_stream_state *stream,
 			static_coasting_vtotal);
 	return true;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_link_setup_replay);
 
 /*
  * amdgpu_dm_replay_set_event() - set or clear replay event for a stream
@@ -205,3 +207,4 @@ bool amdgpu_dm_replay_set_event(struct amdgpu_display_manager *dm,
 	return mod_power_set_replay_event(dm->power_module, stream,
 					 set_event, event, wait_for_disable);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_replay_set_event);

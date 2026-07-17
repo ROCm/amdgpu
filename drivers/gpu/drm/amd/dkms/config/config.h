@@ -772,8 +772,14 @@
 /* drm_plane->color_pipeline_property is available */
 #define HAVE_DRM_PLANE_COLOR_PIPELINE_PROPERTY 1
 
+/* drm_plane_funcs->format_mod_supported_async is available */
+#define HAVE_DRM_PLANE_FUNCS_FORMAT_MOD_SUPPORTED_ASYNC 1
+
 /* drm_plane_helper_destroy() is available */
 #define HAVE_DRM_PLANE_HELPER_DESTROY 1
+
+/* drm_plane_state->ignore_damage_clips is available */
+#define HAVE_DRM_PLANE_STATE_IGNORE_DAMAGE_CLIPS 1
 
 /* drm_prime_pages_to_sg() wants 3 arguments */
 #define HAVE_DRM_PRIME_PAGES_TO_SG_3ARGS 1
@@ -1038,6 +1044,9 @@
 
 /* Define to 1 if you have the <linux/mmap_lock.h> header file. */
 #define HAVE_LINUX_MMAP_LOCK_H 1
+
+/* Define to 1 if you have the <linux/mutex_types.h> header file. */
+#define HAVE_LINUX_MUTEX_TYPES_H 1
 
 /* Define to 1 if you have the <linux/pci-p2pdma.h> header file. */
 #define HAVE_LINUX_PCI_P2PDMA_H 1

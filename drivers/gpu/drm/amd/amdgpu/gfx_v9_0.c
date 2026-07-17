@@ -1232,7 +1232,7 @@ static int gfx_v9_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 	uint32_t tmp;
 	long r;
 
-	r = amdgpu_device_wb_get(adev, &index);
+	r = amdgpu_wb_get(adev, &index);
 	if (r)
 		return r;
 
@@ -1273,7 +1273,7 @@ err2:
 	amdgpu_ib_free(&ib, NULL);
 	dma_fence_put(f);
 err1:
-	amdgpu_device_wb_free(adev, index);
+	amdgpu_wb_free(adev, index);
 	return r;
 }
 
@@ -2449,11 +2449,11 @@ static int gfx_v9_0_sw_init(struct amdgpu_ip_block *ip_block)
 		return -EINVAL;
 	}
 
-	gfx_v9_0_alloc_ip_dump(adev);
-
 	r = amdgpu_gfx_sysfs_init(adev);
 	if (r)
 		return r;
+
+	gfx_v9_0_alloc_ip_dump(adev);
 
 	return 0;
 }
@@ -4275,7 +4275,7 @@ static uint64_t gfx_v9_0_kiq_read_clock(struct amdgpu_device *adev)
 	BUG_ON(!ring->funcs->emit_rreg);
 
 	spin_lock_irqsave(&kiq->ring_lock, flags);
-	if (amdgpu_device_wb_get(adev, &reg_val_offs)) {
+	if (amdgpu_wb_get(adev, &reg_val_offs)) {
 		pr_err("critical bug! too many kiq readers\n");
 		goto failed_unlock;
 	}
@@ -4323,7 +4323,7 @@ static uint64_t gfx_v9_0_kiq_read_clock(struct amdgpu_device *adev)
 	mb();
 	value = (uint64_t)adev->wb.wb[reg_val_offs] |
 		(uint64_t)adev->wb.wb[reg_val_offs + 1 ] << 32ULL;
-	amdgpu_device_wb_free(adev, reg_val_offs);
+	amdgpu_wb_free(adev, reg_val_offs);
 	return value;
 
 failed_undo:
@@ -4332,7 +4332,7 @@ failed_unlock:
 	spin_unlock_irqrestore(&kiq->ring_lock, flags);
 failed_kiq_read:
 	if (reg_val_offs)
-		amdgpu_device_wb_free(adev, reg_val_offs);
+		amdgpu_wb_free(adev, reg_val_offs);
 	pr_err("failed to read gpu clock\n");
 	return ~0;
 }
@@ -4941,7 +4941,7 @@ static const struct spm_funcs gfx_v9_0_spm_funcs = {
 	.stop = &gfx_v9_0_spm_stop,
 	.set_rdptr = &gfx_v9_0_spm_set_rdptr,
 	.set_spm_perfmon_ring_buf = &gfx_v9_0_set_spm_perfmon_ring_buf,
-	.set_spm_config_size = 30,
+	.set_spm_config_size = 38,
 };
 
 static void gfx_v9_0_set_spm_funcs(struct amdgpu_device *adev)

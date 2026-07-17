@@ -54,7 +54,8 @@ enum amdgpu_mes_priority_level {
 
 #define AMDGPU_MES_PROC_CTX_SIZE 0x1000 /* one page area */
 #define AMDGPU_MES_GANG_CTX_SIZE 0x1000 /* one page area */
-
+#define AMDGPU_MES_PROC_CTX_ARRAY_MAX  128
+#define AMDGPU_MES_GANG_CTX_ARRAY_MAX  512
 struct amdgpu_mes_funcs;
 
 enum amdgpu_mes_pipe {
@@ -171,6 +172,16 @@ struct amdgpu_mes {
 
 	bool			compute_pipe_reset_enabled;
 	bool			gfx_pipe_reset_enabled;
+
+	bool				use_rs64mem;
+	struct amdgpu_bo		*ctx_array_size_bo;
+	uint64_t			ctx_array_size_gpu_addr;
+	uint32_t			*ctx_array_size_cpu_ptr;
+
+	uint32_t			proc_ctx_array_size;
+	unsigned long			*proc_ctx_bitmap;
+	uint32_t			gang_ctx_array_size;
+	unsigned long			*gang_ctx_bitmap;
 };
 
 struct amdgpu_mes_hung_queue_hqd_info {
@@ -268,6 +279,7 @@ struct mes_add_queue_input {
 	uint32_t	exclusively_scheduled;
 	uint32_t	sh_mem_config_data;
 	uint32_t	vm_cntx_cntl;
+	uint32_t	process_context_array_index;
 };
 
 struct mes_remove_queue_input {
@@ -306,12 +318,14 @@ struct mes_suspend_gang_input {
 	uint64_t	gang_context_addr;
 	uint64_t	suspend_fence_addr;
 	uint32_t	suspend_fence_value;
+	uint32_t	doorbell_offset;
 };
 
 struct mes_resume_gang_input {
 	uint32_t	xcc_id;
 	bool		resume_all_gangs;
 	uint64_t	gang_context_addr;
+	uint32_t	doorbell_offset;
 };
 
 struct mes_reset_queue_input {
@@ -438,6 +452,52 @@ struct amdgpu_mes_funcs {
 	int (*invalidate_tlbs_pasid)(struct amdgpu_mes *mes,
 			      struct mes_inv_tlbs_pasid_input *input);
 };
+
+enum amdgpu_mqd_update_flag {
+	AMDGPU_UPDATE_FLAG_DBG_WA_ENABLE = 1,
+	AMDGPU_UPDATE_FLAG_DBG_WA_DISABLE = 2,
+	AMDGPU_UPDATE_FLAG_IS_GWS = 4, /* quirk for gfx9 IP */
+};
+
+struct amdgpu_mqd_prop {
+	uint64_t mqd_gpu_addr;
+	uint64_t hqd_base_gpu_addr;
+	uint64_t rptr_gpu_addr;
+	uint64_t wptr_gpu_addr;
+	uint32_t queue_size;
+	bool use_doorbell;
+	uint32_t doorbell_index;
+	uint64_t eop_gpu_addr;
+	uint32_t hqd_pipe_priority;
+	uint32_t hqd_queue_priority;
+	uint32_t mqd_stride_size;
+	bool allow_tunneling;
+	bool hqd_active;
+	uint64_t shadow_addr;
+	uint64_t gds_bkup_addr;
+	uint64_t csa_addr;
+	uint64_t fence_address;
+	bool tmz_queue;
+	bool kernel_queue;
+	uint32_t *cu_mask;
+	uint32_t cu_mask_count;
+	uint32_t cu_flags;
+	bool is_user_cu_masked;
+};
+
+struct amdgpu_mqd {
+	unsigned mqd_size;
+	int (*init_mqd)(struct amdgpu_device *adev, void *mqd,
+			struct amdgpu_mqd_prop *p);
+};
+
+/*
+ * MES FW uses address(mqd_addr + sizeof(struct mqd) + 3*sizeof(uint32_t))
+ * as fence address and writes a 32 bit fence value to this address.
+ * Driver needs to allocate at least 4 DWs extra memory in addition to
+ * sizeof(struct mqd). Add 8 DWs and align to AMDGPU_GPU_PAGE_SIZE for safety.
+ */
+#define AMDGPU_MQD_SIZE_ALIGN(mqd_size) AMDGPU_GPU_PAGE_ALIGN(((mqd_size) + 32))
 
 #define amdgpu_mes_kiq_hw_init(adev, xcc_id) \
 	(adev)->mes.kiq_hw_init((adev), (xcc_id))
@@ -569,4 +629,11 @@ bool amdgpu_mes_queue_reset_by_mes_supported(struct amdgpu_device *adev);
 
 int amdgpu_mes_update_enforce_isolation(struct amdgpu_device *adev);
 
+int amdgpu_mes_rs64mem_init(struct amdgpu_mes *mes);
+void amdgpu_mes_rs64mem_fini(struct amdgpu_mes *mes);
+int amdgpu_mes_rs64mem_setup_bitmaps(struct amdgpu_mes *mes);
+int amdgpu_mes_alloc_proc_ctx_index(struct amdgpu_mes *mes,
+				    struct amdgpu_usermode_queue *queue);
+void amdgpu_mes_free_proc_ctx_index(struct amdgpu_mes *mes,
+				    struct amdgpu_usermode_queue *queue);
 #endif /* __AMDGPU_MES_H__ */

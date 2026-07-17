@@ -29,6 +29,7 @@
  */
 
 #include "link_edp_panel_control.h"
+#include "link_ddc.h"
 #include "link_dpcd.h"
 #include "link_dp_capability.h"
 #include "dm_helpers.h"
@@ -788,10 +789,7 @@ bool edp_setup_psr(struct dc_link *link,
 		}
 	}
 
-	if (dc->config.dp_connector_no_native_i2c && link->no_ddc_pin)
-		psr_context->channel = (enum channel_id)link->aux_hw_inst;
-	else
-		psr_context->channel = link->ddc->ddc_pin->hw_info.ddc_channel;
+	psr_context->channel = link_get_ddc_aux_inst(link);
 	psr_context->transmitterId = link->link_enc->transmitter;
 	psr_context->engineId = link->link_enc->preferred_engine;
 
@@ -1024,7 +1022,7 @@ bool edp_setup_freesync_replay(struct dc_link *link, const struct dc_stream_stat
 	if (!dp_pr_get_panel_inst(dc, link, &panel_inst))
 		return false;
 
-	replay_context.aux_inst = link->ddc->ddc_pin->hw_info.ddc_channel;
+	replay_context.aux_inst = link_get_ddc_aux_inst(link);
 	replay_context.digbe_inst = link->link_enc->transmitter;
 	replay_context.digfe_inst = link->link_enc->preferred_engine;
 

@@ -74,8 +74,10 @@
 
 #include "amdgpu_xgmi.h"
 #include "amdgpu_ras.h"
+#include "amdgpu_wb.h"
 #include "amdgpu_ras_mgr.h"
 #include "amdgpu_pmu.h"
+#include "amdgpu_smu.h"
 #include "amdgpu_fru_eeprom.h"
 #include "amdgpu_reset.h"
 #include "amdgpu_virt.h"
@@ -1012,109 +1014,6 @@ int amdgpu_device_pci_reset(struct amdgpu_device *adev)
 	return pci_reset_function(adev->pdev);
 }
 
-/*
- * amdgpu_device_wb_*()
- * Writeback is the method by which the GPU updates special pages in memory
- * with the status of certain GPU events (fences, ring pointers,etc.).
- */
-
-/**
- * amdgpu_device_wb_fini - Disable Writeback and free memory
- *
- * @adev: amdgpu_device pointer
- *
- * Disables Writeback and frees the Writeback memory (all asics).
- * Used at driver shutdown.
- */
-static void amdgpu_device_wb_fini(struct amdgpu_device *adev)
-{
-	if (adev->wb.wb_obj) {
-		amdgpu_bo_free_kernel(&adev->wb.wb_obj,
-				      &adev->wb.gpu_addr,
-				      (void **)&adev->wb.wb);
-		adev->wb.wb_obj = NULL;
-	}
-}
-
-/**
- * amdgpu_device_wb_init - Init Writeback driver info and allocate memory
- *
- * @adev: amdgpu_device pointer
- *
- * Initializes writeback and allocates writeback memory (all asics).
- * Used at driver startup.
- * Returns 0 on success or an -error on failure.
- */
-static int amdgpu_device_wb_init(struct amdgpu_device *adev)
-{
-	int r;
-
-	if (adev->wb.wb_obj == NULL) {
-		/* AMDGPU_MAX_WB * sizeof(uint32_t) * 8 = AMDGPU_MAX_WB 256bit slots */
-		r = amdgpu_bo_create_kernel(adev, AMDGPU_MAX_WB * sizeof(uint32_t) * 8,
-					    PAGE_SIZE, AMDGPU_GEM_DOMAIN_GTT,
-					    &adev->wb.wb_obj, &adev->wb.gpu_addr,
-					    (void **)&adev->wb.wb);
-		if (r) {
-			dev_warn(adev->dev, "(%d) create WB bo failed\n", r);
-			return r;
-		}
-
-		adev->wb.num_wb = AMDGPU_MAX_WB;
-		memset(&adev->wb.used, 0, sizeof(adev->wb.used));
-
-		/* clear wb memory */
-		memset((char *)adev->wb.wb, 0, AMDGPU_MAX_WB * sizeof(uint32_t) * 8);
-	}
-
-	return 0;
-}
-
-/**
- * amdgpu_device_wb_get - Allocate a wb entry
- *
- * @adev: amdgpu_device pointer
- * @wb: wb index
- *
- * Allocate a wb slot for use by the driver (all asics).
- * Returns 0 on success or -EINVAL on failure.
- */
-int amdgpu_device_wb_get(struct amdgpu_device *adev, u32 *wb)
-{
-	unsigned long flags, offset;
-
-	spin_lock_irqsave(&adev->wb.lock, flags);
-	offset = find_first_zero_bit(adev->wb.used, adev->wb.num_wb);
-	if (offset < adev->wb.num_wb) {
-		__set_bit(offset, adev->wb.used);
-		spin_unlock_irqrestore(&adev->wb.lock, flags);
-		*wb = offset << 3; /* convert to dw offset */
-		return 0;
-	} else {
-		spin_unlock_irqrestore(&adev->wb.lock, flags);
-		return -EINVAL;
-	}
-}
-
-/**
- * amdgpu_device_wb_free - Free a wb entry
- *
- * @adev: amdgpu_device pointer
- * @wb: wb index
- *
- * Free a wb slot allocated for use by the driver (all asics)
- */
-void amdgpu_device_wb_free(struct amdgpu_device *adev, u32 wb)
-{
-	unsigned long flags;
-
-	wb >>= 3;
-	spin_lock_irqsave(&adev->wb.lock, flags);
-	if (wb < adev->wb.num_wb)
-		__clear_bit(wb, adev->wb.used);
-	spin_unlock_irqrestore(&adev->wb.lock, flags);
-}
-
 #ifdef AMDKCL_ENABLE_RESIZE_FB_BAR
 /**
  * amdgpu_device_resize_fb_bar - try to resize FB BAR
@@ -1331,28 +1230,44 @@ bool amdgpu_device_seamless_boot_supported(struct amdgpu_device *adev)
 	return amdgpu_ip_version(adev, DCE_HWIP, 0) >= IP_VERSION(3, 0, 0);
 }
 
-/*
- * Intel hosts such as Rocket Lake, Alder Lake, Raptor Lake and Sapphire Rapids
- * don't support dynamic speed switching. Until we have confirmation from Intel
- * that a specific host supports it, it's safer that we keep it disabled for all.
- *
- * https://edc.intel.com/content/www/us/en/design/products/platforms/details/raptor-lake-s/13th-generation-core-processors-datasheet-volume-1-of-2/005/pci-express-support/
- * https://gitlab.freedesktop.org/drm/amd/-/issues/2663
- */
+#if IS_ENABLED(CONFIG_X86)
+static const struct x86_cpu_id amdgpu_pcie_dynamic_switching_quirks[] = {
+	/*
+	 * Intel hosts such as Rocket Lake, Alder Lake, Raptor Lake and Sapphire Rapids
+	 * don't support dynamic speed switching. Until we have confirmation from Intel
+	 * that a specific host supports it, it's safer that we keep it disabled for all.
+	 *
+	 * https://edc.intel.com/content/www/us/en/design/products/platforms/details/raptor-lake-s/13th-generation-core-processors-datasheet-volume-1-of-2/005/pci-express-support/
+	 * https://gitlab.freedesktop.org/drm/amd/-/issues/2663
+	 */
+	X86_MATCH_VENDOR_FAM(INTEL, X86_FAMILY_ANY, NULL),
+	/*
+	 * AMD Ryzen Pinnacle Ridge (Zen+, family 0x17 model 0x08) CPUs don't
+	 * support PCIe dynamic speed switching.
+	 * https://gitlab.freedesktop.org/drm/amd/-/work_items/5436
+	 */
+	X86_MATCH_VENDOR_FAM_MODEL(AMD, 0x17, 0x08, NULL),
+	{}
+};
+
 static bool amdgpu_device_pcie_dynamic_switching_supported(struct amdgpu_device *adev)
 {
-#if IS_ENABLED(CONFIG_X86)
-	struct cpuinfo_x86 *c = &cpu_data(0);
-
 	/* eGPU change speeds based on USB4 fabric conditions */
 	if (dev_is_removable(adev->dev))
 		return true;
 
-	if (c->x86_vendor == X86_VENDOR_INTEL)
+	/* Hosts have problems with dynamic speed switching */
+	if (x86_match_cpu(amdgpu_pcie_dynamic_switching_quirks))
 		return false;
-#endif
+
 	return true;
 }
+#else
+static inline bool amdgpu_device_pcie_dynamic_switching_supported(struct amdgpu_device *adev)
+{
+	return true;
+}
+#endif
 
 static bool amdgpu_device_aspm_support_quirk(struct amdgpu_device *adev)
 {
@@ -1360,7 +1275,8 @@ static bool amdgpu_device_aspm_support_quirk(struct amdgpu_device *adev)
 	 * It's unclear if this is a platform-specific or GPU-specific issue.
 	 * Disable ASPM on SI for the time being.
 	 */
-	if (adev->family == AMDGPU_FAMILY_SI)
+	if (adev->family == AMDGPU_FAMILY_SI ||
+		(!(adev->pm.pp_feature & PP_PCIE_DPM_MASK) && adev->family == AMDGPU_FAMILY_VI))
 		return true;
 
 #if IS_ENABLED(CONFIG_X86)
@@ -2172,6 +2088,8 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 	adev->cg_flags &= amdgpu_cg_mask;
 	adev->pg_flags &= amdgpu_pg_mask;
 
+	amdgpu_smu_early_init(adev);
+
 	return 0;
 }
 
@@ -2412,10 +2330,10 @@ static int amdgpu_device_ip_init(struct amdgpu_device *adev)
 					r);
 				goto init_failed;
 			}
-			r = amdgpu_device_wb_init(adev);
+			r = amdgpu_wb_init(adev);
 			if (r) {
 				dev_err(adev->dev,
-					"amdgpu_device_wb_init failed %d\n", r);
+					"amdgpu_wb_init failed %d\n", r);
 				goto init_failed;
 			}
 			adev->ip_blocks[i].status.hw = true;
@@ -2947,7 +2865,7 @@ static int amdgpu_device_ip_fini(struct amdgpu_device *adev)
 		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_GMC) {
 			amdgpu_ucode_free_bo(adev);
 			amdgpu_free_static_csa(&adev->virt.csa_obj);
-			amdgpu_device_wb_fini(adev);
+			amdgpu_wb_fini(adev);
 			amdgpu_device_mem_scratch_fini(adev);
 			amdgpu_ib_pool_fini(adev);
 			amdgpu_seq64_fini(adev);

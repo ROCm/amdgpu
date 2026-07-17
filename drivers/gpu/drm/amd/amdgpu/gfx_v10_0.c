@@ -4080,7 +4080,7 @@ static int gfx_v10_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 
 	memset(&ib, 0, sizeof(ib));
 
-	r = amdgpu_device_wb_get(adev, &index);
+	r = amdgpu_wb_get(adev, &index);
 	if (r)
 		return r;
 
@@ -4121,7 +4121,7 @@ err2:
 	amdgpu_ib_free(&ib, NULL);
 	dma_fence_put(f);
 err1:
-	amdgpu_device_wb_free(adev, index);
+	amdgpu_wb_free(adev, index);
 	return r;
 }
 
@@ -4995,11 +4995,11 @@ static int gfx_v10_0_sw_init(struct amdgpu_ip_block *ip_block)
 
 	gfx_v10_0_gpu_early_init(adev);
 
-	gfx_v10_0_alloc_ip_dump(adev);
-
 	r = amdgpu_gfx_sysfs_init(adev);
 	if (r)
 		return r;
+
+	gfx_v10_0_alloc_ip_dump(adev);
 
 	return 0;
 }
@@ -5357,6 +5357,15 @@ static void gfx_v10_0_constants_init(struct amdgpu_device *adev)
 	gfx_v10_0_get_tcc_info(adev);
 	adev->gfx.config.pa_sc_tile_steering_override =
 		gfx_v10_0_init_pa_sc_tile_steering_override(adev);
+	/* Program DB_RING_CONTROL for multiple GFX pipes
+	 * Default power up value is 1.
+	 * Possible values:
+	 * 0 - split occlusion counters between gfx pipes
+	 * 1 - all occlusion counters to pipe 0
+	 * 2 - all occlusion counters to pipe 1
+	 */
+	WREG32_FIELD15(GC, 0, DB_RING_CONTROL, COUNTER_CONTROL,
+		       (adev->gfx.me.num_pipe_per_me > 1) ? 0 : 1);
 
 	/* XXX SH_MEM regs */
 	/* where to put LDS, scratch, GPUVM in FSA64 space */
@@ -7899,7 +7908,7 @@ static const struct spm_funcs gfx_v10_0_spm_funcs = {
 	.stop = &gfx_v10_0_spm_stop,
 	.set_rdptr = &gfx_v10_0_spm_set_rdptr,
 	.set_spm_perfmon_ring_buf = &gfx_v10_0_set_spm_perfmon_ring_buf,
-	.set_spm_config_size = 30,
+	.set_spm_config_size = 38,
 };
 
 static void gfx_v10_0_set_spm_funcs(struct amdgpu_device *adev)

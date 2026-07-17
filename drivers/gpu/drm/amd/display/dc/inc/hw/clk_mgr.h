@@ -320,6 +320,8 @@ struct clk_states {
 	uint32_t dprefclk_khz;
 };
 
+struct block_sequence_state;
+
 struct clk_mgr_funcs {
 	/*
 	 * This function should set new clocks based on the input "safe_to_lower".
@@ -409,6 +411,12 @@ struct clk_mgr_funcs {
 	void (*get_requested_memory_qos)(
 			struct clk_mgr *clk_mgr,
 			struct dc_requested_memory_qos *qos);
+
+	void (*build_clock_update_for_bls)(struct clk_mgr *clk_mgr,
+			struct dc_state *context, bool safe_to_lower,
+			struct block_sequence_state *seq_state);
+
+	void (*execute_clk_mgr_block_sequence)(struct clk_mgr *clk_mgr);
 };
 
 struct clk_mgr {
