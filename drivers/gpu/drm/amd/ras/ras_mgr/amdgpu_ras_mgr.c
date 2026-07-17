@@ -196,6 +196,9 @@ static int amdgpu_ras_mgr_init_nbio_config(struct amdgpu_device *adev,
 	case IP_VERSION(6, 3, 2):
 		//TBD for dGPU
 		break;
+	case IP_VERSION(7, 10, 0):
+		//TBD for dGPU
+		break;
 	default:
 		RAS_DEV_ERR(adev,
 			"The nbio(0x%x) ras config is not right!\n",
