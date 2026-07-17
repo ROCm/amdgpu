@@ -47,6 +47,7 @@ static const struct ras_psp_ip_func *ras_psp_get_ip_funcs(
 	case IP_VERSION(13, 0, 14):
 	case IP_VERSION(13, 0, 12):
 		return &ras_psp_v13_0;
+	case IP_VERSION(15, 0, 3):
 	case IP_VERSION(15, 0, 8):
 		return &ras_psp_v15_0;
 	default:

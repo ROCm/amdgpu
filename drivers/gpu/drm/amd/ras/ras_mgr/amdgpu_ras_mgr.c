@@ -339,9 +339,10 @@ int amdgpu_ras_mgr_sw_init(struct amdgpu_device *adev, struct ras_module_param *
 	if (param && !param->ras_feature_enable)
 		return 0;
 	else if (amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(13, 0, 14) ||
-	    amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(13, 0, 12) ||
-	    amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(13, 0, 6) ||
-	    amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(15, 0, 8))
+		 amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(13, 0, 12) ||
+		 amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(13, 0, 6) ||
+		 amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(15, 0, 3) ||
+		 amdgpu_ip_version(adev, MP0_HWIP, 0) == IP_VERSION(15, 0, 8))
 		con->uniras_enabled = true;
 	else
 		return 0;
