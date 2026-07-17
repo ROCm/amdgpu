@@ -500,7 +500,9 @@ EXPORT_IF_KUNIT(amdgpu_dm_register_backlight_device);
 
 void amdgpu_dm_update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 {
+#ifdef HAVE_DRM_GET_PANEL_BACKLIGHT_QUIRK
 	const struct drm_panel_backlight_quirk *panel_backlight_quirk;
+#endif
 	struct amdgpu_dm_backlight_caps *caps;
 	struct drm_connector *conn_base;
 	struct amdgpu_device *adev;
@@ -519,7 +521,13 @@ void amdgpu_dm_update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 	caps->ext_caps = &aconnector->dc_link->dpcd_sink_ext_caps;
 	caps->aux_support = false;
 
+#ifdef HAVE_DRM_GET_PANEL_BACKLIGHT_QUIRK
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	panel_backlight_quirk = drm_get_panel_backlight_quirk(aconnector->drm_edid);
+#else
+	panel_backlight_quirk = drm_get_panel_backlight_quirk(aconnector->edid);
+#endif
+#endif
 
 	if (caps->ext_caps->bits.oled == 1
 	    /*
@@ -533,9 +541,11 @@ void amdgpu_dm_update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 		caps->aux_support = false;
 	else if (amdgpu_backlight == 1)
 		caps->aux_support = true;
+#if defined(HAVE_DRM_PANEL_BACKLIGHT_QUIRK_FORCE_PWM)
 	else if (!IS_ERR_OR_NULL(panel_backlight_quirk) &&
 		 panel_backlight_quirk->force_pwm)
 		caps->aux_support = false;
+#endif
 	if (caps->aux_support)
 		aconnector->dc_link->backlight_control_type = BACKLIGHT_CONTROL_AMD_AUX;
 
@@ -554,8 +564,6 @@ void amdgpu_dm_update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 #endif
 
 #ifdef HAVE_DRM_GET_PANEL_BACKLIGHT_QUIRK
-	panel_backlight_quirk =
-		drm_get_panel_backlight_quirk(aconnector->drm_edid);
 	if (!IS_ERR_OR_NULL(panel_backlight_quirk)) {
 		if (panel_backlight_quirk->min_brightness) {
 			caps->min_input_signal =

@@ -769,6 +769,9 @@
 /* enum drm_output_color_format is available */
 #define HAVE_DRM_OUTPUT_COLOR_FORMAT 1
 
+/* struct drm_panel_backlight_quirk has force_pwm member */
+#define HAVE_DRM_PANEL_BACKLIGHT_QUIRK_FORCE_PWM 1
+
 /* drm_plane->color_pipeline_property is available */
 #define HAVE_DRM_PLANE_COLOR_PIPELINE_PROPERTY 1
 
