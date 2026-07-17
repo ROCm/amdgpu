@@ -42,6 +42,9 @@
 #define MAX_AID_NUM_PER_SOCKET_GFX12    16
 #define MAX_XCD_NUM_PER_AID_GFX12       4
 
+#define MAX_AID_NUM_PER_SOCKET_GFX13    1
+#define MAX_XCD_NUM_PER_AID_GFX13       1
+
 /* Reserve 8 physical dram row for possible retirement.
  * In worst cases, it will lose 8 * 2MB memory in vram domain
  */
@@ -115,6 +118,10 @@ static int amdgpu_ras_mgr_init_aca_config(struct amdgpu_device *adev,
 	case IP_VERSION(12, 1, 0):
 		aca_cfg->aid_num_per_socket = MAX_AID_NUM_PER_SOCKET_GFX12;
 		aca_cfg->xcd_num_per_aid = MAX_XCD_NUM_PER_AID_GFX12;
+		break;
+	case IP_VERSION(13, 0, 1):
+		aca_cfg->aid_num_per_socket = MAX_AID_NUM_PER_SOCKET_GFX13;
+		aca_cfg->xcd_num_per_aid = MAX_XCD_NUM_PER_AID_GFX13;
 		break;
 	default:
 		return -EINVAL;
@@ -284,7 +291,8 @@ static struct ras_core_context *amdgpu_ras_mgr_create_ras_core(struct amdgpu_dev
 	init_config.nbio_ip_version = amdgpu_ip_version(adev, NBIO_HWIP, 0);
 	init_config.psp_ip_version = amdgpu_ip_version(adev, MP0_HWIP, 0);
 
-	if (init_config.gfx_ip_version == IP_VERSION(12, 1, 0))
+	if (init_config.gfx_ip_version == IP_VERSION(12, 1, 0) ||
+	    init_config.gfx_ip_version == IP_VERSION(13, 0, 1))
 		init_config.aca_ip_version = IP_VERSION(5, 0, 0);
 	else if (init_config.umc_ip_version == IP_VERSION(12, 0, 0) ||
 	    init_config.umc_ip_version == IP_VERSION(12, 5, 0))
