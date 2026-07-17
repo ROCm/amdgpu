@@ -31,6 +31,7 @@
 #include "vpe/vpe_3_0_0_sh_mask.h"
 
 MODULE_FIRMWARE("amdgpu/vpe_3_0_0.bin");
+MODULE_FIRMWARE("amdgpu/vpe_3_0_1.bin");
 
 #define VPE_THREAD1_UCODE_OFFSET	0x8000
 

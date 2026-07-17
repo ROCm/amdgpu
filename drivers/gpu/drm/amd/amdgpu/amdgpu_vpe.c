@@ -317,6 +317,7 @@ static int vpe_early_init(struct amdgpu_ip_block *ip_block)
 		vpe_v2_0_set_funcs(vpe);
 		break;
 	case IP_VERSION(3, 0, 0):
+	case IP_VERSION(3, 0, 1):
 		vpe_v3_0_set_funcs(vpe);
 		break;
 	default:
