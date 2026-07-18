@@ -63,6 +63,7 @@
 #include "amdgpu_atomfirmware.h"
 #include "amdgpu_res_cursor.h"
 #include "bif/bif_4_1_d.h"
+#include "kfd_svm.h"
 
 #ifdef HAVE_MODULE_IMPORT_NS_NEED_A_STRING
 MODULE_IMPORT_NS("DMA_BUF");
@@ -1762,7 +1763,8 @@ static bool amdgpu_ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 		return true;
 
 	abo = ttm_to_amdgpu_bo(bo);
-	if (abo->flags & AMDGPU_GEM_CREATE_DISCARDABLE) {
+	if ((abo->flags & AMDGPU_GEM_CREATE_DISCARDABLE) &&
+	    bo->destroy == &svm_range_bo_destroy) {
 		/*
 		 * SVM BOs are migrated to system memory synchronously in this
 		 * TTM eviction context. The migration needs the owning
@@ -1772,7 +1774,7 @@ static bool amdgpu_ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 		 * if the eviction fails for any reason, we return false so TTM
 		 * skips this BO instead of risking a deadlock.
 		 */
-		if (amdgpu_amdkfd_evict_svm_bo(abo) < 0)
+		if (svm_range_evict_svm_bo(abo) < 0)
 			return false;
 	}
 
