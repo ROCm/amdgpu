@@ -1451,9 +1451,7 @@ enum dc_edid_status dm_helpers_read_local_edid(
 		struct dc_sink *sink)
 {
 	struct amdgpu_dm_connector *aconnector = link->priv;
-#ifdef HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM
 	struct drm_connector *connector = &aconnector->base;
-#endif
 	struct i2c_adapter *ddc;
 	int retry = 25;
 	enum dc_edid_status edid_status = EDID_NO_RESPONSE;
