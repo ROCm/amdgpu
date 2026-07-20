@@ -31,6 +31,14 @@ void amdgpu_amdkfd_rlc_spm_cntl(struct amdgpu_device *adev, int xcc_id, bool cnt
 	uint32_t seq;
 	int r = 0;
 
+	if (!adev->gfx.spmfuncs->set_spm_config_size) {
+		if (cntl)
+			adev->gfx.spmfuncs->start(adev, xcc_id);
+		else
+			adev->gfx.spmfuncs->stop(adev, xcc_id);
+		return;
+	}
+
 	spin_lock(&adev->gfx.kiq[xcc_id].ring_lock);
 	amdgpu_ring_alloc(kiq_ring, adev->gfx.spmfuncs->set_spm_config_size);
 	if (cntl)
@@ -57,6 +65,11 @@ void amdgpu_amdkfd_rlc_spm_set_rdptr(struct amdgpu_device *adev, int xcc_id, u32
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[xcc_id].ring;
 	uint32_t seq;
 	int r = 0;
+
+	if (!adev->gfx.spmfuncs->set_spm_config_size) {
+		adev->gfx.spmfuncs->set_rdptr(adev, xcc_id, rptr);
+		return;
+	}
 
 	spin_lock(&adev->gfx.kiq[xcc_id].ring_lock);
 	amdgpu_ring_alloc(kiq_ring, adev->gfx.spmfuncs->set_spm_config_size);
@@ -93,6 +106,11 @@ int amdgpu_amdkfd_rlc_spm_acquire(struct amdgpu_device *adev, int xcc_id,
 	/* init spm vmid with 0x0 */
 	adev->gfx.rlc.funcs->update_spm_vmid(adev, xcc_id, NULL, 0);
 
+	if (!adev->gfx.spmfuncs->set_spm_config_size) {
+		adev->gfx.spmfuncs->set_spm_perfmon_ring_buf(adev, xcc_id, gpu_addr, size);
+		return 0;
+	}
+
 	/* set spm ring registers */
 	spin_lock(&adev->gfx.kiq[xcc_id].ring_lock);
 	amdgpu_ring_alloc(kiq_ring, adev->gfx.spmfuncs->set_spm_config_size);
@@ -120,6 +138,11 @@ void amdgpu_amdkfd_rlc_spm_release(struct amdgpu_device *adev, int xcc_id, struc
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[xcc_id].ring;
 	uint32_t seq;
 	int r = 0;
+
+	if (!adev->gfx.spmfuncs->set_spm_config_size) {
+		adev->gfx.spmfuncs->stop(adev, xcc_id);
+		goto skip_wait;
+	}
 
 	/* stop spm stream and interrupt */
 	spin_lock(&adev->gfx.kiq[xcc_id].ring_lock);
@@ -152,4 +175,3 @@ void amdgpu_amdkfd_rlc_spm_interrupt(struct amdgpu_device *adev, int xcc_id)
 	if (adev->kfd.dev)
 		kgd2kfd_spm_interrupt(adev->kfd.dev, xcc_id);
 }
-
