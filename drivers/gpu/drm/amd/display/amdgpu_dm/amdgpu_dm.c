@@ -1585,8 +1585,7 @@ static void dm_gpureset_toggle_interrupts(struct amdgpu_device *adev,
 		acrtc = amdgpu_dm_get_crtc_by_otg_inst(
 				adev, state->stream_status[i].primary_otg_inst);
 
-		if (acrtc && state->stream_status[i].plane_count != 0 &&
-		    amdgpu_ip_version(adev, DCE_HWIP, 0) == 0) {
+		if (acrtc && state->stream_status[i].plane_count != 0) {
 			irq_source = IRQ_TYPE_PFLIP + acrtc->otg_inst;
 			rc = dc_interrupt_set(adev->dm.dc, irq_source, enable) ? 0 : -EBUSY;
 			if (rc)
@@ -1614,13 +1613,6 @@ static void dm_gpureset_toggle_interrupts(struct amdgpu_device *adev,
 			 */
 			if (!dc_interrupt_set(adev->dm.dc, irq_source, enable))
 				drm_warn(adev_to_drm(adev), "Failed to %sable vblank interrupt\n", enable ? "en" : "dis");
-
-		} else if (acrtc && state->stream_status[i].plane_count != 0) {
-			/* DCN only needs to toggle VUPDATE_NO_LOCK */
-			rc = amdgpu_dm_crtc_set_vupdate_irq(&acrtc->base, enable);
-			if (rc)
-				drm_warn(adev_to_drm(adev), "Failed to %sable vupdate interrupt\n",
-					 enable ? "en" : "dis");
 		}
 	}
 
@@ -3659,22 +3651,14 @@ static void manage_dm_interrupts(struct amdgpu_device *adev,
 
 		drm_crtc_vblank_on_config(&acrtc->base,
 					  &config);
-		/*
-		 * Since pflip_high_irq is no longer registered for DCN, grab an
-		 * extra reference to vupdate irq instead to workaround this
-		 * issue:
-		 * https://gitlab.freedesktop.org/drm/amd/-/work_items/3936
-		 *
-		 * The callbacks to drm_vblank_on/off should really take care of
-		 * this though.
-		 */
+		/* Allow RX6xxx, RX7700, RX7800 GPUs to call amdgpu_irq_get.*/
 		switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 		case IP_VERSION(3, 0, 0):
 		case IP_VERSION(3, 0, 2):
 		case IP_VERSION(3, 0, 3):
 		case IP_VERSION(3, 2, 0):
-			if (amdgpu_irq_get(adev, &adev->vupdate_irq, irq_type))
-				drm_err(dev, "DM_IRQ: Cannot get vupdate irq!\n");
+			if (amdgpu_irq_get(adev, &adev->pageflip_irq, irq_type))
+				drm_err(dev, "DM_IRQ: Cannot get pageflip irq!\n");
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
 			if (amdgpu_irq_get(adev, &adev->vline0_irq, irq_type))
 				drm_err(dev, "DM_IRQ: Cannot get vline0 irq!\n");
@@ -3692,8 +3676,8 @@ static void manage_dm_interrupts(struct amdgpu_device *adev,
 			if (amdgpu_irq_put(adev, &adev->vline0_irq, irq_type))
 				drm_err(dev, "DM_IRQ: Cannot put vline0 irq!\n");
 #endif
-			if (amdgpu_irq_put(adev, &adev->vupdate_irq, irq_type))
-				drm_err(dev, "DM_IRQ: Cannot put vupdate irq!\n");
+			if (amdgpu_irq_put(adev, &adev->pageflip_irq, irq_type))
+				drm_err(dev, "DM_IRQ: Cannot put pageflip irq!\n");
 		}
 
 		drm_crtc_vblank_off(&acrtc->base);
@@ -3711,10 +3695,6 @@ static void dm_update_pflip_irq_state(struct amdgpu_device *adev,
 {
 	int irq_type =
 		amdgpu_display_crtc_idx_to_irq_type(adev, acrtc->crtc_id);
-
-	/* GRPH_PFLIP is not used on DCN; nothing to reapply. */
-	if (amdgpu_ip_version(adev, DCE_HWIP, 0) != 0)
-		return;
 
 	/**
 	 * This reads the current state for the IRQ and force reapplies
@@ -4051,12 +4031,8 @@ static void amdgpu_dm_handle_vrr_transition(struct amdgpu_display_manager *dm,
 					    struct dm_crtc_state *old_state,
 					    struct dm_crtc_state *new_state)
 {
-	struct amdgpu_device *adev = dm->adev;
 	bool old_vrr_active = amdgpu_dm_crtc_vrr_active(old_state);
 	bool new_vrr_active = amdgpu_dm_crtc_vrr_active(new_state);
-
-	/* Only DCE gates vupdate on VRR, keep it enabled for DCN */
-	bool vrr_gates_vupdate = amdgpu_ip_version(adev, DCE_HWIP, 0) == 0;
 
 	if (!old_vrr_active && new_vrr_active) {
 		/* Transition VRR inactive -> active:
@@ -4067,8 +4043,7 @@ static void amdgpu_dm_handle_vrr_transition(struct amdgpu_display_manager *dm,
 		 * We also need vupdate irq for the actual core vblank handling
 		 * at end of vblank.
 		 */
-		if (vrr_gates_vupdate)
-			WARN_ON(amdgpu_dm_crtc_set_vupdate_irq(new_state->base.crtc, true) != 0);
+		WARN_ON(amdgpu_dm_crtc_set_vupdate_irq(new_state->base.crtc, true) != 0);
 		WARN_ON(drm_crtc_vblank_get(new_state->base.crtc) != 0);
 		drm_dbg_driver(new_state->base.crtc->dev, "%s: crtc=%u VRR off->on: Get vblank ref\n",
 				 __func__, new_state->base.crtc->base.id);
@@ -4084,8 +4059,7 @@ static void amdgpu_dm_handle_vrr_transition(struct amdgpu_display_manager *dm,
 		/* Transition VRR active -> inactive:
 		 * Allow vblank irq disable again for fixed refresh rate.
 		 */
-		if (vrr_gates_vupdate)
-			WARN_ON(amdgpu_dm_crtc_set_vupdate_irq(new_state->base.crtc, false) != 0);
+		WARN_ON(amdgpu_dm_crtc_set_vupdate_irq(new_state->base.crtc, false) != 0);
 		drm_crtc_vblank_put(new_state->base.crtc);
 		drm_dbg_driver(new_state->base.crtc->dev, "%s: crtc=%u VRR on->off: Drop vblank ref\n",
 				 __func__, new_state->base.crtc->base.id);
@@ -4256,7 +4230,6 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_commit *state,
 	bool vrr_active = amdgpu_dm_crtc_vrr_active(acrtc_state);
 	bool cursor_update = false;
 	bool pflip_present = false;
-	bool immediate_flip = false;
 	bool dirty_rects_changed = false;
 	bool updated_planes_and_streams = false;
 	struct {
@@ -4432,8 +4405,6 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_commit *state,
 #endif
 			acrtc_state->update_type == UPDATE_TYPE_FAST &&
 			get_mem_type(old_plane_state->fb) == get_mem_type(fb);
-
-		immediate_flip |= bundle->flip_addrs[planes_count].flip_immediate;
 
 		timestamp_ns = ktime_get_ns();
 		bundle->flip_addrs[planes_count].flip_timestamp_in_us = div_u64(timestamp_ns, 1000);
@@ -4626,29 +4597,6 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_commit *state,
 	    (!updated_planes_and_streams || amdgpu_ip_version(dm->adev, DCE_HWIP, 0) == 0) &&
 	    acrtc_state->cursor_mode == DM_CURSOR_NATIVE_MODE)
 		amdgpu_dm_commit_cursors(state);
-
-	/*
-	 * On DCN, flip completion is normally delivered from VUPDATE_NO_LOCK.
-	 * However, an immediate (tearing / async) flip is latched by HW right
-	 * away and does not wait for the next vupdate, so deliver its
-	 * completion event here after programming.
-	 *
-	 * On DCE, GRPH_PFLIP already fires immediately for immediate flips, so
-	 * this is DCN-only.
-	 */
-	if (immediate_flip && amdgpu_ip_version(dm->adev, DCE_HWIP, 0) != 0) {
-		spin_lock_irqsave(&pcrtc->dev->event_lock, flags);
-		if (acrtc_attach->pflip_status == AMDGPU_FLIP_SUBMITTED &&
-		    acrtc_attach->event) {
-			drm_crtc_accurate_vblank_count(&acrtc_attach->base);
-			drm_crtc_send_vblank_event(&acrtc_attach->base,
-						   acrtc_attach->event);
-			acrtc_attach->event = NULL;
-			drm_crtc_vblank_put(&acrtc_attach->base);
-			acrtc_attach->pflip_status = AMDGPU_FLIP_NONE;
-		}
-		spin_unlock_irqrestore(&pcrtc->dev->event_lock, flags);
-	}
 
 cleanup:
 	kfree(bundle);
