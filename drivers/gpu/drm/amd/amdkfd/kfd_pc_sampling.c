@@ -80,6 +80,15 @@ struct supported_pc_sample_info supported_formats[] = {
 	{ IP_VERSION(12 ,1, 0), &sample_info_stoch_cycle_12_0_0 },
 };
 
+static bool kfd_pc_sample_cap_quirk_check(struct kfd_node *dev)
+{
+	if (KFD_GC_VERSION(dev) == IP_VERSION(12, 1, 0) &&
+		(dev->adev->rev_id & 0xf) == 0x0) /* A0 version */
+		return true;
+
+	return false;
+}
+
 static int kfd_pc_sample_thread(void *param)
 {
 	struct amdgpu_device *adev;
@@ -518,6 +527,9 @@ int kfd_pc_sample(struct kfd_process_device *pdd,
 					struct kfd_ioctl_pc_sample_args __user *args)
 {
 	struct pc_sampling_entry *pcs_entry;
+
+	if (kfd_pc_sample_cap_quirk_check(pdd->dev))
+		return -EOPNOTSUPP;
 
 	if (args->op != KFD_IOCTL_PCS_OP_QUERY_CAPABILITIES &&
 		args->op != KFD_IOCTL_PCS_OP_CREATE) {
