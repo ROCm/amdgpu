@@ -1158,15 +1158,91 @@ int amdgpu_xgmi_remove_device(struct amdgpu_device *adev)
 	return 0;
 }
 
+static int xgmi_v6_4_0_aca_bank_parser(struct aca_handle *handle, struct aca_bank *bank,
+				       enum aca_smu_type type, void *data)
+{
+	struct amdgpu_device *adev = handle->adev;
+	struct aca_bank_info info;
+	const char *error_str;
+	u64 status, count;
+	int ret, ext_error_code;
+
+	ret = aca_bank_info_decode(bank, &info);
+	if (ret)
+		return ret;
+
+	status = bank->regs[ACA_REG_IDX_STATUS];
+	ext_error_code = ACA_REG__STATUS__ERRORCODEEXT(status);
+
+	error_str = ext_error_code < ARRAY_SIZE(xgmi_v6_4_0_ras_error_code_ext) ?
+		xgmi_v6_4_0_ras_error_code_ext[ext_error_code] : NULL;
+	if (error_str)
+		dev_info(adev->dev, "%s detected\n", error_str);
+
+	count = ACA_REG__MISC0__ERRCNT(bank->regs[ACA_REG_IDX_MISC0]);
+
+	switch (type) {
+	case ACA_SMU_TYPE_UE:
+		if (ext_error_code != 0 && ext_error_code != 1 && ext_error_code != 9)
+			count = 0ULL;
+
+		bank->aca_err_type = ACA_ERROR_TYPE_UE;
+		ret = aca_error_cache_log_bank_error(handle, &info, ACA_ERROR_TYPE_UE, count);
+		break;
+	case ACA_SMU_TYPE_CE:
+		count = ext_error_code == 6 ? count : 0ULL;
+		bank->aca_err_type = ACA_ERROR_TYPE_CE;
+		ret = aca_error_cache_log_bank_error(handle, &info, bank->aca_err_type, count);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return ret;
+}
+
+static const struct aca_bank_ops xgmi_v6_4_0_aca_bank_ops = {
+	.aca_bank_parser = xgmi_v6_4_0_aca_bank_parser,
+};
+
+static const struct aca_info xgmi_v6_4_0_aca_info = {
+	.hwip = ACA_HWIP_TYPE_PCS_XGMI,
+	.mask = ACA_ERROR_UE_MASK | ACA_ERROR_CE_MASK,
+	.bank_ops = &xgmi_v6_4_0_aca_bank_ops,
+};
+
 static int amdgpu_xgmi_ras_late_init(struct amdgpu_device *adev, struct ras_common_if *ras_block)
 {
+	int r;
+
 	if (!adev->gmc.xgmi.supported ||
 	    adev->gmc.xgmi.num_physical_nodes == 0)
 		return 0;
 
 	amdgpu_ras_reset_error_count(adev, AMDGPU_RAS_BLOCK__XGMI_WAFL);
 
-	return amdgpu_ras_block_late_init(adev, ras_block);
+	r = amdgpu_ras_block_late_init(adev, ras_block);
+	if (r)
+		return r;
+
+	switch (amdgpu_ip_version(adev, XGMI_HWIP, 0)) {
+	case IP_VERSION(6, 4, 0):
+	case IP_VERSION(6, 4, 1):
+		r = amdgpu_ras_bind_aca(adev, AMDGPU_RAS_BLOCK__XGMI_WAFL,
+					&xgmi_v6_4_0_aca_info, NULL);
+		if (r)
+			goto late_fini;
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+
+late_fini:
+	amdgpu_ras_block_late_fini(adev, ras_block);
+
+	return r;
 }
 
 uint64_t amdgpu_xgmi_get_relative_phy_addr(struct amdgpu_device *adev,
