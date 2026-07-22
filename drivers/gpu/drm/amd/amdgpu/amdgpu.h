@@ -104,6 +104,7 @@
 #include "amdgpu_smuio.h"
 #include "amdgpu_fdinfo.h"
 #include "amdgpu_mca.h"
+#include "amdgpu_aca.h"
 #include "amdgpu_ras.h"
 #include "amdgpu_lockdep.h"
 #include "amdgpu_cper.h"
@@ -826,6 +827,9 @@ struct amdgpu_device {
 
 	/* MCA */
 	struct amdgpu_mca               mca;
+
+	/* ACA */
+	struct amdgpu_aca		aca;
 
 	/* CPER */
 	struct amdgpu_cper		cper;
