@@ -95,6 +95,8 @@ static const struct amdgpu_hwip_reg_entry sdma_reg_list_4_4_2[] = {
 	SOC15_REG_ENTRY_STR(GC, 0, regSDMA_VM_CNTL)
 };
 
+#define mmSMNAID_AID0_MCA_SMU 0x03b30400
+
 #define WREG32_SDMA(instance, offset, value) \
 	WREG32(sdma_v4_4_2_get_reg_offset(adev, (instance), (offset)), value)
 #define RREG32_SDMA(instance, offset) \
@@ -2520,9 +2522,85 @@ static const struct amdgpu_ras_block_hw_ops sdma_v4_4_2_ras_hw_ops = {
 	.reset_ras_error_count = sdma_v4_4_2_reset_ras_error_count,
 };
 
+static int sdma_v4_4_2_aca_bank_parser(struct aca_handle *handle, struct aca_bank *bank,
+				       enum aca_smu_type type, void *data)
+{
+	struct aca_bank_info info;
+	u64 misc0;
+	int ret;
+
+	ret = aca_bank_info_decode(bank, &info);
+	if (ret)
+		return ret;
+
+	misc0 = bank->regs[ACA_REG_IDX_MISC0];
+	switch (type) {
+	case ACA_SMU_TYPE_UE:
+		bank->aca_err_type = ACA_ERROR_TYPE_UE;
+		ret = aca_error_cache_log_bank_error(handle, &info, ACA_ERROR_TYPE_UE,
+						     1ULL);
+		break;
+	case ACA_SMU_TYPE_CE:
+		bank->aca_err_type = ACA_ERROR_TYPE_CE;
+		ret = aca_error_cache_log_bank_error(handle, &info, bank->aca_err_type,
+						     ACA_REG__MISC0__ERRCNT(misc0));
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return ret;
+}
+
+/* CODE_SDMA0 - CODE_SDMA4, reference to smu driver if header file */
+static int sdma_v4_4_2_err_codes[] = { 33, 34, 35, 36 };
+
+static bool sdma_v4_4_2_aca_bank_is_valid(struct aca_handle *handle, struct aca_bank *bank,
+					  enum aca_smu_type type, void *data)
+{
+	u32 instlo;
+
+	instlo = ACA_REG__IPID__INSTANCEIDLO(bank->regs[ACA_REG_IDX_IPID]);
+	instlo &= GENMASK(31, 1);
+
+	if (instlo != mmSMNAID_AID0_MCA_SMU)
+		return false;
+
+	if (aca_bank_check_error_codes(handle->adev, bank,
+				       sdma_v4_4_2_err_codes,
+				       ARRAY_SIZE(sdma_v4_4_2_err_codes)))
+		return false;
+
+	return true;
+}
+
+static const struct aca_bank_ops sdma_v4_4_2_aca_bank_ops = {
+	.aca_bank_parser = sdma_v4_4_2_aca_bank_parser,
+	.aca_bank_is_valid = sdma_v4_4_2_aca_bank_is_valid,
+};
+
+static const struct aca_info sdma_v4_4_2_aca_info = {
+	.hwip = ACA_HWIP_TYPE_SMU,
+	.mask = ACA_ERROR_UE_MASK,
+	.bank_ops = &sdma_v4_4_2_aca_bank_ops,
+};
+
+static int sdma_v4_4_2_ras_late_init(struct amdgpu_device *adev, struct ras_common_if *ras_block)
+{
+	int r;
+
+	r = amdgpu_sdma_ras_late_init(adev, ras_block);
+	if (r)
+		return r;
+
+	return amdgpu_ras_bind_aca(adev, AMDGPU_RAS_BLOCK__SDMA,
+				   &sdma_v4_4_2_aca_info, NULL);
+}
+
 static struct amdgpu_sdma_ras sdma_v4_4_2_ras = {
 	.ras_block = {
 		.hw_ops = &sdma_v4_4_2_ras_hw_ops,
+		.ras_late_init = sdma_v4_4_2_ras_late_init,
 	},
 };
 
