@@ -2118,3 +2118,10 @@ void amdgpu_dpm_phase_det_debugfs_init(struct amdgpu_device *adev)
 	
 	amdgpu_smu_phase_det_debugfs_init(adev);
 }
+
+const struct ras_smu_drv *amdgpu_dpm_get_ras_smu_driver(struct amdgpu_device *adev)
+{
+	void *pp_handle = adev->powerplay.pp_handle;
+
+	return smu_get_ras_smu_driver(pp_handle);
+}
