@@ -128,6 +128,12 @@ const char *get_ras_block_str(struct ras_common_if *ras_block)
 /* typical ECC bad page rate is 1 bad page per 100MB VRAM */
 #define RAS_BAD_PAGE_COVER              (100 * 1024 * 1024ULL)
 
+#define MAX_UMC_POISON_POLLING_TIME_ASYNC  10
+
+#define AMDGPU_RAS_RETIRE_PAGE_INTERVAL 100  //ms
+
+#define MAX_FLUSH_RETIRE_DWORK_TIMES  100
+
 #define BYPASS_ALLOCATED_ADDRESS        0x0
 #define BYPASS_INITIALIZATION_ADDRESS   0x1
 
@@ -2500,6 +2506,14 @@ static void amdgpu_ras_interrupt_poison_creation_handler(struct ras_manager *obj
 	event_id = amdgpu_ras_acquire_event_id(adev, type);
 	RAS_EVENT_LOG(adev, event_id, "Poison is created\n");
 
+	if (amdgpu_ip_version(obj->adev, UMC_HWIP, 0) >= IP_VERSION(12, 0, 0)) {
+		struct amdgpu_ras *con = amdgpu_ras_get_context(obj->adev);
+
+		atomic_inc(&con->page_retirement_req_cnt);
+		atomic_inc(&con->poison_creation_count);
+
+		wake_up(&con->page_retirement_wq);
+	}
 }
 
 static void amdgpu_ras_interrupt_umc_handler(struct ras_manager *obj,
@@ -3553,6 +3567,38 @@ static void amdgpu_ras_validate_threshold(struct amdgpu_device *adev,
 	}
 }
 
+int amdgpu_ras_put_poison_req(struct amdgpu_device *adev,
+		enum amdgpu_ras_block block, uint16_t pasid,
+		pasid_notify pasid_fn, void *data, uint32_t reset)
+{
+	int ret = 0;
+	struct ras_poison_msg poison_msg;
+	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
+
+	memset(&poison_msg, 0, sizeof(poison_msg));
+	poison_msg.block = block;
+	poison_msg.pasid = pasid;
+	poison_msg.reset = reset;
+	poison_msg.pasid_fn = pasid_fn;
+	poison_msg.data = data;
+
+	ret = kfifo_put(&con->poison_fifo, poison_msg);
+	if (!ret) {
+		dev_err(adev->dev, "Poison message fifo is full!\n");
+		return -ENOSPC;
+	}
+
+	return 0;
+}
+
+static int amdgpu_ras_get_poison_req(struct amdgpu_device *adev,
+		struct ras_poison_msg *poison_msg)
+{
+	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
+
+	return kfifo_get(&con->poison_fifo, poison_msg);
+}
+
 static void amdgpu_ras_ecc_log_init(struct ras_ecc_log_info *ecc_log)
 {
 	mutex_init(&ecc_log->lock);
@@ -3580,6 +3626,232 @@ static void amdgpu_ras_ecc_log_fini(struct ras_ecc_log_info *ecc_log)
 	mutex_destroy(&ecc_log->lock);
 	ecc_log->de_queried_count = 0;
 	ecc_log->consumption_q_count = 0;
+}
+
+static bool amdgpu_ras_schedule_retirement_dwork(struct amdgpu_ras *con,
+				uint32_t delayed_ms)
+{
+	int ret;
+
+	mutex_lock(&con->umc_ecc_log.lock);
+	ret = radix_tree_tagged(&con->umc_ecc_log.de_page_tree,
+			UMC_ECC_NEW_DETECTED_TAG);
+	mutex_unlock(&con->umc_ecc_log.lock);
+
+	if (ret)
+		schedule_delayed_work(&con->page_retirement_dwork,
+			msecs_to_jiffies(delayed_ms));
+
+	return ret ? true : false;
+}
+
+static void amdgpu_ras_do_page_retirement(struct work_struct *work)
+{
+	struct amdgpu_ras *con = container_of(work, struct amdgpu_ras,
+					      page_retirement_dwork.work);
+	struct amdgpu_device *adev = con->adev;
+	struct ras_err_data err_data;
+
+	/* If gpu reset is ongoing, delay retiring the bad pages */
+	if (amdgpu_in_reset(adev) || amdgpu_ras_in_recovery(adev)) {
+		amdgpu_ras_schedule_retirement_dwork(con,
+				AMDGPU_RAS_RETIRE_PAGE_INTERVAL * 3);
+		return;
+	}
+
+	amdgpu_ras_error_data_init(&err_data);
+
+	amdgpu_umc_handle_bad_pages(adev, &err_data);
+
+	amdgpu_ras_error_data_fini(&err_data);
+
+	amdgpu_ras_schedule_retirement_dwork(con,
+			AMDGPU_RAS_RETIRE_PAGE_INTERVAL);
+}
+
+static int amdgpu_ras_poison_creation_handler(struct amdgpu_device *adev,
+				uint32_t poison_creation_count)
+{
+	int ret = 0;
+	struct ras_ecc_log_info *ecc_log;
+	struct ras_query_if info;
+	u32 timeout = MAX_UMC_POISON_POLLING_TIME_ASYNC;
+	struct amdgpu_ras *ras = amdgpu_ras_get_context(adev);
+	u64 de_queried_count;
+	u64 consumption_q_count;
+	enum ras_event_type type = RAS_EVENT_TYPE_POISON_CREATION;
+
+	memset(&info, 0, sizeof(info));
+	info.head.block = AMDGPU_RAS_BLOCK__UMC;
+
+	ecc_log = &ras->umc_ecc_log;
+	ecc_log->de_queried_count = 0;
+	ecc_log->consumption_q_count = 0;
+
+	do {
+		ret = amdgpu_ras_query_error_status_with_event(adev, &info, type);
+		if (ret)
+			return ret;
+
+		de_queried_count = ecc_log->de_queried_count;
+		consumption_q_count = ecc_log->consumption_q_count;
+
+		if (de_queried_count && consumption_q_count)
+			break;
+
+		msleep(100);
+	} while (--timeout);
+
+	if (de_queried_count)
+		schedule_delayed_work(&ras->page_retirement_dwork, 0);
+
+	if (amdgpu_ras_is_rma(adev) && atomic_cmpxchg(&ras->rma_in_recovery, 0, 1) == 0)
+		amdgpu_ras_reset_gpu(adev);
+
+	return 0;
+}
+
+static void amdgpu_ras_clear_poison_fifo(struct amdgpu_device *adev)
+{
+	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
+	struct ras_poison_msg msg;
+	int ret;
+
+	do {
+		ret = kfifo_get(&con->poison_fifo, &msg);
+	} while (ret);
+}
+
+static int amdgpu_ras_poison_consumption_handler(struct amdgpu_device *adev,
+			uint32_t msg_count, uint32_t *gpu_reset)
+{
+	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
+	uint32_t reset_flags = 0, reset = 0;
+	struct ras_poison_msg msg;
+	int ret, i;
+
+	kgd2kfd_set_sram_ecc_flag(adev->kfd.dev);
+
+	for (i = 0; i < msg_count; i++) {
+		ret = amdgpu_ras_get_poison_req(adev, &msg);
+		if (!ret)
+			continue;
+
+		if (msg.pasid_fn)
+			msg.pasid_fn(adev, msg.pasid, msg.data);
+
+		reset_flags |= msg.reset;
+	}
+
+	/*
+	 * Try to ensure poison creation handler is completed first
+	 * to set rma if bad page exceed threshold.
+	 */
+	flush_delayed_work(&con->page_retirement_dwork);
+
+	/* for RMA, amdgpu_ras_poison_creation_handler will trigger gpu reset */
+	if (reset_flags && !amdgpu_ras_is_rma(adev)) {
+		if (reset_flags & AMDGPU_RAS_GPU_RESET_MODE1_RESET)
+			reset = AMDGPU_RAS_GPU_RESET_MODE1_RESET;
+		else if (reset_flags & AMDGPU_RAS_GPU_RESET_MODE2_RESET)
+			reset = AMDGPU_RAS_GPU_RESET_MODE2_RESET;
+		else
+			reset = reset_flags;
+
+		con->gpu_reset_flags |= reset;
+		amdgpu_ras_reset_gpu(adev);
+
+		*gpu_reset = reset;
+
+		/* Wait for gpu recovery to complete */
+		flush_work(&con->recovery_work);
+	}
+
+	return 0;
+}
+
+static int amdgpu_ras_page_retirement_thread(void *param)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)param;
+	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
+	uint32_t poison_creation_count, msg_count;
+	uint32_t gpu_reset;
+	int ret;
+
+	while (!kthread_should_stop()) {
+
+		wait_event_interruptible(con->page_retirement_wq,
+				kthread_should_stop() ||
+				atomic_read(&con->page_retirement_req_cnt));
+
+		if (kthread_should_stop())
+			break;
+
+		mutex_lock(&con->poison_lock);
+		gpu_reset = 0;
+
+		do {
+			poison_creation_count = atomic_read(&con->poison_creation_count);
+			ret = amdgpu_ras_poison_creation_handler(adev, poison_creation_count);
+			if (ret == -EIO)
+				break;
+
+			if (poison_creation_count) {
+				atomic_sub(poison_creation_count, &con->poison_creation_count);
+				atomic_sub(poison_creation_count, &con->page_retirement_req_cnt);
+			}
+		} while (atomic_read(&con->poison_creation_count) &&
+			!atomic_read(&con->poison_consumption_count));
+
+		if (ret != -EIO) {
+			msg_count = kfifo_len(&con->poison_fifo);
+			if (msg_count) {
+				ret = amdgpu_ras_poison_consumption_handler(adev,
+						msg_count, &gpu_reset);
+				if ((ret != -EIO) &&
+				    (gpu_reset != AMDGPU_RAS_GPU_RESET_MODE1_RESET))
+					atomic_sub(msg_count, &con->page_retirement_req_cnt);
+			}
+		}
+
+		if ((ret == -EIO) || (gpu_reset == AMDGPU_RAS_GPU_RESET_MODE1_RESET)) {
+			/* gpu mode-1 reset is ongoing or just completed ras mode-1 reset */
+			/* Clear poison creation request */
+			atomic_set(&con->poison_creation_count, 0);
+			atomic_set(&con->poison_consumption_count, 0);
+
+			/* Clear poison fifo */
+			amdgpu_ras_clear_poison_fifo(adev);
+
+			/* Clear all poison requests */
+			atomic_set(&con->page_retirement_req_cnt, 0);
+
+			if (ret == -EIO) {
+				/* Wait for mode-1 reset to complete */
+				down_read(&adev->reset_domain->sem);
+				up_read(&adev->reset_domain->sem);
+			}
+
+			/* Wake up work to save bad pages to eeprom */
+			schedule_delayed_work(&con->page_retirement_dwork, 0);
+		} else if (gpu_reset) {
+			/* gpu just completed mode-2 reset or other reset */
+			/* Clear poison consumption messages cached in fifo */
+			msg_count = kfifo_len(&con->poison_fifo);
+			if (msg_count) {
+				amdgpu_ras_clear_poison_fifo(adev);
+				atomic_sub(msg_count, &con->page_retirement_req_cnt);
+			}
+
+			atomic_set(&con->poison_consumption_count, 0);
+
+			/* Wake up work to save bad pages to eeprom */
+			schedule_delayed_work(&con->page_retirement_dwork, 0);
+		}
+		mutex_unlock(&con->poison_lock);
+	}
+
+	return 0;
 }
 
 int amdgpu_ras_init_badpage_info(struct amdgpu_device *adev)
@@ -3669,8 +3941,10 @@ int amdgpu_ras_recovery_init(struct amdgpu_device *adev, bool init_bp_info)
 	}
 
 	mutex_init(&con->recovery_lock);
+	mutex_init(&con->poison_lock);
 	INIT_WORK(&con->recovery_work, amdgpu_ras_do_recovery);
 	atomic_set(&con->in_recovery, 0);
+	atomic_set(&con->rma_in_recovery, 0);
 	con->eeprom_control.bad_channel_bitmap = 0;
 
 	max_eeprom_records_count = amdgpu_ras_eeprom_max_record_count(&con->eeprom_control);
@@ -3683,8 +3957,20 @@ int amdgpu_ras_recovery_init(struct amdgpu_device *adev, bool init_bp_info)
 	}
 
 	mutex_init(&con->page_rsv_lock);
+	INIT_KFIFO(con->poison_fifo);
 	mutex_init(&con->page_retirement_lock);
+	init_waitqueue_head(&con->page_retirement_wq);
+	atomic_set(&con->page_retirement_req_cnt, 0);
+	atomic_set(&con->poison_creation_count, 0);
+	atomic_set(&con->poison_consumption_count, 0);
+	con->page_retirement_thread =
+		kthread_run(amdgpu_ras_page_retirement_thread, adev, "umc_page_retirement");
+	if (IS_ERR(con->page_retirement_thread)) {
+		con->page_retirement_thread = NULL;
+		dev_warn(adev->dev, "Failed to create umc_page_retirement thread!!!\n");
+	}
 
+	INIT_DELAYED_WORK(&con->page_retirement_dwork, amdgpu_ras_do_page_retirement);
 	amdgpu_ras_ecc_log_init(&con->umc_ecc_log);
 #ifdef CONFIG_X86_MCE_AMD
 	if ((adev->asic_type == CHIP_ALDEBARAN) &&
@@ -3717,14 +4003,30 @@ static int amdgpu_ras_recovery_fini(struct amdgpu_device *adev)
 {
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 	struct ras_err_handler_data *data = con->eh_data;
+	int max_flush_timeout = MAX_FLUSH_RETIRE_DWORK_TIMES;
+	bool ret;
 
 	/* recovery_init failed to init it, fini is useless */
 	if (!data)
 		return 0;
 
+	/* Save all cached bad pages to eeprom */
+	do {
+		flush_delayed_work(&con->page_retirement_dwork);
+		ret = amdgpu_ras_schedule_retirement_dwork(con, 0);
+	} while (ret && max_flush_timeout--);
+
+	if (con->page_retirement_thread)
+		kthread_stop(con->page_retirement_thread);
+
+	atomic_set(&con->page_retirement_req_cnt, 0);
+	atomic_set(&con->poison_creation_count, 0);
+
 	mutex_destroy(&con->page_rsv_lock);
 
 	cancel_work_sync(&con->recovery_work);
+
+	cancel_delayed_work_sync(&con->page_retirement_dwork);
 
 	amdgpu_ras_ecc_log_fini(&con->umc_ecc_log);
 
