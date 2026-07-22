@@ -2899,6 +2899,77 @@ static int amdgpu_ras_realloc_eh_data_space(struct amdgpu_device *adev,
 	return 0;
 }
 
+static int amdgpu_ras_mca2pa_by_idx(struct amdgpu_device *adev,
+			struct eeprom_table_record *bps,
+			struct ras_err_data *err_data)
+{
+	struct ta_ras_query_address_input addr_in;
+	uint32_t socket = 0;
+	int ret = 0;
+
+	if (adev->smuio.funcs && adev->smuio.funcs->get_socket_id)
+		socket = adev->smuio.funcs->get_socket_id(adev);
+
+	/* reinit err_data */
+	err_data->err_addr_cnt = 0;
+	err_data->err_addr_len = adev->umc.retire_unit;
+
+	memset(&addr_in, 0, sizeof(addr_in));
+	addr_in.ma.err_addr = bps->address;
+	addr_in.ma.socket_id = socket;
+	addr_in.ma.ch_inst = bps->mem_channel;
+	if (!amdgpu_ras_smu_eeprom_supported(adev)) {
+		/* tell RAS TA the node instance is not used */
+		addr_in.ma.node_inst = TA_RAS_INV_NODE;
+	} else {
+		addr_in.ma.umc_inst = bps->mcumc_id;
+		addr_in.ma.node_inst = bps->cu;
+	}
+
+	if (adev->umc.ras && adev->umc.ras->convert_ras_err_addr)
+		ret = adev->umc.ras->convert_ras_err_addr(adev, err_data,
+				&addr_in, NULL, false);
+
+	return ret;
+}
+
+static int amdgpu_ras_mca2pa(struct amdgpu_device *adev,
+			struct eeprom_table_record *bps,
+			struct ras_err_data *err_data)
+{
+	struct ta_ras_query_address_input addr_in;
+	uint32_t die_id, socket = 0;
+
+	if (adev->smuio.funcs && adev->smuio.funcs->get_socket_id)
+		socket = adev->smuio.funcs->get_socket_id(adev);
+
+	/* although die id is gotten from PA in nps1 mode, the id is
+	 * fitable for any nps mode
+	 */
+	if (adev->umc.ras && adev->umc.ras->get_die_id_from_pa)
+		die_id = adev->umc.ras->get_die_id_from_pa(adev, bps->address,
+					bps->retired_page << AMDGPU_GPU_PAGE_SHIFT);
+	else
+		return -EINVAL;
+
+	/* reinit err_data */
+	err_data->err_addr_cnt = 0;
+	err_data->err_addr_len = adev->umc.retire_unit;
+
+	memset(&addr_in, 0, sizeof(addr_in));
+	addr_in.ma.err_addr = bps->address;
+	addr_in.ma.ch_inst = bps->mem_channel;
+	addr_in.ma.umc_inst = bps->mcumc_id;
+	addr_in.ma.node_inst = die_id;
+	addr_in.ma.socket_id = socket;
+
+	if (adev->umc.ras && adev->umc.ras->convert_ras_err_addr)
+		return adev->umc.ras->convert_ras_err_addr(adev, err_data,
+					&addr_in, NULL, false);
+	else
+		return  -EINVAL;
+}
+
 static bool __check_record_in_range(struct amdgpu_device *adev,
 			struct eeprom_table_record *bps, int count)
 {
@@ -2959,11 +3030,115 @@ static int __amdgpu_ras_convert_rec_array_from_rom(struct amdgpu_device *adev,
 				struct eeprom_table_record *bps, struct ras_err_data *err_data,
 				enum amdgpu_memory_partition nps)
 {
-	/*old asics just have pa in eeprom*/
-	memcpy(err_data->err_addr, bps,
-		sizeof(struct eeprom_table_record) * adev->umc.retire_unit);
+	int i = 0;
+	uint64_t chan_idx_v2;
+	enum amdgpu_memory_partition save_nps;
 
+	save_nps = (bps[0].retired_page >> UMC_NPS_SHIFT) & UMC_NPS_MASK;
+	chan_idx_v2 = bps[0].retired_page & UMC_CHANNEL_IDX_V2;
+
+	/*old asics just have pa in eeprom*/
+	if (IP_VERSION_MAJ(amdgpu_ip_version(adev, UMC_HWIP, 0)) < 12) {
+		memcpy(err_data->err_addr, bps,
+			sizeof(struct eeprom_table_record) * adev->umc.retire_unit);
+		goto out;
+	}
+
+	for (i = 0; i < adev->umc.retire_unit; i++)
+		bps[i].retired_page &= ~(UMC_NPS_MASK << UMC_NPS_SHIFT);
+
+	if (save_nps || chan_idx_v2) {
+		if (save_nps == nps) {
+			if (amdgpu_umc_pages_in_a_row(adev, err_data,
+					bps[0].retired_page << AMDGPU_GPU_PAGE_SHIFT))
+				return -EINVAL;
+			for (i = 0; i < adev->umc.retire_unit; i++) {
+				err_data->err_addr[i].address = bps[0].address;
+				err_data->err_addr[i].mem_channel = bps[0].mem_channel;
+				err_data->err_addr[i].bank = bps[0].bank;
+				err_data->err_addr[i].err_type = bps[0].err_type;
+				err_data->err_addr[i].mcumc_id = bps[0].mcumc_id;
+			}
+		} else {
+			if (amdgpu_ras_mca2pa_by_idx(adev, &bps[0], err_data))
+				return -EINVAL;
+		}
+	} else {
+		if (bps[0].address == 0) {
+			/* for specific old eeprom data, mca address is not stored,
+			 * calc it from pa
+			 */
+			if (amdgpu_umc_pa2mca(adev, bps[0].retired_page << AMDGPU_GPU_PAGE_SHIFT,
+				&(bps[0].address), AMDGPU_NPS1_PARTITION_MODE))
+				return -EINVAL;
+		}
+
+		if (amdgpu_ras_mca2pa(adev, &bps[0], err_data)) {
+			if (nps == AMDGPU_NPS1_PARTITION_MODE)
+				memcpy(err_data->err_addr, bps,
+					sizeof(struct eeprom_table_record) * adev->umc.retire_unit);
+			else
+				return -EOPNOTSUPP;
+		}
+	}
+
+out:
 	return __amdgpu_ras_restore_bad_pages(adev, err_data->err_addr, adev->umc.retire_unit);
+}
+
+static int __amdgpu_ras_convert_rec_from_rom(struct amdgpu_device *adev,
+				struct eeprom_table_record *bps, struct ras_err_data *err_data,
+				enum amdgpu_memory_partition nps)
+{
+	int i = 0;
+	uint64_t chan_idx_v2;
+	enum amdgpu_memory_partition save_nps;
+
+	if (!amdgpu_ras_smu_eeprom_supported(adev)) {
+		save_nps = (bps->retired_page >> UMC_NPS_SHIFT) & UMC_NPS_MASK;
+		chan_idx_v2 = bps->retired_page & UMC_CHANNEL_IDX_V2;
+		bps->retired_page &= ~(UMC_NPS_MASK << UMC_NPS_SHIFT);
+	} else {
+		/* if pmfw manages eeprom, save_nps is not stored on eeprom,
+		 * we should always convert mca address into physical address,
+		 * make save_nps different from nps
+		 */
+		save_nps = nps + 1;
+	}
+
+	if (save_nps == nps) {
+		if (amdgpu_umc_pages_in_a_row(adev, err_data,
+				bps->retired_page << AMDGPU_GPU_PAGE_SHIFT))
+			return -EINVAL;
+		for (i = 0; i < adev->umc.retire_unit; i++) {
+			err_data->err_addr[i].address = bps->address;
+			err_data->err_addr[i].mem_channel = bps->mem_channel;
+			err_data->err_addr[i].bank = bps->bank;
+			err_data->err_addr[i].err_type = bps->err_type;
+			err_data->err_addr[i].mcumc_id = bps->mcumc_id;
+		}
+	} else {
+		if (save_nps || chan_idx_v2) {
+			if (amdgpu_ras_mca2pa_by_idx(adev, bps, err_data))
+				return -EINVAL;
+		} else {
+			/* for specific old eeprom data, mca address is not stored,
+			 * calc it from pa
+			 */
+			if (bps->address == 0)
+				if (amdgpu_umc_pa2mca(adev,
+					bps->retired_page << AMDGPU_GPU_PAGE_SHIFT,
+					&(bps->address),
+					AMDGPU_NPS1_PARTITION_MODE))
+					return -EINVAL;
+
+			if (amdgpu_ras_mca2pa(adev, bps, err_data))
+				return -EOPNOTSUPP;
+		}
+	}
+
+	return __amdgpu_ras_restore_bad_pages(adev, err_data->err_addr,
+									adev->umc.retire_unit);
 }
 
 /* it deal with vram only. */
@@ -2998,7 +3173,8 @@ int amdgpu_ras_add_bad_pages(struct amdgpu_device *adev,
 
 	if (from_rom) {
 		/* there is no pa recs in V3, so skip pa recs processing */
-		if (control->tbl_hdr.version < RAS_TABLE_VER_V3) {
+		if ((control->tbl_hdr.version < RAS_TABLE_VER_V3) &&
+		    !amdgpu_ras_smu_eeprom_supported(adev)) {
 			for (i = 0; i < pages; i++) {
 				if (control->ras_num_recs - i >= adev->umc.retire_unit) {
 					if ((bps[i].address == bps[i + 1].address) &&
@@ -3015,8 +3191,10 @@ int amdgpu_ras_add_bad_pages(struct amdgpu_device *adev,
 				}
 			}
 		}
-		for (; i < pages; i++)
-			bps[i].retired_page &= ~(UMC_NPS_MASK << UMC_NPS_SHIFT);
+		for (; i < pages; i++) {
+			ret = __amdgpu_ras_convert_rec_from_rom(adev,
+				&bps[i], &err_data, nps);
+		}
 
 		con->eh_data->count_saved = con->eh_data->count;
 	} else {
@@ -3041,7 +3219,7 @@ int amdgpu_ras_save_bad_pages(struct amdgpu_device *adev,
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 	struct ras_err_handler_data *data;
 	struct amdgpu_ras_eeprom_control *control;
-	int save_count, unit_num;
+	int save_count, unit_num, i;
 
 	if (!con || !con->eh_data) {
 		if (new_cnt)
@@ -3078,10 +3256,21 @@ int amdgpu_ras_save_bad_pages(struct amdgpu_device *adev,
 	/* only new entries are saved */
 	if (unit_num && save_count) {
 		/*old asics only save pa to eeprom like before*/
-		if (amdgpu_ras_eeprom_append(control,
-				&data->bps[data->count_saved], unit_num)) {
-			dev_err(adev->dev, "Failed to save EEPROM table data!");
-			return -EIO;
+		if (IP_VERSION_MAJ(amdgpu_ip_version(adev, UMC_HWIP, 0)) < 12) {
+			if (amdgpu_ras_eeprom_append(control,
+					&data->bps[data->count_saved], unit_num)) {
+				dev_err(adev->dev, "Failed to save EEPROM table data!");
+				return -EIO;
+			}
+		} else {
+			for (i = 0; i < unit_num; i++) {
+				if (amdgpu_ras_eeprom_append(control,
+						&data->bps[data->count_saved +
+						i * adev->umc.retire_unit], 1)) {
+					dev_err(adev->dev, "Failed to save EEPROM table data!");
+					return -EIO;
+				}
+			}
 		}
 
 		dev_info(adev->dev, "Saved %d pages to EEPROM table.\n", save_count);
@@ -3100,7 +3289,7 @@ static int amdgpu_ras_load_bad_pages(struct amdgpu_device *adev)
 	struct amdgpu_ras_eeprom_control *control =
 		&adev->psp.ras_context.ras->eeprom_control;
 	struct eeprom_table_record *bps;
-	int ret;
+	int ret, i = 0;
 
 	/* no bad page record, skip eeprom access */
 	if (control->ras_num_recs == 0 || amdgpu_bad_page_threshold == 0)
@@ -3114,6 +3303,33 @@ static int amdgpu_ras_load_bad_pages(struct amdgpu_device *adev)
 	if (ret) {
 		dev_err(adev->dev, "Failed to load EEPROM table records!");
 	} else {
+		if (adev->umc.ras && adev->umc.ras->convert_ras_err_addr) {
+			/*In V3, there is no pa recs, and some cases(when address==0) may be parsed
+			as pa recs, so add verion check to avoid it.
+			*/
+			if ((control->tbl_hdr.version < RAS_TABLE_VER_V3) &&
+			    !amdgpu_ras_smu_eeprom_supported(adev)) {
+				for (i = 0; i < control->ras_num_recs; i++) {
+					if ((control->ras_num_recs - i) >= adev->umc.retire_unit) {
+						if ((bps[i].address == bps[i + 1].address) &&
+							(bps[i].mem_channel == bps[i + 1].mem_channel)) {
+							control->ras_num_pa_recs += adev->umc.retire_unit;
+							i += (adev->umc.retire_unit - 1);
+						} else {
+							control->ras_num_mca_recs +=
+										(control->ras_num_recs - i);
+							break;
+						}
+					} else {
+						control->ras_num_mca_recs += (control->ras_num_recs - i);
+						break;
+					}
+				}
+			} else {
+				control->ras_num_mca_recs = control->ras_num_recs;
+			}
+		}
+
 		ret = amdgpu_ras_add_bad_pages(adev, bps, control->ras_num_recs, true);
 		if (ret)
 			goto out;
@@ -3232,6 +3448,9 @@ int amdgpu_ras_init_badpage_info(struct amdgpu_device *adev)
 	ret = amdgpu_ras_eeprom_init(control);
 	control->is_eeprom_valid = !ret;
 
+	if (!adev->umc.ras || !adev->umc.ras->convert_ras_err_addr)
+		control->ras_num_pa_recs = control->ras_num_recs;
+
 	if (adev->umc.ras &&
 	    adev->umc.ras->get_retire_flip_bits)
 		adev->umc.ras->get_retire_flip_bits(adev);
@@ -3251,6 +3470,13 @@ int amdgpu_ras_init_badpage_info(struct amdgpu_device *adev)
 				adev, control->bad_channel_bitmap);
 			con->update_channel_flag = false;
 		}
+
+		/* The format action is only applied to new ASICs */
+		if (IP_VERSION_MAJ(amdgpu_ip_version(adev, UMC_HWIP, 0)) >= 12 &&
+		    control->tbl_hdr.version < RAS_TABLE_VER_V3)
+			if (!amdgpu_ras_eeprom_reset_table(control))
+				if (amdgpu_ras_save_bad_pages(adev, NULL))
+					dev_warn(adev->dev, "Failed to format RAS EEPROM data in V3 version!\n");
 	}
 
 	return 0;
