@@ -3427,6 +3427,35 @@ static void amdgpu_ras_validate_threshold(struct amdgpu_device *adev,
 	}
 }
 
+static void amdgpu_ras_ecc_log_init(struct ras_ecc_log_info *ecc_log)
+{
+	mutex_init(&ecc_log->lock);
+
+	INIT_RADIX_TREE(&ecc_log->de_page_tree, GFP_KERNEL);
+	ecc_log->de_queried_count = 0;
+	ecc_log->consumption_q_count = 0;
+}
+
+static void amdgpu_ras_ecc_log_fini(struct ras_ecc_log_info *ecc_log)
+{
+	struct radix_tree_iter iter;
+	void __rcu **slot;
+	struct ras_ecc_err *ecc_err;
+
+	mutex_lock(&ecc_log->lock);
+	radix_tree_for_each_slot(slot, &ecc_log->de_page_tree, &iter, 0) {
+		ecc_err = radix_tree_deref_slot(slot);
+		kfree(ecc_err->err_pages.pfn);
+		kfree(ecc_err);
+		radix_tree_iter_delete(&ecc_log->de_page_tree, &iter, slot);
+	}
+	mutex_unlock(&ecc_log->lock);
+
+	mutex_destroy(&ecc_log->lock);
+	ecc_log->de_queried_count = 0;
+	ecc_log->consumption_q_count = 0;
+}
+
 int amdgpu_ras_init_badpage_info(struct amdgpu_device *adev)
 {
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
@@ -3530,6 +3559,7 @@ int amdgpu_ras_recovery_init(struct amdgpu_device *adev, bool init_bp_info)
 	mutex_init(&con->page_rsv_lock);
 	mutex_init(&con->page_retirement_lock);
 
+	amdgpu_ras_ecc_log_init(&con->umc_ecc_log);
 #ifdef CONFIG_X86_MCE_AMD
 	if ((adev->asic_type == CHIP_ALDEBARAN) &&
 	    (adev->gmc.xgmi.connected_to_cpu))
@@ -3569,6 +3599,8 @@ static int amdgpu_ras_recovery_fini(struct amdgpu_device *adev)
 	mutex_destroy(&con->page_rsv_lock);
 
 	cancel_work_sync(&con->recovery_work);
+
+	amdgpu_ras_ecc_log_fini(&con->umc_ecc_log);
 
 	mutex_lock(&con->recovery_lock);
 	con->eh_data = NULL;
