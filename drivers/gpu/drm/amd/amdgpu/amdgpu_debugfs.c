@@ -2184,8 +2184,6 @@ int amdgpu_debugfs_init(struct amdgpu_device *adev)
 
 		if (!ring)
 			continue;
-		if (ring == &adev->cper.ring_buf && !adev->cper.enabled)
-			continue;
 
 		amdgpu_debugfs_ring_init(adev, ring);
 	}

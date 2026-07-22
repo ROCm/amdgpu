@@ -92,7 +92,6 @@ int amdgpu_cper_generate_bp_threshold_record(struct amdgpu_device *adev);
 void amdgpu_cper_ring_write(struct amdgpu_ring *ring,
 			void *src, int count);
 int amdgpu_cper_init(struct amdgpu_device *adev);
-int amdgpu_cper_deferred_init(struct amdgpu_device *adev);
 int amdgpu_cper_fini(struct amdgpu_device *adev);
 
 #endif

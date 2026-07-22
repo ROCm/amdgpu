@@ -5008,13 +5008,7 @@ void amdgpu_ras_post_reset(struct amdgpu_device *adev,
 	}
 }
 
-int amdgpu_ras_resume_after_reset(struct amdgpu_device *adev)
+void amdgpu_ras_resume_after_reset(struct amdgpu_device *adev)
 {
-	int r;
-
-	r = amdgpu_ras_mgr_resume_after_reset(adev);
-	if (r)
-		return r;
-
-	return amdgpu_cper_deferred_init(adev);
+	amdgpu_ras_mgr_resume_after_reset(adev);
 }

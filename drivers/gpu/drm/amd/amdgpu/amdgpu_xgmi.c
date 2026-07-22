@@ -1399,10 +1399,7 @@ static void amdgpu_xgmi_reset_on_init_work(struct work_struct *work)
 		 * no-op for any other reset path where RAS is already
 		 * initialized, and for non-uniras devices.
 		 */
-		r = amdgpu_ras_resume_after_reset(tmp_adev);
-		if (r)
-			dev_err(tmp_adev->dev,
-				"failed to resume RAS after XGMI reset-on-init\n");
+		amdgpu_ras_resume_after_reset(tmp_adev);
 	}
 }
 
