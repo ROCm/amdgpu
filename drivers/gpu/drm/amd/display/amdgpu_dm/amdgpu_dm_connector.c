@@ -1680,7 +1680,11 @@ static bool amdgpu_dm_hide_secondary_tile_from_userspace(struct drm_connector *c
 	if (!aconnector->dc_sink->edid_caps.panel_patch.disable_second_tile)
 		return false;
 
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	drm_edid_connector_update(connector, aconnector->drm_edid);
+#else
+	drm_connector_update_edid_property(connector, aconnector->edid);
+#endif
 
 	if (!connector->has_tile)
 		return false;
