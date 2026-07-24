@@ -1500,10 +1500,6 @@ void kfd_process_notifier_release_internal(struct kfd_process *p)
 		kfd_unref_process(p);
 
 	/*
-	 * Dequeue and destroy user queues, it is not safe for GPU to access
-	 * system memory after mmu release notifier callback returns because
-	 * exit_mmap free process memory afterwards.
-	 *
 	 * p->mutex must be held across dequeue+pqm_uninit+dlog release: a
 	 * cross-process profiler can walk pqm->queues under target->mutex while
 	 * dequeue frees q->mqd, so serialize to avoid a use-after-free.
@@ -1511,8 +1507,6 @@ void kfd_process_notifier_release_internal(struct kfd_process *p)
 	mutex_lock(&p->mutex);
 	/* Block a racing profiler OPEN_STREAM from arming a torn-down process. */
 	p->dlog_teardown = true;
-	kfd_process_dequeue_from_all_devices(p);
-	pqm_uninit(&p->pqm);
 	/*
 	 * Queues stopped: terminate the target's streams then release the PQM
 	 * sessions. The KFD-owned BO is not freed here (final records stay
@@ -1522,16 +1516,17 @@ void kfd_process_notifier_release_internal(struct kfd_process *p)
 	kfd_dispatch_log_release_process(p);
 	mutex_unlock(&p->mutex);
 
-	for (i = 0; i < p->n_pdds; i++) {
-		struct kfd_process_device *pdd = p->pdds[i];
-
-		/* re-enable GFX OFF since runtime enable with ttmp setup disabled it. */
-		if (!kfd_dbg_is_rlc_restore_supported(pdd->dev) && p->runtime_info.ttmp_setup)
-			amdgpu_gfx_off_ctrl(pdd->dev->adev, true);
-	}
-
-	/* Indicate to other users that MM is no longer valid */
-	p->mm = NULL;
+	/*
+	 * Disable debug BEFORE dequeuing/flushing the MES process context.
+	 *
+	 * kfd_dbg_trap_disable() -> kfd_dbg_trap_deactivate() issues
+	 * SET_SHADER_DEBUGGER (process_ctx_flush=0) packets that re-add the
+	 * process to the MES scheduler list. kfd_process_dequeue_from_all_devices()
+	 * sends the process_ctx_flush=1 that retires the context. If debug
+	 * teardown ran after the dequeue, those packets would put the process
+	 * back on the MES list and, once proc_ctx_bo is freed, MES would fault
+	 * on the freed process context. Retiring the context last avoids this.
+	 */
 	kfd_dbg_trap_disable(p);
 
 	if (atomic_read(&p->debugged_process_count) > 0) {
@@ -1551,6 +1546,25 @@ void kfd_process_notifier_release_internal(struct kfd_process *p)
 
 		srcu_read_unlock(&kfd_processes_srcu, idx);
 	}
+	
+	/*
+	 * Dequeue and destroy user queues, it is not safe for GPU to access
+	 * system memory after mmu release notifier callback returns because
+	 * exit_mmap free process memory afterwards.
+	 */
+	kfd_process_dequeue_from_all_devices(p);
+	pqm_uninit(&p->pqm);
+
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		/* re-enable GFX OFF since runtime enable with ttmp setup disabled it. */
+		if (!kfd_dbg_is_rlc_restore_supported(pdd->dev) && p->runtime_info.ttmp_setup)
+			amdgpu_gfx_off_ctrl(pdd->dev->adev, true);
+	}
+
+	/* Indicate to other users that MM is no longer valid */
+	p->mm = NULL;
 
 #ifdef HAVE_MMU_NOTIFIER_PUT
 	if (p->context_id == KFD_CONTEXT_ID_PRIMARY)
