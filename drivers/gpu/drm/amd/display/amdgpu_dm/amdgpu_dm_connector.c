@@ -244,7 +244,7 @@ STATIC_IFN_KUNIT enum drm_mode_subconnector get_subconnector_type(struct dc_link
 }
 EXPORT_IF_KUNIT(get_subconnector_type);
 
-static void update_subconnector_property(struct amdgpu_dm_connector *aconnector)
+STATIC_IFN_KUNIT void update_subconnector_property(struct amdgpu_dm_connector *aconnector)
 {
 	struct dc_link *link = aconnector->dc_link;
 	struct drm_connector *connector = &aconnector->base;
@@ -261,10 +261,11 @@ static void update_subconnector_property(struct amdgpu_dm_connector *aconnector)
 			subconnector);
 #endif
 }
+EXPORT_IF_KUNIT(update_subconnector_property);
 
 static int amdgpu_dm_connector_get_modes(struct drm_connector *connector);
 
-static void amdgpu_dm_fbc_init(struct drm_connector *connector)
+STATIC_IFN_KUNIT void amdgpu_dm_fbc_init(struct drm_connector *connector)
 {
 	struct amdgpu_device *adev = drm_to_adev(connector->dev);
 	struct dm_compressor_info *compressor = &adev->dm.compressor;
@@ -302,6 +303,7 @@ static void amdgpu_dm_fbc_init(struct drm_connector *connector)
 	}
 
 }
+EXPORT_IF_KUNIT(amdgpu_dm_fbc_init);
 
 
 int amdgpu_dm_detect_mst_link_for_all_connectors(struct drm_device *dev)
@@ -339,6 +341,7 @@ int amdgpu_dm_detect_mst_link_for_all_connectors(struct drm_device *dev)
 
 	return ret;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_detect_mst_link_for_all_connectors);
 
 static void hdmi_cec_unset_edid(struct amdgpu_dm_connector *aconnector)
 {
@@ -403,45 +406,45 @@ amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_commit *state,
 
 	return NULL;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_find_first_crtc_matching_connector);
 
 #ifdef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
-static void dm_set_panel_type(struct amdgpu_dm_connector *aconnector)
+STATIC_IFN_KUNIT void amdgpu_dm_set_panel_type(struct amdgpu_dm_connector *aconnector)
 {
 	struct drm_connector *connector = &aconnector->base;
 	struct drm_display_info *display_info = &connector->display_info;
 	struct dc_link *link = aconnector->dc_link;
 	struct amdgpu_device *adev;
+	enum dc_panel_type panel_type = PANEL_TYPE_NONE;
 
 	adev = drm_to_adev(connector->dev);
 
-	link->panel_type = PANEL_TYPE_NONE;
-
 	switch (display_info->amd_vsdb.panel_type) {
 	case AMD_VSDB_PANEL_TYPE_OLED:
-		link->panel_type = PANEL_TYPE_OLED;
+		panel_type = PANEL_TYPE_OLED;
 		break;
 	case AMD_VSDB_PANEL_TYPE_MINILED:
-		link->panel_type = PANEL_TYPE_MINILED;
+		panel_type = PANEL_TYPE_MINILED;
 		break;
 	}
 
 	/* If VSDB didn't determine panel type, check DPCD ext caps */
-	if (link->panel_type == PANEL_TYPE_NONE) {
+	if (panel_type == PANEL_TYPE_NONE) {
 		if (link->dpcd_sink_ext_caps.bits.miniled == 1)
-			link->panel_type = PANEL_TYPE_MINILED;
+			panel_type = PANEL_TYPE_MINILED;
 		if (link->dpcd_sink_ext_caps.bits.oled == 1)
-			link->panel_type = PANEL_TYPE_OLED;
+			panel_type = PANEL_TYPE_OLED;
 	}
 
 	/* If VSDB and DPCD didn't determine panel type, check DID */
-	if (link->panel_type == PANEL_TYPE_NONE) {
+	if (panel_type == PANEL_TYPE_NONE) {
 		if (display_info->panel_type == DRM_MODE_PANEL_TYPE_LCD)
-			link->panel_type = PANEL_TYPE_LCD;
+			panel_type = PANEL_TYPE_LCD;
 		else if (display_info->panel_type == DRM_MODE_PANEL_TYPE_OLED)
-			link->panel_type = PANEL_TYPE_OLED;
+			panel_type = PANEL_TYPE_OLED;
 	}
 
-	if (link->panel_type == PANEL_TYPE_NONE) {
+	if (panel_type == PANEL_TYPE_NONE) {
 		struct drm_amd_vsdb_info *vsdb = &display_info->amd_vsdb;
 		u32 lum1_max = vsdb->luminance_range1.max_luminance;
 		u32 lum2_max = vsdb->luminance_range2.max_luminance;
@@ -450,8 +453,13 @@ static void dm_set_panel_type(struct amdgpu_dm_connector *aconnector)
 		    link->local_sink->edid_caps.manufacturer_id ==
 		    DDC_MANUFACTURERNAME_SAMSUNG &&
 		    lum1_max >= ((lum2_max * 3) / 2))
-			link->panel_type = PANEL_TYPE_MINILED;
+			panel_type = PANEL_TYPE_MINILED;
 	}
+
+	if (panel_type != PANEL_TYPE_NONE)
+		link->panel_type = panel_type;
+	else
+		link->panel_type = PANEL_TYPE_LCD;
 
 	if (link->panel_type == PANEL_TYPE_OLED)
 		drm_object_property_set_value(&connector->base,
@@ -468,7 +476,36 @@ static void dm_set_panel_type(struct amdgpu_dm_connector *aconnector)
 
 	drm_dbg_kms(aconnector->base.dev, "Panel type: %d\n", link->panel_type);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_set_panel_type);
 #endif
+
+STATIC_IFN_KUNIT void amdgpu_dm_update_cacp_caps(struct amdgpu_dm_connector *aconnector)
+{
+	struct amdgpu_device *adev = drm_to_adev(aconnector->base.dev);
+	struct dc_link *link = aconnector->dc_link;
+
+	link->panel_config.cacp.cacp_supported = true;
+
+	if (amdgpu_ip_version(adev, DCE_HWIP, 0) < IP_VERSION(3, 1, 4) ||
+	    amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(3, 1, 6)) {
+		link->panel_config.cacp.cacp_supported = false;
+		return;
+	}
+
+	if (link->connector_signal != SIGNAL_TYPE_EDP &&
+	    link->connector_signal != SIGNAL_TYPE_LVDS) {
+		link->panel_config.cacp.cacp_supported = false;
+		return;
+	}
+
+	if (link->panel_type == PANEL_TYPE_LCD)
+		link->panel_config.cacp.cacp_supported = false;
+
+	drm_dbg_kms(aconnector->base.dev, "cacp_supported: %d\n",
+		    link->panel_config.cacp.cacp_supported);
+}
+EXPORT_IF_KUNIT(amdgpu_dm_update_cacp_caps);
+
 DEFINE_FREE(sink_release, struct dc_sink *, if (_T) dc_sink_release(_T))
 
 void amdgpu_dm_update_connector_after_detect(
@@ -477,6 +514,8 @@ void amdgpu_dm_update_connector_after_detect(
 	struct drm_connector *connector = &aconnector->base;
 	struct dc_sink *sink __free(sink_release) = NULL;
 	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = drm_to_adev(dev);
+	int inst;
 
 	/* MST handled by drm_mst framework */
 	if (aconnector->mst_mgr.mst_state)
@@ -614,8 +653,10 @@ void amdgpu_dm_update_connector_after_detect(
 #endif
 		amdgpu_dm_update_connector_ext_caps(aconnector);
 #ifdef HAVE_DRM_DISPLAY_INFO_AMD_VSDB
-		dm_set_panel_type(aconnector);
+		amdgpu_dm_set_panel_type(aconnector);
 #endif
+		amdgpu_dm_update_cacp_caps(aconnector);
+
 		if (aconnector->hdmi_comp_auto) {
 			if (sink->sink_signal != SIGNAL_TYPE_HDMI_FRL)
 				sink->sink_signal = SIGNAL_TYPE_HDMI_FRL;
@@ -638,6 +679,13 @@ void amdgpu_dm_update_connector_after_detect(
 		/* Set CP to DESIRED if it was ENABLED, so we can re-enable it again on hotplug */
 		if (connector->state->content_protection == DRM_MODE_CONTENT_PROTECTION_ENABLED)
 			connector->state->content_protection = DRM_MODE_CONTENT_PROTECTION_DESIRED;
+
+		mutex_lock(&adev->dm.audio_lock);
+		inst = aconnector->audio_inst;
+		aconnector->audio_inst = -1;
+		mutex_unlock(&adev->dm.audio_lock);
+		if (inst != -1)
+			amdgpu_dm_audio_eld_notify(adev, inst);
 	}
 
 	update_subconnector_property(aconnector);
@@ -837,7 +885,7 @@ STATIC_IFN_KUNIT bool adjust_colour_depth_from_display_info(
 }
 EXPORT_IF_KUNIT(adjust_colour_depth_from_display_info);
 
-static void fill_stream_properties_from_drm_display_mode(
+STATIC_IFN_KUNIT void fill_stream_properties_from_drm_display_mode(
 	struct dc_stream_state *stream,
 	const struct drm_display_mode *mode_in,
 	const struct drm_connector *connector,
@@ -953,8 +1001,9 @@ static void fill_stream_properties_from_drm_display_mode(
 	stream->output_color_space = amdgpu_dm_get_output_color_space(timing_out, connector_state);
 	stream->content_type = get_output_content_type(connector_state);
 }
+EXPORT_IF_KUNIT(fill_stream_properties_from_drm_display_mode);
 
-static void
+STATIC_IFN_KUNIT void
 copy_crtc_timing_for_drm_display_mode(const struct drm_display_mode *src_mode,
 				      struct drm_display_mode *dst_mode)
 {
@@ -973,6 +1022,7 @@ copy_crtc_timing_for_drm_display_mode(const struct drm_display_mode *src_mode,
 	dst_mode->crtc_vsync_end = src_mode->crtc_vsync_end;
 	dst_mode->crtc_vtotal = src_mode->crtc_vtotal;
 }
+EXPORT_IF_KUNIT(copy_crtc_timing_for_drm_display_mode);
 
 STATIC_IFN_KUNIT void
 decide_crtc_timing_for_drm_display_mode(struct drm_display_mode *drm_mode,
@@ -1253,6 +1303,9 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 #endif
 	struct dc_dsc_config_options dsc_options = {0};
 
+	if (!aconnector->dc_link)
+		return;
+
 	dc_dsc_get_default_config_option(dc, &dsc_options);
 	dsc_options.max_target_bpp_limit_override_x16 = max_dsc_target_bpp_limit_override * 16;
 
@@ -1314,7 +1367,7 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 							(dsc_caps->is_frl == 1) ? "HDMI FRL RX" : "DP-HDMI PCON");
 				}
 		}
-	} else if (aconnector->dc_link && sink->sink_signal == SIGNAL_TYPE_HDMI_FRL) {
+	} else if (sink->sink_signal == SIGNAL_TYPE_HDMI_FRL) {
 		frl_verified_link_cap = dc_link_get_frl_link_cap(stream->link);
 		timing_bw_in_kbps = dc_bandwidth_in_kbps_from_timing(&stream->timing, DC_LINK_ENCODING_HDMI_FRL);
 		link_bandwidth_kbps = dc_link_frl_bandwidth_kbps(stream->link, frl_verified_link_cap->frl_link_rate);
@@ -2349,7 +2402,7 @@ amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
 		drm_atomic_get_new_connector_state(state, conn);
 	struct drm_connector_state *old_con_state =
 		drm_atomic_get_old_connector_state(state, conn);
-	struct drm_crtc *crtc = new_con_state->crtc;
+	struct drm_crtc *crtc;
 	struct drm_crtc_state *new_crtc_state;
 	struct amdgpu_dm_connector *aconn = to_amdgpu_dm_connector(conn);
 	int ret;
@@ -2367,6 +2420,7 @@ amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
 #endif
 	}
 
+	crtc = new_con_state->crtc;
 	if (!crtc)
 		return 0;
 #ifdef HAVE_DRM_CONNECTOR_UPDATE_PRIVACY_SCREEN

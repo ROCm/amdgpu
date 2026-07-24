@@ -195,6 +195,9 @@ static struct list_head *remove_irq_handler(struct amdgpu_device *adev,
 		return NULL;
 	}
 
+	if (int_params->int_context == INTERRUPT_LOW_IRQ_CONTEXT)
+		cancel_work_sync(&handler->work);
+
 	kfree(handler);
 
 	DRM_DEBUG_KMS(
@@ -202,55 +205,6 @@ static struct list_head *remove_irq_handler(struct amdgpu_device *adev,
 		ih, int_params->irq_source, int_params->int_context);
 
 	return hnd_list;
-}
-
-/**
- * unregister_all_irq_handlers() - Cleans up handlers from the DM IRQ table
- * @adev: The base driver device containing the DM device
- *
- * Go through low and high context IRQ tables and deallocate handlers.
- */
-static void unregister_all_irq_handlers(struct amdgpu_device *adev)
-{
-	struct list_head *hnd_list_low;
-	struct list_head *hnd_list_high;
-	struct list_head *entry, *tmp;
-	struct amdgpu_dm_irq_handler_data *handler;
-	unsigned long irq_table_flags;
-	int i;
-
-	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
-
-	for (i = 0; i < DAL_IRQ_SOURCES_NUMBER; i++) {
-		hnd_list_low = &adev->dm.irq_handler_list_low_tab[i];
-		hnd_list_high = &adev->dm.irq_handler_list_high_tab[i];
-
-		list_for_each_safe(entry, tmp, hnd_list_low) {
-
-			handler = list_entry(entry, struct amdgpu_dm_irq_handler_data,
-					     list);
-
-			if (handler == NULL || handler->handler == NULL)
-				continue;
-
-			list_del(&handler->list);
-			kfree(handler);
-		}
-
-		list_for_each_safe(entry, tmp, hnd_list_high) {
-
-			handler = list_entry(entry, struct amdgpu_dm_irq_handler_data,
-					     list);
-
-			if (handler == NULL || handler->handler == NULL)
-				continue;
-
-			list_del(&handler->list);
-			kfree(handler);
-		}
-	}
-
-	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 }
 
 static bool
@@ -443,6 +397,21 @@ int amdgpu_dm_irq_init(struct amdgpu_device *adev)
 
 	spin_lock_init(&adev->dm.irq_handler_list_table_lock);
 
+	adev->dm.irq_wq = alloc_workqueue("amdgpu_dm_irq",
+		WQ_UNBOUND | WQ_HIGHPRI, 0);
+
+	if (!adev->dm.irq_wq)
+		return -ENOMEM;
+
+	adev->dm.vmin_vmax_wq = alloc_workqueue("amdgpu_dm_vmin_vmax",
+		WQ_UNBOUND, 0);
+
+	if (!adev->dm.vmin_vmax_wq) {
+		destroy_workqueue(adev->dm.irq_wq);
+		adev->dm.irq_wq = NULL;
+		return -ENOMEM;
+	}
+
 	for (src = 0; src < DAL_IRQ_SOURCES_NUMBER; src++) {
 		/* low context handler list init */
 		lh = &adev->dm.irq_handler_list_low_tab[src];
@@ -459,38 +428,81 @@ EXPORT_IF_KUNIT(amdgpu_dm_irq_init);
  * amdgpu_dm_irq_fini() - Tear down DM IRQ management
  * @adev: The base driver device containing the DM device
  *
- * Flush all work within the low context IRQ table.
+ * Removes all handlers from the IRQ tables under the spinlock, cancels
+ * pending work items, and deallocates all handler data.
  */
 void amdgpu_dm_irq_fini(struct amdgpu_device *adev)
 {
 	int src;
-	struct list_head *lh;
+	LIST_HEAD(low_handlers);
+	LIST_HEAD(high_handlers);
 	struct list_head *entry, *tmp;
 	struct amdgpu_dm_irq_handler_data *handler;
 	unsigned long irq_table_flags;
 
 	DRM_DEBUG_KMS("DM_IRQ: releasing resources.\n");
+
 	for (src = 0; src < DAL_IRQ_SOURCES_NUMBER; src++) {
 		DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
-		/* The handler was removed from the table,
-		 * it means it is safe to flush all the 'work'
-		 * (because no code can schedule a new one).
+
+		/*
+		 * Move all handlers from the low and high context tables to
+		 * temporary lists under the lock. This prevents the ISR from
+		 * finding them while we process them outside the lock.
 		 */
-		lh = &adev->dm.irq_handler_list_low_tab[src];
+		list_splice_init(&adev->dm.irq_handler_list_low_tab[src],
+				 &low_handlers);
+		list_splice_init(&adev->dm.irq_handler_list_high_tab[src],
+				 &high_handlers);
+
 		DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 
-		if (!list_empty(lh)) {
-			list_for_each_safe(entry, tmp, lh) {
-				handler = list_entry(
-					entry,
-					struct amdgpu_dm_irq_handler_data,
-					list);
-				flush_work(&handler->work);
-			}
+		/*
+		 * Cancel all pending work for the low-context handlers
+		 * outside the lock. cancel_work_sync() may sleep and waits
+		 * until any running work completes, preventing UAF.
+		 */
+		list_for_each_safe(entry, tmp, &low_handlers) {
+			handler = list_entry(entry,
+					    struct amdgpu_dm_irq_handler_data,
+					    list);
+			cancel_work_sync(&handler->work);
 		}
+
+		/*
+		 * High-context handlers are executed synchronously within ISR
+		 * context (see amdgpu_dm_irq_immediate_work()) and have no
+		 * work_struct, so there is no pending work to cancel here.
+		 * They will be freed along with low_handlers after the loop.
+		 */
 	}
-	/* Deallocate handlers from the table. */
-	unregister_all_irq_handlers(adev);
+
+	/* Deallocate all handlers. */
+	list_for_each_safe(entry, tmp, &low_handlers) {
+		handler = list_entry(entry,
+				     struct amdgpu_dm_irq_handler_data,
+				     list);
+		list_del(&handler->list);
+		kfree(handler);
+	}
+
+	list_for_each_safe(entry, tmp, &high_handlers) {
+		handler = list_entry(entry,
+				     struct amdgpu_dm_irq_handler_data,
+				     list);
+		list_del(&handler->list);
+		kfree(handler);
+	}
+
+	if (adev->dm.vmin_vmax_wq) {
+		destroy_workqueue(adev->dm.vmin_vmax_wq);
+		adev->dm.vmin_vmax_wq = NULL;
+	}
+
+	if (adev->dm.irq_wq) {
+		destroy_workqueue(adev->dm.irq_wq);
+		adev->dm.irq_wq = NULL;
+	}
 }
 EXPORT_IF_KUNIT(amdgpu_dm_irq_fini);
 
@@ -498,7 +510,6 @@ void amdgpu_dm_irq_suspend(struct amdgpu_device *adev)
 {
 	struct drm_device *dev = adev_to_drm(adev);
 	int src;
-	struct list_head *hnd_list_h;
 	struct list_head *hnd_list_l;
 	unsigned long irq_table_flags;
 	struct list_head *entry, *tmp;
@@ -511,12 +522,15 @@ void amdgpu_dm_irq_suspend(struct amdgpu_device *adev)
 	/**
 	 * Disable HW interrupt  for HPD and HPDRX only since FLIP and VBLANK
 	 * will be disabled from manage_dm_interrupts on disable CRTC.
+	 *
+	 * Disable the HW interrupt first, then flush any pending work. Since
+	 * the HW interrupt is disabled under the lock, no new IRQ can be
+	 * generated after the disable completes. Any work already queued by an
+	 * in-flight ISR will be flushed below.
 	 */
 	for (src = DC_IRQ_SOURCE_HPD1; src <= DC_IRQ_SOURCE_HPD6RX; src++) {
 		hnd_list_l = &adev->dm.irq_handler_list_low_tab[src];
-		hnd_list_h = &adev->dm.irq_handler_list_high_tab[src];
-		if (!list_empty(hnd_list_l) || !list_empty(hnd_list_h))
-			dc_interrupt_set(adev->dm.dc, src, false);
+		dc_interrupt_set(adev->dm.dc, src, false);
 
 		DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 
@@ -537,6 +551,7 @@ void amdgpu_dm_irq_suspend(struct amdgpu_device *adev)
 	if (dev->mode_config.poll_enabled)
 		drm_kms_helper_poll_disable(dev);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_suspend);
 
 void amdgpu_dm_irq_resume_early(struct amdgpu_device *adev)
 {
@@ -558,6 +573,7 @@ void amdgpu_dm_irq_resume_early(struct amdgpu_device *adev)
 
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_resume_early);
 
 void amdgpu_dm_irq_resume_late(struct amdgpu_device *adev)
 {
@@ -586,23 +602,27 @@ void amdgpu_dm_irq_resume_late(struct amdgpu_device *adev)
 	if (dev->mode_config.poll_enabled)
 		drm_kms_helper_poll_enable(dev);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_resume_late);
 
 /*
  * amdgpu_dm_irq_schedule_work - schedule all work items registered for the
  * "irq_source".
  */
-static void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
 					enum dc_irq_source irq_source)
 {
 	struct  list_head *handler_list = &adev->dm.irq_handler_list_low_tab[irq_source];
 	struct  amdgpu_dm_irq_handler_data *handler_data;
 	bool    work_queued = false;
+	unsigned long irq_table_flags;
+
+	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
 
 	if (list_empty(handler_list))
-		return;
+		goto out_unlock;
 
 	list_for_each_entry(handler_data, handler_list, list) {
-		if (queue_work(system_highpri_wq, &handler_data->work)) {
+		if (queue_work(adev->dm.irq_wq, &handler_data->work)) {
 			work_queued = true;
 			break;
 		}
@@ -617,7 +637,7 @@ static void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
 		handler_data_add = kzalloc_obj(*handler_data, GFP_ATOMIC);
 		if (!handler_data_add) {
 			DRM_ERROR("DM_IRQ: failed to allocate irq handler!\n");
-			return;
+			goto out_unlock;
 		}
 
 		/*copy new amdgpu_dm_irq_handler_data members from handler_data*/
@@ -630,7 +650,7 @@ static void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
 
 		INIT_WORK(&handler_data_add->work, dm_irq_work_func);
 
-		if (queue_work(system_highpri_wq, &handler_data_add->work))
+		if (queue_work(adev->dm.irq_wq, &handler_data_add->work))
 			DRM_DEBUG("Queued work for handling interrupt from "
 				  "display for IRQ source %d\n",
 				  irq_source);
@@ -639,13 +659,17 @@ static void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
 				  "from display for IRQ source %d\n",
 				  irq_source);
 	}
+
+out_unlock:
+	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_schedule_work);
 
 /*
  * amdgpu_dm_irq_immediate_work
  * Callback high irq work immediately, don't send to work queue
  */
-static void amdgpu_dm_irq_immediate_work(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT void amdgpu_dm_irq_immediate_work(struct amdgpu_device *adev,
 					 enum dc_irq_source irq_source)
 {
 	struct amdgpu_dm_irq_handler_data *handler_data;
@@ -664,6 +688,7 @@ static void amdgpu_dm_irq_immediate_work(struct amdgpu_device *adev,
 
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_immediate_work);
 
 /**
  * amdgpu_dm_irq_handler - Generic DM IRQ handler
@@ -674,7 +699,7 @@ static void amdgpu_dm_irq_immediate_work(struct amdgpu_device *adev,
  * Calls all registered high irq work immediately, and schedules work for low
  * irq. The DM IRQ table is used to find the corresponding handlers.
  */
-static int amdgpu_dm_irq_handler(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT int amdgpu_dm_irq_handler(struct amdgpu_device *adev,
 				 struct amdgpu_irq_src *source,
 				 struct amdgpu_iv_entry *entry)
 {
@@ -694,6 +719,7 @@ static int amdgpu_dm_irq_handler(struct amdgpu_device *adev,
 
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_irq_handler);
 
 STATIC_IFN_KUNIT enum dc_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned int type)
 {
@@ -716,7 +742,7 @@ STATIC_IFN_KUNIT enum dc_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned int
 }
 EXPORT_IF_KUNIT(amdgpu_dm_hpd_to_dal_irq_source);
 
-static int amdgpu_dm_set_hpd_irq_state(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT int amdgpu_dm_set_hpd_irq_state(struct amdgpu_device *adev,
 				       struct amdgpu_irq_src *source,
 				       unsigned int type,
 				       enum amdgpu_interrupt_state state)
@@ -727,6 +753,7 @@ static int amdgpu_dm_set_hpd_irq_state(struct amdgpu_device *adev,
 	dc_interrupt_set(adev->dm.dc, src, st);
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_set_hpd_irq_state);
 
 static inline int dm_irq_state(struct amdgpu_device *adev,
 			       struct amdgpu_irq_src *source,
@@ -762,7 +789,7 @@ static inline int dm_irq_state(struct amdgpu_device *adev,
 	return 0;
 }
 
-static int amdgpu_dm_set_pflip_irq_state(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT int amdgpu_dm_set_pflip_irq_state(struct amdgpu_device *adev,
 					 struct amdgpu_irq_src *source,
 					 unsigned int crtc_id,
 					 enum amdgpu_interrupt_state state)
@@ -775,8 +802,9 @@ static int amdgpu_dm_set_pflip_irq_state(struct amdgpu_device *adev,
 		IRQ_TYPE_PFLIP,
 		__func__);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_set_pflip_irq_state);
 
-static int amdgpu_dm_set_crtc_irq_state(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT int amdgpu_dm_set_crtc_irq_state(struct amdgpu_device *adev,
 					struct amdgpu_irq_src *source,
 					unsigned int crtc_id,
 					enum amdgpu_interrupt_state state)
@@ -789,8 +817,9 @@ static int amdgpu_dm_set_crtc_irq_state(struct amdgpu_device *adev,
 		IRQ_TYPE_VBLANK,
 		__func__);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_set_crtc_irq_state);
 
-static int amdgpu_dm_set_vline0_irq_state(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT int amdgpu_dm_set_vline0_irq_state(struct amdgpu_device *adev,
 					struct amdgpu_irq_src *source,
 					unsigned int crtc_id,
 					enum amdgpu_interrupt_state state)
@@ -803,8 +832,9 @@ static int amdgpu_dm_set_vline0_irq_state(struct amdgpu_device *adev,
 		IRQ_TYPE_VLINE0,
 		__func__);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_set_vline0_irq_state);
 
-static int amdgpu_dm_set_dmub_outbox_irq_state(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT int amdgpu_dm_set_dmub_outbox_irq_state(struct amdgpu_device *adev,
 					struct amdgpu_irq_src *source,
 					unsigned int crtc_id,
 					enum amdgpu_interrupt_state state)
@@ -815,8 +845,9 @@ static int amdgpu_dm_set_dmub_outbox_irq_state(struct amdgpu_device *adev,
 	dc_interrupt_set(adev->dm.dc, irq_source, st);
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_set_dmub_outbox_irq_state);
 
-static int amdgpu_dm_set_vupdate_irq_state(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT int amdgpu_dm_set_vupdate_irq_state(struct amdgpu_device *adev,
 					   struct amdgpu_irq_src *source,
 					   unsigned int crtc_id,
 					   enum amdgpu_interrupt_state state)
@@ -829,8 +860,9 @@ static int amdgpu_dm_set_vupdate_irq_state(struct amdgpu_device *adev,
 		IRQ_TYPE_VUPDATE,
 		__func__);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_set_vupdate_irq_state);
 
-static int amdgpu_dm_set_dmub_trace_irq_state(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT int amdgpu_dm_set_dmub_trace_irq_state(struct amdgpu_device *adev,
 					   struct amdgpu_irq_src *source,
 					   unsigned int type,
 					   enum amdgpu_interrupt_state state)
@@ -841,6 +873,7 @@ static int amdgpu_dm_set_dmub_trace_irq_state(struct amdgpu_device *adev,
 	dc_interrupt_set(adev->dm.dc, irq_source, st);
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_set_dmub_trace_irq_state);
 
 static const struct amdgpu_irq_src_funcs dm_crtc_irq_funcs = {
 	.set = amdgpu_dm_set_crtc_irq_state,
@@ -900,12 +933,15 @@ void amdgpu_dm_set_irq_funcs(struct amdgpu_device *adev)
 	adev->hpd_irq.num_types = adev->mode_info.num_hpd;
 	adev->hpd_irq.funcs = &dm_hpd_irq_funcs;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_set_irq_funcs);
+
 void amdgpu_dm_outbox_init(struct amdgpu_device *adev)
 {
 	dc_interrupt_set(adev->dm.dc,
 		DC_IRQ_SOURCE_DMCUB_OUTBOX,
 		true);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_outbox_init);
 
 /**
  * amdgpu_dm_hpd_init - hpd setup callback.
@@ -988,6 +1024,7 @@ void amdgpu_dm_hpd_init(struct amdgpu_device *adev)
 	if (use_polling)
 		drm_kms_helper_poll_init(dev);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_hpd_init);
 
 /**
  * amdgpu_dm_hpd_fini - hpd tear down callback.
@@ -1041,6 +1078,7 @@ void amdgpu_dm_hpd_fini(struct amdgpu_device *adev)
 	if (dev->mode_config.poll_enabled)
 		drm_kms_helper_poll_fini(dev);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_hpd_fini);
 
 /* ========== HPD handling ========== */
 static void force_connector_state(
@@ -1058,7 +1096,7 @@ static void force_connector_state(
 	mutex_unlock(&aconnector->hpd_lock);
 }
 
-static void dm_handle_hpd_rx_offload_work(struct work_struct *work)
+STATIC_IFN_KUNIT void dm_handle_hpd_rx_offload_work(struct work_struct *work)
 {
 	struct hpd_rx_irq_offload_work *offload_work;
 	struct amdgpu_dm_connector *aconnector;
@@ -1151,6 +1189,7 @@ skip:
 	kfree(offload_work);
 
 }
+EXPORT_IF_KUNIT(dm_handle_hpd_rx_offload_work);
 
 struct hpd_rx_irq_offload_work_queue *amdgpu_dm_hpd_rx_irq_create_workqueue(struct amdgpu_device *adev)
 {
@@ -1187,6 +1226,7 @@ out_err:
 	kfree(hpd_rx_offload_wq);
 	return NULL;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_hpd_rx_irq_create_workqueue);
 
 void amdgpu_dm_hpd_rx_irq_work_suspend(struct amdgpu_display_manager *dm)
 {
@@ -1197,6 +1237,7 @@ void amdgpu_dm_hpd_rx_irq_work_suspend(struct amdgpu_display_manager *dm)
 			flush_workqueue(dm->hpd_rx_offload_wq[i].wq);
 	}
 }
+EXPORT_IF_KUNIT(amdgpu_dm_hpd_rx_irq_work_suspend);
 
 STATIC_IFN_KUNIT bool are_sinks_equal(const struct dc_sink *sink1, const struct dc_sink *sink2)
 {
@@ -1290,8 +1331,9 @@ void amdgpu_dm_hdmi_hpd_debounce_work(struct work_struct *work)
 			dc_allow_idle_optimizations(dc, true);
 	}
 }
+EXPORT_IF_KUNIT(amdgpu_dm_hdmi_hpd_debounce_work);
 
-static void handle_hpd_irq_helper(struct amdgpu_dm_connector *aconnector,
+STATIC_IFN_KUNIT void handle_hpd_irq_helper(struct amdgpu_dm_connector *aconnector,
 				  enum dc_detect_reason reason)
 {
 	struct drm_connector *connector = &aconnector->base;
@@ -1389,16 +1431,18 @@ static void handle_hpd_irq_helper(struct amdgpu_dm_connector *aconnector,
 		}
 	}
 }
+EXPORT_IF_KUNIT(handle_hpd_irq_helper);
 
-static void handle_hpd_irq(void *param)
+STATIC_IFN_KUNIT void handle_hpd_irq(void *param)
 {
 	struct amdgpu_dm_connector *aconnector = (struct amdgpu_dm_connector *)param;
 
 	handle_hpd_irq_helper(aconnector, DETECT_REASON_HPD);
 
 }
+EXPORT_IF_KUNIT(handle_hpd_irq);
 
-static void schedule_hpd_rx_offload_work(struct amdgpu_device *adev, struct hpd_rx_irq_offload_work_queue *offload_wq,
+STATIC_IFN_KUNIT void schedule_hpd_rx_offload_work(struct amdgpu_device *adev, struct hpd_rx_irq_offload_work_queue *offload_wq,
 							union hpd_irq_data hpd_irq_data)
 {
 	struct hpd_rx_irq_offload_work *offload_work =
@@ -1417,8 +1461,9 @@ static void schedule_hpd_rx_offload_work(struct amdgpu_device *adev, struct hpd_
 	queue_work(offload_wq->wq, &offload_work->work);
 	drm_dbg_kms(adev_to_drm(adev), "queue work to handle hpd_rx offload work");
 }
+EXPORT_IF_KUNIT(schedule_hpd_rx_offload_work);
 
-static void handle_hpd_rx_irq(void *param)
+STATIC_IFN_KUNIT void handle_hpd_rx_irq(void *param)
 {
 	struct amdgpu_dm_connector *aconnector = (struct amdgpu_dm_connector *)param;
 	struct drm_connector *connector = &aconnector->base;
@@ -1551,6 +1596,7 @@ out:
 
 	mutex_unlock(&aconnector->hpd_lock);
 }
+EXPORT_IF_KUNIT(handle_hpd_rx_irq);
 
 /**
  * dmub_hpd_callback - DMUB HPD interrupt processing callback.
@@ -1560,7 +1606,7 @@ out:
  * Dmub Hpd interrupt processing callback. Gets displayindex through the
  * ink index and calls helper to do the processing.
  */
-static void dmub_hpd_callback(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT void dmub_hpd_callback(struct amdgpu_device *adev,
 			      struct dmub_notification *notify)
 {
 	struct amdgpu_dm_connector *aconnector;
@@ -1626,6 +1672,7 @@ static void dmub_hpd_callback(struct amdgpu_device *adev,
 		}
 	}
 }
+EXPORT_IF_KUNIT(dmub_hpd_callback);
 
 /**
  * dmub_hpd_sense_callback - DMUB HPD sense processing callback.
@@ -1635,11 +1682,12 @@ static void dmub_hpd_callback(struct amdgpu_device *adev,
  * HPD sense changes can occur during low power states and need to be
  * notified from firmware to driver.
  */
-static void dmub_hpd_sense_callback(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT void dmub_hpd_sense_callback(struct amdgpu_device *adev,
 			      struct dmub_notification *notify)
 {
 	drm_dbg_driver(adev_to_drm(adev), "DMUB HPD SENSE callback.\n");
 }
+EXPORT_IF_KUNIT(dmub_hpd_sense_callback);
 
 int amdgpu_dm_register_hpd_handlers(struct amdgpu_device *adev)
 {
@@ -1717,6 +1765,7 @@ int amdgpu_dm_register_hpd_handlers(struct amdgpu_device *adev)
 	}
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_register_hpd_handlers);
 
 /* ========== IRQ handlers ========== */
 struct amdgpu_crtc *
@@ -1748,7 +1797,7 @@ EXPORT_IF_KUNIT(amdgpu_dm_get_crtc_by_otg_inst);
  * Handles the pageflip interrupt by notifying all interested parties
  * that the pageflip has been completed.
  */
-static void dm_pflip_high_irq(void *interrupt_params)
+STATIC_IFN_KUNIT void dm_pflip_high_irq(void *interrupt_params)
 {
 	struct amdgpu_crtc *amdgpu_crtc;
 	struct common_irq_params *irq_params = interrupt_params;
@@ -1844,8 +1893,9 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		      "crtc:%d[%p], pflip_stat:AMDGPU_FLIP_NONE, vrr[%d]-fp %d\n",
 		      amdgpu_crtc->crtc_id, amdgpu_crtc, vrr_active, (int)!e);
 }
+EXPORT_IF_KUNIT(dm_pflip_high_irq);
 
-static void dm_handle_vmin_vmax_update(struct work_struct *offload_work)
+STATIC_IFN_KUNIT void dm_handle_vmin_vmax_update(struct work_struct *offload_work)
 {
 	struct vupdate_offload_work *work = container_of(offload_work, struct vupdate_offload_work, work);
 	struct amdgpu_device *adev = work->adev;
@@ -1860,6 +1910,7 @@ static void dm_handle_vmin_vmax_update(struct work_struct *offload_work)
 	kfree(work->adjust);
 	kfree(work);
 }
+EXPORT_IF_KUNIT(dm_handle_vmin_vmax_update);
 
 static void schedule_dc_vmin_vmax(struct amdgpu_device *adev,
 	struct dc_stream_state *stream,
@@ -1887,10 +1938,10 @@ static void schedule_dc_vmin_vmax(struct amdgpu_device *adev,
 	offload_work->stream = stream;
 	offload_work->adjust = adjust_copy;
 
-	queue_work(system_percpu_wq, &offload_work->work);
+	queue_work(adev->dm.vmin_vmax_wq, &offload_work->work);
 }
 
-static void dm_vupdate_high_irq(void *interrupt_params)
+STATIC_IFN_KUNIT void dm_vupdate_high_irq(void *interrupt_params)
 {
 	struct common_irq_params *irq_params = interrupt_params;
 	struct amdgpu_device *adev = irq_params->adev;
@@ -1953,6 +2004,7 @@ static void dm_vupdate_high_irq(void *interrupt_params)
 		}
 	}
 }
+EXPORT_IF_KUNIT(dm_vupdate_high_irq);
 
 /**
  * dm_crtc_high_irq() - Handles CRTC interrupt
@@ -1961,7 +2013,7 @@ static void dm_vupdate_high_irq(void *interrupt_params)
  * Handles the CRTC/VSYNC interrupt by notfying DRM's VBLANK
  * event handler.
  */
-static void dm_crtc_high_irq(void *interrupt_params)
+STATIC_IFN_KUNIT void dm_crtc_high_irq(void *interrupt_params)
 {
 	struct common_irq_params *irq_params = interrupt_params;
 	struct amdgpu_device *adev = irq_params->adev;
@@ -2060,6 +2112,7 @@ static void dm_crtc_high_irq(void *interrupt_params)
 
 	spin_unlock_irqrestore(&adev_to_drm(adev)->event_lock, flags);
 }
+EXPORT_IF_KUNIT(dm_crtc_high_irq);
 
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
 /**
@@ -2084,7 +2137,7 @@ static void dm_dcn_vertical_interrupt0_high_irq(void *interrupt_params)
 }
 #endif /* CONFIG_DRM_AMD_SECURE_DISPLAY */
 
-static void dm_handle_hpd_work(struct work_struct *work)
+STATIC_IFN_KUNIT void dm_handle_hpd_work(struct work_struct *work)
 {
 	struct dmub_hpd_work *dmub_hpd_wrk;
 
@@ -2104,6 +2157,7 @@ static void dm_handle_hpd_work(struct work_struct *work)
 	kfree(dmub_hpd_wrk);
 
 }
+EXPORT_IF_KUNIT(dm_handle_hpd_work);
 
 STATIC_IFN_KUNIT const char *dmub_notification_type_str(enum dmub_notification_type e)
 {
@@ -2138,7 +2192,7 @@ EXPORT_IF_KUNIT(dmub_notification_type_str);
  * Handles the Outbox Interrupt
  * event handler.
  */
-static void dm_dmub_outbox1_low_irq(void *interrupt_params)
+STATIC_IFN_KUNIT void dm_dmub_outbox1_low_irq(void *interrupt_params)
 {
 	struct dmub_notification notify = {0};
 	struct common_irq_params *irq_params = interrupt_params;
@@ -2201,6 +2255,7 @@ static void dm_dmub_outbox1_low_irq(void *interrupt_params)
 		} while (notify.pending_notification);
 	}
 }
+EXPORT_IF_KUNIT(dm_dmub_outbox1_low_irq);
 
 /* Register IRQ sources and initialize IRQ callbacks */
 int amdgpu_dm_dce110_register_irq_handlers(struct amdgpu_device *adev)
@@ -2339,6 +2394,7 @@ int amdgpu_dm_dce110_register_irq_handlers(struct amdgpu_device *adev)
 
 	return r;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_dce110_register_irq_handlers);
 
 /* Register IRQ sources and initialize IRQ callbacks */
 int amdgpu_dm_dcn10_register_irq_handlers(struct amdgpu_device *adev)
@@ -2520,6 +2576,7 @@ int amdgpu_dm_dcn10_register_irq_handlers(struct amdgpu_device *adev)
 
 	return r;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_dcn10_register_irq_handlers);
 
 /* Register Outbox IRQ sources and initialize IRQ callbacks */
 int amdgpu_dm_register_outbox_irq_handlers(struct amdgpu_device *adev)
@@ -2557,3 +2614,4 @@ int amdgpu_dm_register_outbox_irq_handlers(struct amdgpu_device *adev)
 
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_register_outbox_irq_handlers);

@@ -108,6 +108,11 @@ void hdcp_get_link_display_adjustments(
 	bool hdcp_lc_enable_sw_fallback,
 	struct mod_hdcp_link_adjustment *link_adjust,
 	struct mod_hdcp_display_adjustment *display_adjust);
+void hdcp_update_display_encryption_control(struct hdcp_workqueue *hdcp_work,
+					    struct hdcp_workqueue *hdcp_w,
+					    unsigned int conn_index,
+					    bool enable_encryption);
+void event_property_update(struct work_struct *work);
 #endif
 
 #endif /* AMDGPU_DM_AMDGPU_DM_HDCP_H_ */

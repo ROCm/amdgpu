@@ -155,6 +155,17 @@ int amdgpu_dm_encoder_init(struct drm_device *dev,
 
 #if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 enum drm_mode_subconnector get_subconnector_type(struct dc_link *link);
+void update_subconnector_property(struct amdgpu_dm_connector *aconnector);
+void amdgpu_dm_fbc_init(struct drm_connector *connector);
+void amdgpu_dm_set_panel_type(struct amdgpu_dm_connector *aconnector);
+void amdgpu_dm_update_cacp_caps(struct amdgpu_dm_connector *aconnector);
+void fill_stream_properties_from_drm_display_mode(
+	struct dc_stream_state *stream,
+	const struct drm_display_mode *mode_in,
+	const struct drm_connector *connector,
+	const struct drm_connector_state *connector_state,
+	const struct dc_stream_state *old_stream,
+	int requested_bpc);
 enum display_content_type
 get_output_content_type(const struct drm_connector_state *connector_state);
 bool adjust_colour_depth_from_display_info(struct dc_crtc_timing *timing_out,
@@ -163,8 +174,12 @@ bool adjust_colour_depth_from_display_info(struct dc_crtc_timing *timing_out,
 int to_drm_connector_type(enum signal_type st, uint32_t connector_id);
 bool is_duplicate_mode(struct amdgpu_dm_connector *aconnector, struct drm_display_mode *mode);
 enum dc_aspect_ratio get_aspect_ratio(const struct drm_display_mode *mode_in);
+void copy_crtc_timing_for_drm_display_mode(const struct drm_display_mode *src_mode,
+					   struct drm_display_mode *dst_mode);
 void decide_crtc_timing_for_drm_display_mode(struct drm_display_mode *drm_mode,
 					     const struct drm_display_mode *native_mode,
 					     bool scale_enabled);
+void amdgpu_dm_set_panel_type(struct amdgpu_dm_connector *aconnector);
+void amdgpu_dm_update_cacp_caps(struct amdgpu_dm_connector *aconnector);
 #endif
 #endif /* __AMDGPU_DM_CONNECTOR_H__ */

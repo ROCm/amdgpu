@@ -172,6 +172,7 @@ void amdgpu_dm_init_color_mod(void)
 {
 	setup_x_points_distribution();
 }
+EXPORT_IF_KUNIT(amdgpu_dm_init_color_mod);
 
 STATIC_IFN_KUNIT INLINE_IFN_KUNIT
 struct fixed31_32 amdgpu_dm_fixpt_from_s3132(__u64 x)
@@ -1179,6 +1180,7 @@ int amdgpu_dm_verify_lut3d_size(struct amdgpu_device *adev,
 
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_verify_lut3d_size);
 
 /**
  * amdgpu_dm_verify_lut_sizes - verifies if DRM luts match the hw supported sizes
@@ -1323,6 +1325,7 @@ int amdgpu_dm_check_crtc_color_mgmt(struct dm_crtc_state *crtc,
 
 	return r;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_check_crtc_color_mgmt);
 
 /**
  * amdgpu_dm_update_crtc_color_mgmt: Maps DRM color management to DC stream.
@@ -1381,6 +1384,7 @@ int amdgpu_dm_update_crtc_color_mgmt(struct dm_crtc_state *crtc)
 
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_update_crtc_color_mgmt);
 
 static int
 map_crtc_degamma_to_dc_plane(struct dm_crtc_state *crtc,
@@ -1548,8 +1552,7 @@ __set_colorop_in_tf_1d_curve(struct dc_plane_state *dc_plane_state,
 }
 EXPORT_IF_KUNIT(__set_colorop_in_tf_1d_curve);
 
-
-static int
+STATIC_IFN_KUNIT int
 __set_dm_plane_colorop_degamma(struct drm_plane_state *plane_state,
 			       struct dc_plane_state *dc_plane_state,
 			       struct drm_colorop *colorop)
@@ -1575,8 +1578,9 @@ __set_dm_plane_colorop_degamma(struct drm_plane_state *plane_state,
 
 	return __set_colorop_in_tf_1d_curve(dc_plane_state, colorop_state);
 }
+EXPORT_IF_KUNIT(__set_dm_plane_colorop_degamma);
 
-static int
+STATIC_IFN_KUNIT int
 __set_dm_plane_colorop_3x4_matrix(struct drm_plane_state *plane_state,
 				  struct dc_plane_state *dc_plane_state,
 				  struct drm_colorop *colorop)
@@ -1616,8 +1620,9 @@ __set_dm_plane_colorop_3x4_matrix(struct drm_plane_state *plane_state,
 
 	return 0;
 }
+EXPORT_IF_KUNIT(__set_dm_plane_colorop_3x4_matrix);
 
-static int
+STATIC_IFN_KUNIT int
 __set_dm_plane_colorop_multiplier(struct drm_plane_state *plane_state,
 				  struct dc_plane_state *dc_plane_state,
 				  struct drm_colorop *colorop)
@@ -1645,6 +1650,7 @@ __set_dm_plane_colorop_multiplier(struct drm_plane_state *plane_state,
 
 	return 0;
 }
+EXPORT_IF_KUNIT(__set_dm_plane_colorop_multiplier);
 
 static int
 __set_dm_plane_colorop_shaper(struct drm_plane_state *plane_state,
@@ -2133,3 +2139,4 @@ int amdgpu_dm_update_plane_color_mgmt(struct dm_crtc_state *crtc,
 
 	return amdgpu_dm_plane_set_color_properties(plane_state, dc_plane_state);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_update_plane_color_mgmt);

@@ -273,11 +273,11 @@ static int amdgpu_cs_pass1(struct amdgpu_cs_parser *p,
 	for (i = 0; i < p->gang_size; ++i) {
 #ifdef HAVE_DRM_FILE_CLIENT_ID
 		ret = amdgpu_job_alloc(p->adev, vm, p->entities[i], vm,
-				       num_ibs[i], &p->jobs[i],
-				       p->filp->client_id);
+				       num_ibs[i], p->filp->client_id,
+				       GFP_KERNEL, &p->jobs[i]);
 #else
 		ret = amdgpu_job_alloc(p->adev, vm, p->entities[i], vm,
-				       num_ibs[i], &p->jobs[i], 0);
+				       num_ibs[i], 0, GFP_KERNEL, &p->jobs[i]);
 #endif
 		if (ret)
 			goto free_all_kdata;

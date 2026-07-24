@@ -6,10 +6,13 @@
  */
 
 #include <kunit/test.h>
+#include <linux/device.h>
 
 #include <drm/drm_audio_component.h>
 
 #include "dc.h"
+#include "dc/inc/core_types.h"
+#include "dc/inc/hw/audio.h"
 #include "amdgpu.h"
 #include "amdgpu_mode.h"
 #include "amdgpu_dm.h"
@@ -35,6 +38,57 @@ static void dm_test_audio_init_disabled(struct kunit *test)
 	KUNIT_EXPECT_FALSE(test, adev->mode_info.audio.enabled);
 	KUNIT_EXPECT_FALSE(test, adev->dm.audio_registered);
 
+	amdgpu_dm_audio_set_param(saved_audio);
+}
+
+/**
+ * dm_test_audio_init_enabled_success - Test init deeper path when audio is enabled
+ * @test: The KUnit test context
+ */
+static void dm_test_audio_init_enabled_success(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	struct dc *dc;
+	struct resource_pool *res_pool;
+	struct audio *audio0;
+	struct audio *audio1;
+	struct device *dev;
+	int saved_audio = amdgpu_dm_audio_get_param();
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	dc = kunit_kzalloc(test, sizeof(*dc), GFP_KERNEL);
+	res_pool = kunit_kzalloc(test, sizeof(*res_pool), GFP_KERNEL);
+	audio0 = kunit_kzalloc(test, sizeof(*audio0), GFP_KERNEL);
+	audio1 = kunit_kzalloc(test, sizeof(*audio1), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dc);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, res_pool);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, audio0);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, audio1);
+
+	dev = root_device_register("kunit-dm-audio-init");
+	KUNIT_ASSERT_FALSE(test, IS_ERR(dev));
+
+	audio0->inst = 2;
+	audio1->inst = 6;
+	res_pool->audio_count = 2;
+	res_pool->audios[0] = audio0;
+	res_pool->audios[1] = audio1;
+	dc->res_pool = res_pool;
+	adev->dm.dc = dc;
+	adev->dev = dev;
+
+	amdgpu_dm_audio_set_param(1);
+
+	KUNIT_EXPECT_EQ(test, amdgpu_dm_audio_init(adev), 0);
+	KUNIT_EXPECT_TRUE(test, adev->mode_info.audio.enabled);
+	KUNIT_EXPECT_TRUE(test, adev->dm.audio_registered);
+	KUNIT_EXPECT_EQ(test, adev->mode_info.audio.num_pins, 2);
+	KUNIT_EXPECT_EQ(test, adev->mode_info.audio.pin[0].id, 2U);
+	KUNIT_EXPECT_EQ(test, adev->mode_info.audio.pin[1].id, 6U);
+
+	amdgpu_dm_audio_fini(adev);
+	root_device_unregister(dev);
 	amdgpu_dm_audio_set_param(saved_audio);
 }
 
@@ -455,9 +509,73 @@ static void dm_test_eld_notify_null_callback(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, dm_test_eld_notify_count, 0);
 }
 
+/* Tests for amdgpu_dm_audio_init_pins() */
+
+/**
+ * dm_test_audio_init_pins_sets_defaults - pin entries are initialised to default values
+ * @test: The KUnit test context
+ *
+ * amdgpu_dm_audio_init_pins() must set num_pins from audio_count, reset every
+ * pin to the sentinel defaults (-1 for rate/channels/bits, 0 for the rest)
+ * and copy each pin's hardware instance index from res_pool->audios[i]->inst.
+ */
+static void dm_test_audio_init_pins_sets_defaults(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+	const unsigned int inst_array[] = {3, 7};
+	int i;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+
+	amdgpu_dm_audio_init_pins(adev, 2, inst_array);
+
+	KUNIT_EXPECT_EQ(test, adev->mode_info.audio.num_pins, 2);
+
+	for (i = 0; i < 2; i++) {
+		KUNIT_EXPECT_EQ(test, adev->mode_info.audio.pin[i].channels, -1);
+		KUNIT_EXPECT_EQ(test, adev->mode_info.audio.pin[i].rate, -1);
+		KUNIT_EXPECT_EQ(test, adev->mode_info.audio.pin[i].bits_per_sample, -1);
+		KUNIT_EXPECT_EQ(test, adev->mode_info.audio.pin[i].status_bits, 0);
+		KUNIT_EXPECT_EQ(test, adev->mode_info.audio.pin[i].category_code, 0);
+		KUNIT_EXPECT_FALSE(test, adev->mode_info.audio.pin[i].connected);
+		KUNIT_EXPECT_EQ(test, adev->mode_info.audio.pin[i].offset, 0);
+	}
+	KUNIT_EXPECT_EQ(test, adev->mode_info.audio.pin[0].id, 3U);
+	KUNIT_EXPECT_EQ(test, adev->mode_info.audio.pin[1].id, 7U);
+}
+
+/**
+ * dm_test_audio_init_pins_zero_count - zero audio_count leaves num_pins at zero
+ * @test: The KUnit test context
+ *
+ * When res_pool->audio_count is 0, num_pins must be 0 and no pins touched.
+ */
+static void dm_test_audio_init_pins_zero_count(struct kunit *test)
+{
+	struct amdgpu_device *adev;
+
+	adev = kunit_kzalloc(test, sizeof(*adev), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, adev);
+
+	/* Pre-fill a sentinel so we can confirm the loop never ran. */
+	adev->mode_info.audio.pin[0].channels = 99;
+
+	amdgpu_dm_audio_init_pins(adev, 0, NULL);
+
+	KUNIT_EXPECT_EQ(test, adev->mode_info.audio.num_pins, 0);
+	KUNIT_EXPECT_EQ(test, adev->mode_info.audio.pin[0].channels, 99);
+}
+
+/* End of tests for amdgpu_dm_audio_init_pins() */
+
 static struct kunit_case dm_audio_test_cases[] = {
 	/* amdgpu_dm_audio_init */
 	KUNIT_CASE(dm_test_audio_init_disabled),
+	KUNIT_CASE(dm_test_audio_init_enabled_success),
+	/* amdgpu_dm_audio_init_pins */
+	KUNIT_CASE(dm_test_audio_init_pins_sets_defaults),
+	KUNIT_CASE(dm_test_audio_init_pins_zero_count),
 	/* amdgpu_dm_audio_fini */
 	KUNIT_CASE(dm_test_audio_fini_without_enabled_audio),
 	/* amdgpu_dm_fill_audio_info */

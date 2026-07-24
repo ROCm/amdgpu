@@ -729,8 +729,8 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.clock_trace = true,
 	.disable_pplib_clock_request = false,
 	.ignore_pg = false,
-	.disable_dpp_power_gate = true,
-	.disable_hubp_power_gate = true,
+	.disable_dpp_power_gate = false,
+	.disable_hubp_power_gate = false,
 	.disable_optc_power_gate = true,
 	.disable_dsc_power_gate = false,
 	.disable_dio_power_gate = true,
@@ -762,7 +762,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 		.bits = {
 			.dpp = true,
 			.dsc = true,/*dscclk and dsc pg*/
-			.hdmistream = false,
+			.hdmistream = true,
 			.hdmichar = true,
 			.dpstream = true,
 			.symclk32_se = true,
@@ -2145,6 +2145,7 @@ static bool dcn42_resource_construct(
 	dc->config.use_pipe_ctx_sync_logic = true;
 	dc->config.dc_mode_clk_limit_support = false;
 	dc->config.enable_windowed_mpo_odm = true;
+	dc->config.set_pipe_unlock_order = true; /* Need to ensure DET gets freed before allocating */
 	/* Use psp mailbox to enable assr */
 	dc->config.use_assr_psp_message = true;
 	/* dcn42 and afterward always support external panel replay */

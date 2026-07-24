@@ -341,6 +341,8 @@ struct hpd_rx_irq_offload_work {
  * @ddev: DRM base driver structure
  * @display_indexes_num: Max number of display streams supported
  * @irq_handler_list_table_lock: Synchronizes access to IRQ tables
+ * @irq_wq: Dedicated high-priority unbound workqueue for deferred IRQ work
+ * @vmin_vmax_wq: Dedicated unbound workqueue for deferred vmin/vmax updates
  * @backlight_dev: Backlight control device
  * @backlight_link: Link on which to control backlight
  * @backlight_caps: Capabilities of the backlight device
@@ -587,6 +589,8 @@ struct amdgpu_display_manager {
 	dmub_outbox_params[1];
 
 	spinlock_t irq_handler_list_table_lock;
+	struct workqueue_struct *irq_wq;
+	struct workqueue_struct *vmin_vmax_wq;
 
 	struct backlight_device *backlight_dev[AMDGPU_DM_MAX_NUM_EDP];
 
@@ -711,6 +715,13 @@ struct amdgpu_display_manager {
 	 * Data is stored as a byte array that should be casted to the appropriate bb struct
 	 */
 	void *bb_from_dmub;
+
+	/**
+	 * @i2c_devres_group:
+	 *
+	 * Devres group for DM i2c adapter lifetime management.
+	 */
+	void *i2c_devres_group;
 
 	/**
 	 * @oem_i2c:
@@ -1159,6 +1170,26 @@ void amdgpu_dm_apply_delay_after_dpcd_poweroff(struct amdgpu_device *adev,
 											   struct dc_sink *sink);
 
 #if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
+struct amdgpu_ip_block;
+bool dm_is_idle(struct amdgpu_ip_block *ip_block);
+int dm_wait_for_idle(struct amdgpu_ip_block *ip_block);
+int dm_soft_reset(struct amdgpu_ip_block *ip_block);
+int dm_set_clockgating_state(struct amdgpu_ip_block *ip_block,
+			     enum amd_clockgating_state state);
+int dm_set_powergating_state(struct amdgpu_ip_block *ip_block,
+			     enum amd_powergating_state state);
+void dm_bandwidth_update(struct amdgpu_device *adev);
+u32 dm_vblank_get_counter(struct amdgpu_device *adev, int crtc);
+int dm_crtc_get_scanoutpos(struct amdgpu_device *adev, int crtc,
+			   u32 *vbl, u32 *position);
+struct dm_atomic_state *dm_atomic_get_new_state(struct drm_atomic_commit *state);
+void dm_atomic_destroy_state(struct drm_private_obj *obj,
+			     struct drm_private_state *state);
+int amdgpu_dm_smu_write_watermarks_table(struct amdgpu_device *adev);
+bool dm_should_update_native_cursor(struct drm_atomic_commit *state,
+				    struct drm_crtc *old_plane_crtc,
+				    struct drm_crtc *new_plane_crtc,
+				    bool enable);
 int dm_plane_layer_index_cmp(const void *a, const void *b);
 int fill_plane_color_attributes(const struct drm_plane_state *plane_state,
 				const enum surface_pixel_format format,
@@ -1177,6 +1208,19 @@ bool is_dc_timing_adjust_needed(struct dm_crtc_state *old_state,
 				struct dm_crtc_state *new_state);
 void set_multisync_trigger_params(struct dc_stream_state *stream);
 void set_master_stream(struct dc_stream_state *stream_set[], int stream_count);
+struct pci_dev;
+bool dm_should_disable_stutter(struct pci_dev *pdev);
+void reset_freesync_config_for_crtc(struct dm_crtc_state *new_crtc_state);
+void get_freesync_config_for_crtc(struct dm_crtc_state *new_crtc_state,
+				  struct dm_connector_state *new_con_state);
+void dm_enable_per_frame_crtc_master_sync(struct dc_state *context);
+struct hdcp_workqueue;
+bool is_content_protection_different(struct drm_crtc_state *new_crtc_state,
+				     struct drm_crtc_state *old_crtc_state,
+				     struct drm_connector_state *new_conn_state,
+				     struct drm_connector_state *old_conn_state,
+				     const struct drm_connector *connector,
+				     struct hdcp_workqueue *hdcp_w);
 #endif
 
 #endif /* __AMDGPU_DM_H__ */

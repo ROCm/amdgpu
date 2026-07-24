@@ -65,7 +65,7 @@ struct dcn_dsc_reg_state;
 struct dcn_optc_reg_state;
 struct dcn_dccg_reg_state;
 
-#define DC_VER "3.2.388"
+#define DC_VER "3.2.389"
 
 /**
  * MAX_SURFACES - representative of the upper bound of surfaces that can be piped to a single CRTC
@@ -632,6 +632,7 @@ enum visual_confirm {
 	VISUAL_CONFIRM_SMARTMUX_DGPU = 10,
 	VISUAL_CONFIRM_REPLAY = 12,
 	VISUAL_CONFIRM_SUBVP = 14,
+	VISUAL_CONFIRM_ABM = 15,
 	VISUAL_CONFIRM_MCLK_SWITCH = 16,
 	VISUAL_CONFIRM_FAMS2 = 19,
 	VISUAL_CONFIRM_HW_CURSOR = 20,
@@ -1291,6 +1292,8 @@ struct dc_debug_options {
 	bool enable_replay_esd_recovery;
 	uint8_t iommu_mismatch_temp_wka;
 	bool disable_dynamic_expansion_for_test_pattern;
+	uint32_t dml21_custom_derate_num_dpms;
+	uint32_t dml21_custom_derate_at_dpm[DML2_MAX_NUM_DPM_LVL];
 };
 
 
@@ -1936,6 +1939,8 @@ struct dc_scratch_space {
 		bool dp_skip_DID2;
 		bool dp_skip_reset_segment;
 		bool dp_skip_fs_144hz;
+		/* Some DP bridges don't work with RBR and must use HBR. */
+		bool dp_skip_rbr;
 		bool dp_mot_reset_segment;
 		/* Some USB4 docks do not handle turning off MST DSC once it has been enabled. */
 		bool dpia_mst_dsc_always_on;
@@ -3009,6 +3014,8 @@ void dc_set_power_state(
 void dc_resume(struct dc *dc);
 
 void dc_power_down_on_boot(struct dc *dc);
+
+void dc_disable_dangling_timing_generators(struct dc *dc);
 
 /*
  * HDCP Interfaces

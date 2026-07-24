@@ -338,6 +338,7 @@ static int mes_v11_0_add_hw_queue(struct amdgpu_mes *mes,
 	mes_add_queue_pkt.process_context_array_index = input->process_context_array_index;
 	mes_add_queue_pkt.gang_quantum = input->gang_quantum;
 	mes_add_queue_pkt.gang_context_addr = input->gang_context_addr;
+	mes_add_queue_pkt.gang_context_array_index = input->gang_context_array_index;
 	mes_add_queue_pkt.inprocess_gang_priority =
 		convert_to_mes_priority_level(input->inprocess_gang_priority);
 	mes_add_queue_pkt.gang_global_priority_level =
@@ -388,6 +389,7 @@ static int mes_v11_0_remove_hw_queue(struct amdgpu_mes *mes,
 
 	mes_remove_queue_pkt.doorbell_offset = input->doorbell_offset;
 	mes_remove_queue_pkt.gang_context_addr = input->gang_context_addr;
+	mes_remove_queue_pkt.gang_context_array_index = input->gang_context_array_index;
 	mes_remove_queue_pkt.queue_type =
 		convert_to_mes_queue_type(input->queue_type);
 

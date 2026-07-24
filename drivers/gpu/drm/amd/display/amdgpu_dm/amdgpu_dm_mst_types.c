@@ -1014,10 +1014,11 @@ void dm_handle_mst_sideband_msg_ready_event(
 EXPORT_IF_KUNIT(dm_handle_mst_sideband_msg_ready_event);
 
 #ifdef HAVE_DRM_DP_MST_TOPOLOGY_CBS_POLL_HPD_IRQ
-static void dm_handle_mst_down_rep_msg_ready(struct drm_dp_mst_topology_mgr *mgr)
+STATIC_IFN_KUNIT void dm_handle_mst_down_rep_msg_ready(struct drm_dp_mst_topology_mgr *mgr)
 {
 	dm_handle_mst_sideband_msg_ready_event(mgr, DOWN_REP_MSG_RDY_EVENT);
 }
+EXPORT_IF_KUNIT(dm_handle_mst_down_rep_msg_ready);
 #endif
 
 #ifdef HAVE_DRM_DP_MST_TOPOLOGY_CBS_DESTROY_CONNECTOR
@@ -1121,6 +1122,7 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 
 	drm_connector_attach_dp_subconnector_property(&aconnector->base);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_initialize_dp_connector);
 
 uint32_t dm_mst_get_pbn_divider(struct dc_link *link)
 {

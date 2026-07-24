@@ -769,20 +769,21 @@ void dc_stream_set_dither_option(struct dc_stream_state *stream,
 {
 	struct bit_depth_reduction_params params;
 	struct dc_link *link = stream->link;
-	struct pipe_ctx *pipes = NULL;
+	struct resource_context *res_ctx = &link->dc->current_state->res_ctx;
+	struct pipe_ctx *otg_master;
+	struct pipe_ctx *opp_heads[MAX_PIPES];
+	int opp_cnt;
 	int i;
 
-	for (i = 0; i < MAX_PIPES; i++) {
-		if (link->dc->current_state->res_ctx.pipe_ctx[i].stream ==
-				stream) {
-			pipes = &link->dc->current_state->res_ctx.pipe_ctx[i];
-			break;
-		}
-	}
-
-	if (!pipes)
+	otg_master = resource_get_otg_master_for_stream(res_ctx, stream);
+	if (!otg_master)
 		return;
 	if (option > DITHER_OPTION_MAX)
+		return;
+
+	opp_cnt = resource_get_opp_heads_for_otg_master(otg_master, res_ctx, opp_heads);
+
+	if (opp_cnt == 0)
 		return;
 
 	dc_exit_ips_for_hw_access(stream->ctx->dc);
@@ -793,16 +794,30 @@ void dc_stream_set_dither_option(struct dc_stream_state *stream,
 	resource_build_bit_depth_reduction_params(stream, &params);
 	stream->bit_depth_params = params;
 
-	if (pipes->plane_res.xfm &&
-	    pipes->plane_res.xfm->funcs->transform_set_pixel_storage_depth) {
-		pipes->plane_res.xfm->funcs->transform_set_pixel_storage_depth(
-			pipes->plane_res.xfm,
-			pipes->plane_res.scl_data.lb_params.depth,
-			&stream->bit_depth_params);
-	}
+	/*
+	 * Program bit-depth reduction (dither) on every OPP head of the
+	 * stream. Under ODM combine there is more than one OPP head and they
+	 * must all be kept in sync, otherwise (e.g. when CRC capture requests
+	 * dither off) a secondary ODM segment can keep dither enabled and
+	 * produce a different CRC than the primary segment.
+	 */
+	for (i = 0; i < opp_cnt; i++) {
+		struct pipe_ctx *opp_head = opp_heads[i];
 
-	pipes->stream_res.opp->funcs->
-		opp_program_bit_depth_reduction(pipes->stream_res.opp, &params);
+		if (opp_head->plane_res.xfm &&
+		    opp_head->plane_res.xfm->funcs->transform_set_pixel_storage_depth) {
+			opp_head->plane_res.xfm->funcs->transform_set_pixel_storage_depth(
+				opp_head->plane_res.xfm,
+				opp_head->plane_res.scl_data.lb_params.depth,
+				&stream->bit_depth_params);
+		}
+
+		if (opp_head->stream_res.opp &&
+		    opp_head->stream_res.opp->funcs->opp_program_bit_depth_reduction) {
+			opp_head->stream_res.opp->funcs->opp_program_bit_depth_reduction(
+				opp_head->stream_res.opp, &params);
+		}
+	}
 }
 
 bool dc_stream_set_gamut_remap(struct dc *dc, const struct dc_stream_state *stream)
@@ -1929,6 +1944,13 @@ bool dc_validate_boot_timing(const struct dc *dc,
 	if (crtc_timing->flags.DSC) {
 		struct display_stream_compressor *dsc = NULL;
 		struct dcn_dsc_state dsc_state = {0};
+
+		if (dc->ctx->dce_version < DCN_VERSION_4_2) {
+			/*vbios enabled eDP dsc for one of DCN315  only but it has known issue,
+			since there is no production bios update, block it there*/
+			DC_LOG_DEBUG("boot timing validation failed due to unsupported DSC on this ASIC\n");
+			return false;
+		}
 
 		/* Find DSC associated with this timing generator */
 		if (tg_inst < (unsigned int)dc->res_pool->res_cap->num_dsc) {
@@ -6217,6 +6239,115 @@ bool dc_interrupt_set(struct dc *dc, enum dc_irq_source src, bool enable)
 void dc_interrupt_ack(struct dc *dc, enum dc_irq_source src)
 {
 	dal_irq_service_ack(dc->res_pool->irqs, src);
+}
+
+/* Preserve this tg if a physical link is still lighting a present display */
+static bool should_preserve_tg(struct dc *dc, struct timing_generator *tg)
+{
+	unsigned int i, j;
+
+	/* Check if a physical link is lighting this tg */
+	for (i = 0; i < dc->link_count; i++) {
+		struct dc_link *link = dc->links[i];
+		int fe;
+
+		if (!link || link->ep_type != DISPLAY_ENDPOINT_PHY ||
+				!link->link_enc ||
+				!link->link_enc->funcs->is_dig_enabled ||
+				!link->link_enc->funcs->is_dig_enabled(link->link_enc) ||
+				!link->link_enc->funcs->get_dig_frontend)
+			continue;
+
+		/* Get the DIG front-end this link's encoder drives; skip if none */
+		fe = link->link_enc->funcs->get_dig_frontend(link->link_enc);
+		if (fe == ENGINE_ID_UNKNOWN)
+			continue;
+
+		/* Find the stream encoder bound to this link's front-end */
+		for (j = 0; j < dc->res_pool->stream_enc_count; j++) {
+			struct stream_encoder *se = dc->res_pool->stream_enc[j];
+
+			/* Skip unless this stream encoder feeds our front-end and drives this tg */
+			if (se->id != fe || !se->funcs->dig_source_otg ||
+					(int)se->funcs->dig_source_otg(se) != tg->inst)
+				continue;
+
+			/* This link drives the OTG: keep a seamless-boot eDP, or
+			 * any external link whose sink is still connected.
+			 */
+			if (link->connector_signal == SIGNAL_TYPE_EDP)
+				return true;
+			if (link->link_enc->funcs->get_hpd_state &&
+					dc->link_srv->get_hpd_state(link))
+				return true;
+		}
+	}
+
+	return false;
+}
+
+/*
+ * GOP/vBIOS may leave an OPTC enabled for a display present at power-on but no
+ * longer driven (e.g. external DP unplugged at boot). Such a dangling pipe keeps
+ * DCN out of idle and blocks s0i3. If nothing needs to survive (no committed
+ * stream or seamless-boot eDP) and no sink is still connected, power down all hw
+ * blocks.
+ */
+void dc_disable_dangling_timing_generators(struct dc *dc)
+{
+	struct dce_hwseq *hws = dc->hwseq;
+	bool any_dangling = false;
+	bool any_preserved = false;
+	bool any_connected = false;
+	unsigned int i;
+
+	/* No real hw to touch on a virtual/emulated environment */
+	if (dc->ctx->dce_environment == DCE_ENV_VIRTUAL_HW)
+		return;
+
+	/* Wake hw out of IPS before reading/touching tg state */
+	dc_exit_ips_for_hw_access(dc);
+
+	/* Classify every enabled tg as either to-preserve or dangling */
+	for (i = 0; i < dc->res_pool->timing_generator_count; i++) {
+		struct timing_generator *tg = dc->res_pool->timing_generators[i];
+
+		if (!tg || !tg->funcs->is_tg_enabled ||
+				!tg->funcs->is_tg_enabled(tg))
+			continue;
+
+		if (should_preserve_tg(dc, tg))
+			any_preserved = true;
+		else
+			any_dangling = true;
+	}
+
+	/* A physically connected sink (HPD asserted) will be re-lit by a
+	 * subsequent atomic commit. For that case we don't call the global
+	 * power_down().
+	 */
+	for (i = 0; i < dc->link_count; i++) {
+		struct dc_link *link = dc->links[i];
+
+		if (link && link->ep_type == DISPLAY_ENDPOINT_PHY &&
+				link->link_enc && link->link_enc->funcs &&
+				link->link_enc->funcs->get_hpd_state &&
+				dc->link_srv->get_hpd_state(link)) {
+			any_connected = true;
+			break;
+		}
+	}
+
+	if (!any_dangling)
+		return;
+
+	if (!any_preserved && !any_connected && hws && hws->funcs.power_down) {
+		/* Truly headless / all sinks unplugged: nothing to preserve */
+		DC_LOG_DC("%s: powering down dangling hw blocks to allow idle\n",
+				__func__);
+		hws->funcs.power_down(dc);
+		return;
+	}
 }
 
 void dc_power_down_on_boot(struct dc *dc)
