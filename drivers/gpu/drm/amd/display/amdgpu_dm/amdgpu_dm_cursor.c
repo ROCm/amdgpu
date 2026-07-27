@@ -233,6 +233,7 @@ EXPORT_IF_KUNIT(dm_get_plane_scale);
  *
  * Return: true if the pipeline modifies pixels, false otherwise.
  */
+#ifdef HAVE_DRM_DRM_COLOROP_H
 static bool dm_plane_color_pipeline_active(struct drm_atomic_commit *state,
 					   struct drm_plane *plane,
 					   bool use_old)
@@ -251,6 +252,7 @@ static bool dm_plane_color_pipeline_active(struct drm_atomic_commit *state,
 	}
 	return false;
 }
+#endif
 
 /**
  * amdgpu_dm_crtc_get_cursor_mode() - Determine the required cursor mode on crtc
@@ -359,11 +361,13 @@ int amdgpu_dm_crtc_get_cursor_mode(struct amdgpu_device *adev,
 			break;
 		}
 
+#ifdef HAVE_DRM_DRM_COLOROP_H
 		if (dm_plane_color_pipeline_active(state, plane, true) !=
 		    dm_plane_color_pipeline_active(state, plane, false)) {
 			consider_mode_change = true;
 			break;
 		}
+#endif
 	}
 
 	if (!consider_mode_change && !crtc_state->zpos_changed)
@@ -405,10 +409,12 @@ int amdgpu_dm_crtc_get_cursor_mode(struct amdgpu_device *adev,
 		}
 
 		/* Underlying plane has an active color pipeline - cursor would be transformed */
+#ifdef HAVE_DRM_DRM_COLOROP_H
 		if (dm_plane_color_pipeline_active(state, plane, false)) {
 			*cursor_mode = DM_CURSOR_OVERLAY_MODE;
 			return 0;
 		}
+#endif
 
 		dm_get_plane_scale(plane_state,
 				   &underlying_scale_w, &underlying_scale_h);
