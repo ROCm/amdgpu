@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 #include <kcl/kcl_list_lru.h>
 #include "kcl_common.h"
+#if defined(CONFIG_X86_KERNEL_IBT)
+#include <asm/cpufeature.h>
+#endif
 
 #ifndef HAVE_4ARGS_LIST_LRU_ADD
 /*
@@ -75,6 +78,17 @@ void amdkcl_list_lru_init(void)
 	 * to our stub only if the symbol cannot be found.
 	 */
 	_kcl_list_lru_add = amdkcl_fp_setup("list_lru_add", _kcl_list_lru_add_stub);
+#if defined(CONFIG_X86_KERNEL_IBT)
+	/*
+	 * On IBT-enforcing Intel CPUs register_kprobe() (used inside
+	 * amdkcl_fp_setup() when kallsyms_lookup_name is unavailable) hands back
+	 * a pointer just past the function's ENDBR, and calling it indirectly
+	 * raises a #CP "Missing ENDBR" fault. Rather than fix up the resolved
+	 * address, just use our own stub, which is a correctly-entered function.
+	 */
+	if (cpu_feature_enabled(X86_FEATURE_IBT))
+		_kcl_list_lru_add = _kcl_list_lru_add_stub;
+#endif
 #else
 	/*
 	 * No list_lru_add_obj() means the symbol named list_lru_add is the old
