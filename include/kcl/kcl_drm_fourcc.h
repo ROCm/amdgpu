@@ -207,6 +207,72 @@
 #endif
 
 /*
+ * GFX6-8 (SI/CIK/VI) tiling modifier fields, backported from newer
+ * drm_fourcc.h. Kept outside the "#if !defined(AMD_FMT_MOD)" block above so
+ * that they are also added on kernels (e.g. RHEL 8.x) that already provide the
+ * AMD_FMT_MOD framework but lack these GFX6-specific defines.
+ */
+#ifndef AMD_FMT_MOD_TILE_VER_GFX6
+#define AMD_FMT_MOD_TILE_VER_GFX6 0
+#endif
+
+#ifndef AMD_FMT_MOD_TILE_GFX6_1D_TILED_THIN1
+#define AMD_FMT_MOD_TILE_GFX6_1D_TILED_THIN1 0x2
+#define AMD_FMT_MOD_TILE_GFX6_2D_TILED_THIN1 0x4
+#endif
+
+#ifndef AMD_FMT_MOD_MICROTILE_SHIFT
+#define AMD_FMT_MOD_MICROTILE_SHIFT 14ULL
+#define AMD_FMT_MOD_MICROTILE_MASK 0x7
+#define AMD_FMT_MOD_MICROTILE_DISPLAY 0x0
+#define AMD_FMT_MOD_MICROTILE_THIN 0x1
+#endif
+
+#ifndef AMD_FMT_MOD_PIPE_CONFIG_SHIFT
+#define AMD_FMT_MOD_PIPE_CONFIG_SHIFT 17ULL
+#define AMD_FMT_MOD_PIPE_CONFIG_MASK 0x1f
+#define AMD_FMT_MOD_PIPE_CONFIG_P2 0x0
+#define AMD_FMT_MOD_PIPE_CONFIG_P4_8x16 0x4
+#define AMD_FMT_MOD_PIPE_CONFIG_P4_16x16 0x5
+#define AMD_FMT_MOD_PIPE_CONFIG_P4_16x32 0x6
+#define AMD_FMT_MOD_PIPE_CONFIG_P4_32x32 0x7
+#define AMD_FMT_MOD_PIPE_CONFIG_P8_16x16_8x16 0x8
+#define AMD_FMT_MOD_PIPE_CONFIG_P8_16x32_8x16 0x9
+#define AMD_FMT_MOD_PIPE_CONFIG_P8_32x32_8x16 0xa
+#define AMD_FMT_MOD_PIPE_CONFIG_P8_16x32_16x16 0xb
+#define AMD_FMT_MOD_PIPE_CONFIG_P8_32x32_16x16 0xc
+#define AMD_FMT_MOD_PIPE_CONFIG_P8_32x32_16x32 0xd
+#define AMD_FMT_MOD_PIPE_CONFIG_P8_32x64_32x32 0xe
+#define AMD_FMT_MOD_PIPE_CONFIG_P16_32x32_8x16 0x10
+#define AMD_FMT_MOD_PIPE_CONFIG_P16_32x32_16x16 0x11
+#endif
+
+#ifndef AMD_FMT_MOD_TILE_SPLIT_SHIFT
+#define AMD_FMT_MOD_TILE_SPLIT_SHIFT 22ULL
+#define AMD_FMT_MOD_TILE_SPLIT_MASK 0x7
+#endif
+
+#ifndef AMD_FMT_MOD_BANK_WIDTH_SHIFT
+#define AMD_FMT_MOD_BANK_WIDTH_SHIFT 25ULL
+#define AMD_FMT_MOD_BANK_WIDTH_MASK 0x3
+#endif
+
+#ifndef AMD_FMT_MOD_BANK_HEIGHT_SHIFT
+#define AMD_FMT_MOD_BANK_HEIGHT_SHIFT 27ULL
+#define AMD_FMT_MOD_BANK_HEIGHT_MASK 0x3
+#endif
+
+#ifndef AMD_FMT_MOD_MACRO_TILE_ASPECT_SHIFT
+#define AMD_FMT_MOD_MACRO_TILE_ASPECT_SHIFT 29ULL
+#define AMD_FMT_MOD_MACRO_TILE_ASPECT_MASK 0x3
+#endif
+
+#ifndef AMD_FMT_MOD_NUM_BANKS_SHIFT
+#define AMD_FMT_MOD_NUM_BANKS_SHIFT 31ULL
+#define AMD_FMT_MOD_NUM_BANKS_MASK 0x3
+#endif
+
+/*
  * 2 plane YCbCr MSB aligned
  * index 0 = Y plane, [15:0] Y:x [10:6] little endian
  * index 1 = Cr:Cb plane, [31:0] Cr:x:Cb:x [10:6:10:6] little endian
