@@ -70,7 +70,9 @@
 #include "amdgpu_dm_audio.h"
 #include "amdgpu_dm_dmub.h"
 #include "amdgpu_dm_connector.h"
-#include "amdgpu_dm_kunit_helpers.h"
+#include "amdgpu_dm_pp_smu.h"
+#include "amdgpu_dm_freesync.h"
+#include "amdgpu_dm_cursor.h"
 
 #include "ivsrcid/ivsrcid_vislands30.h"
 
@@ -127,7 +129,6 @@ MODULE_FIRMWARE(FIRMWARE_NAVI12_DMCU);
 /* basic init/fini API */
 static int amdgpu_dm_init(struct amdgpu_device *adev);
 static void amdgpu_dm_fini(struct amdgpu_device *adev);
-STATIC_IFN_KUNIT void reset_freesync_config_for_crtc(struct dm_crtc_state *new_crtc_state);
 
 /*
  * initializes drm_device display related structures, based on the information
@@ -150,10 +151,6 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 				  struct drm_atomic_commit *state);
 
 static void prepare_flip_isr(struct amdgpu_crtc *acrtc);
-
-STATIC_IFN_KUNIT bool
-is_timing_unchanged_for_freesync(struct drm_crtc_state *old_crtc_state,
-				 struct drm_crtc_state *new_crtc_state);
 
 static inline void amdgpu_dm_exit_ips_for_hw_access(struct dc *dc)
 {
@@ -251,20 +248,6 @@ STATIC_IFN_KUNIT int dm_soft_reset(struct amdgpu_ip_block *ip_block)
 	return 0;
 }
 EXPORT_IF_KUNIT(dm_soft_reset);
-
-STATIC_IFN_KUNIT bool is_dc_timing_adjust_needed(struct dm_crtc_state *old_state,
-						 struct dm_crtc_state *new_state)
-{
-	if (new_state->stream->adjust.timing_adjust_pending)
-		return true;
-	if (new_state->freesync_config.state ==  VRR_STATE_ACTIVE_FIXED)
-		return true;
-	else if (amdgpu_dm_crtc_vrr_active(old_state) != amdgpu_dm_crtc_vrr_active(new_state))
-		return true;
-	else
-		return false;
-}
-EXPORT_IF_KUNIT(is_dc_timing_adjust_needed);
 
 /*
  * DC will program planes with their z-order determined by their ordering
@@ -412,91 +395,6 @@ static void mmhub_read_system_context(struct amdgpu_device *adev, struct dc_phy_
 	pa_config->gart_config.page_table_base_addr = page_table_base.quad_part;
 
 	pa_config->is_hvm_enabled = adev->mode_info.gpu_vm_support;
-
-}
-struct amdgpu_stutter_quirk {
-	u16 chip_vendor;
-	u16 chip_device;
-	u16 subsys_vendor;
-	u16 subsys_device;
-	u8 revision;
-};
-
-static const struct amdgpu_stutter_quirk amdgpu_stutter_quirk_list[] = {
-	/* https://bugzilla.kernel.org/show_bug.cgi?id=214417 */
-	{ 0x1002, 0x15dd, 0x1002, 0x15dd, 0xc8 },
-	{ 0, 0, 0, 0, 0 },
-};
-
-STATIC_IFN_KUNIT bool dm_should_disable_stutter(struct pci_dev *pdev)
-{
-	const struct amdgpu_stutter_quirk *p = amdgpu_stutter_quirk_list;
-
-	while (p && p->chip_device != 0) {
-		if (pdev->vendor == p->chip_vendor &&
-		    pdev->device == p->chip_device &&
-		    pdev->subsystem_vendor == p->subsys_vendor &&
-		    pdev->subsystem_device == p->subsys_device &&
-		    pdev->revision == p->revision) {
-			return true;
-		}
-		++p;
-	}
-	return false;
-}
-EXPORT_IF_KUNIT(dm_should_disable_stutter);
-
-
-void*
-dm_allocate_gpu_mem(
-		struct amdgpu_device *adev,
-		enum dc_gpu_mem_alloc_type type,
-		size_t size,
-		long long *addr)
-{
-	struct dal_allocation *da;
-	u32 domain = (type == DC_MEM_ALLOC_TYPE_GART) ?
-		AMDGPU_GEM_DOMAIN_GTT : AMDGPU_GEM_DOMAIN_VRAM;
-	int ret;
-
-	da = kzalloc_obj(struct dal_allocation);
-	if (!da)
-		return NULL;
-
-	ret = amdgpu_bo_create_kernel(adev, size, PAGE_SIZE,
-				      domain, &da->bo,
-				      &da->gpu_addr, &da->cpu_ptr);
-
-	*addr = da->gpu_addr;
-
-	if (ret) {
-		kfree(da);
-		return NULL;
-	}
-
-	/* add da to list in dm */
-	list_add(&da->list, &adev->dm.da_list);
-
-	return da->cpu_ptr;
-}
-
-void
-dm_free_gpu_mem(
-		struct amdgpu_device *adev,
-		enum dc_gpu_mem_alloc_type type,
-		void *pvMem)
-{
-	struct dal_allocation *da;
-
-	/* walk the da list in DM */
-	list_for_each_entry(da, &adev->dm.da_list, list) {
-		if (pvMem == da->cpu_ptr) {
-			amdgpu_bo_free_kernel(&da->bo, &da->gpu_addr, &da->cpu_ptr);
-			list_del(&da->list);
-			kfree(da);
-			break;
-		}
-	}
 
 }
 
@@ -1434,58 +1332,6 @@ static void s3_handle_mst(struct drm_device *dev, bool suspend)
 	drm_connector_list_iter_end(&iter);
 }
 
-STATIC_IFN_KUNIT int amdgpu_dm_smu_write_watermarks_table(struct amdgpu_device *adev)
-{
-	int ret = 0;
-
-	/* This interface is for dGPU Navi1x.Linux dc-pplib interface depends
-	 * on window driver dc implementation.
-	 * For Navi1x, clock settings of dcn watermarks are fixed. the settings
-	 * should be passed to smu during boot up and resume from s3.
-	 * boot up: dc calculate dcn watermark clock settings within dc_create,
-	 * dcn20_resource_construct
-	 * then call pplib functions below to pass the settings to smu:
-	 * smu_set_watermarks_for_clock_ranges
-	 * smu_set_watermarks_table
-	 * navi10_set_watermarks_table
-	 * smu_write_watermarks_table
-	 *
-	 * For Renoir, clock settings of dcn watermark are also fixed values.
-	 * dc has implemented different flow for window driver:
-	 * dc_hardware_init / dc_set_power_state
-	 * dcn10_init_hw
-	 * notify_wm_ranges
-	 * set_wm_ranges
-	 * -- Linux
-	 * smu_set_watermarks_for_clock_ranges
-	 * renoir_set_watermarks_table
-	 * smu_write_watermarks_table
-	 *
-	 * For Linux,
-	 * dc_hardware_init -> amdgpu_dm_init
-	 * dc_set_power_state --> dm_resume
-	 *
-	 * therefore, this function apply to navi10/12/14 but not Renoir
-	 * *
-	 */
-	switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
-	case IP_VERSION(2, 0, 2):
-	case IP_VERSION(2, 0, 0):
-		break;
-	default:
-		return 0;
-	}
-
-	ret = amdgpu_dpm_write_watermarks_table(adev);
-	if (ret) {
-		drm_err(adev_to_drm(adev), "Failed to update WMTABLE!\n");
-		return ret;
-	}
-
-	return 0;
-}
-EXPORT_IF_KUNIT(amdgpu_dm_smu_write_watermarks_table);
-
 static int dm_oem_i2c_hw_init(struct amdgpu_device *adev)
 {
 	struct amdgpu_display_manager *dm = &adev->dm;
@@ -1700,7 +1546,7 @@ static void dm_destroy_cached_state(struct amdgpu_device *adev)
 	for_each_new_crtc_in_state(dm->cached_state, crtc, new_crtc_state, i) {
 		new_crtc_state->active_changed = true;
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
-		reset_freesync_config_for_crtc(dm_new_crtc_state);
+		amdgpu_dm_reset_freesync_config_for_crtc(dm_new_crtc_state);
 	}
 
 	/*
@@ -3479,63 +3325,6 @@ ffu:
 			   &flip_addrs->dirty_rect_count, true);
 }
 
-void amdgpu_dm_update_stream_scaling_settings(struct drm_device *dev,
-					   const struct drm_display_mode *mode,
-					   const struct dm_connector_state *dm_state,
-					   struct dc_stream_state *stream)
-{
-	enum amdgpu_rmx_type rmx_type;
-
-	struct rect src = { 0 }; /* viewport in composition space*/
-	struct rect dst = { 0 }; /* stream addressable area */
-
-	/* no mode. nothing to be done */
-	if (!mode)
-		return;
-
-	/* Full screen scaling by default */
-	src.width = mode->hdisplay;
-	src.height = mode->vdisplay;
-	dst.width = stream->timing.h_addressable;
-	dst.height = stream->timing.v_addressable;
-
-	if (dm_state) {
-		rmx_type = dm_state->scaling;
-		if (rmx_type == RMX_ASPECT || rmx_type == RMX_OFF) {
-			if (src.width * dst.height <
-					src.height * dst.width) {
-				/* height needs less upscaling/more downscaling */
-				dst.width = src.width *
-						dst.height / src.height;
-			} else {
-				/* width needs less upscaling/more downscaling */
-				dst.height = src.height *
-						dst.width / src.width;
-			}
-		} else if (rmx_type == RMX_CENTER) {
-			dst = src;
-		}
-
-		dst.x = (stream->timing.h_addressable - dst.width) / 2;
-		dst.y = (stream->timing.v_addressable - dst.height) / 2;
-
-		if (dm_state->underscan_enable) {
-			dst.x += dm_state->underscan_hborder / 2;
-			dst.y += dm_state->underscan_vborder / 2;
-			dst.width -= dm_state->underscan_hborder;
-			dst.height -= dm_state->underscan_vborder;
-		}
-	}
-
-	stream->src = src;
-	stream->dst = dst;
-
-	drm_dbg_kms(dev, "Destination Rectangle x:%d  y:%d  width:%d  height:%d\n",
-		    dst.x, dst.y, dst.width, dst.height);
-
-}
-EXPORT_IF_KUNIT(amdgpu_dm_update_stream_scaling_settings);
-
 #if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_commit *state,
 					    struct dc_state *dc_state,
@@ -3889,207 +3678,6 @@ static void prepare_flip_isr(struct amdgpu_crtc *acrtc)
 		      acrtc->crtc_id);
 }
 
-static void update_freesync_state_on_stream(
-	struct amdgpu_display_manager *dm,
-	struct dm_crtc_state *new_crtc_state,
-	struct dc_stream_state *new_stream,
-	struct dc_plane_state *surface,
-	u32 flip_timestamp_in_us)
-{
-	struct mod_vrr_params vrr_params;
-	struct dc_info_packet vrr_infopacket = {0};
-	struct amdgpu_device *adev = dm->adev;
-	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(new_crtc_state->base.crtc);
-	unsigned long flags;
-	bool pack_sdp_v1_3 = false;
-	struct amdgpu_dm_connector *aconn;
-	enum vrr_packet_type packet_type = PACKET_TYPE_VRR;
-
-	if (!new_stream)
-		return;
-
-	/*
-	 * TODO: Determine why min/max totals and vrefresh can be 0 here.
-	 * For now it's sufficient to just guard against these conditions.
-	 */
-
-	if (!new_stream->timing.h_total || !new_stream->timing.v_total)
-		return;
-
-	spin_lock_irqsave(&adev_to_drm(adev)->event_lock, flags);
-	vrr_params = acrtc->dm_irq_params.vrr_params;
-
-	if (surface) {
-		mod_freesync_handle_preflip(
-			dm->freesync_module,
-			surface,
-			new_stream,
-			flip_timestamp_in_us,
-			&vrr_params);
-
-		if (adev->family < AMDGPU_FAMILY_AI &&
-		    amdgpu_dm_crtc_vrr_active(new_crtc_state)) {
-			mod_freesync_handle_v_update(dm->freesync_module,
-						     new_stream, &vrr_params);
-
-			/* Need to call this before the frame ends. */
-			dc_stream_adjust_vmin_vmax(dm->dc,
-						   new_crtc_state->stream,
-						   &vrr_params.adjust);
-		}
-	}
-
-	aconn = (struct amdgpu_dm_connector *)new_stream->dm_stream_context;
-
-	if (aconn && (aconn->as_type == FREESYNC_TYPE_PCON_IN_WHITELIST || aconn->vsdb_info.replay_mode)) {
-		pack_sdp_v1_3 = aconn->pack_sdp_v1_3;
-
-		if (aconn->vsdb_info.amd_vsdb_version == 1)
-			packet_type = PACKET_TYPE_FS_V1;
-		else if (aconn->vsdb_info.amd_vsdb_version == 2)
-			packet_type = PACKET_TYPE_FS_V2;
-		else if (aconn->vsdb_info.amd_vsdb_version == 3)
-			packet_type = PACKET_TYPE_FS_V3;
-
-		mod_build_adaptive_sync_infopacket(new_stream, aconn->as_type, NULL,
-					&new_stream->adaptive_sync_infopacket);
-	}
-
-	mod_freesync_build_vrr_infopacket(
-		dm->freesync_module,
-		new_stream,
-		&vrr_params,
-		packet_type,
-		TRANSFER_FUNC_UNKNOWN,
-		&vrr_infopacket,
-		pack_sdp_v1_3);
-
-	new_crtc_state->freesync_vrr_info_changed |=
-		(memcmp(&new_crtc_state->vrr_infopacket,
-			&vrr_infopacket,
-			sizeof(vrr_infopacket)) != 0);
-
-	acrtc->dm_irq_params.vrr_params = vrr_params;
-	new_crtc_state->vrr_infopacket = vrr_infopacket;
-
-	new_stream->vrr_infopacket = vrr_infopacket;
-	new_stream->allow_freesync = mod_freesync_get_freesync_enabled(&vrr_params);
-
-	if (new_crtc_state->freesync_vrr_info_changed)
-		drm_dbg_kms(adev_to_drm(adev), "VRR packet update: crtc=%u enabled=%d state=%d",
-			      new_crtc_state->base.crtc->base.id,
-			      (int)new_crtc_state->base.vrr_enabled,
-			      (int)vrr_params.state);
-
-	spin_unlock_irqrestore(&adev_to_drm(adev)->event_lock, flags);
-}
-
-static void update_stream_irq_parameters(
-	struct amdgpu_display_manager *dm,
-	struct dm_crtc_state *new_crtc_state)
-{
-	struct dc_stream_state *new_stream = new_crtc_state->stream;
-	struct mod_vrr_params vrr_params;
-	struct mod_freesync_config config = new_crtc_state->freesync_config;
-	struct amdgpu_device *adev = dm->adev;
-	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(new_crtc_state->base.crtc);
-	unsigned long flags;
-
-	if (!new_stream)
-		return;
-
-	/*
-	 * TODO: Determine why min/max totals and vrefresh can be 0 here.
-	 * For now it's sufficient to just guard against these conditions.
-	 */
-	if (!new_stream->timing.h_total || !new_stream->timing.v_total)
-		return;
-
-	spin_lock_irqsave(&adev_to_drm(adev)->event_lock, flags);
-	vrr_params = acrtc->dm_irq_params.vrr_params;
-
-	if (new_crtc_state->vrr_supported &&
-	    config.min_refresh_in_uhz &&
-	    config.max_refresh_in_uhz) {
-		/*
-		 * if freesync compatible mode was set, config.state will be set
-		 * in atomic check
-		 */
-		if (config.state == VRR_STATE_ACTIVE_FIXED && config.fixed_refresh_in_uhz &&
-		    (!drm_atomic_crtc_needs_modeset(&new_crtc_state->base) ||
-		     new_crtc_state->freesync_config.state == VRR_STATE_ACTIVE_FIXED)) {
-			vrr_params.max_refresh_in_uhz = config.max_refresh_in_uhz;
-			vrr_params.min_refresh_in_uhz = config.min_refresh_in_uhz;
-			vrr_params.fixed_refresh_in_uhz = config.fixed_refresh_in_uhz;
-			vrr_params.state = VRR_STATE_ACTIVE_FIXED;
-		} else {
-			config.state = new_crtc_state->base.vrr_enabled ?
-						     VRR_STATE_ACTIVE_VARIABLE :
-						     VRR_STATE_INACTIVE;
-		}
-	} else {
-		config.state = VRR_STATE_UNSUPPORTED;
-	}
-
-	mod_freesync_build_vrr_params(dm->freesync_module,
-				      new_stream,
-				      &config, &vrr_params);
-
-	new_crtc_state->freesync_config = config;
-	/* Copy state for access from DM IRQ handler */
-	acrtc->dm_irq_params.freesync_config = config;
-	acrtc->dm_irq_params.active_planes = new_crtc_state->active_planes;
-	acrtc->dm_irq_params.vrr_params = vrr_params;
-	spin_unlock_irqrestore(&adev_to_drm(adev)->event_lock, flags);
-}
-
-static void amdgpu_dm_handle_vrr_transition(struct amdgpu_display_manager *dm,
-					    struct dm_crtc_state *old_state,
-					    struct dm_crtc_state *new_state)
-{
-	bool old_vrr_active = amdgpu_dm_crtc_vrr_active(old_state);
-	bool new_vrr_active = amdgpu_dm_crtc_vrr_active(new_state);
-
-	if (!old_vrr_active && new_vrr_active) {
-		/* Transition VRR inactive -> active:
-		 * While VRR is active, we must not disable vblank irq, as a
-		 * reenable after disable would compute bogus vblank/pflip
-		 * timestamps if it likely happened inside display front-porch.
-		 *
-		 * We also need vupdate irq for the actual core vblank handling
-		 * at end of vblank.
-		 */
-		WARN_ON(amdgpu_dm_crtc_set_vupdate_irq(new_state->base.crtc, true) != 0);
-		WARN_ON(drm_crtc_vblank_get(new_state->base.crtc) != 0);
-		drm_dbg_driver(new_state->base.crtc->dev, "%s: crtc=%u VRR off->on: Get vblank ref\n",
-				 __func__, new_state->base.crtc->base.id);
-
-		scoped_guard(mutex, &dm->dc_lock) {
-			dc_exit_ips_for_hw_access(dm->dc);
-			amdgpu_dm_psr_set_event(dm, new_state->stream, true,
-				psr_event_vrr_transition, true);
-			amdgpu_dm_replay_set_event(dm, new_state->stream, true,
-				replay_event_vrr, true);
-		}
-	} else if (old_vrr_active && !new_vrr_active) {
-		/* Transition VRR active -> inactive:
-		 * Allow vblank irq disable again for fixed refresh rate.
-		 */
-		WARN_ON(amdgpu_dm_crtc_set_vupdate_irq(new_state->base.crtc, false) != 0);
-		drm_crtc_vblank_put(new_state->base.crtc);
-		drm_dbg_driver(new_state->base.crtc->dev, "%s: crtc=%u VRR on->off: Drop vblank ref\n",
-				 __func__, new_state->base.crtc->base.id);
-
-		scoped_guard(mutex, &dm->dc_lock) {
-			dc_exit_ips_for_hw_access(dm->dc);
-			amdgpu_dm_psr_set_event(dm, new_state->stream, false,
-				psr_event_vrr_transition, false);
-			amdgpu_dm_replay_set_event(dm, new_state->stream, false,
-				replay_event_vrr, false);
-		}
-	}
-}
-
 static void amdgpu_dm_commit_cursors(struct drm_atomic_commit *state)
 {
 	struct drm_plane *plane;
@@ -4434,7 +4022,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_commit *state,
 		}
 
 		if (plane == pcrtc->primary)
-			update_freesync_state_on_stream(
+			amdgpu_dm_update_freesync_state_on_stream(
 				dm,
 				acrtc_state,
 				acrtc_state->stream,
@@ -4567,7 +4155,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_commit *state,
 		 * re-adjust the min/max bounds now that DC doesn't handle this
 		 * as part of commit.
 		 */
-		if (is_dc_timing_adjust_needed(dm_old_crtc_state, acrtc_state)) {
+		if (amdgpu_dm_is_dc_timing_adjust_needed(dm_old_crtc_state, acrtc_state)) {
 			spin_lock_irqsave(&pcrtc->dev->event_lock, flags);
 			dc_stream_adjust_vmin_vmax(
 				dm->dc, acrtc_state->stream,
@@ -4657,6 +4245,7 @@ bool amdgpu_dm_crtc_complete_writeback(struct amdgpu_crtc *acrtc)
 	spin_lock_irqsave(&acrtc->wb_conn->job_lock, flags);
 	pending = acrtc->wb_pending;
 	acrtc->wb_pending = false;
+	acrtc->wb_frame_done = false;
 	spin_unlock_irqrestore(&acrtc->wb_conn->job_lock, flags);
 
 	if (!pending)
@@ -5125,6 +4714,7 @@ static void dm_set_writeback(struct amdgpu_display_manager *dm,
 	 * cannot run its matching vblank_put before this get.
 	 */
 	WARN_ON(drm_crtc_vblank_get(&acrtc->base));
+	acrtc->wb_frame_done = false;
 	acrtc->wb_pending = true;
 }
 
@@ -5532,7 +5122,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_commit *state)
 		dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
 
 		/* For freesync config update on crtc state and params for irq */
-		update_stream_irq_parameters(dm, dm_new_crtc_state);
+		amdgpu_dm_update_stream_irq_parameters(dm, dm_new_crtc_state);
 
 #ifdef CONFIG_DEBUG_FS
 		spin_lock_irqsave(&adev_to_drm(adev)->event_lock, flags);
@@ -5736,108 +5326,6 @@ static int do_aquire_global_lock(struct drm_device *dev,
 	return ret < 0 ? ret : 0;
 }
 
-STATIC_IFN_KUNIT void get_freesync_config_for_crtc(
-	struct dm_crtc_state *new_crtc_state,
-	struct dm_connector_state *new_con_state)
-{
-	struct mod_freesync_config config = {0};
-	struct amdgpu_dm_connector *aconnector;
-	struct drm_display_mode *mode = &new_crtc_state->base.mode;
-	int vrefresh = drm_mode_vrefresh(mode);
-	bool fs_vid_mode = false;
-
-	if (new_con_state->base.connector->connector_type == DRM_MODE_CONNECTOR_WRITEBACK)
-		return;
-
-	aconnector = to_amdgpu_dm_connector(new_con_state->base.connector);
-
-	new_crtc_state->vrr_supported = new_con_state->freesync_capable &&
-					vrefresh >= aconnector->min_vfreq &&
-					vrefresh <= aconnector->max_vfreq;
-
-	if (new_crtc_state->vrr_supported) {
-		new_crtc_state->stream->ignore_msa_timing_param = true;
-		fs_vid_mode = new_crtc_state->freesync_config.state == VRR_STATE_ACTIVE_FIXED;
-
-		config.min_refresh_in_uhz = aconnector->min_vfreq * 1000000;
-		config.max_refresh_in_uhz = aconnector->max_vfreq * 1000000;
-		config.vsif_supported = true;
-		config.btr = true;
-
-		if (fs_vid_mode) {
-			config.state = VRR_STATE_ACTIVE_FIXED;
-			config.fixed_refresh_in_uhz = new_crtc_state->freesync_config.fixed_refresh_in_uhz;
-			goto out;
-		} else if (new_crtc_state->base.vrr_enabled) {
-			config.state = VRR_STATE_ACTIVE_VARIABLE;
-		} else {
-			config.state = VRR_STATE_INACTIVE;
-		}
-	} else {
-		config.state = VRR_STATE_UNSUPPORTED;
-	}
-out:
-	new_crtc_state->freesync_config = config;
-}
-EXPORT_IF_KUNIT(get_freesync_config_for_crtc);
-
-STATIC_IFN_KUNIT void reset_freesync_config_for_crtc(
-	struct dm_crtc_state *new_crtc_state)
-{
-	new_crtc_state->vrr_supported = false;
-
-	memset(&new_crtc_state->vrr_infopacket, 0,
-	       sizeof(new_crtc_state->vrr_infopacket));
-}
-EXPORT_IF_KUNIT(reset_freesync_config_for_crtc);
-
-STATIC_IFN_KUNIT bool
-is_timing_unchanged_for_freesync(struct drm_crtc_state *old_crtc_state,
-				 struct drm_crtc_state *new_crtc_state)
-{
-	const struct drm_display_mode *old_mode, *new_mode;
-
-	if (!old_crtc_state || !new_crtc_state)
-		return false;
-
-	old_mode = &old_crtc_state->mode;
-	new_mode = &new_crtc_state->mode;
-
-	if (old_mode->clock       == new_mode->clock &&
-	    old_mode->hdisplay    == new_mode->hdisplay &&
-	    old_mode->vdisplay    == new_mode->vdisplay &&
-	    old_mode->htotal      == new_mode->htotal &&
-	    old_mode->vtotal      != new_mode->vtotal &&
-	    old_mode->hsync_start == new_mode->hsync_start &&
-	    old_mode->vsync_start != new_mode->vsync_start &&
-	    old_mode->hsync_end   == new_mode->hsync_end &&
-	    old_mode->vsync_end   != new_mode->vsync_end &&
-	    old_mode->hskew       == new_mode->hskew &&
-	    old_mode->vscan       == new_mode->vscan &&
-	    (old_mode->vsync_end - old_mode->vsync_start) ==
-	    (new_mode->vsync_end - new_mode->vsync_start))
-		return true;
-
-	return false;
-}
-EXPORT_IF_KUNIT(is_timing_unchanged_for_freesync);
-
-STATIC_IFN_KUNIT void set_freesync_fixed_config(struct dm_crtc_state *dm_new_crtc_state)
-{
-	u64 num, den, res;
-	struct drm_crtc_state *new_crtc_state = &dm_new_crtc_state->base;
-
-	dm_new_crtc_state->freesync_config.state = VRR_STATE_ACTIVE_FIXED;
-
-	num = (unsigned long long)new_crtc_state->mode.clock * 1000 * 1000000;
-	den = (unsigned long long)new_crtc_state->mode.htotal *
-	      (unsigned long long)new_crtc_state->mode.vtotal;
-
-	res = div_u64(num, den);
-	dm_new_crtc_state->freesync_config.fixed_refresh_in_uhz = res;
-}
-EXPORT_IF_KUNIT(set_freesync_fixed_config);
-
 static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 			 struct drm_atomic_commit *state,
 			 struct drm_crtc *crtc,
@@ -5936,7 +5424,7 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 		 */
 		if (amdgpu_freesync_vid_mode &&
 		    dm_new_crtc_state->stream &&
-		    is_timing_unchanged_for_freesync(new_crtc_state, old_crtc_state))
+		    amdgpu_dm_is_timing_unchanged_for_freesync(new_crtc_state, old_crtc_state))
 			goto skip_modeset;
 
 		if (dm_new_crtc_state->stream &&
@@ -5978,14 +5466,14 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 		if (amdgpu_freesync_vid_mode && dm_new_crtc_state->stream &&
 		    dc_is_stream_unchanged(new_stream, dm_old_crtc_state->stream) &&
 		    dc_is_stream_scaling_unchanged(new_stream, dm_old_crtc_state->stream) &&
-		    is_timing_unchanged_for_freesync(new_crtc_state,
+		    amdgpu_dm_is_timing_unchanged_for_freesync(new_crtc_state,
 						     old_crtc_state)) {
 			new_crtc_state->mode_changed = false;
 			drm_dbg_driver(adev_to_drm(adev),
 				"Mode change not required for front porch change, setting mode_changed to %d",
 				new_crtc_state->mode_changed);
 
-			set_freesync_fixed_config(dm_new_crtc_state);
+			amdgpu_dm_set_freesync_fixed_config(dm_new_crtc_state);
 
 			goto skip_modeset;
 		} else if (amdgpu_freesync_vid_mode && aconnector &&
@@ -5995,7 +5483,7 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 
 			high_mode = amdgpu_dm_get_highest_refresh_rate_mode(aconnector, false);
 			if (!drm_mode_equal(&new_crtc_state->mode, high_mode))
-				set_freesync_fixed_config(dm_new_crtc_state);
+				amdgpu_dm_set_freesync_fixed_config(dm_new_crtc_state);
 		}
 
 		ret = dm_atomic_get_state(state, &dm_state);
@@ -6017,7 +5505,7 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 		dc_stream_release(dm_old_crtc_state->stream);
 		dm_new_crtc_state->stream = NULL;
 
-		reset_freesync_config_for_crtc(dm_new_crtc_state);
+		amdgpu_dm_reset_freesync_config_for_crtc(dm_new_crtc_state);
 
 		*lock_and_validation_needed = true;
 
@@ -6105,7 +5593,7 @@ skip_modeset:
 	}
 
 	/* Update Freesync settings. */
-	get_freesync_config_for_crtc(dm_new_crtc_state,
+	amdgpu_dm_get_freesync_config_for_crtc(dm_new_crtc_state,
 				     dm_new_conn_state);
 
 	return ret;
@@ -6283,133 +5771,6 @@ static bool should_reset_plane(struct drm_atomic_commit *state,
 	return false;
 }
 
-static int dm_check_cursor_fb(struct amdgpu_crtc *new_acrtc,
-			      struct drm_plane_state *new_plane_state,
-			      struct drm_framebuffer *fb)
-{
-	struct amdgpu_device *adev = drm_to_adev(new_acrtc->base.dev);
-	struct amdgpu_framebuffer *afb = to_amdgpu_framebuffer(fb);
-	unsigned int pitch;
-	bool linear;
-
-	if (fb->width > new_acrtc->max_cursor_width ||
-	    fb->height > new_acrtc->max_cursor_height) {
-		drm_dbg_atomic(adev_to_drm(adev), "Bad cursor FB size %dx%d\n",
-				 new_plane_state->fb->width,
-				 new_plane_state->fb->height);
-		return -EINVAL;
-	}
-	if (new_plane_state->src_w != fb->width << 16 ||
-	    new_plane_state->src_h != fb->height << 16) {
-		drm_dbg_atomic(adev_to_drm(adev), "Cropping not supported for cursor plane\n");
-		return -EINVAL;
-	}
-
-	/* Pitch in pixels */
-	pitch = fb->pitches[0] / fb->format->cpp[0];
-
-	if (fb->width != pitch) {
-		drm_dbg_atomic(adev_to_drm(adev), "Cursor FB width %d doesn't match pitch %d",
-				 fb->width, pitch);
-		return -EINVAL;
-	}
-
-	switch (pitch) {
-	case 64:
-	case 128:
-	case 256:
-		/* FB pitch is supported by cursor plane */
-		break;
-	default:
-		drm_dbg_atomic(adev_to_drm(adev), "Bad cursor FB pitch %d px\n", pitch);
-		return -EINVAL;
-	}
-
-	/* Core DRM takes care of checking FB modifiers, so we only need to
-	 * check tiling flags when the FB doesn't have a modifier.
-	 */
-	if (!(fb->flags & DRM_MODE_FB_MODIFIERS)) {
-		if (adev->family == AMDGPU_FAMILY_GC_12_0_0) {
-			linear = AMDGPU_TILING_GET(afb->tiling_flags, GFX12_SWIZZLE_MODE) == 0;
-		} else if (adev->family >= AMDGPU_FAMILY_AI) {
-			linear = AMDGPU_TILING_GET(afb->tiling_flags, SWIZZLE_MODE) == 0;
-		} else {
-			linear = AMDGPU_TILING_GET(afb->tiling_flags, ARRAY_MODE) != DC_ARRAY_2D_TILED_THIN1 &&
-				 AMDGPU_TILING_GET(afb->tiling_flags, ARRAY_MODE) != DC_ARRAY_1D_TILED_THIN1 &&
-				 AMDGPU_TILING_GET(afb->tiling_flags, MICRO_TILE_MODE) == 0;
-		}
-		if (!linear) {
-			drm_dbg_atomic(adev_to_drm(adev), "Cursor FB not linear");
-			return -EINVAL;
-		}
-	}
-
-	return 0;
-}
-
-/*
- * Helper function for checking the cursor in native mode
- */
-static int dm_check_native_cursor_state(struct drm_crtc *new_plane_crtc,
-					struct drm_plane *plane,
-					struct drm_plane_state *new_plane_state,
-					bool enable)
-{
-
-	struct amdgpu_crtc *new_acrtc;
-	int ret;
-
-	if (!enable || !new_plane_crtc ||
-	    drm_atomic_plane_disabling(plane->state, new_plane_state))
-		return 0;
-
-	new_acrtc = to_amdgpu_crtc(new_plane_crtc);
-
-	if (new_plane_state->src_x != 0 || new_plane_state->src_y != 0) {
-		drm_dbg_atomic(new_plane_crtc->dev, "Cropping not supported for cursor plane\n");
-		return -EINVAL;
-	}
-
-	if (new_plane_state->fb) {
-		ret = dm_check_cursor_fb(new_acrtc, new_plane_state,
-						new_plane_state->fb);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
-}
-
-STATIC_IFN_KUNIT bool dm_should_update_native_cursor(struct drm_atomic_commit *state,
-						     struct drm_crtc *old_plane_crtc,
-						     struct drm_crtc *new_plane_crtc,
-						     bool enable)
-{
-	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
-	struct dm_crtc_state *dm_old_crtc_state, *dm_new_crtc_state;
-
-	if (!enable) {
-		if (old_plane_crtc == NULL)
-			return true;
-
-		old_crtc_state = drm_atomic_get_old_crtc_state(
-			state, old_plane_crtc);
-		dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
-
-		return dm_old_crtc_state->cursor_mode == DM_CURSOR_NATIVE_MODE;
-	} else {
-		if (new_plane_crtc == NULL)
-			return true;
-
-		new_crtc_state = drm_atomic_get_new_crtc_state(
-			state, new_plane_crtc);
-		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
-
-		return dm_new_crtc_state->cursor_mode == DM_CURSOR_NATIVE_MODE;
-	}
-}
-EXPORT_IF_KUNIT(dm_should_update_native_cursor);
-
 static int dm_update_plane_state(struct dc *dc,
 				 struct drm_atomic_commit *state,
 				 struct drm_plane *plane,
@@ -6434,14 +5795,14 @@ static int dm_update_plane_state(struct dc *dc,
 	dm_new_plane_state = to_dm_plane_state(new_plane_state);
 	dm_old_plane_state = to_dm_plane_state(old_plane_state);
 
-	update_native_cursor = dm_should_update_native_cursor(state,
-							      old_plane_crtc,
-							      new_plane_crtc,
-							      enable);
+	update_native_cursor = amdgpu_dm_should_update_native_cursor(state,
+								     old_plane_crtc,
+								     new_plane_crtc,
+								     enable);
 
 	if (plane->type == DRM_PLANE_TYPE_CURSOR && update_native_cursor) {
-		ret = dm_check_native_cursor_state(new_plane_crtc, plane,
-						    new_plane_state, enable);
+		ret = amdgpu_dm_check_native_cursor_state(new_plane_crtc, plane,
+							  new_plane_state, enable);
 		if (ret)
 			return ret;
 
@@ -6571,8 +5932,8 @@ static int dm_update_plane_state(struct dc *dc,
 out:
 	/* If enabling cursor overlay failed, attempt fallback to native mode */
 	if (enable && ret == -EINVAL && plane->type == DRM_PLANE_TYPE_CURSOR) {
-		ret = dm_check_native_cursor_state(new_plane_crtc, plane,
-						    new_plane_state, enable);
+		ret = amdgpu_dm_check_native_cursor_state(new_plane_crtc, plane,
+							  new_plane_state, enable);
 		if (ret)
 			return ret;
 
@@ -6582,37 +5943,6 @@ out:
 	return ret;
 }
 
-STATIC_IFN_KUNIT void dm_get_oriented_plane_size(struct drm_plane_state *plane_state,
-					 int *src_w, int *src_h)
-{
-	switch (plane_state->rotation & DRM_MODE_ROTATE_MASK) {
-	case DRM_MODE_ROTATE_90:
-	case DRM_MODE_ROTATE_270:
-		*src_w = plane_state->src_h >> 16;
-		*src_h = plane_state->src_w >> 16;
-		break;
-	case DRM_MODE_ROTATE_0:
-	case DRM_MODE_ROTATE_180:
-	default:
-		*src_w = plane_state->src_w >> 16;
-		*src_h = plane_state->src_h >> 16;
-		break;
-	}
-}
-EXPORT_IF_KUNIT(dm_get_oriented_plane_size);
-
-STATIC_IFN_KUNIT void
-dm_get_plane_scale(struct drm_plane_state *plane_state,
-		   int *out_plane_scale_w, int *out_plane_scale_h)
-{
-	int plane_src_w, plane_src_h;
-
-	dm_get_oriented_plane_size(plane_state, &plane_src_w, &plane_src_h);
-	*out_plane_scale_w = plane_src_w ? plane_state->crtc_w * 1000 / plane_src_w : 0;
-	*out_plane_scale_h = plane_src_h ? plane_state->crtc_h * 1000 / plane_src_h : 0;
-}
-EXPORT_IF_KUNIT(dm_get_plane_scale);
-
 /*
  * The normalized_zpos value cannot be used by this iterator directly. It's only
  * calculated for enabled planes, potentially causing normalized_zpos collisions
@@ -6620,7 +5950,7 @@ EXPORT_IF_KUNIT(dm_get_plane_scale);
  * so that the iterator will not generate the same object twice, or loop
  * indefinitely.
  */
-static inline struct __drm_planes_state *__get_next_zpos(
+struct __drm_planes_state *amdgpu_dm_get_next_zpos(
 	struct drm_atomic_commit *state,
 	struct __drm_planes_state *prev)
 {
@@ -6658,20 +5988,8 @@ static inline struct __drm_planes_state *__get_next_zpos(
 	return &state->planes[highest_i];
 }
 
-/*
- * Use the uniqueness of the plane's (zpos, drm obj ID) combination to iterate
- * by descending zpos, as read from the new plane state. This is the same
- * ordering as defined by drm_atomic_normalize_zpos().
- */
-#define for_each_oldnew_plane_in_descending_zpos(__state, plane, old_plane_state, new_plane_state) \
-	for (struct __drm_planes_state *__i = __get_next_zpos((__state), NULL); \
-	     __i != NULL; __i = __get_next_zpos((__state), __i))		\
-		for_each_if(((plane) = __i->ptr,				\
-			     (void)(plane) /* Only to avoid unused-but-set-variable warning */, \
-			     (old_plane_state) = __i->old_state,		\
-			     (new_plane_state) = __i->new_state, 1))
-
 #if defined(HAVE_DRM_DP_MST_ADD_AFFECTED_DSC_CRTCS)
+
 static int add_affected_mst_dsc_crtcs(struct drm_atomic_commit *state, struct drm_crtc *crtc)
 {
 	struct drm_connector *connector;
@@ -6702,249 +6020,6 @@ static int add_affected_mst_dsc_crtcs(struct drm_atomic_commit *state, struct dr
 	return drm_dp_mst_add_affected_dsc_crtcs(state, &aconnector->mst_root->mst_mgr);
 }
 #endif
-
-/**
- * DOC: Cursor Modes - Native vs Overlay
- *
- * In native mode, the cursor uses a integrated cursor pipe within each DCN hw
- * plane. It does not require a dedicated hw plane to enable, but it is
- * subjected to the same z-order and scaling as the hw plane. It also has format
- * restrictions, a RGB cursor in native mode cannot be enabled within a non-RGB
- * hw plane.
- *
- * In overlay mode, the cursor uses a separate DCN hw plane, and thus has its
- * own scaling and z-pos. It also has no blending restrictions. It lends to a
- * cursor behavior more akin to a DRM client's expectations. However, it does
- * occupy an extra DCN plane, and therefore will only be used if a DCN plane is
- * available.
- */
-
-#ifdef HAVE_DRM_DRM_COLOROP_H
-/**
- * dm_plane_color_pipeline_active() - Check if a plane's color pipeline active.
- * @state: DRM atomic state
- * @plane: DRM plane to check
- * @use_old: if true, inspect the old colorop states; otherwise the new ones
- *
- * A color pipeline may be selected (color_pipeline != NULL) but still is
- * inactive if every colorop in the chain is bypassed.  Only return
- * true when at least one colorop has bypass == false, meaning the cursor
- * would be subjected to the transformation in native mode.
- *
- * Return: true if the pipeline modifies pixels, false otherwise.
- */
-static bool dm_plane_color_pipeline_active(struct drm_atomic_commit *state,
-					   struct drm_plane *plane,
-					   bool use_old)
-{
-	struct drm_colorop *colorop;
-	struct drm_colorop_state *old_colorop_state, *new_colorop_state;
-	int i;
-
-	for_each_oldnew_colorop_in_state(state, colorop, old_colorop_state, new_colorop_state, i) {
-		struct drm_colorop_state *cstate = use_old ? old_colorop_state : new_colorop_state;
-
-		if (cstate->colorop->plane != plane)
-			continue;
-		if (!cstate->bypass)
-			return true;
-	}
-	return false;
-}
-#endif
-
-/**
- * dm_crtc_get_cursor_mode() - Determine the required cursor mode on crtc
- * @adev: amdgpu device
- * @state: DRM atomic state
- * @dm_crtc_state: amdgpu state for the CRTC containing the cursor
- * @cursor_mode: Returns the required cursor mode on dm_crtc_state
- *
- * Get whether the cursor should be enabled in native mode, or overlay mode, on
- * the dm_crtc_state.
- *
- * The cursor should be enabled in overlay mode if there exists an underlying
- * plane - on which the cursor may be blended - that is either YUV formatted,
- * scaled differently from the cursor, or has a color pipeline active.
- *
- * Since zpos info is required, drm_atomic_normalize_zpos must be called before
- * calling this function.
- *
- * Return: 0 on success, or an error code if getting the cursor plane state
- * failed.
- */
-static int dm_crtc_get_cursor_mode(struct amdgpu_device *adev,
-				   struct drm_atomic_commit *state,
-				   struct dm_crtc_state *dm_crtc_state,
-				   enum amdgpu_dm_cursor_mode *cursor_mode)
-{
-	struct drm_plane_state *old_plane_state, *plane_state, *cursor_state;
-	struct drm_crtc_state *crtc_state = &dm_crtc_state->base;
-	struct drm_plane *plane;
-	bool consider_mode_change = false;
-	bool entire_crtc_covered = false;
-	bool cursor_changed = false;
-	int underlying_scale_w, underlying_scale_h;
-	int cursor_scale_w, cursor_scale_h;
-	int i;
-
-	/* Overlay cursor not supported on HW before DCN
-	 * DCN401/420 does not have the cursor-on-scaled-plane or cursor-on-yuv-plane restrictions
-	 * as previous DCN generations, so enable native mode on DCN401/420
-	 *
-	 * Always set native cursor mode when the CRTC is disabled,
-	 * to make sure it doesn't cause atomic commits to fail when
-	 * they are trying to disable the CRTC.
-	 */
-	if (amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 0, 1) ||
-	    amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 2, 0) ||
-	    amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(4, 2, 1) ||
-	    !dm_crtc_state->base.enable) {
-		*cursor_mode = DM_CURSOR_NATIVE_MODE;
-		return 0;
-	}
-
-	/* Init cursor_mode to be the same as current */
-	*cursor_mode = dm_crtc_state->cursor_mode;
-
-	/*
-	 * Cursor mode can change if a plane's format changes, scale changes, is
-	 * enabled/disabled, z-order changes, or color management properties change.
-	 */
-	for_each_oldnew_plane_in_state(state, plane, old_plane_state, plane_state, i) {
-		int new_scale_w, new_scale_h, old_scale_w, old_scale_h;
-
-		/* Only care about planes on this CRTC */
-		if ((drm_plane_mask(plane) & crtc_state->plane_mask) == 0)
-			continue;
-
-		if (plane->type == DRM_PLANE_TYPE_CURSOR)
-			cursor_changed = true;
-
-		if (drm_atomic_plane_enabling(old_plane_state, plane_state) ||
-		    drm_atomic_plane_disabling(old_plane_state, plane_state) ||
-		    old_plane_state->fb->format != plane_state->fb->format) {
-			consider_mode_change = true;
-			break;
-		}
-
-		dm_get_plane_scale(plane_state, &new_scale_w, &new_scale_h);
-		dm_get_plane_scale(old_plane_state, &old_scale_w, &old_scale_h);
-		if (new_scale_w != old_scale_w || new_scale_h != old_scale_h) {
-			consider_mode_change = true;
-			break;
-		}
-
-		/*
-		 * A non-cursor plane moving or resizing (without a scale change)
-		 * changes how much of the CRTC it covers. This can create or
-		 * remove a hole under the cursor and thus flip the required
-		 * cursor mode (native vs overlay), so its destination rect must
-		 * be re-evaluated too.
-		 *
-		 * The cursor plane itself is deliberately excluded: the cursor
-		 * mode depends on the underlying planes' coverage, not on the
-		 * cursor's position (see the entire_crtc_covered logic below).
-		 * Triggering on cursor movement would force every legacy cursor
-		 * update off its fast path, and in a cursor-only commit - where
-		 * the underlying planes are not part of the state - the coverage
-		 * loop would see no covering plane and misevaluate the mode as
-		 * overlay, regressing flip-vs-cursor-legacy.
-		 */
-		if (plane->type != DRM_PLANE_TYPE_CURSOR &&
-		    (old_plane_state->crtc_x != plane_state->crtc_x ||
-		     old_plane_state->crtc_y != plane_state->crtc_y ||
-		     old_plane_state->crtc_w != plane_state->crtc_w ||
-		     old_plane_state->crtc_h != plane_state->crtc_h)) {
-			consider_mode_change = true;
-			break;
-		}
-#ifdef HAVE_DRM_DRM_COLOROP_H
-		if (dm_plane_color_pipeline_active(state, plane, true) !=
-		    dm_plane_color_pipeline_active(state, plane, false)) {
-			consider_mode_change = true;
-			break;
-		}
-#endif
-	}
-
-	if (!consider_mode_change && !crtc_state->zpos_changed)
-		return 0;
-
-	/*
-	 * If no cursor change on this CRTC, and not enabled on this CRTC, then
-	 * no need to set cursor mode. This avoids needlessly locking the cursor
-	 * state.
-	 */
-	if (!cursor_changed &&
-	    !(drm_plane_mask(crtc_state->crtc->cursor) & crtc_state->plane_mask)) {
-		return 0;
-	}
-
-	cursor_state = drm_atomic_get_plane_state(state,
-						  crtc_state->crtc->cursor);
-	if (IS_ERR(cursor_state))
-		return PTR_ERR(cursor_state);
-
-	/* Cursor is disabled */
-	if (!cursor_state->fb)
-		return 0;
-
-	/* For all planes in descending z-order (all of which are below cursor
-	 * as per zpos definitions), check their scaling and format
-	 */
-	for_each_oldnew_plane_in_descending_zpos(state, plane, old_plane_state, plane_state) {
-
-		/* Only care about non-cursor planes on this CRTC */
-		if ((drm_plane_mask(plane) & crtc_state->plane_mask) == 0 ||
-		    plane->type == DRM_PLANE_TYPE_CURSOR)
-			continue;
-
-		/* Underlying plane is YUV format - use overlay cursor */
-		if (amdgpu_dm_plane_is_video_format(plane_state->fb->format->format)) {
-			*cursor_mode = DM_CURSOR_OVERLAY_MODE;
-			return 0;
-		}
-
-#ifdef HAVE_DRM_DRM_COLOROP_H
-		/* Underlying plane has an active color pipeline - cursor would be transformed */
-		if (dm_plane_color_pipeline_active(state, plane, false)) {
-			*cursor_mode = DM_CURSOR_OVERLAY_MODE;
-			return 0;
-		}
-#endif
-
-		dm_get_plane_scale(plane_state,
-				   &underlying_scale_w, &underlying_scale_h);
-		dm_get_plane_scale(cursor_state,
-				   &cursor_scale_w, &cursor_scale_h);
-
-		/* Underlying plane has different scale - use overlay cursor */
-		if (cursor_scale_w != underlying_scale_w &&
-		    cursor_scale_h != underlying_scale_h) {
-			*cursor_mode = DM_CURSOR_OVERLAY_MODE;
-			return 0;
-		}
-
-		/* If this plane covers the whole CRTC, no need to check planes underneath */
-		if (plane_state->crtc_x <= 0 && plane_state->crtc_y <= 0 &&
-		    plane_state->crtc_x + plane_state->crtc_w >= crtc_state->mode.hdisplay &&
-		    plane_state->crtc_y + plane_state->crtc_h >= crtc_state->mode.vdisplay) {
-			entire_crtc_covered = true;
-			break;
-		}
-	}
-
-	/* If planes do not cover the entire CRTC, use overlay mode to enable
-	 * cursor over holes
-	 */
-	if (entire_crtc_covered)
-		*cursor_mode = DM_CURSOR_NATIVE_MODE;
-	else
-		*cursor_mode = DM_CURSOR_OVERLAY_MODE;
-
-	return 0;
-}
 
 static bool amdgpu_dm_crtc_mem_type_changed(struct drm_device *dev,
 					    struct drm_atomic_commit *state,
@@ -7150,8 +6225,8 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 
-		ret = dm_crtc_get_cursor_mode(adev, state, dm_new_crtc_state,
-					      &dm_new_crtc_state->cursor_mode);
+		ret = amdgpu_dm_crtc_get_cursor_mode(adev, state, dm_new_crtc_state,
+						     &dm_new_crtc_state->cursor_mode);
 		if (ret) {
 			drm_dbg(dev, "Failed to determine cursor mode: %pe\n", ERR_PTR(ret));
 			goto fail;
@@ -7287,8 +6362,8 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 
 		/* If HW can only do native cursor, check restrictions again */
-		ret = dm_crtc_get_cursor_mode(adev, state, dm_new_crtc_state,
-					      &required_cursor_mode);
+		ret = amdgpu_dm_crtc_get_cursor_mode(adev, state, dm_new_crtc_state,
+						     &required_cursor_mode);
 		if (ret) {
 			drm_dbg_driver(crtc->dev,
 				       "[CRTC:%d:%s] Checking cursor mode failed\n",

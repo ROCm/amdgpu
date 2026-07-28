@@ -275,6 +275,7 @@ static int psp_early_init(struct amdgpu_ip_block *ip_block)
 		psp->boot_time_tmr = false;
 		break;
 	case IP_VERSION(15, 0, 0):
+	case IP_VERSION(15, 0, 5):
 	case IP_VERSION(15, 0, 9):
 		psp_v15_0_0_set_psp_funcs(psp);
 		psp->boot_time_tmr = false;
@@ -1291,7 +1292,18 @@ static int psp_ptl_invoke(struct psp_context *psp, u32 req_code,
 {
 	struct psp_gfx_cmd_resp *cmd;
 	struct amdgpu_ptl *ptl = &psp->ptl;
+	struct amdgpu_device *adev = psp->adev;
 	int ret;
+
+	if (amdgpu_sriov_vf(adev)) {
+		ret = amdgpu_virt_ptl_request(adev, req_code, ptl_state, fmt1, fmt2);
+		if (!ret) {
+			ptl->enabled = *ptl_state;
+			ptl->fmt1 = *fmt1;
+			ptl->fmt2 = *fmt2;
+		}
+		return ret;
+	}
 
 	cmd = acquire_psp_cmd_buf(psp);
 
@@ -1355,14 +1367,17 @@ int amdgpu_ptl_perf_monitor_ctrl(struct amdgpu_device *adev, u32 req_code,
 	if (!adev || !ptl_state || !fmt1 || !fmt2)
 		return -EINVAL;
 
-	if (amdgpu_sriov_vf(adev))
-		return 0;
-
 	psp = &adev->psp;
 	ptl = &psp->ptl;
 
 	if (ptl->permanently_disabled && *ptl_state == 1)
 		return 0;
+
+	if (amdgpu_sriov_vf(adev)) {
+		ptl_fmt1 = *fmt1;
+		ptl_fmt2 = *fmt2;
+		return psp_ptl_invoke(psp, req_code, ptl_state, &ptl_fmt1, &ptl_fmt2);
+	}
 
 	if (amdgpu_ip_version(adev, GC_HWIP, 0) != IP_VERSION(9, 4, 4) ||
 			psp->sos.fw_version < 0x0036081a)
@@ -1502,6 +1517,18 @@ static ssize_t ptl_enable_show(struct device *dev, struct device_attribute *attr
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
 	struct amdgpu_ptl *ptl = &adev->psp.ptl;
+	uint32_t ptl_state, fmt1, fmt2;
+	int ret;
+
+	if (amdgpu_sriov_vf(adev)) {
+		ptl_state = ptl->enabled;
+		fmt1 = ptl->fmt1;
+		fmt2 = ptl->fmt2;
+		ret = amdgpu_ptl_perf_monitor_ctrl(adev, PSP_PTL_PERF_MON_QUERY,
+				&ptl_state, &fmt1, &fmt2);
+		if (ret)
+			return ret;
+	}
 
 	if (ptl->permanently_disabled)
 		return sysfs_emit(buf, "permanently disabled\n");
@@ -1560,11 +1587,23 @@ static ssize_t ptl_format_show(struct device *dev, struct device_attribute *attr
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
-	struct psp_context *psp = &adev->psp;
+	struct amdgpu_ptl *ptl = &adev->psp.ptl;
+	uint32_t ptl_state, fmt1, fmt2;
+	int ret;
+
+	if (amdgpu_sriov_vf(adev)) {
+		ptl_state = ptl->enabled;
+		fmt1 = ptl->fmt1;
+		fmt2 = ptl->fmt2;
+		ret = amdgpu_ptl_perf_monitor_ctrl(adev, PSP_PTL_PERF_MON_QUERY,
+				&ptl_state, &fmt1, &fmt2);
+		if (ret)
+			return ret;
+	}
 
 	return sysfs_emit(buf, "%s,%s\n",
-			amdgpu_ptl_fmt_str[psp->ptl.fmt1],
-			amdgpu_ptl_fmt_str[psp->ptl.fmt2]);
+			amdgpu_ptl_fmt_str[ptl->fmt1],
+			amdgpu_ptl_fmt_str[ptl->fmt2]);
 }
 
 static umode_t amdgpu_ptl_is_visible(struct kobject *kobj, struct attribute *attr, int idx)
@@ -1574,7 +1613,7 @@ static umode_t amdgpu_ptl_is_visible(struct kobject *kobj, struct attribute *att
 	struct amdgpu_device *adev = drm_to_adev(ddev);
 
 	/* Only show PTL sysfs files if PTL hardware is supported */
-	if (!adev->psp.ptl.hw_supported)
+	if (adev->psp.ptl.hw_supported_state != AMDGPU_PTL_HW_SUPPORTED)
 		return 0;
 
 	return attr->mode;
@@ -1585,7 +1624,7 @@ int amdgpu_ptl_sysfs_init(struct amdgpu_device *adev)
 	struct amdgpu_ptl *ptl = &adev->psp.ptl;
 	int ret;
 
-	if (!ptl->hw_supported)
+	if (ptl->hw_supported_state != AMDGPU_PTL_HW_SUPPORTED)
 		return 0;
 
 	if (ptl->ptl_sysfs_created)
@@ -1602,7 +1641,7 @@ void amdgpu_ptl_sysfs_fini(struct amdgpu_device *adev)
 {
 	struct amdgpu_ptl *ptl = &adev->psp.ptl;
 
-	if (!ptl->hw_supported)
+	if (ptl->hw_supported_state != AMDGPU_PTL_HW_SUPPORTED)
 		return;
 
 	if (!ptl->ptl_sysfs_created)
@@ -3507,8 +3546,10 @@ static int psp_load_non_psp_fw(struct psp_context *psp)
 		     amdgpu_ip_version(adev, MP0_HWIP, 0) ==
 			     IP_VERSION(15, 0, 0) ||
 		     amdgpu_ip_version(adev, MP0_HWIP, 0) ==
-			     IP_VERSION(15, 0, 8) ||
+			     IP_VERSION(15, 0, 5) ||
 		     amdgpu_ip_version(adev, MP0_HWIP, 0) ==
+			     IP_VERSION(15, 0, 8) ||
+			amdgpu_ip_version(adev, MP0_HWIP, 0) ==
 			     IP_VERSION(15, 0, 9)) &&
 		    (ucode->ucode_id == AMDGPU_UCODE_ID_SDMA1 ||
 		     ucode->ucode_id == AMDGPU_UCODE_ID_SDMA2 ||
