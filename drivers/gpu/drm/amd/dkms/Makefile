@@ -4,7 +4,7 @@ else
 KERNELVER ?= $(shell uname -r)
 kernel_build_dir := /lib/modules/$(KERNELVER)/build
 module_src_dir := $(CURDIR)
-module_build_dir := $(shell mktemp -ut amd.XXXXXXXX)
+module_build_dir := $(shell mktemp -t amd.XXXXXXXX)
 module_build_flags :=
 num_cpu_cores := $(shell which nproc > /dev/null && nproc || echo "1")
 CC := gcc

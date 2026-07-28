@@ -100,7 +100,10 @@ if version_lt 6.0; then
 fi
 
 export KERNELVER
-ln -s $DKMS_TREE $MODULE_BUILD_DIR
+# Security: MODULE_BUILD_DIR is atomically created by mktemp (mode 0600) as a
+# regular file. Use ln -sf to atomically replace it with a symlink to DKMS_TREE,
+# eliminating the TOCTOU race that existed with rmdir + ln sequence.
+ln -sf $DKMS_TREE $MODULE_BUILD_DIR
 echo "PATH=$PATH" >$MODULE_BUILD_DIR/.env
 
 # unset TMPDIR in this shell
