@@ -73,6 +73,12 @@
 /* bin_attrs in struct attribute_group is const */
 #define HAVE_ATTRIBUTE_GROUP_BIN_ATTRS_NEW 1
 
+/* bdev_file_open_by_path() exists (kernel 6.8+) */
+#define HAVE_BDEV_FILE_OPEN_BY_PATH 1
+
+/* bdev_open_by_path() exists and returns struct bdev_handle * */
+/* #undef HAVE_BDEV_OPEN_BY_PATH */
+
 /* bin_attribute.read is const args */
 #define HAVE_BIN_ATTR_CONST_ARGS 1
 
@@ -84,6 +90,12 @@
 
 /* bitmap_to_arr32() is available */
 #define HAVE_BITMAP_TO_ARR32 1
+
+/* blkdev_get_by_path() exists with 3 args (kernel <6.5) */
+/* #undef HAVE_BLKDEV_GET_BY_PATH */
+
+/* blkdev_get_by_path() exists with 4 args (RHEL backport) */
+/* #undef HAVE_BLKDEV_GET_BY_PATH_4ARG */
 
 /* struct block_device has member named 'bd_device' */
 #define HAVE_BLOCK_DEVICE_BD_DEVICE 1
@@ -840,6 +852,9 @@
 
 /* file_operation->fop_flags is available */
 #define HAVE_FILE_OPERATION_FOP_FLAGS 1
+
+/* filldir_t callback returns int (kernel <6.1) */
+/* #undef HAVE_FILLDIR_RETURNS_INT */
 
 /* follow_pfn() is available */
 /* #undef HAVE_FOLLOW_PFN */
