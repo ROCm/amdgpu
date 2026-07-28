@@ -308,4 +308,14 @@
 #define AMD_FMT_MOD_TILE_GFX12_256K_2D 4
 #endif
 
+#ifndef HAVE_DRM_FORMAT_INFO_BPP
+/*
+ * drm_format_info_bpp() was added in newer kernels. Provide an equivalent
+ * helper for older kernels that lack it. The definition lives in
+ * drivers/gpu/drm/amd/amdkcl/kcl_drm_fourcc.c.
+ */
+unsigned int kcl_drm_format_info_bpp(const struct drm_format_info *info, int plane);
+#define drm_format_info_bpp kcl_drm_format_info_bpp
+#endif /* HAVE_DRM_FORMAT_INFO_BPP */
+
 #endif /* KCL_KCL_DRM_FOURCC_H */
