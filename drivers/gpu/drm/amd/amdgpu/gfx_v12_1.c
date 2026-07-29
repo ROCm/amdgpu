@@ -198,6 +198,10 @@ static void gfx_v12_1_set_mqd_funcs(struct amdgpu_device *adev);
 static void gfx_v12_1_set_imu_funcs(struct amdgpu_device *adev);
 static int gfx_v12_1_get_cu_info(struct amdgpu_device *adev,
 				 struct amdgpu_cu_info *cu_info);
+static void gfx_v12_1_update_spm_vmid_internal(struct amdgpu_device *adev,
+					       int xcc_id,
+					       struct amdgpu_ring *ring,
+					       u32 vmid);
 static uint64_t gfx_v12_1_get_gpu_clock_counter(struct amdgpu_device *adev);
 static void gfx_v12_1_xcc_select_se_sh(struct amdgpu_device *adev, u32 se_num,
 				       u32 sh_num, u32 instance, int xcc_id);
@@ -1460,6 +1464,13 @@ static int gfx_v12_1_sw_init(struct amdgpu_ip_block *ip_block)
 
 	num_xcc = NUM_XCC(adev->gfx.xcc_mask);
 
+	/* SPM */
+	r = amdgpu_irq_add_id(adev, SOC15_IH_CLIENTID_RLC,
+			      GFX_12_1_0__SRCID__RLC_STRM_PERF_MONITOR_INTERRUPT,
+			      &adev->gfx.spm_irq);
+	if (r)
+		return r;
+
 	/* EOP Event */
 	r = amdgpu_irq_add_id(adev, SOC_V1_0_IH_CLIENTID_GRBM_CP,
 			      GFX_12_1_0__SRCID__CP_EOP_INTERRUPT,
@@ -2064,6 +2075,7 @@ static int gfx_v12_1_xcc_rlc_resume(struct amdgpu_device *adev,
 		}
 
 		gfx_v12_1_xcc_rlc_stop(adev, xcc_id);
+		gfx_v12_1_update_spm_vmid_internal(adev, xcc_id, NULL, 0xf);
 
 		/* disable CG */
 		WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_CGCG_CGLS_CTRL, 0);
@@ -3138,6 +3150,10 @@ static int gfx_v12_1_hw_init(struct amdgpu_ip_block *ip_block)
 	if (r)
 		return r;
 
+	r = amdgpu_irq_get(adev, &adev->gfx.spm_irq, 0);
+	if (r)
+		goto err_spm_irq;
+
 	r = amdgpu_irq_get(adev, &adev->gfx.priv_inst_irq, 0);
 	if (r)
 		goto err_priv_inst;
@@ -3151,6 +3167,8 @@ static int gfx_v12_1_hw_init(struct amdgpu_ip_block *ip_block)
 err_userq_eop:
 	amdgpu_irq_put(adev, &adev->gfx.priv_inst_irq, 0);
 err_priv_inst:
+	amdgpu_irq_put(adev, &adev->gfx.spm_irq, 0);
+err_spm_irq:
 	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
 	return r;
 }
@@ -3183,6 +3201,7 @@ static int gfx_v12_1_hw_fini(struct amdgpu_ip_block *ip_block)
 	int i, num_xcc;
 
 	gfx_v12_1_set_userq_eop_interrupts(adev, false);
+	amdgpu_irq_put(adev, &adev->gfx.spm_irq, 0);
 	amdgpu_irq_put(adev, &adev->gfx.priv_inst_irq, 0);
 	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
 
@@ -3248,6 +3267,84 @@ static uint64_t gfx_v12_1_get_gpu_clock_counter(struct amdgpu_device *adev)
 	return clock;
 }
 
+static void gfx_v12_1_spm_start(struct amdgpu_device *adev, int xcc_id)
+{
+	u32 data = 0;
+
+	amdgpu_gfx_off_ctrl(adev, false);
+
+	data = RREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_PERFMON_CNTL);
+	data |= RLC_SPM_PERFMON_CNTL__PERFMON_RING_MODE_MASK;
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_PERFMON_CNTL, data);
+
+	data = REG_SET_FIELD(0, CP_PERFMON_CNTL, SPM_PERFMON_STATE,
+			CP_PERFMON_STATE_DISABLE_AND_RESET);
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regCP_PERFMON_CNTL, data);
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_ACCUM_MODE, 0);
+
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_RING_WRPTR, 0);
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_RING_RDPTR, 0);
+
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_INT_CNTL, 1);
+
+	amdgpu_gfx_off_ctrl(adev, true);
+}
+
+static void gfx_v12_1_spm_stop(struct amdgpu_device *adev, int xcc_id)
+{
+	u32 data = 0;
+
+	amdgpu_gfx_off_ctrl(adev, false);
+
+	data = REG_SET_FIELD(0, CP_PERFMON_CNTL, SPM_PERFMON_STATE,
+			CP_PERFMON_STATE_STOP_COUNTING);
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regCP_PERFMON_CNTL, data);
+
+	data = REG_SET_FIELD(0, CP_PERFMON_CNTL, SPM_PERFMON_STATE,
+			CP_PERFMON_STATE_DISABLE_AND_RESET);
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regCP_PERFMON_CNTL, data);
+
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_RING_WRPTR, 0);
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_RING_RDPTR, 0);
+
+	amdgpu_gfx_off_ctrl(adev, true);
+}
+
+static void gfx_v12_1_spm_set_rdptr(struct amdgpu_device *adev, int xcc_id, u32 rptr)
+{
+	amdgpu_gfx_off_ctrl(adev, false);
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_RING_RDPTR, rptr);
+	amdgpu_gfx_off_ctrl(adev, true);
+}
+
+static void gfx_v12_1_set_spm_perfmon_ring_buf(struct amdgpu_device *adev,
+					       int xcc_id, u64 gpu_addr,
+					       u32 size)
+{
+	amdgpu_gfx_off_ctrl(adev, false);
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_PERFMON_RING_BASE_LO,
+		     lower_32_bits(gpu_addr));
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_PERFMON_RING_BASE_HI,
+		     upper_32_bits(gpu_addr));
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_PERFMON_RING_SIZE, size);
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_SEGMENT_THRESHOLD, 0x1);
+	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regCP_PERFMON_CNTL, 0);
+	amdgpu_gfx_off_ctrl(adev, true);
+}
+
+static const struct spm_funcs gfx_v12_1_spm_funcs = {
+	.start = &gfx_v12_1_spm_start,
+	.stop = &gfx_v12_1_spm_stop,
+	.set_rdptr = &gfx_v12_1_spm_set_rdptr,
+	.set_spm_perfmon_ring_buf = &gfx_v12_1_set_spm_perfmon_ring_buf,
+	.set_spm_config_size = 0,
+};
+
+static void gfx_v12_1_set_spm_funcs(struct amdgpu_device *adev)
+{
+	adev->gfx.spmfuncs = &gfx_v12_1_spm_funcs;
+}
+
 static int gfx_v12_1_early_init(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
@@ -3273,6 +3370,7 @@ static int gfx_v12_1_early_init(struct amdgpu_ip_block *ip_block)
 		adev->gfx.num_compute_rings = min(amdgpu_gfx_get_num_kcq(adev),
 						  AMDGPU_MAX_COMPUTE_RINGS);
 
+	gfx_v12_1_set_spm_funcs(adev);
 	gfx_v12_1_set_kiq_pm4_funcs(adev);
 	gfx_v12_1_set_ring_funcs(adev);
 	gfx_v12_1_set_irq_funcs(adev);
@@ -3333,26 +3431,28 @@ static void gfx_v12_1_update_perf_clk(struct amdgpu_device *adev,
 		gfx_v12_1_xcc_update_perf_clk(adev, enable, i);
 }
 
-static void gfx_v12_1_update_spm_vmid(struct amdgpu_device *adev,
-				      int xcc_id,
-				      struct amdgpu_ring *ring,
-				      unsigned vmid)
+static void gfx_v12_1_update_spm_vmid_internal(struct amdgpu_device *adev,
+					       int xcc_id,
+					       struct amdgpu_ring *ring,
+					       u32 vmid)
 {
-	u32 reg, data;
+	u32 reg, pre_data, data;
 
 	reg = SOC15_REG_OFFSET(GC, GET_INST(GC, xcc_id), regRLC_SPM_MC_CNTL);
-	if (amdgpu_sriov_is_pp_one_vf(adev))
-		data = RREG32_NO_KIQ(reg);
+	if (amdgpu_sriov_is_pp_one_vf(adev) && !amdgpu_sriov_runtime(adev))
+		pre_data = RREG32_NO_KIQ(reg);
 	else
-		data = RREG32(reg);
+		pre_data = RREG32(reg);
 
-	data &= ~RLC_SPM_MC_CNTL__RLC_SPM_VMID_MASK;
+	data =	pre_data & (~RLC_SPM_MC_CNTL__RLC_SPM_VMID_MASK);
 	data |= (vmid & RLC_SPM_MC_CNTL__RLC_SPM_VMID_MASK) << RLC_SPM_MC_CNTL__RLC_SPM_VMID__SHIFT;
 
-	if (amdgpu_sriov_is_pp_one_vf(adev))
-		WREG32_SOC15_NO_KIQ(GC, GET_INST(GC, xcc_id), regRLC_SPM_MC_CNTL, data);
-	else
-		WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_MC_CNTL, data);
+	if (pre_data != data) {
+		if (amdgpu_sriov_is_pp_one_vf(adev) && !amdgpu_sriov_runtime(adev))
+			WREG32_SOC15_NO_KIQ(GC, GET_INST(GC, xcc_id), regRLC_SPM_MC_CNTL, data);
+		else
+			WREG32_SOC15(GC, GET_INST(GC, xcc_id), regRLC_SPM_MC_CNTL, data);
+	}
 
 	if (ring
 	    && amdgpu_sriov_is_pp_one_vf(adev)
@@ -3361,6 +3461,18 @@ static void gfx_v12_1_update_spm_vmid(struct amdgpu_device *adev,
 		uint32_t reg = SOC15_REG_OFFSET(GC, GET_INST(GC, xcc_id), regRLC_SPM_MC_CNTL);
 		amdgpu_ring_emit_wreg(ring, reg, data);
 	}
+}
+
+static void gfx_v12_1_update_spm_vmid(struct amdgpu_device *adev,
+				      int xcc_id,
+				      struct amdgpu_ring *ring,
+				      u32 vmid)
+{
+	amdgpu_gfx_off_ctrl(adev, false);
+
+	gfx_v12_1_update_spm_vmid_internal(adev, xcc_id, ring, vmid);
+
+	amdgpu_gfx_off_ctrl(adev, true);
 }
 
 static const struct amdgpu_rlc_funcs gfx_v12_1_rlc_funcs = {
@@ -4280,6 +4392,50 @@ static const struct amdgpu_irq_src_funcs gfx_v12_1_priv_inst_irq_funcs = {
 	.process = gfx_v12_1_priv_inst_irq,
 };
 
+static int gfx_v12_1_spm_set_interrupt_state(struct amdgpu_device *adev,
+					     struct amdgpu_irq_src *src,
+					     unsigned int type,
+					     enum amdgpu_interrupt_state state)
+{
+	int i, num_xcc;
+
+	amdgpu_gfx_off_ctrl(adev, false);
+
+	num_xcc = NUM_XCC(adev->gfx.xcc_mask);
+	for (i = 0; i < num_xcc; i++) {
+		switch (state) {
+		case AMDGPU_IRQ_STATE_DISABLE:
+			WREG32_SOC15(GC, GET_INST(GC, i), regRLC_SPM_INT_CNTL, 0);
+			break;
+		case AMDGPU_IRQ_STATE_ENABLE:
+			WREG32_SOC15(GC, GET_INST(GC, i), regRLC_SPM_INT_CNTL, 1);
+			break;
+		default:
+			break;
+		}
+	}
+	amdgpu_gfx_off_ctrl(adev, true);
+
+	return 0;
+}
+
+static int gfx_v12_1_set_spm_irq(struct amdgpu_device *adev,
+				 struct amdgpu_irq_src *source,
+				 struct amdgpu_iv_entry *entry)
+{
+	int xcc_id;
+
+	xcc_id = gfx_v12_1_ih_to_xcc_inst(adev, entry->node_id);
+
+	amdgpu_amdkfd_rlc_spm_interrupt(adev, xcc_id);
+	return 0;
+}
+
+static const struct amdgpu_irq_src_funcs gfx_v12_1_set_spm_irq_funcs = {
+	.set = gfx_v12_1_spm_set_interrupt_state,
+	.process = gfx_v12_1_set_spm_irq,
+};
+
 static const struct amdgpu_irq_src_funcs gfx_v12_1_rlc_poison_irq_funcs = {
 	.process = gfx_v12_1_rlc_poison_irq,
 };
@@ -4288,6 +4444,9 @@ static void gfx_v12_1_set_irq_funcs(struct amdgpu_device *adev)
 {
 	adev->gfx.eop_irq.num_types = AMDGPU_CP_IRQ_LAST;
 	adev->gfx.eop_irq.funcs = &gfx_v12_1_eop_irq_funcs;
+
+	adev->gfx.spm_irq.num_types = 1;
+	adev->gfx.spm_irq.funcs = &gfx_v12_1_set_spm_irq_funcs;
 
 	adev->gfx.priv_reg_irq.num_types = 1;
 	adev->gfx.priv_reg_irq.funcs = &gfx_v12_1_priv_reg_irq_funcs;
