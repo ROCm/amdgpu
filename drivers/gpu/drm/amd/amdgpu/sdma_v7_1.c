@@ -1393,7 +1393,8 @@ static int sdma_v7_1_hw_init(struct amdgpu_ip_block *ip_block)
 
 	inst_mask = GENMASK(adev->sdma.num_instances - 1, 0);
 
-	sdma_v7_1_rb_cmd_switch(adev, inst_mask);
+	if (!amdgpu_sriov_vf(adev))
+		sdma_v7_1_rb_cmd_switch(adev, inst_mask);
 
 	r = sdma_v7_1_inst_start(adev, inst_mask);
 	if (r)

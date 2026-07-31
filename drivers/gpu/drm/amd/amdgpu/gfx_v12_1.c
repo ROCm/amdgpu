@@ -2693,7 +2693,8 @@ static int gfx_v12_1_hw_init(struct amdgpu_ip_block *ip_block)
 	if (r)
 		return r;
 
-	gfx_v12_1_init_golden_registers(adev);
+	if (!amdgpu_sriov_vf(adev))
+		gfx_v12_1_init_golden_registers(adev);
 
 	gfx_v12_1_constants_init(adev);
 
