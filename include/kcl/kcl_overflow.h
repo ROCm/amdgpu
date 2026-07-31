@@ -41,4 +41,37 @@
 })
 #endif
 
+/*
+ * wrapping_add()/wrapping_sub()/wrapping_mul() were introduced in newer
+ * kernels (linux/overflow.h). Provide equivalent fallbacks for older
+ * kernels that lack them so drivers can perform intentional wrap-around
+ * arithmetic without tripping wrap-around sanitizers.
+ */
+#ifndef wrapping_add
+#define wrapping_add(type, a, b)				\
+	({							\
+		type __val;					\
+		__builtin_add_overflow(a, b, &__val);		\
+		__val;						\
+	})
+#endif
+
+#ifndef wrapping_sub
+#define wrapping_sub(type, a, b)				\
+	({							\
+		type __val;					\
+		__builtin_sub_overflow(a, b, &__val);		\
+		__val;						\
+	})
+#endif
+
+#ifndef wrapping_mul
+#define wrapping_mul(type, a, b)				\
+	({							\
+		type __val;					\
+		__builtin_mul_overflow(a, b, &__val);		\
+		__val;						\
+	})
+#endif
+
 #endif  // _KCL_OVERFLOW_H_
