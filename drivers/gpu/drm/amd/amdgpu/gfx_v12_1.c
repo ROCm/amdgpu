@@ -707,6 +707,19 @@ static int gfx_v12_1_get_xccs_per_xcp(struct amdgpu_device *adev)
 	u32 reg_data;
 
 	/* the register data is expected to be the same on all instances */
+	if (amdgpu_sriov_vf(adev)) {
+		/*
+		 * RLCG cannot access the GFX_IMU registers, so take the field
+		 * from RLC_IMU_AID_CONFIG and read it without going through
+		 * the RLCG path.
+		 */
+		reg_data = RREG32_NO_KIQ(SOC15_REG_OFFSET(GC, GET_INST(GC, 0),
+							 regRLC_IMU_AID_CONFIG));
+
+		return REG_GET_FIELD(reg_data, RLC_IMU_AID_CONFIG,
+				     TOTAL_XCCS_IN_XCP);
+	}
+
 	reg_data = RREG32_SOC15(GC, GET_INST(GC, 0),
 				regGFX_IMU_PARTITION_SWITCH_SHADOW);
 
