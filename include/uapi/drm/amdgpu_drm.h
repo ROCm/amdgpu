@@ -623,18 +623,18 @@ struct drm_amdgpu_userq_wait {
 
 struct drm_amdgpu_sem_in {
 	/** AMDGPU_SEM_OP_* */
-	uint32_t	op;
-	uint32_t        handle;
-	uint32_t	ctx_id;
-	uint32_t        ip_type;
-	uint32_t        ip_instance;
-	uint32_t        ring;
-	uint64_t        seq;
+	__u32	op;
+	__u32        handle;
+	__u32	ctx_id;
+	__u32        ip_type;
+	__u32        ip_instance;
+	__u32        ring;
+	__u64        seq;
 };
 
 union drm_amdgpu_sem_out {
-	int32_t         fd;
-	uint32_t	handle;
+	__s32         fd;
+	__u32	handle;
 };
 
 union drm_amdgpu_sem {
@@ -844,7 +844,7 @@ struct drm_amdgpu_fence {
 };
 
 struct drm_amdgpu_wait_fences_in {
-	/** This points to uint64_t * which points to fences */
+	/** This points to __u64 * which points to fences */
 	__u64 fences;
 	__u32 fence_count;
 	__u32 wait_all;
@@ -1396,8 +1396,8 @@ struct drm_amdgpu_info {
 		} read_mmr_reg;
 
 		struct {
-			uint32_t aperture;
-			uint32_t _pad;
+			__u32 aperture;
+			__u32 _pad;
 		} virtual_range;
 
 		struct drm_amdgpu_query_fw query_fw;
@@ -1752,8 +1752,8 @@ struct drm_amdgpu_info_uq_metadata {
 #define AMDGPU_SUA_APERTURE_PRIVATE    1
 #define AMDGPU_SUA_APERTURE_SHARED     2
 struct drm_amdgpu_virtual_range {
-	uint64_t start;
-	uint64_t end;
+	__u64 start;
+	__u64 end;
 };
 
 struct drm_amdgpu_capability {
