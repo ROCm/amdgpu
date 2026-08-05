@@ -47,6 +47,7 @@
 	} while (0)
 
 #define mmRCC_CONFIG_MEMSIZE    0xde3
+#define mmRCC_HW_DEBUG          0x10c01
 
 const char *amdgpu_virt_dynamic_crit_table_name[] = {
 	"IP DISCOVERY",
@@ -1068,6 +1069,9 @@ int amdgpu_virt_init_critical_region(struct amdgpu_device *adev)
 		return 0;
 
 	vram_size = RREG32(mmRCC_CONFIG_MEMSIZE);
+	/* Fall back to RCC_HW_DEBUG when RCC_CONFIG_MEMSIZE reads 0 on a VF. */
+	if (!vram_size)
+		vram_size = RREG32(mmRCC_HW_DEBUG);
 	if (!vram_size || vram_size == U32_MAX)
 		return -EINVAL;
 	vram_size <<= 20;

@@ -60,7 +60,13 @@ static void nbif_v7_10_mc_access_enable(struct amdgpu_device *adev, bool enable)
 
 static u32 nbif_v7_10_get_memsize(struct amdgpu_device *adev)
 {
-	return RREG32_SOC15(NBIO, 0, regRCC_DEV0_EPF0_RCC_CONFIG_MEMSIZE);
+	u32 vram_size = RREG32_SOC15(NBIO, 0, regRCC_DEV0_EPF0_RCC_CONFIG_MEMSIZE);
+
+	/* Fall back to RCC_HW_DEBUG when RCC_CONFIG_MEMSIZE reads 0 on a VF. */
+	if (!vram_size && amdgpu_sriov_vf(adev))
+		vram_size = RREG32_SOC15(NBIO, 0, regRCC_DEV0_EPF0_RCC_HW_DEBUG);
+
+	return vram_size;
 }
 
 static void nbif_v7_10_sdma_doorbell_range(struct amdgpu_device *adev,

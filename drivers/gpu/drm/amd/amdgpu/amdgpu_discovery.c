@@ -144,6 +144,7 @@ MODULE_FIRMWARE("amdgpu/aldebaran_ip_discovery.bin");
 /* Note: These registers are consistent across all the SOCs */
 #define mmIP_DISCOVERY_VERSION  0x16A00
 #define mmRCC_CONFIG_MEMSIZE	0xde3
+#define mmRCC_HW_DEBUG		0x10c01
 #define mmMP0_SMN_C2PMSG_33	0x16061
 #define mmMM_INDEX		0x0
 #define mmMM_INDEX_HI		0x6
@@ -289,6 +290,17 @@ static int hw_id_map[MAX_HWIP] = {
 	[ATU_HWIP]	= ATU_HWID,
 };
 
+static u32 amdgpu_discovery_get_config_memsize(struct amdgpu_device *adev)
+{
+	u32 memsize = RREG32(mmRCC_CONFIG_MEMSIZE);
+
+	/* Fall back to RCC_HW_DEBUG when RCC_CONFIG_MEMSIZE reads 0 on a VF. */
+	if (!memsize && amdgpu_sriov_vf(adev))
+		memsize = RREG32(mmRCC_HW_DEBUG);
+
+	return memsize;
+}
+
 static int amdgpu_discovery_get_tmr_info(struct amdgpu_device *adev,
 					 bool *is_tmr_in_sysmem)
 {
@@ -313,7 +325,7 @@ static int amdgpu_discovery_get_tmr_info(struct amdgpu_device *adev,
 		}
 	}
 
-	vram_size = RREG32(mmRCC_CONFIG_MEMSIZE);
+	vram_size = amdgpu_discovery_get_config_memsize(adev);
 	if (vram_size == U32_MAX)
 		return -ENXIO;
 	else if (!vram_size)
@@ -2339,7 +2351,7 @@ static int amdgpu_discovery_refresh_nps_info(struct amdgpu_device *adev,
 	struct binary_header_v2 bhdrv2;
 	uint16_t checksum;
 
-	vram_size = (uint64_t)RREG32(mmRCC_CONFIG_MEMSIZE) << 20;
+	vram_size = (uint64_t)amdgpu_discovery_get_config_memsize(adev) << 20;
 	pos = vram_size - DISCOVERY_TMR_OFFSET;
 	amdgpu_device_vram_access(adev, pos, &bhdr, sizeof(bhdr), false);
 
