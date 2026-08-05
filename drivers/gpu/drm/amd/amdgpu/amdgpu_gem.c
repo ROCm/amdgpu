@@ -669,6 +669,11 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 #endif
 			goto release_object;
 		}
+
+		r = pm_runtime_resume_and_get(adev->dev);
+		if (r < 0)
+			goto user_pages_done;
+
 		r = amdgpu_bo_reserve(bo, true);
 		if (r)
 			goto user_pages_done;
@@ -680,6 +685,9 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 		amdgpu_bo_placement_from_domain(bo, AMDGPU_GEM_DOMAIN_GTT);
 		r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
 		amdgpu_bo_unreserve(bo);
+
+		pm_runtime_put_autosuspend(adev->dev);
+
 		if (r)
 			goto user_pages_done;
 	}
