@@ -39,6 +39,8 @@
 #define AMDGPU_BO_INVALID_OFFSET	LONG_MAX
 #define AMDGPU_BO_MAX_PLACEMENTS	3
 
+/* BO flag to indicate VRAM already accounted by KFD */
+#define AMDGPU_AMDKFD_CREATE_VRAM_ACCOUNTED	BIT_ULL(62)
 /* BO flag to indicate a KFD userptr BO */
 #define AMDGPU_AMDKFD_CREATE_USERPTR_BO	(1ULL << 63)
 
@@ -127,6 +129,7 @@ struct amdgpu_bo {
 #endif
 
 	struct kgd_mem                  *kfd_bo;
+	bool				kfd_vram_accounted;
 
 	/*
 	 * For GPUs with spatial partitioning, xcp partition number, -1 means

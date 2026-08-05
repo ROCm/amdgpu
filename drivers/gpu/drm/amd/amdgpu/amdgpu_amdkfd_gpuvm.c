@@ -235,9 +235,19 @@ int amdgpu_amdkfd_reserve_mem_limit(struct amdgpu_device *adev,
 	 */
 
 	if (adev && xcp_id >= 0 && (!adev->apu_prefer_gtt || adev->gmc.is_app_apu)) {
-		uint64_t vram_available =
-			vram_size - reserved_for_pt - reserved_for_ras -
-			atomic64_read(&adev->vram_pin_size);
+		u64 vram_available;
+
+		if (!(adev->flags & AMD_IS_APU) && !adev->gmc.mem_partitions) {
+			u64 vram_unavailable = reserved_for_pt + reserved_for_ras +
+				atomic64_read(&adev->kfd.unaccounted_vram_pinned) +
+				amdgpu_vram_mgr_kfd_available_usage(adev, xcp_id);
+
+			vram_available = vram_size > vram_unavailable ?
+				vram_size - vram_unavailable : 0;
+		} else {
+			vram_available = vram_size - reserved_for_pt - reserved_for_ras -
+				atomic64_read(&adev->vram_pin_size);
+		}
 		if (adev->kfd.vram_used[xcp_id] + vram_needed > vram_available) {
 			ret = -ENOMEM;
 			goto release;
@@ -1769,18 +1779,28 @@ size_t amdgpu_amdkfd_get_available_memory(struct amdgpu_device *adev,
 	uint64_t reserved_for_ras = (con ? con->reserved_pages_in_bytes : 0);
 	ssize_t available;
 	uint64_t vram_available, system_mem_available, ttm_mem_available;
+	u64 vram_unavailable;
 
 	spin_lock(&kfd_mem_limit.mem_limit_lock);
 	if (adev->apu_prefer_gtt && !adev->gmc.is_app_apu)
 		vram_available = KFD_XCP_MEMORY_SIZE(adev, xcp_id)
 			- adev->kfd.vram_used_aligned[xcp_id];
-	else
+	else if (!(adev->flags & AMD_IS_APU) && !adev->gmc.mem_partitions) {
+		vram_unavailable = adev->kfd.vram_used_aligned[xcp_id] +
+			atomic64_read(&adev->kfd.unaccounted_vram_pinned) +
+			amdgpu_vram_mgr_kfd_available_usage(adev, xcp_id) +
+			reserved_for_pt + reserved_for_ras;
+		vram_available = KFD_XCP_MEMORY_SIZE(adev, xcp_id) >
+			vram_unavailable ? KFD_XCP_MEMORY_SIZE(adev, xcp_id) -
+			vram_unavailable : 0;
+	} else {
 		vram_available = KFD_XCP_MEMORY_SIZE(adev, xcp_id)
 			- adev->kfd.vram_used_aligned[xcp_id]
 			- atomic64_read(&adev->vram_pin_size)
 			+ atomic64_read(&adev->kfd.vram_pinned)
 			- reserved_for_pt
 			- reserved_for_ras;
+	}
 
 	if (adev->apu_prefer_gtt) {
 		system_mem_available = no_system_mem_limit ?
@@ -1877,6 +1897,8 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		alloc_flags |= AMDGPU_GEM_CREATE_EXT_COHERENT;
 	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_UNCACHED)
 		alloc_flags |= AMDGPU_GEM_CREATE_UNCACHED;
+	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
+		alloc_flags |= AMDGPU_AMDKFD_CREATE_VRAM_ACCOUNTED;
 
 	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
 	if (!*mem) {

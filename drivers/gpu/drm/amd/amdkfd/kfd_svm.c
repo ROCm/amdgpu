@@ -598,7 +598,8 @@ svm_range_vram_node_new(struct kfd_node *node, struct svm_range *prange,
 	bp.size = prange->npages * PAGE_SIZE;
 	bp.byte_align = PAGE_SIZE;
 	bp.domain = AMDGPU_GEM_DOMAIN_VRAM;
-	bp.flags = AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
+	bp.flags = AMDGPU_GEM_CREATE_NO_CPU_ACCESS |
+		AMDGPU_AMDKFD_CREATE_VRAM_ACCOUNTED;
 	bp.flags |= clear ? AMDGPU_GEM_CREATE_VRAM_CLEARED : 0;
 	bp.flags |= AMDGPU_GEM_CREATE_DISCARDABLE;
 	bp.type = ttm_bo_type_device;

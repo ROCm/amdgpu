@@ -26,6 +26,9 @@
 
 #include <drm/drm_buddy.h>
 
+struct amdgpu_bo;
+struct amdgpu_device;
+
 struct amdgpu_vram_mgr {
 	struct ttm_resource_manager manager;
 	struct drm_buddy mm;
@@ -55,6 +58,8 @@ struct amdgpu_vram_mgr_resource {
 	unsigned long flags;
 	struct list_head vres_node;
 	struct amdgpu_vres_task task;
+	s8 kfd_available_xcp_id;
+	bool kfd_available_accounted;
 };
 
 static inline u64 amdgpu_vram_mgr_block_start(struct drm_buddy_block *block)
@@ -88,5 +93,8 @@ static inline void amdgpu_vram_mgr_set_cleared(struct ttm_resource *res)
 
 int amdgpu_vram_mgr_query_address_block_info(struct amdgpu_vram_mgr *mgr,
 		uint64_t address, struct amdgpu_vram_block_info *info);
+u64 amdgpu_vram_mgr_kfd_available_usage(struct amdgpu_device *adev,
+					s8 xcp_id);
+bool amdgpu_vram_mgr_bo_kfd_available_accounted(struct amdgpu_bo *bo);
 
 #endif

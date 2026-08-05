@@ -90,6 +90,24 @@ static inline u64 amdgpu_vram_mgr_blocks_size(struct list_head *head)
 	return size;
 }
 
+u64 amdgpu_vram_mgr_kfd_available_usage(struct amdgpu_device *adev,
+					s8 xcp_id)
+{
+	if (xcp_id < 0 || xcp_id >= MAX_XCP)
+		return 0;
+
+	return atomic64_read(&adev->kfd.drm_vram_used[xcp_id]);
+}
+
+bool amdgpu_vram_mgr_bo_kfd_available_accounted(struct amdgpu_bo *bo)
+{
+	if (!bo->tbo.resource || bo->tbo.resource->mem_type != TTM_PL_VRAM)
+		return false;
+
+	return to_amdgpu_vram_mgr_resource(bo->tbo.resource)->
+		kfd_available_accounted;
+}
+
 /**
  * DOC: mem_info_vram_total
  *
@@ -615,6 +633,14 @@ static int amdgpu_vram_mgr_new(struct ttm_resource_manager *man,
 	else
 		vres->base.bus.caching = ttm_write_combined;
 
+	vres->kfd_available_xcp_id = bo->xcp_id;
+	if (tbo->type == ttm_bo_type_device &&
+	    !bo->kfd_vram_accounted &&
+	    bo->xcp_id >= 0 && bo->xcp_id < MAX_XCP &&
+	    !(adev->flags & AMD_IS_APU) && !adev->gmc.mem_partitions) {
+		atomic64_add(vres->base.size, &adev->kfd.drm_vram_used[bo->xcp_id]);
+		vres->kfd_available_accounted = true;
+	}
 	atomic64_add(vis_usage, &mgr->vis_usage);
 	*res = &vres->base;
 	return 0;
@@ -660,6 +686,9 @@ static void amdgpu_vram_mgr_del(struct ttm_resource_manager *man,
 	mutex_unlock(&mgr->lock);
 
 	atomic64_sub(vis_usage, &mgr->vis_usage);
+	if (vres->kfd_available_accounted)
+		atomic64_sub(vres->base.size,
+			     &adev->kfd.drm_vram_used[vres->kfd_available_xcp_id]);
 
 	ttm_resource_fini(man, res);
 	kfree(vres);

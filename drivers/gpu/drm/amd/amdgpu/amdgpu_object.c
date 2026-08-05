@@ -679,7 +679,9 @@ int amdgpu_bo_create(struct amdgpu_device *adev,
 	    bo->allowed_domains == AMDGPU_GEM_DOMAIN_VRAM)
 		bo->allowed_domains |= AMDGPU_GEM_DOMAIN_GTT;
 
-	bo->flags = bp->flags;
+	bo->kfd_vram_accounted = bp->flags &
+		AMDGPU_AMDKFD_CREATE_VRAM_ACCOUNTED;
+	bo->flags = bp->flags & ~AMDGPU_AMDKFD_CREATE_VRAM_ACCOUNTED;
 
 	if (adev->gmc.mem_partitions)
 		/* For GPUs with spatial partitioning, bo->xcp_id=-1 means any partition */
@@ -1002,6 +1004,11 @@ int amdgpu_bo_pin(struct amdgpu_bo *bo, u32 domain)
 
 	if (bo->tbo.resource->mem_type == TTM_PL_VRAM) {
 		atomic64_add(amdgpu_bo_size(bo), &adev->vram_pin_size);
+		if (!(adev->flags & AMD_IS_APU) && !adev->gmc.mem_partitions &&
+		    !bo->kfd_vram_accounted &&
+		    !amdgpu_vram_mgr_bo_kfd_available_accounted(bo))
+			atomic64_add(amdgpu_bo_size(bo),
+				     &adev->kfd.unaccounted_vram_pinned);
 		atomic64_add(amdgpu_vram_mgr_bo_visible_size(bo),
 			     &adev->visible_pin_size);
 	} else if (bo->tbo.resource->mem_type == TTM_PL_TT) {
@@ -1036,6 +1043,11 @@ void amdgpu_bo_unpin(struct amdgpu_bo *bo)
 #endif
 
 	if (bo->tbo.resource->mem_type == TTM_PL_VRAM) {
+		if (!(adev->flags & AMD_IS_APU) && !adev->gmc.mem_partitions &&
+		    !bo->kfd_vram_accounted &&
+		    !amdgpu_vram_mgr_bo_kfd_available_accounted(bo))
+			atomic64_sub(amdgpu_bo_size(bo),
+				     &adev->kfd.unaccounted_vram_pinned);
 		atomic64_sub(amdgpu_bo_size(bo), &adev->vram_pin_size);
 		atomic64_sub(amdgpu_vram_mgr_bo_visible_size(bo),
 			     &adev->visible_pin_size);
