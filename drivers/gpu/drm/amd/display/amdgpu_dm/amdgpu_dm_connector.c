@@ -2992,7 +2992,7 @@ EXPORT_IF_KUNIT(amdgpu_set_panel_orientation);
  * per-tile timing from the primary connector so compositors only pick the full
  * 5K mode.
  */
-static void amdgpu_dm_prune_primary_tile_modes(struct drm_connector *connector)
+STATIC_IFN_KUNIT void amdgpu_dm_prune_primary_tile_modes(struct drm_connector *connector)
 {
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 	struct drm_display_mode *mode, *t;
@@ -3025,6 +3025,7 @@ static void amdgpu_dm_prune_primary_tile_modes(struct drm_connector *connector)
 		aconnector->num_modes--;
 	}
 }
+EXPORT_IF_KUNIT(amdgpu_dm_prune_primary_tile_modes);
 
 STATIC_IFN_KUNIT void amdgpu_dm_connector_ddc_get_modes(struct drm_connector *connector,
 #ifdef HAVE_DRM_DP_MST_EDID_READ
