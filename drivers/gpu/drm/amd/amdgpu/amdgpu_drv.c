@@ -3134,25 +3134,6 @@ static int amdgpu_drm_release(struct inode *inode, struct file *filp)
 	return drm_release(inode, filp);
 }
 
-long amdgpu_drm_ioctl(struct file *filp,
-		      unsigned int cmd, unsigned long arg)
-{
-	struct drm_file *file_priv = filp->private_data;
-	struct drm_device *dev;
-	long ret;
-
-	dev = file_priv->minor->dev;
-	ret = pm_runtime_get_sync(dev->dev);
-	if (ret < 0)
-		goto out;
-
-	ret = drm_ioctl(filp, cmd, arg);
-
-out:
-	pm_runtime_put_autosuspend(dev->dev);
-	return ret;
-}
-
 static const struct dev_pm_ops amdgpu_pm_ops = {
 	.prepare = pm_sleep_ptr(amdgpu_pmops_prepare),
 	.complete = pm_sleep_ptr(amdgpu_pmops_complete),
@@ -3185,12 +3166,12 @@ static const struct file_operations amdgpu_driver_kms_fops = {
 	.open = drm_open,
 	.flush = amdgpu_flush,
 	.release = amdgpu_drm_release,
-	.unlocked_ioctl = amdgpu_drm_ioctl,
+	.unlocked_ioctl = drm_ioctl,
 	.mmap = amdkcl_drm_gem_mmap,
 	.poll = drm_poll,
 	.read = drm_read,
 #ifdef CONFIG_COMPAT
-	.compat_ioctl = amdgpu_kms_compat_ioctl,
+	.compat_ioctl = drm_compat_ioctl,
 #endif
 #ifdef CONFIG_PROC_FS
 	.show_fdinfo = drm_show_fdinfo,
