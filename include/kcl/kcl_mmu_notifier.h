@@ -4,6 +4,15 @@
 
 #include <linux/mmu_notifier.h>
 
+#ifndef HAVE_MMU_NOTIFY_MIGRATE
+/*
+ * MMU_NOTIFY_MIGRATE was added to enum mmu_notifier_event later. Old kernels
+ * never generate this event, so map it to a sentinel that never matches a real
+ * event value; the dependent branch is dead code but still needs to compile.
+ */
+#define MMU_NOTIFY_MIGRATE 0x10000
+#endif
+
 #if !defined(HAVE_MMU_NOTIFIER_RANGE_BLOCKABLE)
 /* Copied from v5.1-10225-g4a83bfe916f3 include/linux/mmu_notifier.h */
 #if defined(CONFIG_MMU_NOTIFIER) && \
