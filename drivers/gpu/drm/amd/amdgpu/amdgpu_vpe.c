@@ -699,8 +699,10 @@ static int vpe_set_powergating_state(struct amdgpu_ip_block *ip_block,
 	struct amdgpu_device *adev = ip_block->adev;
 	struct amdgpu_vpe *vpe = &adev->vpe;
 
-	if (!adev->pm.dpm_enabled)
+	if (!adev->pm.dpm_enabled) {
 		dev_err(adev->dev, "Without PM, cannot support powergating\n");
+		return 0;
+	}
 
 	dev_dbg(adev->dev, "%s: %s!\n", __func__, (state == AMD_PG_STATE_GATE) ? "GATE":"UNGATE");
 
