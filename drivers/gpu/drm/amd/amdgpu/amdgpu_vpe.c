@@ -378,7 +378,7 @@ static int vpe_common_init(struct amdgpu_vpe *vpe)
 	int r;
 
 	r = amdgpu_bo_create_kernel(adev, PAGE_SIZE, PAGE_SIZE,
-				    AMDGPU_GEM_DOMAIN_GTT,
+				    AMDGPU_GEM_DOMAIN_VRAM | AMDGPU_GEM_DOMAIN_GTT,
 				    &adev->vpe.cmdbuf_obj,
 				    &adev->vpe.cmdbuf_gpu_addr,
 				    (void **)&adev->vpe.cmdbuf_cpu_addr);
