@@ -14,6 +14,9 @@
  * predates these defines (e.g. RHEL 8.x 4.18). Values copied verbatim from
  * upstream include/linux/units.h.
  */
+#ifndef MILLIDEGREE_PER_DEGREE
+#define MILLIDEGREE_PER_DEGREE	1000
+#endif
 #ifndef MILLIWATT_PER_WATT
 #define MILLIWATT_PER_WATT	1000UL
 #endif
