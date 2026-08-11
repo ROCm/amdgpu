@@ -249,6 +249,12 @@ static void nbio_v7_11_5_ih_control(struct amdgpu_device *adev)
 		WREG32_SOC15(NBIO, 0, regBIF_BX1_INTERRUPT_CNTL, interrupt_cntl);
 }
 
+static void
+nbio_v7_11_5_get_clockgating_state(struct amdgpu_device *adev,
+				  u64 *flags)
+{
+}
+
 static u32 nbio_v7_11_5_get_hdp_flush_req_offset(struct amdgpu_device *adev)
 {
 	u32 offset;
@@ -337,6 +343,7 @@ const struct amdgpu_nbio_funcs nbio_v7_11_5_funcs = {
 	.enable_doorbell_aperture = nbio_v7_11_5_enable_doorbell_aperture,
 	.enable_doorbell_selfring_aperture = nbio_v7_11_5_enable_doorbell_selfring_aperture,
 	.ih_doorbell_range = nbio_v7_11_5_ih_doorbell_range,
+	.get_clockgating_state = nbio_v7_11_5_get_clockgating_state,
 	.ih_control = nbio_v7_11_5_ih_control,
 	.init_registers = nbio_v7_11_5_init_registers,
 	.remap_hdp_registers = nbio_v7_11_5_remap_hdp_registers,
