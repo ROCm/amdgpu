@@ -338,7 +338,7 @@ int kfd_ais_init(struct amdgpu_device *adev)
 		return 0;
 	}
 
-	ret = pci_p2pdma_add_resource(adev->pdev, 0 /*bar*/, 0 /*whole VRAM*/,
+	ret = pci_p2pdma_add_resource(adev->pdev, 0 /*bar*/, size /*vram size*/,
 				      0 /*offset*/);
 	if (ret) {
 		dev_dbg(adev->dev, "AIS: Failed to add PCI P2PDMA resource for VRAM %d\n", ret);
