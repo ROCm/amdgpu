@@ -1702,6 +1702,7 @@ void *dm_helpers_allocate_gpu_mem(
 
 	return dm_allocate_gpu_mem(adev, type, size, addr);
 }
+EXPORT_IF_KUNIT(dm_helpers_allocate_gpu_mem);
 
 void dm_helpers_free_gpu_mem(
 		struct dc_context *ctx,
@@ -1712,6 +1713,7 @@ void dm_helpers_free_gpu_mem(
 
 	dm_free_gpu_mem(adev, type, pvMem);
 }
+EXPORT_IF_KUNIT(dm_helpers_free_gpu_mem);
 
 bool dm_helpers_dmub_outbox_interrupt_control(struct dc_context *ctx, bool enable)
 {
