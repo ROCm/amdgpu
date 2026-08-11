@@ -614,6 +614,37 @@ static void kgd_gfx_v12_1_get_cu_occupancy(struct amdgpu_device *adev,
 				adev->gfx.cu_info.max_waves_per_simd;
 }
 
+static void kgd_gfx_v12_1_get_iq_wait_times(struct amdgpu_device *adev,
+					uint32_t *wait_times,
+					uint32_t inst)
+{
+	*wait_times = RREG32_SOC15(GC, GET_INST(GC, inst), regCP_IQ_WAIT_TIME2);
+}
+
+static void kgd_gfx_v12_1_build_dequeue_wait_counts_packet_info(struct amdgpu_device *adev,
+					uint32_t wait_times,
+					uint32_t sch_wave,
+					uint32_t que_sleep,
+					uint32_t *reg_offset,
+					uint32_t *reg_data,
+					uint32_t inst)
+{
+	*reg_data = wait_times;
+
+	if (sch_wave)
+		*reg_data = REG_SET_FIELD(*reg_data,
+				CP_IQ_WAIT_TIME2,
+				SCH_WAVE,
+				sch_wave);
+	if (que_sleep)
+		*reg_data = REG_SET_FIELD(*reg_data,
+				CP_IQ_WAIT_TIME2,
+				QUE_SLEEP,
+				que_sleep);
+
+	*reg_offset = SOC15_REG_OFFSET(GC, GET_INST(GC, inst), regCP_IQ_WAIT_TIME2);
+}
+
 const struct kfd2kgd_calls gfx_v12_1_kfd2kgd = {
 	.init_interrupts = init_interrupts_v12_1,
 	.hqd_dump = hqd_dump_v12_1,
@@ -630,5 +661,8 @@ const struct kfd2kgd_calls gfx_v12_1_kfd2kgd = {
 	.hqd_sdma_get_doorbell = kgd_gfx_v12_1_hqd_sdma_get_doorbell,
 	.trigger_pc_sample_trap = kgd_v12_1_trigger_pc_sample_trap,
 	.setup_stoch_sampling = kgd_v12_setup_stoch_sampling,
-	.get_cu_occupancy = kgd_gfx_v12_1_get_cu_occupancy
+	.get_cu_occupancy = kgd_gfx_v12_1_get_cu_occupancy,
+	.get_iq_wait_times = kgd_gfx_v12_1_get_iq_wait_times,
+	.build_dequeue_wait_counts_packet_info =
+				kgd_gfx_v12_1_build_dequeue_wait_counts_packet_info,
 };
