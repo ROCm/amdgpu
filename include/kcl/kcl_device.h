@@ -6,6 +6,8 @@
 #ifndef AMDKCL_DEVICE_H
 #define AMDKCL_DEVICE_H
 
+#include <linux/kernel.h>
+#include <linux/pci.h>
 #include <linux/ratelimit.h>
 
 /* Copied from include/linux/dev_printk.h */
@@ -47,8 +49,27 @@ do {									\
 #endif
 
 #ifndef HAVE_DEV_IS_REMOVABLE
+static const u16 kcl_removable_pci_vendor_ids[] = {
+	PCI_VENDOR_ID_ASMEDIA,
+};
+
 static inline bool _kcl_dev_is_removable(struct device *dev)
 {
+	struct pci_dev *pdev;
+	unsigned int i;
+
+	if (dev->bus != &pci_bus_type)
+		return false;
+
+	pdev = to_pci_dev(dev);
+	while ((pdev = pci_upstream_bridge(pdev))) {
+		for (i = 0; i < ARRAY_SIZE(kcl_removable_pci_vendor_ids);
+		     i++) {
+			if (pdev->vendor == kcl_removable_pci_vendor_ids[i])
+				return true;
+		}
+	}
+
 	return false;
 }
 #define dev_is_removable _kcl_dev_is_removable
