@@ -184,7 +184,8 @@ dm_dp_mst_detect(struct drm_connector *connector, bool force)
        return status;
 }
 #endif
-static void
+
+STATIC_IFN_KUNIT void
 dm_dp_mst_connector_destroy(struct drm_connector *connector)
 {
 	struct amdgpu_dm_connector *aconnector =
@@ -210,6 +211,7 @@ dm_dp_mst_connector_destroy(struct drm_connector *connector)
 #endif /* HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC */
 	kfree(aconnector);
 }
+EXPORT_IF_KUNIT(dm_dp_mst_connector_destroy);
 
 #if defined(HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER)
 STATIC_IFN_KUNIT int
