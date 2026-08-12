@@ -212,7 +212,7 @@ dm_dp_mst_connector_destroy(struct drm_connector *connector)
 }
 
 #if defined(HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER)
-static int
+STATIC_IFN_KUNIT int
 amdgpu_dm_mst_connector_late_register(struct drm_connector *connector)
 {
 	struct amdgpu_dm_connector *amdgpu_dm_connector =
@@ -230,6 +230,7 @@ amdgpu_dm_mst_connector_late_register(struct drm_connector *connector)
 
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_mst_connector_late_register);
 #endif /* HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER */
 
 STATIC_IFN_KUNIT void
@@ -250,7 +251,7 @@ amdgpu_dm_mst_reset_mst_connector_setting(struct amdgpu_dm_connector *aconnector
 EXPORT_IF_KUNIT(amdgpu_dm_mst_reset_mst_connector_setting);
 
 #if defined(HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER)
-static void
+STATIC_IFN_KUNIT void
 amdgpu_dm_mst_connector_early_unregister(struct drm_connector *connector)
 {
 	struct amdgpu_dm_connector *aconnector =
@@ -283,6 +284,7 @@ amdgpu_dm_mst_connector_early_unregister(struct drm_connector *connector)
 	aconnector->mst_status = MST_STATUS_DEFAULT;
 	drm_modeset_unlock(&root->mst_mgr.base.lock);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_mst_connector_early_unregister);
 #endif /* HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER */
 
 static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
