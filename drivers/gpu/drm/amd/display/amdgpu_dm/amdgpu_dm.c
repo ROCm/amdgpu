@@ -852,7 +852,7 @@ error:
 	return -EINVAL;
 }
 
-static int amdgpu_dm_early_fini(struct amdgpu_ip_block *ip_block)
+STATIC_IFN_KUNIT int amdgpu_dm_early_fini(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
 
@@ -860,6 +860,7 @@ static int amdgpu_dm_early_fini(struct amdgpu_ip_block *ip_block)
 
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_early_fini);
 
 static void amdgpu_dm_fini(struct amdgpu_device *adev)
 {
@@ -1101,7 +1102,7 @@ static int dm_sw_init(struct amdgpu_ip_block *ip_block)
 	return load_dmcu_fw(adev);
 }
 
-static int dm_sw_fini(struct amdgpu_ip_block *ip_block)
+STATIC_IFN_KUNIT int dm_sw_fini(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
 	struct dal_allocation *da;
@@ -1131,6 +1132,7 @@ static int dm_sw_fini(struct amdgpu_ip_block *ip_block)
 
 	return 0;
 }
+EXPORT_IF_KUNIT(dm_sw_fini);
 
 
 static void amdgpu_dm_boot_time_crc_init(struct amdgpu_device *adev)
@@ -1329,7 +1331,7 @@ static void s3_handle_mst(struct drm_device *dev, bool suspend)
 	drm_connector_list_iter_end(&iter);
 }
 
-static int dm_oem_i2c_hw_init(struct amdgpu_device *adev)
+STATIC_IFN_KUNIT int dm_oem_i2c_hw_init(struct amdgpu_device *adev)
 {
 	struct amdgpu_display_manager *dm = &adev->dm;
 	struct amdgpu_i2c_adapter *oem_i2c;
@@ -1355,6 +1357,7 @@ static int dm_oem_i2c_hw_init(struct amdgpu_device *adev)
 
 	return 0;
 }
+EXPORT_IF_KUNIT(dm_oem_i2c_hw_init);
 
 /**
  * dm_hw_init() - Initialize DC device
@@ -1737,9 +1740,10 @@ void amdgpu_dm_emulated_link_detect(struct dc_link *link)
 		drm_err(dev, "Failed to read EDID\n");
 
 }
+EXPORT_IF_KUNIT(amdgpu_dm_emulated_link_detect);
 
-static void dm_gpureset_commit_state(struct dc_state *dc_state,
-				     struct amdgpu_display_manager *dm)
+STATIC_IFN_KUNIT void dm_gpureset_commit_state(struct dc_state *dc_state,
+					       struct amdgpu_display_manager *dm)
 {
 	struct {
 		struct dc_surface_update surface_updates[MAX_SURFACES];
@@ -1775,6 +1779,7 @@ static void dm_gpureset_commit_state(struct dc_state *dc_state,
 					 bundle->surface_updates);
 	}
 }
+EXPORT_IF_KUNIT(dm_gpureset_commit_state);
 
 void amdgpu_dm_apply_delay_after_dpcd_poweroff(struct amdgpu_device *adev,
 											   struct dc_sink *sink)
