@@ -3222,13 +3222,13 @@ static inline void fill_dc_dirty_rect(struct drm_plane *plane,
  * implicitly provide damage clips without any client support via the plane
  * bounds.
  */
-static void fill_dc_dirty_rects(struct drm_plane *plane,
-				struct drm_plane_state *old_plane_state,
-				struct drm_plane_state *new_plane_state,
-				struct drm_crtc_state *crtc_state,
-				struct dc_flip_addrs *flip_addrs,
-				bool is_psr_su,
-				bool *dirty_regions_changed)
+STATIC_IFN_KUNIT void fill_dc_dirty_rects(struct drm_plane *plane,
+					  struct drm_plane_state *old_plane_state,
+					  struct drm_plane_state *new_plane_state,
+					  struct drm_crtc_state *crtc_state,
+					  struct dc_flip_addrs *flip_addrs,
+					  bool is_psr_su,
+					  bool *dirty_regions_changed)
 {
 	struct dm_crtc_state *dm_crtc_state = to_dm_crtc_state(crtc_state);
 	struct rect *dirty_rects = flip_addrs->dirty_rects;
@@ -3339,6 +3339,7 @@ ffu:
 			   dm_crtc_state->base.mode.crtc_vdisplay,
 			   &flip_addrs->dirty_rect_count, true);
 }
+EXPORT_IF_KUNIT(fill_dc_dirty_rects);
 
 #if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_commit *state,
