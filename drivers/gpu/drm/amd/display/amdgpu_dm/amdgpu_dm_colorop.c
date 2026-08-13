@@ -66,6 +66,48 @@ static const struct drm_colorop_funcs dm_colorop_funcs = {
 };
 #endif
 
+#if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
+static struct drm_colorop *amdgpu_dm_colorop_kzalloc(void)
+{
+	return kzalloc_obj(struct drm_colorop);
+}
+
+static const struct amdgpu_dm_colorop_kunit_ops amdgpu_dm_colorop_default_ops = {
+	.colorop_kzalloc_obj = amdgpu_dm_colorop_kzalloc,
+	.curve_1d_init = drm_plane_colorop_curve_1d_init,
+	.curve_1d_lut_init = drm_plane_colorop_curve_1d_lut_init,
+	.ctm_3x4_init = drm_plane_colorop_ctm_3x4_init,
+	.mult_init = drm_plane_colorop_mult_init,
+	.lut3d_init = drm_plane_colorop_3dlut_init,
+};
+
+static const struct amdgpu_dm_colorop_kunit_ops *amdgpu_dm_colorop_ops =
+	&amdgpu_dm_colorop_default_ops;
+
+void amdgpu_dm_colorop_kunit_set_ops(const struct amdgpu_dm_colorop_kunit_ops *ops)
+{
+	amdgpu_dm_colorop_ops = ops ? ops : &amdgpu_dm_colorop_default_ops;
+}
+EXPORT_IF_KUNIT(amdgpu_dm_colorop_kunit_set_ops);
+
+#define colorop_kzalloc_obj		amdgpu_dm_colorop_ops->colorop_kzalloc_obj
+#define colorop_curve_1d_init		amdgpu_dm_colorop_ops->curve_1d_init
+#define colorop_curve_1d_lut_init	amdgpu_dm_colorop_ops->curve_1d_lut_init
+#define colorop_ctm_3x4_init		amdgpu_dm_colorop_ops->ctm_3x4_init
+#define colorop_mult_init		amdgpu_dm_colorop_ops->mult_init
+#define colorop_3dlut_init		amdgpu_dm_colorop_ops->lut3d_init
+
+#else
+
+#define colorop_kzalloc_obj()		kzalloc_obj(struct drm_colorop)
+#define colorop_curve_1d_init		drm_plane_colorop_curve_1d_init
+#define colorop_curve_1d_lut_init	drm_plane_colorop_curve_1d_lut_init
+#define colorop_ctm_3x4_init		drm_plane_colorop_ctm_3x4_init
+#define colorop_mult_init		drm_plane_colorop_mult_init
+#define colorop_3dlut_init		drm_plane_colorop_3dlut_init
+
+#endif
+
 STATIC_IFN_KUNIT int
 amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane,
 				  bool hw_3d_lut, struct drm_prop_enum_list *list)
@@ -77,13 +119,13 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 	memset(ops, 0, sizeof(ops));
 
 	/* 1D curve - DEGAM TF */
-	ops[i] = kzalloc_obj(*ops[0]);
+	ops[i] = colorop_kzalloc_obj();
 	if (!ops[i]) {
 		ret = -ENOMEM;
 		goto cleanup;
 	}
 
-	ret = drm_plane_colorop_curve_1d_init(dev, ops[i], plane,
+	ret = colorop_curve_1d_init(dev, ops[i], plane,
 #ifdef HAVE_DRM_COLOROP_FUNCS
 					      &dm_colorop_funcs,
 #endif
@@ -97,13 +139,13 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 	i++;
 
 	/* Multiplier */
-	ops[i] = kzalloc_obj(struct drm_colorop);
+	ops[i] = colorop_kzalloc_obj();
 	if (!ops[i]) {
 		ret = -ENOMEM;
 		goto cleanup;
 	}
 
-	ret = drm_plane_colorop_mult_init(dev, ops[i], plane,
+	ret = colorop_mult_init(dev, ops[i], plane,
 #ifdef HAVE_DRM_COLOROP_FUNCS
 					  &dm_colorop_funcs,
 #endif
@@ -116,13 +158,13 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 	i++;
 
 	/* 3x4 matrix */
-	ops[i] = kzalloc_obj(struct drm_colorop);
+	ops[i] = colorop_kzalloc_obj();
 	if (!ops[i]) {
 		ret = -ENOMEM;
 		goto cleanup;
 	}
 
-	ret = drm_plane_colorop_ctm_3x4_init(dev, ops[i], plane,
+	ret = colorop_ctm_3x4_init(dev, ops[i], plane,
 #ifdef HAVE_DRM_COLOROP_FUNCS
 					     &dm_colorop_funcs,
 #endif
@@ -136,13 +178,13 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 
 	if (hw_3d_lut) {
 		/* 1D curve - SHAPER TF */
-		ops[i] = kzalloc_obj(*ops[0]);
+		ops[i] = colorop_kzalloc_obj();
 		if (!ops[i]) {
 			ret = -ENOMEM;
 			goto cleanup;
 		}
 
-		ret = drm_plane_colorop_curve_1d_init(dev, ops[i], plane,
+		ret = colorop_curve_1d_init(dev, ops[i], plane,
 #ifdef HAVE_DRM_COLOROP_FUNCS
 						&dm_colorop_funcs,
 #endif
@@ -156,13 +198,13 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 		i++;
 
 		/* 1D LUT - SHAPER LUT */
-		ops[i] = kzalloc_obj(*ops[0]);
+		ops[i] = colorop_kzalloc_obj();
 		if (!ops[i]) {
 			ret = -ENOMEM;
 			goto cleanup;
 		}
 
-		ret = drm_plane_colorop_curve_1d_lut_init(dev, ops[i], plane,
+		ret = colorop_curve_1d_lut_init(dev, ops[i], plane,
 #ifdef HAVE_DRM_COLOROP_FUNCS
 							&dm_colorop_funcs,
 #endif
@@ -177,13 +219,13 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 		i++;
 
 		/* 3D LUT */
-		ops[i] = kzalloc_obj(*ops[0]);
+		ops[i] = colorop_kzalloc_obj();
 		if (!ops[i]) {
 			ret = -ENOMEM;
 			goto cleanup;
 		}
 
-		ret = drm_plane_colorop_3dlut_init(dev, ops[i], plane,
+		ret = colorop_3dlut_init(dev, ops[i], plane,
 #ifdef HAVE_DRM_COLOROP_FUNCS
 					&dm_colorop_funcs,
 #endif
@@ -199,13 +241,13 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 	}
 
 	/* 1D curve - BLND TF */
-	ops[i] = kzalloc_obj(*ops[0]);
+	ops[i] = colorop_kzalloc_obj();
 	if (!ops[i]) {
 		ret = -ENOMEM;
 		goto cleanup;
 	}
 
-	ret = drm_plane_colorop_curve_1d_init(dev, ops[i], plane,
+	ret = colorop_curve_1d_init(dev, ops[i], plane,
 #ifdef HAVE_DRM_COLOROP_FUNCS
 					      &dm_colorop_funcs,
 #endif
@@ -219,13 +261,13 @@ amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane
 	i++;
 
 	/* 1D LUT - BLND LUT */
-	ops[i] = kzalloc_obj(struct drm_colorop);
+	ops[i] = colorop_kzalloc_obj();
 	if (!ops[i]) {
 		ret = -ENOMEM;
 		goto cleanup;
 	}
 
-	ret = drm_plane_colorop_curve_1d_lut_init(dev, ops[i], plane,
+	ret = colorop_curve_1d_lut_init(dev, ops[i], plane,
 #ifdef HAVE_DRM_COLOROP_FUNCS
 						  &dm_colorop_funcs,
 #endif
