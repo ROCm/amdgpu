@@ -1803,7 +1803,7 @@ EXPORT_IF_KUNIT(amdgpu_dm_apply_delay_after_dpcd_poweroff);
  * (MST) sinks. Should be called after connector detection is complete to see
  * the final state of all links.
  */
-static void amdgpu_dm_dump_links_and_sinks(struct amdgpu_device *adev)
+STATIC_IFN_KUNIT void amdgpu_dm_dump_links_and_sinks(struct amdgpu_device *adev)
 {
 	struct dc *dc = adev->dm.dc;
 	struct drm_device *dev = adev_to_drm(adev);
@@ -1855,6 +1855,7 @@ static void amdgpu_dm_dump_links_and_sinks(struct amdgpu_device *adev)
 		}
 	}
 }
+EXPORT_IF_KUNIT(amdgpu_dm_dump_links_and_sinks);
 
 static int dm_resume(struct amdgpu_ip_block *ip_block)
 {
