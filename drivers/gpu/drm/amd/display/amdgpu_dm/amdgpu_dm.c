@@ -142,7 +142,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev);
 static void amdgpu_dm_destroy_drm_device(struct amdgpu_display_manager *dm);
 
 #ifdef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT
-static int amdgpu_dm_atomic_setup_commit(struct drm_atomic_commit *state);
+STATIC_IFN_KUNIT int amdgpu_dm_atomic_setup_commit(struct drm_atomic_commit *state);
 #endif
 static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_commit *state);
 STATIC_IFN_KUNIT void dm_enable_per_frame_crtc_master_sync(struct dc_state *context);
@@ -5025,7 +5025,7 @@ STATIC_IFN_KUNIT void amdgpu_dm_update_hdcp(struct drm_atomic_commit *state)
 EXPORT_IF_KUNIT(amdgpu_dm_update_hdcp);
 
 #ifdef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT
-static int amdgpu_dm_atomic_setup_commit(struct drm_atomic_commit *state)
+STATIC_IFN_KUNIT int amdgpu_dm_atomic_setup_commit(struct drm_atomic_commit *state)
 {
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
@@ -5057,6 +5057,7 @@ static int amdgpu_dm_atomic_setup_commit(struct drm_atomic_commit *state)
 
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_atomic_setup_commit);
 #endif
 
 STATIC_IFN_KUNIT void set_multisync_trigger_params(
