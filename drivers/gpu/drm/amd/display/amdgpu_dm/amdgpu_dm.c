@@ -4894,7 +4894,7 @@ cleanup:
 	kfree(wb_info);
 }
 
-static void amdgpu_dm_update_hdcp(struct drm_atomic_commit *state)
+STATIC_IFN_KUNIT void amdgpu_dm_update_hdcp(struct drm_atomic_commit *state)
 {
 	struct drm_connector_state *old_con_state, *new_con_state;
 	struct drm_device *dev = state->dev;
@@ -5015,6 +5015,7 @@ static void amdgpu_dm_update_hdcp(struct drm_atomic_commit *state)
 		}
 	}
 }
+EXPORT_IF_KUNIT(amdgpu_dm_update_hdcp);
 
 #ifdef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT
 static int amdgpu_dm_atomic_setup_commit(struct drm_atomic_commit *state)
