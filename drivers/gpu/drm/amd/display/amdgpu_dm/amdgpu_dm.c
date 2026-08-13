@@ -2167,6 +2167,7 @@ int dm_atomic_get_state(struct drm_atomic_commit *state,
 
 	return 0;
 }
+EXPORT_IF_KUNIT(dm_atomic_get_state);
 
 STATIC_IFN_KUNIT struct dm_atomic_state *
 dm_atomic_get_new_state(struct drm_atomic_commit *state)
@@ -2187,7 +2188,7 @@ dm_atomic_get_new_state(struct drm_atomic_commit *state)
 }
 EXPORT_IF_KUNIT(dm_atomic_get_new_state);
 
-static struct drm_private_state *
+STATIC_IFN_KUNIT struct drm_private_state *
 dm_atomic_duplicate_state(struct drm_private_obj *obj)
 {
 	struct dm_atomic_state *old_state, *new_state;
@@ -2210,6 +2211,7 @@ dm_atomic_duplicate_state(struct drm_private_obj *obj)
 
 	return &new_state->base;
 }
+EXPORT_IF_KUNIT(dm_atomic_duplicate_state);
 
 STATIC_IFN_KUNIT void dm_atomic_destroy_state(struct drm_private_obj *obj,
 					      struct drm_private_state *state)
