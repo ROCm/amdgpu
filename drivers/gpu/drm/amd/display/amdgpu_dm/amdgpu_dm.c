@@ -4457,8 +4457,8 @@ static void dm_clear_writeback(struct amdgpu_display_manager *dm,
  * in preparation for hardware programming. See also
  * amdgpu_dm_mod_power_setup_streams() for post-modeset mod_power setup.
  */
-static void amdgpu_dm_mod_power_update_streams(struct drm_atomic_commit *state,
-					       struct amdgpu_display_manager *dm)
+STATIC_IFN_KUNIT void amdgpu_dm_mod_power_update_streams(struct drm_atomic_commit *state,
+							struct amdgpu_display_manager *dm)
 {
 	struct dm_crtc_state *dm_old_crtc_state, *dm_new_crtc_state;
 	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
@@ -4511,6 +4511,7 @@ static void amdgpu_dm_mod_power_update_streams(struct drm_atomic_commit *state,
 		}
 	}
 }
+EXPORT_IF_KUNIT(amdgpu_dm_mod_power_update_streams);
 
 /**
  * amdgpu_dm_mod_power_setup_streams - setup mod_power stream state post modeset
@@ -4520,8 +4521,8 @@ static void amdgpu_dm_mod_power_update_streams(struct drm_atomic_commit *state,
  * Notify mod_power of mode_change. This needs to be done after dc_stream
  * updates have been committed, and VRR parameters have been updated.
  */
-static void amdgpu_dm_mod_power_setup_streams(struct drm_atomic_commit *state,
-					      struct amdgpu_display_manager *dm)
+STATIC_IFN_KUNIT void amdgpu_dm_mod_power_setup_streams(struct drm_atomic_commit *state,
+						       struct amdgpu_display_manager *dm)
 {
 	struct dm_crtc_state *dm_new_crtc_state;
 	struct drm_crtc_state *new_crtc_state;
@@ -4558,6 +4559,7 @@ static void amdgpu_dm_mod_power_setup_streams(struct drm_atomic_commit *state,
 	}
 
 }
+EXPORT_IF_KUNIT(amdgpu_dm_mod_power_setup_streams);
 
 static void amdgpu_dm_commit_streams(struct drm_atomic_commit *state,
 					struct dc_state *dc_state)
