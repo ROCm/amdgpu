@@ -3377,9 +3377,9 @@ ffu:
 EXPORT_IF_KUNIT(fill_dc_dirty_rects);
 
 #if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
-static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_commit *state,
-					    struct dc_state *dc_state,
-					    struct dsc_mst_fairness_vars *vars)
+STATIC_IFN_KUNIT int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_commit *state,
+						      struct dc_state *dc_state,
+						      struct dsc_mst_fairness_vars *vars)
 {
 	struct dc_stream_state *stream = NULL;
 	struct drm_connector *connector;
@@ -3461,6 +3461,7 @@ static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_commit *state,
 	}
 	return 0;
 }
+EXPORT_IF_KUNIT(dm_update_mst_vcpi_slots_for_dsc);
 #endif
 
 static void manage_dm_interrupts(struct amdgpu_device *adev,
