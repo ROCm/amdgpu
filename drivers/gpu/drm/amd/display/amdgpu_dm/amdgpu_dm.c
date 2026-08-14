@@ -2288,7 +2288,7 @@ static struct drm_private_state_funcs dm_atomic_state_funcs = {
 	.atomic_destroy_state = dm_atomic_destroy_state,
 };
 
-static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
+STATIC_IFN_KUNIT int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 {
 #ifndef HAVE_DRM_PRIVATE_STATE_FUNCS_ATOMIC_CREATE_STATE
 	struct dm_atomic_state *state;
@@ -2363,11 +2363,12 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 
 	return 0;
 }
+EXPORT_IF_KUNIT(amdgpu_dm_mode_config_init);
 
-static int initialize_plane(struct amdgpu_display_manager *dm,
-			    struct amdgpu_mode_info *mode_info, int plane_id,
-			    enum drm_plane_type plane_type,
-			    const struct dc_plane_cap *plane_cap)
+STATIC_IFN_KUNIT int initialize_plane(struct amdgpu_display_manager *dm,
+				      struct amdgpu_mode_info *mode_info, int plane_id,
+				      enum drm_plane_type plane_type,
+				      const struct dc_plane_cap *plane_cap)
 {
 	struct drm_plane *plane;
 	unsigned long possible_crtcs;
@@ -2403,6 +2404,7 @@ static int initialize_plane(struct amdgpu_display_manager *dm,
 
 	return ret;
 }
+EXPORT_IF_KUNIT(initialize_plane);
 
 
 /*
