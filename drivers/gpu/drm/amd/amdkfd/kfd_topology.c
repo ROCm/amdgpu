@@ -416,6 +416,168 @@ static struct kfd_perf_attr perf_attr_iommu[] = {
 };
 /****************************************/
 
+/*
+ * Dispatch-log stream format descriptor, served verbatim per GPU arch via the
+ * node's "dispatch_log_stream_format" sysfs file.
+ */
+static const char kfd_dlog_stream_format_ksy_gfx12[] =
+"meta:\n"
+"  id: kfd_dispatch_log_stream_gfx12\n"
+"  endian: le\n"
+"  bit-endian: le\n"
+"  ks-version: \"0.10\"\n"
+"doc: |\n"
+"  RAW_MMAP layout of the KFD-owned VMID0 dispatch-log stream (ABI v3).\n"
+"  mmap(stream_fd) maps: fw_record[N] then u64 wptr[num_regions] then\n"
+"  u64 rptr[num_regions]. Read the byte offsets (records_offset,\n"
+"  wptr_offset, rptr_offset), num_regions and region_record_count from\n"
+"  KFD_DLOG_STREAM_IOC (op=KFD_DLOG_STREAM_OP_INFO); do not assume them.\n"
+"  Each region is region_record_count fixed 20-byte fw_records; wptr[i]/\n"
+"  rptr[i] count records in region i. Userspace owns rptr[] advancement.\n"
+"  Consumers MUST skip padding records (record_type == 0 or\n"
+"  doorbell_off == 0) and demux interleaved records by doorbell_off.\n"
+"params:\n"
+"  - id: wptr_off\n"
+"    type: u8\n"
+"    doc: wptr_offset from KFD_DLOG_STREAM_OP_INFO (bytes).\n"
+"  - id: n_regions\n"
+"    type: u4\n"
+"    doc: num_regions from KFD_DLOG_STREAM_OP_INFO.\n"
+"seq:\n"
+"  - id: records\n"
+"    size: wptr_off\n"
+"    type: records_region\n"
+"    doc: fw_record slots, records_offset(0) .. wptr_offset.\n"
+"  - id: wptr\n"
+"    type: u8\n"
+"    repeat: expr\n"
+"    repeat-expr: n_regions\n"
+"    doc: firmware producer, one free-running record count per region.\n"
+"  - id: rptr\n"
+"    type: u8\n"
+"    repeat: expr\n"
+"    repeat-expr: n_regions\n"
+"    doc: host consumer cursor, one free-running record count per region.\n"
+"types:\n"
+"  records_region:\n"
+"    seq:\n"
+"      - id: records\n"
+"        type: fw_record\n"
+"        repeat: eos\n"
+"  fw_record:\n"
+"    seq:\n"
+"      - id: timestamp\n"
+"        type: u8\n"
+"        doc: 64-bit GPU clock (ts_lo | ts_hi<<32); 0 in padding slots.\n"
+"      - id: record_type\n"
+"        type: u4\n"
+"        enum: rec_type\n"
+"        doc: 0 = padding/empty slot (skip).\n"
+"      - id: dispatch_id\n"
+"        type: u4\n"
+"        doc: read_dispatch_id[31:0] (packet index).\n"
+"      - id: doorbell_off\n"
+"        type: u4\n"
+"        doc: DoorbellOffset[25:0]; queue identity for host demux.\n"
+"enums:\n"
+"  rec_type:\n"
+"    0: padding\n"
+"    1: dispatch_start\n"
+"    2: eop\n";
+
+/*
+ * gfx950/GC9.5.0 (MI350) KFD-owned VMID0 stream: same RAW_MMAP layout and
+ * 20-byte fw_record as gfx12, but the firmware uses four ring regions (one per
+ * MEC pipe). num_regions/region_record_count/offsets are still read from
+ * KFD_DLOG_STREAM_IOC (op=INFO); the four-region count is documented here.
+ */
+static const char kfd_dlog_stream_format_ksy_gfx950[] =
+"meta:\n"
+"  id: kfd_dispatch_log_stream_gfx950\n"
+"  endian: le\n"
+"  bit-endian: le\n"
+"  ks-version: \"0.10\"\n"
+"doc: |\n"
+"  RAW_MMAP layout of the KFD-owned VMID0 dispatch-log stream (ABI v3).\n"
+"  mmap(stream_fd) maps: fw_record[N] then u64 wptr[num_regions] then\n"
+"  u64 rptr[num_regions]. Read the byte offsets (records_offset,\n"
+"  wptr_offset, rptr_offset), num_regions and region_record_count from\n"
+"  KFD_DLOG_STREAM_IOC (op=KFD_DLOG_STREAM_OP_INFO); do not assume them.\n"
+"  On gfx950 firmware writes four regions (one per MEC pipe). Each region\n"
+"  is region_record_count fixed 20-byte fw_records; wptr[i]/rptr[i] count\n"
+"  records in region i. Userspace owns rptr[] advancement.\n"
+"  Consumers MUST skip padding records (record_type == 0 or\n"
+"  doorbell_off == 0) and demux interleaved records by doorbell_off.\n"
+"params:\n"
+"  - id: wptr_off\n"
+"    type: u8\n"
+"    doc: wptr_offset from KFD_DLOG_STREAM_OP_INFO (bytes).\n"
+"  - id: n_regions\n"
+"    type: u4\n"
+"    doc: num_regions from KFD_DLOG_STREAM_OP_INFO (four on gfx950).\n"
+"seq:\n"
+"  - id: records\n"
+"    size: wptr_off\n"
+"    type: records_region\n"
+"    doc: fw_record slots, records_offset(0) .. wptr_offset.\n"
+"  - id: wptr\n"
+"    type: u8\n"
+"    repeat: expr\n"
+"    repeat-expr: n_regions\n"
+"    doc: firmware producer, one free-running record count per region.\n"
+"  - id: rptr\n"
+"    type: u8\n"
+"    repeat: expr\n"
+"    repeat-expr: n_regions\n"
+"    doc: host consumer cursor, one free-running record count per region.\n"
+"types:\n"
+"  records_region:\n"
+"    seq:\n"
+"      - id: records\n"
+"        type: fw_record\n"
+"        repeat: eos\n"
+"  fw_record:\n"
+"    seq:\n"
+"      - id: timestamp\n"
+"        type: u8\n"
+"        doc: 64-bit GPU clock (ts_lo | ts_hi<<32); 0 in padding slots.\n"
+"      - id: record_type\n"
+"        type: u4\n"
+"        enum: rec_type\n"
+"        doc: 0 = padding/empty slot (skip).\n"
+"      - id: dispatch_id\n"
+"        type: u4\n"
+"        doc: read_dispatch_id[31:0] (packet index).\n"
+"      - id: doorbell_off\n"
+"        type: u4\n"
+"        doc: DoorbellOffset[25:0]; queue identity for host demux.\n"
+"enums:\n"
+"  rec_type:\n"
+"    0: padding\n"
+"    1: dispatch_start\n"
+"    2: eop\n";
+
+/*
+ * The KFD-owned VMID0 stream (kfd_dlog_stream.c) is supported on gfx12.0.x and
+ * gfx950/GC9.5.0. No other GC version has an in-tree producer, so no
+ * stream-format file is served for them (GC9.4.3/9.4.4 use the old
+ * pre-existing dispatch-log format instead).
+ */
+static const char *kfd_dlog_stream_format_ksy(struct kfd_node *dev)
+{
+	if (!dev)
+		return NULL;
+	switch (KFD_GC_VERSION(dev)) {
+	case IP_VERSION(12, 0, 0):
+	case IP_VERSION(12, 0, 1):
+		return kfd_dlog_stream_format_ksy_gfx12;
+	case IP_VERSION(9, 5, 0):
+		return kfd_dlog_stream_format_ksy_gfx950;
+	default:
+		return NULL;
+	}
+}
+
 static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 		char *buffer)
 {
@@ -441,6 +603,17 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 		if (dev->gpu && kfd_devcgroup_check_permission(dev->gpu))
 			return -EPERM;
 		return sysfs_show_str_val(buffer, offs, dev->node_props.name);
+	}
+
+	if (strcmp(attr->name, "dispatch_log_stream_format") == 0) {
+		const char *ksy;
+
+		dev = container_of(attr, struct kfd_topology_device,
+				attr_dlog_stream_format);
+		if (dev->gpu && kfd_devcgroup_check_permission(dev->gpu))
+			return -EPERM;
+		ksy = kfd_dlog_stream_format_ksy(dev->gpu);
+		return sysfs_emit(buffer, "%s", ksy ? ksy : "");
 	}
 
 	dev = container_of(attr, struct kfd_topology_device,
@@ -583,6 +756,33 @@ static void kfd_remove_sysfs_file(struct kobject *kobj, struct attribute *attr)
 	kobject_put(kobj);
 }
 
+/* Remove an optional dispatch-log node attribute if it was created. */
+static void kfd_remove_dlog_attr(struct kobject *kobj, struct attribute *attr)
+{
+	if (attr->name) {
+		sysfs_remove_file(kobj, attr);
+		attr->name = NULL;
+	}
+}
+
+/*
+ * Create an optional dispatch-log node attribute. @attr must already be
+ * sysfs_attr_init()'d by the caller (each call site needs its own lock class
+ * key). @name is a string literal.
+ */
+static int kfd_add_dlog_attr(struct kobject *kobj, struct attribute *attr,
+			     const char *name)
+{
+	int ret;
+
+	attr->name = name;
+	attr->mode = KFD_SYSFS_FILE_MODE;
+	ret = sysfs_create_file(kobj, attr);
+	if (ret < 0)
+		attr->name = NULL;
+	return ret;
+}
+
 static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 {
 	struct kfd_iolink_properties *p2plink;
@@ -669,6 +869,8 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 		sysfs_remove_file(dev->kobj_node, &dev->attr_gpuid);
 		sysfs_remove_file(dev->kobj_node, &dev->attr_name);
 		sysfs_remove_file(dev->kobj_node, &dev->attr_props);
+		kfd_remove_dlog_attr(dev->kobj_node,
+				     &dev->attr_dlog_stream_format);
 		kobject_del(dev->kobj_node);
 		kobject_put(dev->kobj_node);
 		dev->kobj_node = NULL;
@@ -746,6 +948,18 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 	ret = sysfs_create_file(dev->kobj_node, &dev->attr_props);
 	if (ret < 0)
 		return ret;
+
+	/* dispatch-log stream format attr: only on arches with a stream producer. */
+	if (kfd_dlog_stream_format_ksy(dev->gpu)) {
+		sysfs_attr_init(&dev->attr_dlog_stream_format);
+		ret = kfd_add_dlog_attr(dev->kobj_node,
+					&dev->attr_dlog_stream_format,
+					"dispatch_log_stream_format");
+		if (ret < 0) {
+			kfd_remove_sysfs_node_entry(dev);
+			return ret;
+		}
+	}
 
 	i = 0;
 	list_for_each_entry(mem, &dev->mem_props, list) {
