@@ -24,6 +24,12 @@
 
 #include <linux/slab.h>
 #include <linux/list.h>
+#include <linux/cred.h>		/* current_cred, __task_cred, uid_eq, gid_eq */
+#include <linux/capability.h>	/* perfmon_capable, ns_capable, CAP_SYS_PTRACE */
+#include <linux/user_namespace.h>	/* get_user_ns, put_user_ns */
+#include <linux/sched/mm.h>	/* get_task_mm, mmput */
+#include <linux/sched/signal.h>	/* same_thread_group */
+#include <linux/sched/coredump.h>	/* get_dumpable, SUID_DUMP_USER */
 #include "kfd_device_queue_manager.h"
 #include "kfd_priv.h"
 #include "kfd_kernel_queue.h"
@@ -647,6 +653,89 @@ int pqm_update_queue_properties(struct process_queue_manager *pqm,
 		return retval;
 
 	return 0;
+}
+
+/*
+ * Fail-closed cross-process auth for a profiler opening @target's dispatch-log
+ * stream. Modules cannot call ptrace_may_access()/the LSM ptrace hook, so this
+ * inlines PTRACE_MODE_READ_REALCREDS semantics only -- it does NOT honor Yama
+ * ptrace_scope or any other LSM policy (cred + capability + dumpability only).
+ */
+int kfd_dispatch_log_target_check_auth(struct kfd_process *target, u32 gpu_id,
+				       struct kfd_node *node)
+{
+	struct task_struct *lead = target->lead_thread;
+	struct user_namespace *tcred_ns;
+	struct mm_struct *mm;
+	bool creds_match;
+
+	if (!lead)
+		return -ESRCH;
+
+	/* Self-profiling is always allowed (mirrors __ptrace_may_access()). */
+	if (same_thread_group(lead, current))
+		return 0;
+
+	if (node && kfd_devcgroup_check_permission(node)) {
+		pr_warn_ratelimited("kfd profiler: dlog OPEN_STREAM denied by devcgroup: target_tgid=%d gpu=%u\n",
+				    task_pid_nr(lead), (unsigned int)gpu_id);
+		return -EPERM;
+	}
+
+	/* CAP_PERFMON/root override, evaluated lazily (avoids audit side effect). */
+	if (perfmon_capable())
+		return 0;
+
+	/*
+	 * REALCREDS: caller's REAL uid/gid vs ALL THREE of the target's
+	 * {uid,euid,suid}/{gid,egid,sgid}; pin user_ns for the fallback below.
+	 */
+	rcu_read_lock();
+	{
+		const struct cred *tcred = __task_cred(lead);
+		const struct cred *cred = current_cred();
+
+		tcred_ns = get_user_ns(tcred->user_ns);
+		creds_match = uid_eq(cred->uid, tcred->uid) &&
+			      uid_eq(cred->uid, tcred->euid) &&
+			      uid_eq(cred->uid, tcred->suid) &&
+			      gid_eq(cred->gid, tcred->gid) &&
+			      gid_eq(cred->gid, tcred->egid) &&
+			      gid_eq(cred->gid, tcred->sgid);
+	}
+	rcu_read_unlock();
+
+	if (!creds_match && !ns_capable(tcred_ns, CAP_SYS_PTRACE))
+		goto deny;
+
+	/* Order the cred read before the dumpable read (pairs commit_creds()). */
+	smp_rmb();
+
+	/*
+	 * Dumpability gate: a non-dumpable target needs CAP_SYS_PTRACE in the
+	 * TARGET MM's user_ns (not the cred user_ns).
+	 */
+	mm = get_task_mm(lead);
+	if (!mm) {
+		put_user_ns(tcred_ns);
+		return -ESRCH;
+	}
+	if (get_dumpable(mm) != SUID_DUMP_USER &&
+	    !ns_capable(mm->user_ns, CAP_SYS_PTRACE)) {
+		mmput(mm);
+		goto deny;
+	}
+	mmput(mm);
+	put_user_ns(tcred_ns);
+
+	return 0;
+
+deny:
+	put_user_ns(tcred_ns);
+	pr_warn_ratelimited("kfd profiler: dlog OPEN_STREAM denied by cross-process auth: target_tgid=%d caller_uid=%u gpu=%u\n",
+			    task_pid_nr(lead), __kuid_val(current_uid()),
+			    (unsigned int)gpu_id);
+	return -EPERM;
 }
 
 int pqm_update_mqd(struct process_queue_manager *pqm,

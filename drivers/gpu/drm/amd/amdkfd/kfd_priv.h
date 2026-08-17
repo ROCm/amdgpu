@@ -1593,6 +1593,9 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid);
 int pqm_update_queue_properties(struct process_queue_manager *pqm, unsigned int qid,
 			struct queue_properties *p);
+/* Fail-closed cross-process auth, enforced before pinning; 0 if allowed. */
+int kfd_dispatch_log_target_check_auth(struct kfd_process *target, u32 gpu_id,
+				       struct kfd_node *node);
 int pqm_update_mqd(struct process_queue_manager *pqm, unsigned int qid,
 			struct mqd_update_info *minfo);
 int pqm_set_gws(struct process_queue_manager *pqm, unsigned int qid,
