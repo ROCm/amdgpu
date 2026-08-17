@@ -361,6 +361,66 @@ static int kfd_dispatch_log_bind_queue(struct queue *q,
 	return 0;
 }
 
+/*
+ * Bind the stream's VMID0 addresses into an existing compute queue when a
+ * session is live for its (process, device). Called after create_queue().
+ */
+static void kfd_dispatch_log_autoarm_queue(struct kfd_process *target,
+		struct queue *q)
+{
+	struct kfd_process_device *pdd;
+	struct kfd_dlog_session *session;
+
+	lockdep_assert_held(&target->mutex);
+
+	if (!q || q->properties.type != KFD_QUEUE_TYPE_COMPUTE)
+		return;
+
+	pdd = kfd_get_process_device_data(q->device, target);
+	if (!pdd || !pdd->dlog_session)
+		return;
+
+	session = pdd->dlog_session;
+	/* Do not grow the MQD set of a terminal (consumer-gone) stream. */
+	if (kfd_dlog_stream_is_terminal(session->stream))
+		return;
+	/* Re-key to the live pasid before arming (corrects early-attach pasid 0). */
+	kfd_dlog_stream_set_pasid(session->stream, pdd->dev, pdd->pasid);
+	/* Already armed pre-create to this session; avoid a redundant bind. */
+	if (q->properties.dispatch_record_buffer_addr == session->info.base_va)
+		return;
+
+	kfd_dispatch_log_bind_queue(q, &session->info);
+}
+
+/*
+ * Arm dispatch-log fields on q->properties before create_queue() so the initial
+ * MQD/HQD load contains them (queue does not exist yet; no update_queue()).
+ */
+static void kfd_dispatch_log_precreate_arm_queue(struct kfd_process *target,
+		struct queue *q)
+{
+	struct kfd_process_device *pdd;
+	struct kfd_dlog_session *session;
+
+	lockdep_assert_held(&target->mutex);
+
+	if (!q || q->properties.type != KFD_QUEUE_TYPE_COMPUTE)
+		return;
+
+	pdd = kfd_get_process_device_data(q->device, target);
+	if (!pdd || !pdd->dlog_session)
+		return;
+
+	session = pdd->dlog_session;
+	/* Do not arm a new queue into a terminal (consumer-gone) stream. */
+	if (kfd_dlog_stream_is_terminal(session->stream))
+		return;
+	/* Re-key to the live pasid (see kfd_dispatch_log_autoarm_queue). */
+	kfd_dlog_stream_set_pasid(session->stream, pdd->dev, pdd->pasid);
+	kfd_dlog_set_queue_props(&q->properties, &session->info);
+}
+
 int pqm_create_queue(struct process_queue_manager *pqm,
 			    struct kfd_node *dev,
 			    struct queue_properties *properties,
@@ -491,6 +551,11 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 			goto err_create_queue;
 		pqn->q = q;
 		pqn->kq = NULL;
+		/*
+		 * Firmware latches dispatch-log MQD fields at initial HQD load,
+		 * so arm q->properties before create_queue() programs the MQD.
+		 */
+		kfd_dispatch_log_precreate_arm_queue(pqm->process, q);
 		retval = dev->dqm->ops.create_queue(dev->dqm, q, &pdd->qpd, q_data,
 						    restore_mqd, restore_ctl_stack);
 		print_queue(q);
@@ -538,6 +603,9 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 		kfd_procfs_add_queue(q);
 		print_queue_properties(&q->properties);
 	}
+
+	if (pqn->q)
+		kfd_dispatch_log_autoarm_queue(pqm->process, pqn->q);
 
 	return retval;
 
