@@ -210,13 +210,18 @@ struct v9_mqd {
 			uint32_t compute_restore_tg_chunk_size; // offset: 42  (0x2A)
 		};
 	};
-	uint32_t reserved_43;
-	uint32_t reserved_44;
-	uint32_t reserved_45;
-	uint32_t reserved_46;
+	/* DW43-45: VMID0 record buffer base address + total record count. */
+	uint32_t dispatch_record_buffer_addr_lo;
+	uint32_t dispatch_record_buffer_addr_hi;
+	uint32_t dispatch_record_buffer_size;
+	/* DW46: notify interval; firmware notifies ~every N records, 0 disables. */
+	uint32_t dispatch_record_notify_interval;
+	/* DW47: reserved, kept zero. */
 	uint32_t reserved_47;
-	uint32_t reserved_48;
-	uint32_t reserved_49;
+	/* DW48-49: VMID0 per-region wptr array VA; 0 == not registered. */
+	uint32_t dispatch_record_wptr_addr_lo;
+	uint32_t dispatch_record_wptr_addr_hi;
+	/* DW50-53: reserved zero (NOT rptr/signal slots), preserving MQD layout. */
 	uint32_t reserved_50;
 	uint32_t reserved_51;
 	uint32_t reserved_52;

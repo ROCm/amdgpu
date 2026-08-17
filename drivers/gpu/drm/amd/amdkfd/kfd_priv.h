@@ -624,6 +624,16 @@ struct queue_properties {
 	struct amdgpu_bo *wptr_bo;
 	struct amdgpu_bo *rptr_bo;
 	struct amdgpu_bo *ring_bo;
+	/*
+	 * Dispatch-log MQD fields for the KFD-owned VMID0 stream (gfx950/gfx12);
+	 * see the MQD offset static_asserts in kfd_mqd_manager_v9/v12.c.
+	 */
+	uint64_t dispatch_record_buffer_addr;
+	uint32_t dispatch_record_buffer_size;
+	/* Per-region wptr array VA the firmware advances; 0 == not registered. */
+	uint64_t dispatch_record_wptr_addr;
+	/* Notify interval, nonzero while armed to an active stream; 0 when unbound. */
+	uint32_t dispatch_record_notify_interval;
 	struct amdgpu_bo *eop_buf_bo;
 	struct amdgpu_bo *cwsr_bo;
 };
@@ -1006,6 +1016,9 @@ struct kfd_process_device {
 };
 
 #define qpd_to_pdd(x) container_of(x, struct kfd_process_device, qpd)
+
+/* MQD notify interval: firmware raises a notify ~every N records; 0 disables. */
+#define KFD_DISPATCH_LOG_NOTIFY_INTERVAL	50u
 
 struct svm_range_list {
 	struct mutex			lock;

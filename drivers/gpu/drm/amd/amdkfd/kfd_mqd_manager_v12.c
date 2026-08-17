@@ -22,6 +22,7 @@
  *
  */
 
+#include <linux/build_bug.h>
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
@@ -30,6 +31,25 @@
 #include "v12_structs.h"
 #include "gc/gc_12_0_0_sh_mask.h"
 #include "amdgpu_amdkfd.h"
+
+/*
+ * Assert every dispatch-record DW individually: all are u32, so an endpoint-only
+ * check would let a wptr/notify DW swap pass silently. Live block is DW310-315.
+ */
+static_assert(offsetof(struct v12_compute_mqd, dispatch_record_buffer_addr_lo) ==
+	      310 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, dispatch_record_buffer_addr_hi) ==
+	      311 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, dispatch_record_buffer_size) ==
+	      312 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, dispatch_record_wptr_addr_lo) ==
+	      313 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, dispatch_record_wptr_addr_hi) ==
+	      314 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, dispatch_record_notify_interval) ==
+	      315 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, reserved_316) ==
+	      316 * sizeof(uint32_t));
 
 static inline struct v12_compute_mqd *get_mqd(void *mqd)
 {
@@ -77,6 +97,17 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 static void set_priority(struct v12_compute_mqd *m, struct queue_properties *q)
 {
 	m->cp_hqd_pipe_priority = pipe_priority_map[q->priority];
+}
+
+static bool dispatch_record_supported_v12(struct kfd_node *dev)
+{
+	switch (KFD_GC_VERSION(dev)) {
+	case IP_VERSION(12, 0, 0):
+	case IP_VERSION(12, 0, 1):
+		return true;
+	default:
+		return false;
+	}
 }
 
 static struct kfd_mem_obj *allocate_mqd(struct mqd_manager *mm,
@@ -240,6 +271,25 @@ static void update_mqd(struct mqd_manager *mm, void *mqd,
 
 	update_cu_mask(mm, mqd, minfo);
 	set_priority(m, q);
+
+	if (dispatch_record_supported_v12(mm->dev)) {
+		uint64_t base = q->dispatch_record_buffer_addr;
+
+		/*
+		 * Program unconditionally so an unbind (all-zero fields) always
+		 * reaches the live HQD; a base-addr guard would leave it armed.
+		 */
+		m->dispatch_record_buffer_addr_lo = lower_32_bits(base);
+		m->dispatch_record_buffer_addr_hi = upper_32_bits(base);
+		m->dispatch_record_buffer_size = q->dispatch_record_buffer_size;
+		m->dispatch_record_wptr_addr_lo =
+			lower_32_bits(q->dispatch_record_wptr_addr);
+		m->dispatch_record_wptr_addr_hi =
+			upper_32_bits(q->dispatch_record_wptr_addr);
+		/* DW315: dispatch-notify interval (50 armed / 0 disabled). */
+		m->dispatch_record_notify_interval =
+			q->dispatch_record_notify_interval;
+	}
 
 	q->is_active = QUEUE_IS_ACTIVE(*q);
 }

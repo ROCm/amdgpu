@@ -39,6 +39,26 @@ static void update_mqd(struct mqd_manager *mm, void *mqd,
 		       struct queue_properties *q,
 		       struct mqd_update_info *minfo);
 
+/*
+ * Frozen gfx950 v9_mqd dispatch-log ABI: assert every DW individually (all u32,
+ * so an endpoint-only check would let an addr/wptr swap pass). DW47/DW50-53 are
+ * reserved and force-zeroed by program_dispatch_record_v9().
+ */
+static_assert(offsetof(struct v9_mqd, dispatch_record_buffer_addr_lo) ==
+	      43 * sizeof(uint32_t));
+static_assert(offsetof(struct v9_mqd, dispatch_record_buffer_addr_hi) ==
+	      44 * sizeof(uint32_t));
+static_assert(offsetof(struct v9_mqd, dispatch_record_buffer_size) ==
+	      45 * sizeof(uint32_t));
+static_assert(offsetof(struct v9_mqd, dispatch_record_notify_interval) ==
+	      46 * sizeof(uint32_t));
+static_assert(offsetof(struct v9_mqd, reserved_47) ==
+	      47 * sizeof(uint32_t));
+static_assert(offsetof(struct v9_mqd, dispatch_record_wptr_addr_lo) ==
+	      48 * sizeof(uint32_t));
+static_assert(offsetof(struct v9_mqd, dispatch_record_wptr_addr_hi) ==
+	      49 * sizeof(uint32_t));
+
 static uint64_t mqd_stride_v9(struct mqd_manager *mm,
 				struct queue_properties *q)
 {
@@ -157,6 +177,38 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 static void set_priority(struct v9_mqd *m, struct queue_properties *q)
 {
 	m->cp_hqd_pipe_priority = pipe_priority_map[q->priority];
+}
+
+/* KFD-owned VMID0 dispatch-log is only implemented for gfx950/GC9.5.0. */
+static bool dispatch_record_supported_v9(struct kfd_node *dev)
+{
+	return KFD_GC_VERSION(dev) == IP_VERSION(9, 5, 0);
+}
+
+/*
+ * Program the DW43-DW53 dispatch-log fields from the destination queue. VMID0
+ * addresses are host-local, so always (re)derive here, never inherit from a
+ * copied-in MQD (see restore_mqd). Reserved DWs are force-zeroed.
+ */
+static void program_dispatch_record_v9(struct v9_mqd *m,
+				       const struct queue_properties *q)
+{
+	uint64_t base = q->dispatch_record_buffer_addr;
+
+	m->dispatch_record_buffer_addr_lo = lower_32_bits(base);
+	m->dispatch_record_buffer_addr_hi = upper_32_bits(base);
+	m->dispatch_record_buffer_size = q->dispatch_record_buffer_size;
+	/* DW46: dispatch-notify interval (50 armed / 0 unbound). */
+	m->dispatch_record_notify_interval = q->dispatch_record_notify_interval;
+	m->dispatch_record_wptr_addr_lo =
+		lower_32_bits(q->dispatch_record_wptr_addr);
+	m->dispatch_record_wptr_addr_hi =
+		upper_32_bits(q->dispatch_record_wptr_addr);
+	m->reserved_47 = 0;
+	m->reserved_50 = 0;
+	m->reserved_51 = 0;
+	m->reserved_52 = 0;
+	m->reserved_53 = 0;
 }
 
 static struct kfd_mem_obj *allocate_mqd(struct mqd_manager *mm,
@@ -386,6 +438,13 @@ static void update_mqd(struct mqd_manager *mm, void *mqd,
 				~COMPUTE_RESOURCE_LIMITS__FORCE_SIMD_DIST_MASK;
 	}
 
+	/*
+	 * Program unconditionally so an unbind (all-zero fields) always reaches
+	 * the live HQD; a base-addr guard would leave it armed.
+	 */
+	if (dispatch_record_supported_v9(mm->dev))
+		program_dispatch_record_v9(m, q);
+
 	q->is_active = QUEUE_IS_ACTIVE(*q);
 }
 
@@ -504,6 +563,14 @@ static void restore_mqd(struct mqd_manager *mm, void **mqd,
 	addr = mqd_mem_obj->gpu_addr;
 
 	memcpy(m, mqd_src, sizeof(*m));
+
+	/*
+	 * The copied-in MQD carries the source's host-local dispatch-log DWs;
+	 * re-derive from the destination queue and never inherit the source
+	 * addresses (post-create autoarm skips a stale-base-matches queue).
+	 */
+	if (dispatch_record_supported_v9(mm->dev))
+		program_dispatch_record_v9(m, qp);
 
 	*mqd = m;
 	if (gart_addr)
