@@ -3679,6 +3679,18 @@ static int kfd_ioctl_profiler(struct file *filep, struct kfd_process *p, void *d
 {
 	struct kfd_ioctl_profiler_args *args = data;
 
+	/*
+	 * AMDKFD_IOC_PROFILER (0x28) has shipped since KFD minor 1.23 with
+	 * a 40-byte args struct; the union must never grow past
+	 * sizeof(struct kfd_ioctl_pc_sample_args) or the _IOWR-encoded size
+	 * changes and old userspace breaks. See kfd_ioctl.h for details.
+	 */
+	BUILD_BUG_ON(sizeof(struct kfd_ioctl_profiler_args) != 40);
+	BUILD_BUG_ON(offsetof(struct kfd_ioctl_dlog_args, dlog_op) != 0);
+	BUILD_BUG_ON(offsetof(struct kfd_ioctl_dlog_args, gpu_id) != 4);
+	BUILD_BUG_ON(offsetof(struct kfd_ioctl_dlog_args, stream_fd) != 20);
+	BUILD_BUG_ON(sizeof(struct kfd_ioctl_dlog_args) != 24);
+
 	switch (args->op) {
 	case KFD_IOC_PROFILER_VERSION:
 		args->version = KFD_IOC_PROFILER_VERSION_NUM;
@@ -3690,6 +3702,11 @@ static int kfd_ioctl_profiler(struct file *filep, struct kfd_process *p, void *d
 	case KFD_IOC_PROFILER_PTL_CONTROL:
 		return kfd_profiler_ptl_control(p, &args->ptl);
 	}
+	/*
+	 * KFD_IOC_PROFILER_DLOG's only sub-op, OPEN_STREAM, is intercepted and
+	 * installed by kfd_ioctl() before this handler runs; any DLOG request
+	 * reaching here is an unknown sub-op and falls through to -EINVAL.
+	 */
 	return -EINVAL;
 }
 
@@ -3787,6 +3804,32 @@ err_inval:
 	out_args.status = err;
 	memcpy(out, &out_args, sizeof(out_args));
 	return err;
+}
+
+static int kfd_ioctl_profiler_open_stream(struct kfd_ioctl_profiler_args *args,
+		void __user *uarg, unsigned int usize)
+{
+	size_t min_size = offsetof(struct kfd_ioctl_profiler_args,
+				     dlog.stream_fd) +
+			  sizeof(args->dlog.stream_fd);
+	struct file *stream_file = NULL;
+	int ret;
+
+	if (usize < min_size)
+		return -EINVAL;
+
+	ret = kfd_dlog_stream_create_file(&args->dlog, &stream_file);
+	if (ret)
+		return ret;
+
+	if (copy_to_user(uarg, args, usize) != 0) {
+		put_unused_fd(args->dlog.stream_fd);
+		fput(stream_file);
+		return -EFAULT;
+	}
+
+	fd_install(args->dlog.stream_fd, stream_file);
+	return 0;
 }
 
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
@@ -4049,6 +4092,30 @@ static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 		retcode = ioctl->validate(kdata, usize);
 		if (retcode)
 			goto err_i1;
+	}
+
+	/*
+	 * OPEN_STREAM is intercepted here rather than dispatched through
+	 * amdkfd_ioctls[] on purpose: the table copies OUT to userspace after
+	 * func() returns, but this op installs an fd. Doing the install-after-
+	 * copy_to_user here (see kfd_ioctl_profiler_open_stream) means a failed
+	 * copy leaks no fd -- the table's order would publish the fd first.
+	 */
+	if (cmd == AMDKFD_IOC_PROFILER) {
+		struct kfd_ioctl_profiler_args *pargs =
+			(struct kfd_ioctl_profiler_args *)kdata;
+
+		if (pargs->op == KFD_IOC_PROFILER_DLOG &&
+		    pargs->dlog.dlog_op == KFD_IOC_PROFILER_DLOG_OPEN_STREAM) {
+			/* Reserved pad must be zero (matches stream_args.pad). */
+			if (pargs->pad) {
+				retcode = -EINVAL;
+				goto err_i1;
+			}
+			retcode = kfd_ioctl_profiler_open_stream(
+				pargs, (void __user *)arg, usize);
+			goto err_i1;
+		}
 	}
 
 	retcode = func(filep, process, kdata);

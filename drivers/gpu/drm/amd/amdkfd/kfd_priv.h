@@ -247,6 +247,7 @@ enum cache_policy {
 	 (KFD_GC_VERSION(dev) == IP_VERSION(9, 5, 0)))
 
 struct kfd_node;
+struct file;
 
 struct kfd_event_interrupt_class {
 	bool (*interrupt_isr)(struct kfd_node *dev,
@@ -883,6 +884,8 @@ struct ais_counter_entry {
 	uint64_t bytes_written;
 };
 
+struct kfd_dlog_stream;
+
 /* Data that is per-process-per device. */
 struct kfd_process_device {
 	/* The device that owns this data. */
@@ -1016,6 +1019,9 @@ struct kfd_process_device {
 };
 
 #define qpd_to_pdd(x) container_of(x, struct kfd_process_device, qpd)
+
+/* Cap on the requested records-region size (bounds an unprivileged GTT pin). */
+#define KFD_DISPATCH_LOG_MAX_BUFFER_SIZE	(16U << 20)
 
 /* MQD notify interval: firmware raises a notify ~every N records; 0 disables. */
 #define KFD_DISPATCH_LOG_NOTIFY_INTERVAL	50u
@@ -1593,9 +1599,19 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid);
 int pqm_update_queue_properties(struct process_queue_manager *pqm, unsigned int qid,
 			struct queue_properties *p);
+/* Per-ASIC region count (== firmware GC__NUM_ME_PIPES_PER_ME1), 0 if unsupported. */
+u32 kfd_dispatch_log_node_num_regions(struct kfd_node *dev);
 /* Fail-closed cross-process auth, enforced before pinning; 0 if allowed. */
 int kfd_dispatch_log_target_check_auth(struct kfd_process *target, u32 gpu_id,
 				       struct kfd_node *node);
+
+/* Stream refcount, held by PQM sessions and mmap VMAs. */
+void kfd_dlog_stream_get(struct kfd_dlog_stream *st);
+void kfd_dlog_stream_put(struct kfd_dlog_stream *st);
+bool kfd_dlog_stream_is_terminal(struct kfd_dlog_stream *st);
+
+int kfd_dlog_stream_create_file(struct kfd_ioctl_dlog_args *args,
+				       struct file **filep);
 int pqm_update_mqd(struct process_queue_manager *pqm, unsigned int qid,
 			struct mqd_update_info *minfo);
 int pqm_set_gws(struct process_queue_manager *pqm, unsigned int qid,

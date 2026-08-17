@@ -1745,12 +1745,39 @@ struct kfd_ioctl_pc_sample_args {
 	__u32 version;
 };
 
-#define KFD_IOC_PROFILER_VERSION_NUM 1
+#define KFD_IOC_PROFILER_VERSION_NUM 6
 enum kfd_profiler_ops {
 	KFD_IOC_PROFILER_PMC = 0,
 	KFD_IOC_PROFILER_PC_SAMPLE = 1,
 	KFD_IOC_PROFILER_VERSION = 2,
 	KFD_IOC_PROFILER_PTL_CONTROL = 3,
+	/* Dispatch-log op; action selected by @dlog_op (see kfd_profiler_dlog_op). */
+	KFD_IOC_PROFILER_DLOG = 4,
+};
+
+/* Sub-operation for KFD_IOC_PROFILER_DLOG. */
+enum kfd_profiler_dlog_op {
+	KFD_IOC_PROFILER_DLOG_OPEN_STREAM = 0,
+};
+
+/* RAW_MMAP: KFD-owned GTT backing consumed zero-copy; other flag bits reserved-0. */
+#define KFD_DLOG_OPEN_F_RAW_MMAP		(1u << 0)
+
+/*
+ * Args for KFD_IOC_PROFILER_DLOG. @dlog_op/@gpu_id stay at fixed offsets (0, 4)
+ * so the kernel reads them before dispatch. Size @buffer_size without a prior
+ * INFO call: records are KFD_DISPATCH_LOG_FW_RECORD_BYTES (20) each, split into
+ * num_regions equal power-of-two rings (gfx9.5.0: 4, gfx12: 2; else -EOPNOTSUPP).
+ * @buffer_size must be a multiple of num_regions*20 yielding a power-of-two
+ * per-region count. BO layout: records | u64 wptr[] | u64 rptr[] | pad.
+ */
+struct kfd_ioctl_dlog_args {
+	__u32 dlog_op;			/* IN: enum kfd_profiler_dlog_op */
+	__u32 gpu_id;			/* IN: KFD user gpu_id */
+	__u32 target_pid;		/* IN: target tgid */
+	__u32 flags;			/* IN: KFD_DLOG_OPEN_F_* (reserved bits 0) */
+	__u32 buffer_size;		/* IN: requested records-region bytes */
+	__s32 stream_fd;		/* OUT: anon_inode stream fd */
 };
 
 /**
@@ -1769,11 +1796,19 @@ struct kfd_ioctl_ptl_control {
 
 struct kfd_ioctl_profiler_args {
 	__u32 op;						/* kfd_profiler_op */
+	__u32 pad;						/* IN: must be 0 (reserved) */
+	/*
+	 * ABI FREEZE: no union variant may exceed 32 bytes (the shipped
+	 * kfd_ioctl_pc_sample_args since 1.23); growing it changes the _IOWR
+	 * size baked into AMDKFD_IOC_PROFILER. @reserved pins the union at 32.
+	 */
 	union {
 		struct kfd_ioctl_pc_sample_args pc_sample;
 		struct kfd_ioctl_pmc_settings  pmc;
 		struct kfd_ioctl_ptl_control   ptl;
 		__u32 version;				/* KFD_IOC_PROFILER_VERSION_NUM */
+		struct kfd_ioctl_dlog_args dlog;
+		__u32 reserved[8];
 	};
 };
 
@@ -1836,6 +1871,75 @@ struct kfd_ioctl_ais_args {
 		struct kfd_ais_out_args out;
 	};
 };
+
+/* Dispatch-log profiler stream (anon_inode fd; KFD-owned GTT BO, RAW mmap) */
+#define KFD_DLOG_STREAM_ABI_VERSION		3
+#define KFD_DISPATCH_LOG_FW_RECORD_BYTES	20U
+
+#define KFD_DLOG_STATUS_TARGET_EXITED		(1ULL << 2)
+#define KFD_DLOG_STATUS_FATAL			(1ULL << 5)
+
+/*
+ * RAW_MMAP layout: 20-byte records | u64 wptr[num_regions] (firmware producer) |
+ * u64 rptr[num_regions] (consumer); offsets from kfd_dlog_stream_info. Firmware
+ * publishes payload before wptr[]; read wptr[], barrier, then payload. Skip a
+ * record with record_type==0 or doorbell_off==0 (padding/not-yet-written).
+ *
+ * wptr[]/rptr[] are FREE-RUNNING u64 counts (slot = counter % region_record_count,
+ * a power-of-two mask). Use the UNSIGNED delta (u64)(wptr-rptr) for unconsumed
+ * count, never < / >. Firmware never sees rptr[] and does not throttle: a delta >
+ * region_record_count is an overrun; fast-forward rptr to wptr-region_record_count.
+ * Each counter has a single writer; a 32-bit reader must read hi/lo seqlock-style.
+ */
+struct kfd_dlog_stream_info {
+	__u32	abi_version;
+	/* raw per-record stride from firmware */
+	__u32	fw_record_size;
+	__u32	num_regions;
+	__u32	region_record_count;
+	__u64	buffer_size;
+	__u64	mmap_size;
+	__u64	records_offset;
+	/*
+	 * wptr[] is user-writable only because the BO is mapped shared R/W as one
+	 * region; a corrupted wptr[] may steer firmware, so do NOT assume it is
+	 * harmless without confirming the firmware contract (rptr[] never can).
+	 */
+	__u64	wptr_offset;
+	__u64	rptr_offset;
+	__u32	gpu_id;
+	__u32	target_pid;
+	__u32	pasid;
+	__u32	flags;
+};
+
+struct kfd_dlog_stream_status {
+	__u64	status;
+	__u64	target_exit_count;
+};
+
+/* Sub-operation selector for the dispatch-log stream fd ioctl. */
+enum kfd_dlog_stream_op {
+	KFD_DLOG_STREAM_OP_INFO = 0,
+	KFD_DLOG_STREAM_OP_STATUS,
+};
+
+struct kfd_dlog_stream_args {
+	__u32 op;	/* IN: enum kfd_dlog_stream_op */
+	__u32 pad;	/* IN: must be 0 */
+	union {
+		struct kfd_dlog_stream_info   info;	/* OUT for OP_INFO */
+		struct kfd_dlog_stream_status status;	/* OUT for OP_STATUS */
+	};
+};
+
+/*
+ * Stream-fd ioctl, dispatched only on the anon_inode stream fd, never /dev/kfd.
+ * NR 0x88 sits at AMDKFD_COMMAND_END_2, outside both /dev/kfd ranges and not in
+ * amdkfd_ioctls[]; /dev/kfd rejects it with -ENOTTY. Do NOT bump END_2 to cover
+ * it -- that would index amdkfd_ioctls[0x88] (highest entry 0x87) out of bounds.
+ */
+#define KFD_DLOG_STREAM_IOC		_IOWR('K', 0x88, struct kfd_dlog_stream_args)
 
 #define AMDKFD_IOCTL_BASE 'K'
 #define AMDKFD_IO(nr)			_IO(AMDKFD_IOCTL_BASE, nr)
@@ -1989,6 +2093,11 @@ struct kfd_ioctl_ais_args {
 		AMDKFD_IOWR(0x87, struct kfd_ioctl_ais_args)
 
 #define AMDKFD_COMMAND_START_2		0x80
+/*
+ * Highest /dev/kfd ioctl is 0x87; keep END_2 at 0x88 so 0x88 stays out of range
+ * (reserved for KFD_DLOG_STREAM_IOC). Do NOT bump to 0x89: that would index
+ * amdkfd_ioctls[0x88] out of bounds.
+ */
 #define AMDKFD_COMMAND_END_2		0x88
 
 #endif

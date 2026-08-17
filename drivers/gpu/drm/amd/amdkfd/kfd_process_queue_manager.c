@@ -656,6 +656,38 @@ int pqm_update_queue_properties(struct process_queue_manager *pqm,
 }
 
 /*
+ * Number of dispatch-log ring regions for @dev's ASIC (one per MEC pipe), or 0
+ * if unsupported. Explicit per-IP table so a pipe-count change trips the
+ * mismatch check below rather than silently reinterpreting the ring layout.
+ */
+u32 kfd_dispatch_log_node_num_regions(struct kfd_node *dev)
+{
+	u32 num_regions;
+
+	if (!dev)
+		return 0;
+
+	switch (KFD_GC_VERSION(dev)) {
+	/* gfx950: four regions (one per MEC pipe); 9.4.3/9.4.4 unsupported. */
+	case IP_VERSION(9, 5, 0):
+		num_regions = 4;
+		break;
+	/* gfx12: two regions (one per MEC pipe). */
+	case IP_VERSION(12, 0, 0):
+	case IP_VERSION(12, 0, 1):
+		num_regions = 2;
+		break;
+	default:
+		return 0;
+	}
+
+	/* Firmware regions == MEC pipes; reject if the ASIC disagrees. */
+	if (dev->dqm && get_pipes_per_mec(dev->dqm) != num_regions)
+		return 0;
+	return num_regions;
+}
+
+/*
  * Fail-closed cross-process auth for a profiler opening @target's dispatch-log
  * stream. Modules cannot call ptrace_may_access()/the LSM ptrace hook, so this
  * inlines PTRACE_MODE_READ_REALCREDS semantics only -- it does NOT honor Yama
