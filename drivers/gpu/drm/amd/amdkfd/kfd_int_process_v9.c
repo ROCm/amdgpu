@@ -330,6 +330,16 @@ static bool event_interrupt_isr_v9(struct kfd_node *dev,
 	if (WARN_ONCE(pasid == 0, "Bug: No PASID in KFD interrupt"))
 		return false;
 
+	/*
+	 * Dispatch-log notify (gfx950): decode+wake in the top half before the
+	 * context==0 workaround and kfd_signal_event_interrupt(). Pass the
+	 * effective entry (patched copy if the NO_HWS PASID patch ran); a matched
+	 * tag is consumed here, unmatched entries are handled normally.
+	 */
+	if (kfd_dlog_ih_route_notify(dev,
+				     *patched_flag ? patched_ihre : ih_ring_entry))
+		return false;
+
 	/* Workaround CP firmware sending bogus signals with 0 context_id.
 	 * Those can be safely ignored on hardware and firmware versions that
 	 * include a valid context_id on legitimate signals. This avoids the

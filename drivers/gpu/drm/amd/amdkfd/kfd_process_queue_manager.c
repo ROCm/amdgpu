@@ -561,6 +561,7 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 	struct kfd_process_device *pdd;
 	struct device_queue_manager *dqm;
 	struct kfd_node *dev;
+	bool notify_dlog = false;
 	int retval;
 
 	dqm = NULL;
@@ -595,6 +596,13 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 	}
 
 	if (pqn->q) {
+		/*
+		 * Only a compute queue actually armed to a session (nonzero
+		 * record buffer addr) can leave a tail worth nudging a reader.
+		 */
+		notify_dlog = pqn->q->properties.type == KFD_QUEUE_TYPE_COMPUTE &&
+			      pqn->q->properties.dispatch_record_buffer_addr;
+
 		retval = kfd_queue_unref_bo_vas(pdd, &pqn->q->properties);
 		if (retval)
 			goto err_destroy_queue;
@@ -625,6 +633,10 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 	if (list_empty(&pdd->qpd.queues_list) &&
 	    list_empty(&pdd->qpd.priv_queue_list))
 		dqm->ops.unregister_process(dqm, &pdd->qpd);
+
+	/* Non-terminal wake so a reader drains this queue's sub-interval tail. */
+	if (notify_dlog)
+		kfd_dlog_stream_notify_queue_destroyed(dev, pdd->pasid);
 
 err_destroy_queue:
 	return retval;

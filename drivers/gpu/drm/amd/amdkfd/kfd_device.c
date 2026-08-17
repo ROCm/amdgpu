@@ -1038,8 +1038,11 @@ int kgd2kfd_pre_reset(struct kfd_dev *kfd,
 
 	kgd2kfd_suspend(kfd, true, true);
 
-	for (i = 0; i < kfd->num_nodes; i++)
+	for (i = 0; i < kfd->num_nodes; i++) {
 		kfd_signal_reset_event(kfd->nodes[i]);
+		/* Suspended above, so no more records: fail blocked pollers. */
+		kfd_dlog_stream_notify_node_reset(kfd->nodes[i]);
+	}
 
 	return 0;
 }

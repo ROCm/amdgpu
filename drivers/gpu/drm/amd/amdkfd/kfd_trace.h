@@ -143,6 +143,61 @@ TRACE_EVENT(kfd_restore_process_worker_end,
 			    __entry->pid, __get_str(pStatusMsg))
 );
 
+TRACE_EVENT(kfd_dlog_notify_interrupt,
+	    TP_PROTO(u32 node_id, u32 source_id, u32 client_id, u32 pasid,
+		     u32 vmid, u32 pipe_id, u32 context_id0, u32 matched),
+	    TP_ARGS(node_id, source_id, client_id, pasid, vmid, pipe_id,
+		    context_id0, matched),
+	    TP_STRUCT__entry(
+			    __field(u32, node_id)
+			    __field(u32, source_id)
+			    __field(u32, client_id)
+			    __field(u32, pasid)
+			    __field(u32, vmid)
+			    __field(u32, pipe_id)
+			    __field(u32, context_id0)
+			    __field(u32, matched)
+			    ),
+	    TP_fast_assign(
+			   __entry->node_id = node_id;
+			   __entry->source_id = source_id;
+			   __entry->client_id = client_id;
+			   __entry->pasid = pasid;
+			   __entry->vmid = vmid;
+			   __entry->pipe_id = pipe_id;
+			   __entry->context_id0 = context_id0;
+			   __entry->matched = matched;
+			   ),
+	    TP_printk("node=%u src=%u client=0x%x pasid=0x%x vmid=%u pipe=%u ctx0=0x%08x matched=%u",
+		      __entry->node_id, __entry->source_id, __entry->client_id,
+		      __entry->pasid, __entry->vmid, __entry->pipe_id,
+		      __entry->context_id0, __entry->matched)
+);
+
+/*
+ * Emitted once per stream woken by a dispatch-log notify, so a wake can be
+ * attributed to a specific stream rather than only counted.
+ */
+TRACE_EVENT(kfd_dlog_notify_stream,
+	    TP_PROTO(u32 node_id, u32 pasid, u32 target_pid, u32 gpu_id),
+	    TP_ARGS(node_id, pasid, target_pid, gpu_id),
+	    TP_STRUCT__entry(
+			    __field(u32, node_id)
+			    __field(u32, pasid)
+			    __field(u32, target_pid)
+			    __field(u32, gpu_id)
+			    ),
+	    TP_fast_assign(
+			   __entry->node_id = node_id;
+			   __entry->pasid = pasid;
+			   __entry->target_pid = target_pid;
+			   __entry->gpu_id = gpu_id;
+			   ),
+	    TP_printk("node=%u pasid=0x%x target_pid=%u gpu_id=%u",
+		      __entry->node_id, __entry->pasid, __entry->target_pid,
+		      __entry->gpu_id)
+);
+
 #endif
 
 /* This part must be outside protection */

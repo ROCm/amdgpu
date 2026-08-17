@@ -47,11 +47,13 @@
 #include "amdgpu_object.h"
 #include "amdgpu_amdkfd.h"
 #include "kfd_priv.h"
+#include "soc15_int.h"
+#include "kfd_trace.h"
 
 #define KFD_DLOG_STREAM_NAME	"kfd_dlog_stream"
 
 /* Level-triggered poll wake set shared by every stream wake path. */
-#define DLOG_WAKE_MASK	(EPOLLIN | EPOLLRDNORM | EPOLLHUP)
+#define DLOG_WAKE_MASK	(EPOLLIN | EPOLLRDNORM | EPOLLHUP | EPOLLERR)
 
 /*
  * Aggregate pinned-GTT cap across all streams: OPEN_STREAM pins a BO with no
@@ -89,11 +91,7 @@ struct kfd_dlog_stream {
 	/* IH wake-routing key, snapshot of pdd->pasid; assumed stable. */
 	u32			pasid;
 
-	/*
-	 * Registry membership on node->dlog_streams. @registered keeps add/del
-	 * idempotent. @terminal is write-once under st->lock (terminate()); read
-	 * with READ_ONCE() lock-free.
-	 */
+	/* Registry membership on node->dlog_streams; @registered idempotent. */
 	struct list_head	registry_node;
 	bool			registered;
 	wait_queue_head_t	poll_wq;
@@ -104,6 +102,13 @@ struct kfd_dlog_stream {
 	bool			torn_down;
 	/* Target gone (exit), HUP published; write-once under st->lock. */
 	bool			terminal;
+	/*
+	 * GPU reset seen, ERR published; write-once under dlog_streams_lock. Does
+	 * NOT tear down, clear @target, or free the BO.
+	 */
+	bool			fatal;
+	/* One-shot queue-destroy nudge so a quiet-ring tail is not lost. */
+	bool			drain_pending;
 
 	/*
 	 * KFD-owned GTT BO (pinned+GART-bound+kmapped): stable VMID0 @gart_addr.
@@ -317,6 +322,122 @@ void kfd_dlog_stream_set_pasid(struct kfd_dlog_stream *st,
 	spin_unlock_irqrestore(&node->dlog_streams_lock, flags);
 }
 
+/* Caller holds node->dlog_streams_lock. Wake pollers; level-triggered. */
+static void kfd_dlog_stream_wake_locked(struct kfd_dlog_stream *st)
+{
+	wake_up_interruptible_poll(&st->poll_wq, DLOG_WAKE_MASK);
+}
+
+/*
+ * Wake every stream registered for (node, pasid); returns the number woken.
+ * @set_drain_pending latches drain_pending before the wake (store-before-wake
+ * under the same lock) so a quiet-ring wake is still pollable.
+ */
+static u32 kfd_dlog_stream_notify(struct kfd_node *node, u32 pasid,
+				  bool set_drain_pending)
+{
+	struct kfd_dlog_stream *st;
+	unsigned long flags;
+	u32 matched = 0;
+
+	spin_lock_irqsave(&node->dlog_streams_lock, flags);
+	list_for_each_entry(st, &node->dlog_streams, registry_node) {
+		if (st->pasid != pasid)
+			continue;
+		if (set_drain_pending)
+			st->drain_pending = true;
+		kfd_dlog_stream_wake_locked(st);
+		matched++;
+		/* Identify the woken stream; a count alone can't spot a cross-wake. */
+		trace_kfd_dlog_notify_stream(node->id, pasid, st->target_pid,
+					     st->gpu_id);
+	}
+	spin_unlock_irqrestore(&node->dlog_streams_lock, flags);
+
+	return matched;
+}
+
+/* Non-terminal wake after a queue destroy so a sub-interval tail drains. */
+void kfd_dlog_stream_notify_queue_destroyed(struct kfd_node *node, u32 pasid)
+{
+	if (!node)
+		return;
+	kfd_dlog_stream_notify(node, pasid, true);
+}
+
+/*
+ * True for the CP clients that deliver a dispatch-log notify EOP on @node's
+ * arch: gfx950 on GRBM_CP or SE0SH..SE3SH, gfx12 on GRBM_CP or GFX.
+ */
+static bool kfd_dlog_notify_client(struct kfd_node *node, u32 client_id)
+{
+	if (client_id == SOC15_IH_CLIENTID_GRBM_CP)
+		return true;
+
+	if (KFD_GC_VERSION(node) == IP_VERSION(9, 5, 0))
+		return client_id >= SOC15_IH_CLIENTID_SE0SH &&
+		       client_id <= SOC15_IH_CLIENTID_SE3SH;
+
+	/* gfx12.0.x: only GRBM_CP or GFX (numerically SOC15 SE0SH). */
+	return client_id == SOC21_IH_CLIENTID_GFX;
+}
+
+/*
+ * Decode+consume a dispatch-log notify tag and wake matching streams (true even
+ * with no stream). The tag shares bit 24 with AMDGPU_FENCE_MES_QUEUE_FLAG, so it
+ * must run before the gfx12 MES-fence filter and kfd_signal_event_interrupt().
+ */
+bool kfd_dlog_ih_route_notify(struct kfd_node *node,
+			      const uint32_t *ih_ring_entry)
+{
+	u32 client_id = SOC15_CLIENT_ID_FROM_IH_ENTRY(ih_ring_entry);
+	u32 source_id = SOC15_SOURCE_ID_FROM_IH_ENTRY(ih_ring_entry);
+	u32 context_id0 = SOC15_CONTEXT_ID0_FROM_IH_ENTRY(ih_ring_entry);
+	u32 pasid, vmid, pipe_id, matched;
+
+	/* No-op on nodes with no dispatch-log support. */
+	if (!kfd_dispatch_log_node_num_regions(node))
+		return false;
+
+	if (!kfd_dlog_notify_client(node, client_id) ||
+	    source_id != SOC15_INTSRC_CP_END_OF_PIPE ||
+	    (context_id0 & KFD_DISPATCH_LOG_NOTIFY_CTX_MASK) !=
+		    KFD_DISPATCH_LOG_NOTIFY_CTX_TAG)
+		return false;
+
+	/*
+	 * TARGET-process PASID (wake-routing key): gfx950 firmware writes it into
+	 * the notify EOP, gfx12's MES-scheduled EOP already carries it.
+	 */
+	pasid = SOC15_PASID_FROM_IH_ENTRY(ih_ring_entry);
+	vmid = SOC15_VMID_FROM_IH_ENTRY(ih_ring_entry);
+	pipe_id = context_id0 & KFD_DISPATCH_LOG_NOTIFY_PIPE_MASK;
+
+	/* Data-notify means records exist; no drain_pending latch needed. */
+	matched = kfd_dlog_stream_notify(node, pasid, false);
+	trace_kfd_dlog_notify_interrupt(node->id, source_id, client_id, pasid,
+					vmid, pipe_id, context_id0, matched);
+	/* Always consume a tagged notify; matched==0 is the no-live-stream case. */
+	return true;
+}
+
+/*
+ * GPU reset (node survives): publish FATAL/EPOLLERR and wake pollers only.
+ * Does NOT terminate the session, clear st->target, or free the BO.
+ */
+void kfd_dlog_stream_notify_node_reset(struct kfd_node *node)
+{
+	struct kfd_dlog_stream *st;
+	unsigned long flags;
+
+	spin_lock_irqsave(&node->dlog_streams_lock, flags);
+	list_for_each_entry(st, &node->dlog_streams, registry_node) {
+		WRITE_ONCE(st->fatal, true);
+		kfd_dlog_stream_wake_locked(st);
+	}
+	spin_unlock_irqrestore(&node->dlog_streams_lock, flags);
+}
+
 /*=========================== stream lifecycle ==========================*/
 
 void kfd_dlog_stream_get(struct kfd_dlog_stream *st)
@@ -324,14 +445,10 @@ void kfd_dlog_stream_get(struct kfd_dlog_stream *st)
 	kref_get(&st->refcount);
 }
 
-/*
- * True once the stream is terminal (target exit): there is no live consumer, so
- * newly created queues must not be armed into it even if the PQM session was
- * retained after a failed unbind.
- */
+/* Terminal (target exit) or fatal (GPU reset): no live consumer, do not arm. */
 bool kfd_dlog_stream_is_terminal(struct kfd_dlog_stream *st)
 {
-	return !st || READ_ONCE(st->terminal);
+	return !st || READ_ONCE(st->terminal) || READ_ONCE(st->fatal);
 }
 
 /*
@@ -496,7 +613,9 @@ static void kfd_dlog_stream_fill_status(struct kfd_dlog_stream *st,
 	kfd_dlog_stream_check_target_exit(st);
 
 	memset(status, 0, sizeof(*status));
-	status->status = st->status;
+	/* Fold in the lock-free reset latch so STATUS agrees with poll(). */
+	status->status = st->status |
+		(READ_ONCE(st->fatal) ? KFD_DLOG_STATUS_FATAL : 0);
 	status->target_exit_count = st->target_exit_count;
 }
 
@@ -712,22 +831,8 @@ static int kfd_dlog_stream_release(struct inode *inode, struct file *file)
 /*=============================== poll() ================================*/
 
 /*
- * Level check under st->lock: wptr != rptr means unconsumed records (overrun is
- * the reader's problem, not poll()'s). A terminated (target-exit) stream keeps
- * its BO+wptr/rptr, so poll() still reports EPOLLIN|EPOLLHUP for the final
- * drain. Once torn down (last put) wptr/rptr are NULL and there are no records
- * to report.
- *
- * RAW_MMAP userspace advances rptr[] through its own PFN mapping while this
- * kmap reads the same pages; the level check relies on cached-GTT coherence
- * between the two views.
- *
- * Ordering: firmware publishes wptr[] by DMA into the BO. The firmware DMA
- * write to wptr[] is ordered against our read only by a device read barrier.
- * Issue a dma_rmb() before sampling wptr[] so a poll observes the producer's
- * latest wptr publish rather than a stale cached value. This is a level check:
- * if the barrier still races a just-arrived record, the reader's next poll pass
- * (re-armed on the same waitqueue) observes it.
+ * Level check under st->lock: wptr != rptr means unconsumed records. Firmware
+ * DMA-publishes wptr[] independently, so dma_rmb() before sampling it.
  */
 static bool kfd_dlog_stream_has_records(struct kfd_dlog_stream *st)
 {
@@ -753,6 +858,9 @@ static __poll_t kfd_dlog_stream_poll(struct file *file,
 				     struct poll_table_struct *wait)
 {
 	struct kfd_dlog_stream *st = file->private_data;
+	struct kfd_node *node;
+	unsigned long flags;
+	bool drain_pending_now = false;
 	bool has_records;
 	__poll_t mask = 0;
 
@@ -761,12 +869,27 @@ static __poll_t kfd_dlog_stream_poll(struct file *file,
 
 	if (READ_ONCE(st->terminal))
 		mask |= EPOLLHUP;
+	if (READ_ONCE(st->fatal))
+		mask |= EPOLLERR;
 
 	mutex_lock(&st->lock);
 	has_records = kfd_dlog_stream_has_records(st);
+	/*
+	 * Read-and-clear the one-shot drain_pending nudge under the IRQ-safe
+	 * dlog_streams_lock. Clear only once the ring is dry so the nudge
+	 * survives until the final tail is drained.
+	 */
+	node = st->node;
+	if (node) {
+		spin_lock_irqsave(&node->dlog_streams_lock, flags);
+		drain_pending_now = st->drain_pending;
+		if (drain_pending_now && !has_records)
+			st->drain_pending = false;
+		spin_unlock_irqrestore(&node->dlog_streams_lock, flags);
+	}
 	mutex_unlock(&st->lock);
 
-	if (has_records)
+	if (has_records || drain_pending_now)
 		mask |= EPOLLIN | EPOLLRDNORM;
 
 	return mask;

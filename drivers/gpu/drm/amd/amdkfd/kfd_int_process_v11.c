@@ -276,6 +276,15 @@ static bool event_interrupt_isr_v11(struct kfd_node *dev,
 	pasid = SOC15_PASID_FROM_IH_ENTRY(ih_ring_entry);
 	context_id0 = SOC15_CONTEXT_ID0_FROM_IH_ENTRY(ih_ring_entry);
 
+	/*
+	 * Dispatch-log notify (gfx12): decode+wake in the top half, before the
+	 * MES-fence filter (shared bit 24) and kfd_signal_event_interrupt();
+	 * consumed here. Runs after the vmid_kfd gate so the tag is routed only
+	 * for KFD-range VMIDs; the 16-bit tag must survive CPC/RLC/IH intact.
+	 */
+	if (kfd_dlog_ih_route_notify(dev, ih_ring_entry))
+		return false;
+
 	if ((source_id == SOC15_INTSRC_CP_END_OF_PIPE) &&
 	    (context_id0 & AMDGPU_FENCE_MES_QUEUE_FLAG))
 		return false;

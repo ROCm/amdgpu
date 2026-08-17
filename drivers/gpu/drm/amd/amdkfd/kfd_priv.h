@@ -1033,12 +1033,6 @@ struct kfd_process_device {
 
 #define qpd_to_pdd(x) container_of(x, struct kfd_process_device, qpd)
 
-/* Cap on the requested records-region size (bounds an unprivileged GTT pin). */
-#define KFD_DISPATCH_LOG_MAX_BUFFER_SIZE	(16U << 20)
-
-/* MQD notify interval: firmware raises a notify ~every N records; 0 disables. */
-#define KFD_DISPATCH_LOG_NOTIFY_INTERVAL	50u
-
 struct svm_range_list {
 	struct mutex			lock;
 	struct rb_root_cached		objects;
@@ -1061,6 +1055,20 @@ struct svm_range_list {
 	 */
 	uint8_t default_granularity;
 };
+
+/* Cap on the requested records-region size (bounds an unprivileged GTT pin). */
+#define KFD_DISPATCH_LOG_MAX_BUFFER_SIZE	(16U << 20)
+
+/* MQD notify interval: firmware raises a notify ~every N records; 0 disables. */
+#define KFD_DISPATCH_LOG_NOTIFY_INTERVAL	50u
+
+/*
+ * Firmware tags the notify EOP with context_id0 == (CTX_TAG | pipe_id). The tag
+ * shares bit 24 with AMDGPU_FENCE_MES_QUEUE_FLAG, so decode it before that filter.
+ */
+#define KFD_DISPATCH_LOG_NOTIFY_CTX_TAG		0xd10c0000u
+#define KFD_DISPATCH_LOG_NOTIFY_CTX_MASK	0xffff0000u
+#define KFD_DISPATCH_LOG_NOTIFY_PIPE_MASK	0x000000ffu
 
 /* VMID0/GART addresses + geometry the stream hands to PQM to arm queues. */
 struct kfd_dlog_bind_info {
@@ -1665,8 +1673,18 @@ void kfd_dlog_stream_set_pasid(struct kfd_dlog_stream *st,
 
 int kfd_dlog_stream_create_file(struct kfd_ioctl_dlog_args *args,
 				       struct file **filep);
+/*
+ * Decode+route a dispatch-log notify tag; true == consumed. IRQ-safe; must run
+ * before the gfx12 MES-fence filter and kfd_signal_event_interrupt().
+ */
+bool kfd_dlog_ih_route_notify(struct kfd_node *node,
+			      const uint32_t *ih_ring_entry);
 /* @target's queues have stopped: terminal-wake (EPOLLHUP) its streams. */
 void kfd_dlog_stream_notify_target_release(struct kfd_process *target);
+/* Non-terminal wake after a queue on (node, pasid) is destroyed. */
+void kfd_dlog_stream_notify_queue_destroyed(struct kfd_node *node, u32 pasid);
+/* GPU reset: the node survives, so streams are only failed (EPOLLERR). */
+void kfd_dlog_stream_notify_node_reset(struct kfd_node *node);
 int pqm_update_mqd(struct process_queue_manager *pqm, unsigned int qid,
 			struct mqd_update_info *minfo);
 int pqm_set_gws(struct process_queue_manager *pqm, unsigned int qid,
