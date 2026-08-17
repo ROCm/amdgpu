@@ -1878,6 +1878,8 @@ struct kfd_ioctl_ais_args {
 
 #define KFD_DLOG_STATUS_TARGET_EXITED		(1ULL << 2)
 #define KFD_DLOG_STATUS_FATAL			(1ULL << 5)
+/* Diagnostic: unbind incomplete, backing retained past close, cleaned up lazily. */
+#define KFD_DLOG_STATUS_UNBIND_RETAINED		(1ULL << 6)
 
 /*
  * RAW_MMAP layout: 20-byte records | u64 wptr[num_regions] (firmware producer) |

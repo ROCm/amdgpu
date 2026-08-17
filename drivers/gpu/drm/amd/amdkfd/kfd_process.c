@@ -1503,9 +1503,24 @@ void kfd_process_notifier_release_internal(struct kfd_process *p)
 	 * Dequeue and destroy user queues, it is not safe for GPU to access
 	 * system memory after mmu release notifier callback returns because
 	 * exit_mmap free process memory afterwards.
+	 *
+	 * p->mutex must be held across dequeue+pqm_uninit+dlog release: a
+	 * cross-process profiler can walk pqm->queues under target->mutex while
+	 * dequeue frees q->mqd, so serialize to avoid a use-after-free.
 	 */
+	mutex_lock(&p->mutex);
+	/* Block a racing profiler OPEN_STREAM from arming a torn-down process. */
+	p->dlog_teardown = true;
 	kfd_process_dequeue_from_all_devices(p);
 	pqm_uninit(&p->pqm);
+	/*
+	 * Queues stopped: terminate the target's streams then release the PQM
+	 * sessions. The KFD-owned BO is not freed here (final records stay
+	 * readable on the stream's refs; freed only at the last kref put).
+	 */
+	kfd_dlog_stream_notify_target_release(p);
+	kfd_dispatch_log_release_process(p);
+	mutex_unlock(&p->mutex);
 
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];

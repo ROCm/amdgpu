@@ -34,6 +34,8 @@
 #include "kfd_priv.h"
 #include "kfd_kernel_queue.h"
 #include "amdgpu_amdkfd.h"
+#include "amdgpu_object.h"	/* amdgpu_bo */
+#include "amdgpu_vm.h"		/* drm_priv_to_vm */
 #include "amdgpu_reset.h"
 
 static inline struct process_queue_node *get_queue_by_qid(
@@ -325,6 +327,38 @@ cleanup:
 	uninit_queue(*q);
 	*q = NULL;
 	return retval;
+}
+
+/* Program the stream-owned VMID0 addresses into a queue's dispatch-log MQD fields. */
+static void kfd_dlog_set_queue_props(struct queue_properties *p,
+				     const struct kfd_dlog_bind_info *info)
+{
+	p->dispatch_record_buffer_addr = info->base_va;
+	p->dispatch_record_buffer_size =
+		info->buffer_size / KFD_DISPATCH_LOG_FW_RECORD_BYTES;
+	p->dispatch_record_wptr_addr = info->wptr_va;
+	p->dispatch_record_notify_interval = KFD_DISPATCH_LOG_NOTIFY_INTERVAL;
+}
+
+/* Program the stream-owned VMID0 addresses into a queue's MQD. */
+static int kfd_dispatch_log_bind_queue(struct queue *q,
+				       const struct kfd_dlog_bind_info *info)
+{
+	struct queue_properties *p = &q->properties;
+	int err;
+
+	lockdep_assert_held(&q->process->mutex);
+
+	kfd_dlog_set_queue_props(p, info);
+
+	err = q->device->dqm->ops.update_queue(q->device->dqm, q, NULL);
+	if (err) {
+		/* MQD/HQD may retain addrs; leave props "bound", caller keeps the BO. */
+		pr_warn("dispatch_log: bind update_queue failed (qid=%u err=%d); MQD may retain addrs\n",
+			p->queue_id, err);
+		return err;
+	}
+	return 0;
 }
 
 int pqm_create_queue(struct process_queue_manager *pqm,
@@ -768,6 +802,239 @@ deny:
 			    task_pid_nr(lead), __kuid_val(current_uid()),
 			    (unsigned int)gpu_id);
 	return -EPERM;
+}
+
+/* Clear the dispatch-log fields from a queue's MQD/HQD. */
+static int kfd_dispatch_log_unbind_queue(struct queue *q)
+{
+	struct queue_properties *p = &q->properties;
+	u64 buffer_addr = p->dispatch_record_buffer_addr;
+	u32 buffer_size = p->dispatch_record_buffer_size;
+	u64 wptr_addr = p->dispatch_record_wptr_addr;
+	u32 notify_interval = p->dispatch_record_notify_interval;
+	int err;
+
+	p->dispatch_record_buffer_addr = 0;
+	p->dispatch_record_buffer_size = 0;
+	p->dispatch_record_wptr_addr = 0;
+	p->dispatch_record_notify_interval = 0;
+	err = q->device->dqm->ops.update_queue(q->device->dqm, q, NULL);
+	if (err) {
+		/* Restore so the pessimistic "still bound" state is honest. */
+		p->dispatch_record_buffer_addr = buffer_addr;
+		p->dispatch_record_buffer_size = buffer_size;
+		p->dispatch_record_wptr_addr = wptr_addr;
+		p->dispatch_record_notify_interval = notify_interval;
+		pr_warn("dispatch_log: unbind update_queue failed (%d); MQD may retain addrs\n",
+			err);
+	}
+	return err;
+}
+
+/*
+ * Unbind every compute queue this session armed on @info->dev; returns the first
+ * error and sets *unsafe_to_free if any MQD may still reference the BO.
+ */
+static int kfd_dispatch_log_unbind_session_queues(
+		struct process_queue_manager *target_pqm,
+		const struct kfd_dlog_bind_info *info, bool *unsafe_to_free)
+{
+	struct process_queue_node *pqn;
+	int ret = 0, unbind_ret;
+
+	*unsafe_to_free = false;
+
+	list_for_each_entry(pqn, &target_pqm->queues, process_queue_list) {
+		struct queue *q = pqn->q;
+
+		if (!q || q->device != info->dev ||
+		    q->properties.dispatch_record_buffer_addr != info->base_va)
+			continue;
+		unbind_ret = kfd_dispatch_log_unbind_queue(q);
+		if (unbind_ret) {
+			*unsafe_to_free = true;
+			if (!ret)
+				ret = unbind_ret;
+		}
+	}
+	return ret;
+}
+
+int pqm_enable_dispatch_log_stream(struct kfd_process *target, u32 gpu_id,
+		struct kfd_dlog_stream *stream,
+		const struct kfd_dlog_bind_info *bind)
+{
+	struct kfd_process_device *pdd;
+	struct process_queue_node *pqn;
+	struct kfd_dlog_session *session;
+	bool unsafe_to_free = false;
+	int ret;
+
+	if (!target || !stream || !bind)
+		return -EINVAL;
+
+	mutex_lock(&target->mutex);
+	pdd = kfd_process_device_data_by_id(target, gpu_id);
+	if (!pdd || !pdd->dev || pdd->dev != bind->dev) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
+	/*
+	 * Reject arming a torn-down target under target->mutex: dlog_teardown
+	 * closes the register-after-release-scan race; stream may be terminal/fatal.
+	 */
+	if (target->dlog_teardown || kfd_dlog_stream_is_terminal(stream)) {
+		ret = -ESRCH;
+		goto out_unlock;
+	}
+
+	/*
+	 * At most one live session per (process, device); retry cleanup of a
+	 * retained-after-failed-unbind session so a fresh OPEN is not -EEXIST forever.
+	 */
+	if (pdd->dlog_session) {
+		struct kfd_dlog_session *stale = pdd->dlog_session;
+		bool stale_unsafe = false;
+
+		if (!kfd_dlog_stream_is_terminal(stale->stream)) {
+			ret = -EEXIST;
+			goto out_unlock;
+		}
+		kfd_dispatch_log_unbind_session_queues(&target->pqm,
+						       &stale->info,
+						       &stale_unsafe);
+		if (stale_unsafe) {
+			/* Still cannot free safely; keep retaining, report busy. */
+			ret = -EEXIST;
+			goto out_unlock;
+		}
+		pdd->dlog_session = NULL;
+		if (stale->stream)
+			kfd_dlog_stream_put(stale->stream);
+		kfree(stale);
+	}
+
+	session = kzalloc(sizeof(*session), GFP_KERNEL);
+	if (!session) {
+		ret = -ENOMEM;
+		goto out_unlock;
+	}
+	session->info = *bind;
+	/* Session holds a stream reference while any MQD may reference the BO. */
+	kfd_dlog_stream_get(stream);
+	session->stream = stream;
+
+	/* Re-key to the live pdd->pasid before arming (corrects early-attach pasid 0). */
+	kfd_dlog_stream_set_pasid(stream, pdd->dev, pdd->pasid);
+
+	list_for_each_entry(pqn, &target->pqm.queues, process_queue_list) {
+		struct queue *q = pqn->q;
+
+		if (!q || q->device != session->info.dev ||
+		    q->properties.type != KFD_QUEUE_TYPE_COMPUTE)
+			continue;
+		ret = kfd_dispatch_log_bind_queue(q, &session->info);
+		if (ret)
+			goto err_unbind;
+	}
+
+	pdd->dlog_session = session;
+	mutex_unlock(&target->mutex);
+	return 0;
+
+err_unbind:
+	kfd_dispatch_log_unbind_session_queues(&target->pqm, &session->info,
+					       &unsafe_to_free);
+	if (unsafe_to_free) {
+		/* Rollback left an MQD referencing the BO; retain, never free early. */
+		pdd->dlog_session = session;
+		mutex_unlock(&target->mutex);
+		return ret ?: -EIO;
+	}
+	kfd_dlog_stream_put(session->stream);
+	kfree(session);
+out_unlock:
+	mutex_unlock(&target->mutex);
+	return ret;
+}
+
+int pqm_disable_dispatch_log_stream(struct kfd_process *target, u32 gpu_id,
+		struct kfd_dlog_stream *stream)
+{
+	struct kfd_process_device *pdd;
+	struct kfd_dlog_session *session;
+	bool unsafe_to_free = false;
+	int ret;
+
+	if (!target || !stream)
+		return -EINVAL;
+
+	mutex_lock(&target->mutex);
+	pdd = kfd_process_device_data_by_id(target, gpu_id);
+	if (!pdd || !pdd->dev) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
+	session = pdd->dlog_session;
+	if (!session) {
+		ret = -ENOENT;
+		goto out_unlock;
+	}
+	/*
+	 * The live session may belong to a newer stream that took this slot;
+	 * only unbind/drop when it is actually @stream's.
+	 */
+	if (session->stream != stream) {
+		ret = 0;
+		goto out_unlock;
+	}
+
+	ret = kfd_dispatch_log_unbind_session_queues(&target->pqm, &session->info,
+						     &unsafe_to_free);
+	if (unsafe_to_free) {
+		/* Retain session + stream ref + pinned BO; no firmware UAF. */
+		mutex_unlock(&target->mutex);
+		return ret ?: -EIO;
+	}
+
+	/* Clear MQDs succeeded; now safe to drop the session's stream ref. */
+	pdd->dlog_session = NULL;
+	kfree(session);
+	mutex_unlock(&target->mutex);
+	kfd_dlog_stream_put(stream);
+	return 0;
+
+out_unlock:
+	mutex_unlock(&target->mutex);
+	return ret;
+}
+
+/*
+ * Target teardown (queues destroyed, streams already terminated): drop each
+ * session's held stream reference and free the session. The BO is freed only
+ * at the last kref put.
+ */
+void kfd_dispatch_log_release_process(struct kfd_process *target)
+{
+	u32 i;
+
+	lockdep_assert_held(&target->mutex);
+
+	for (i = 0; i < target->n_pdds; i++) {
+		struct kfd_process_device *pdd = target->pdds[i];
+		struct kfd_dlog_session *session;
+
+		if (!pdd || !pdd->dlog_session)
+			continue;
+
+		session = pdd->dlog_session;
+		pdd->dlog_session = NULL;
+		if (session->stream)
+			kfd_dlog_stream_put(session->stream);
+		kfree(session);
+	}
 }
 
 int pqm_update_mqd(struct process_queue_manager *pqm,

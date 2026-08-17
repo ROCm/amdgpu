@@ -377,6 +377,13 @@ struct kfd_node {
 	spinlock_t watch_points_lock;
 
 	struct kfd_dev_pc_sampling pcs_data;
+
+	/*
+	 * Active dispatch-log streams keyed by target PASID, walked from the IRQ
+	 * top half; the IRQ-safe lock guards list membership and the wake only.
+	 */
+	struct list_head	dlog_streams;
+	spinlock_t		dlog_streams_lock;
 };
 
 struct kfd_dev {
@@ -1016,6 +1023,12 @@ struct kfd_process_device {
 	u32 pasid;
 	/* Indicates this process has requested PTL stay disabled */
 	bool ptl_disable_req;
+
+	/*
+	 * Dispatch-log per-device session (guarded by kfd_process.mutex); at most
+	 * one live, holding a stream ref while any MQD may reference the BO.
+	 */
+	struct kfd_dlog_session *dlog_session;
 };
 
 #define qpd_to_pdd(x) container_of(x, struct kfd_process_device, qpd)
@@ -1047,6 +1060,23 @@ struct svm_range_list {
 	 * recoverable page faults
 	 */
 	uint8_t default_granularity;
+};
+
+/* VMID0/GART addresses + geometry the stream hands to PQM to arm queues. */
+struct kfd_dlog_bind_info {
+	struct kfd_node		*dev;
+	u64			base_va;
+	u64			wptr_va;
+	u32			buffer_size;
+};
+
+/*
+ * Per-(process, device) dispatch-log binding, holding one stream reference while
+ * any MQD may contain @info's VMID0 addresses. Guarded by the target's mutex.
+ */
+struct kfd_dlog_session {
+	struct kfd_dlog_stream	*stream;	/* holds one stream reference */
+	struct kfd_dlog_bind_info info;
 };
 
 /* Process data */
@@ -1211,6 +1241,12 @@ struct kfd_process {
 
 	/* Indicates process' PC Sampling ref cnt*/
 	uint32_t pc_sampling_ref;
+
+	/*
+	 * Set under @mutex before dispatch-log teardown (pqm_uninit) so a racing
+	 * profiler OPEN_STREAM cannot install a session on a torn-down target.
+	 */
+	bool dlog_teardown;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 8 /* bits: 256 entries */
@@ -1601,6 +1637,17 @@ int pqm_update_queue_properties(struct process_queue_manager *pqm, unsigned int 
 			struct queue_properties *p);
 /* Per-ASIC region count (== firmware GC__NUM_ME_PIPES_PER_ME1), 0 if unsupported. */
 u32 kfd_dispatch_log_node_num_regions(struct kfd_node *dev);
+/* Arm @target's queues on @gpu_id with @bind and publish a session. */
+int pqm_enable_dispatch_log_stream(struct kfd_process *target, u32 gpu_id,
+			struct kfd_dlog_stream *stream,
+			const struct kfd_dlog_bind_info *bind);
+/*
+ * Unbind the (process, device) session and drop its stream ref, but only if the
+ * live session is @stream's (a newer stream's session is left untouched).
+ */
+int pqm_disable_dispatch_log_stream(struct kfd_process *target, u32 gpu_id,
+			struct kfd_dlog_stream *stream);
+void kfd_dispatch_log_release_process(struct kfd_process *target);
 /* Fail-closed cross-process auth, enforced before pinning; 0 if allowed. */
 int kfd_dispatch_log_target_check_auth(struct kfd_process *target, u32 gpu_id,
 				       struct kfd_node *node);
@@ -1609,9 +1656,17 @@ int kfd_dispatch_log_target_check_auth(struct kfd_process *target, u32 gpu_id,
 void kfd_dlog_stream_get(struct kfd_dlog_stream *st);
 void kfd_dlog_stream_put(struct kfd_dlog_stream *st);
 bool kfd_dlog_stream_is_terminal(struct kfd_dlog_stream *st);
+/*
+ * Re-key the stream's IH wake-routing PASID to the live pdd->pasid at arm time
+ * (corrects early-attach pasid 0). @node == pdd->dev; caller holds target->mutex.
+ */
+void kfd_dlog_stream_set_pasid(struct kfd_dlog_stream *st,
+			       struct kfd_node *node, u32 pasid);
 
 int kfd_dlog_stream_create_file(struct kfd_ioctl_dlog_args *args,
 				       struct file **filep);
+/* @target's queues have stopped: terminal-wake (EPOLLHUP) its streams. */
+void kfd_dlog_stream_notify_target_release(struct kfd_process *target);
 int pqm_update_mqd(struct process_queue_manager *pqm, unsigned int qid,
 			struct mqd_update_info *minfo);
 int pqm_set_gws(struct process_queue_manager *pqm, unsigned int qid,

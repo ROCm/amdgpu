@@ -956,6 +956,10 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 		if (kfd->adev->xcp_mgr)
 			kfd_setup_interrupt_bitmap(node, i);
 
+		/* Init before kfd_init_node() enables the IH handler that walks these. */
+		INIT_LIST_HEAD(&node->dlog_streams);
+		spin_lock_init(&node->dlog_streams_lock);
+
 		/* Initialize the KFD node */
 		if (kfd_init_node(node)) {
 			dev_err(kfd_device, "Error initializing KFD node\n");

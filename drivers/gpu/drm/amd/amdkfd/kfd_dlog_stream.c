@@ -89,6 +89,13 @@ struct kfd_dlog_stream {
 	/* IH wake-routing key, snapshot of pdd->pasid; assumed stable. */
 	u32			pasid;
 
+	/*
+	 * Registry membership on node->dlog_streams. @registered keeps add/del
+	 * idempotent. @terminal is write-once under st->lock (terminate()); read
+	 * with READ_ONCE() lock-free.
+	 */
+	struct list_head	registry_node;
+	bool			registered;
 	wait_queue_head_t	poll_wq;
 	/*
 	 * Set under @lock by detach_locked() once every raw pointer (@node/@bo/
@@ -205,27 +212,29 @@ static int kfd_dlog_stream_alloc_bo(struct kfd_dlog_stream *st)
 }
 
 /*
- * Single detach. Runs under st->lock. It NULLs every raw external pointer --
- * @node, @wptr, @rptr -- and hands the owned BO out via *bo_out (NULLing
- * st->bo). After it returns no path may touch those pointers. Sets @torn_down
- * (read lock-free by mmap/poll/setup to reject a detached stream).
- *
- * The caller MUST free the BO (after dropping st->lock) and release GTT
- * accounting via kfd_dlog_stream_free_finish(). Only kfd_dlog_stream_destroy()
- * (the last kref put) runs this, so the BO is freed in exactly one place and
- * cannot double-free or race a second free. Target exit and GPU reset only
- * terminate/flag the stream; they do not detach.
- *
- * *bo_out and *unreserve are outputs the caller passes back to
- * kfd_dlog_stream_free_finish().
+ * Single detach under st->lock (last kref put only): unlink, NULL every raw
+ * pointer, set @torn_down, hand the BO out via *bo_out for free_finish().
  */
 static void kfd_dlog_stream_detach_locked(struct kfd_dlog_stream *st,
 					  struct amdgpu_bo **bo_out,
 					  bool *unreserve)
 {
+	struct kfd_node *node;
+	unsigned long flags;
+
 	lockdep_assert_held(&st->lock);
 
 	st->torn_down = true;
+
+	node = st->node;
+	if (node) {
+		spin_lock_irqsave(&node->dlog_streams_lock, flags);
+		if (st->registered) {
+			list_del_init(&st->registry_node);
+			st->registered = false;
+		}
+		spin_unlock_irqrestore(&node->dlog_streams_lock, flags);
+	}
 
 	*bo_out = st->bo;
 	*unreserve = st->bo_accounted;
@@ -247,6 +256,67 @@ static void kfd_dlog_stream_free_finish(struct amdgpu_bo *bo, bool unreserve,
 		kfd_dlog_gtt_unreserve(bo_size);
 }
 
+/*======= Per-node active-stream registry + poll wake (IRQ-safe) =======*/
+
+/*
+ * Register on node->dlog_streams so wake paths find it by (node, pasid).
+ * Idempotent; called before arming. Caller holds st->lock (st->node read under
+ * it), so a concurrent detach cannot NULL/free the node under this read.
+ */
+static void kfd_dlog_stream_registry_add(struct kfd_dlog_stream *st)
+{
+	struct kfd_node *node;
+	unsigned long flags;
+
+	lockdep_assert_held(&st->lock);
+	node = st->node;
+	if (!node)
+		return;
+
+	spin_lock_irqsave(&node->dlog_streams_lock, flags);
+	if (!st->registered) {
+		list_add_tail(&st->registry_node, &node->dlog_streams);
+		st->registered = true;
+	}
+	spin_unlock_irqrestore(&node->dlog_streams_lock, flags);
+}
+
+/* Unlink from node->dlog_streams; caller holds st->lock (matching add()). */
+static void kfd_dlog_stream_registry_del(struct kfd_dlog_stream *st)
+{
+	struct kfd_node *node;
+	unsigned long flags;
+
+	lockdep_assert_held(&st->lock);
+	node = st->node;
+	if (!node)
+		return;
+
+	spin_lock_irqsave(&node->dlog_streams_lock, flags);
+	if (st->registered) {
+		list_del_init(&st->registry_node);
+		st->registered = false;
+	}
+	spin_unlock_irqrestore(&node->dlog_streams_lock, flags);
+}
+
+/*
+ * Update the IH wake-routing PASID under node->dlog_streams_lock (no torn write
+ * vs. notify), correcting an early-attach OPEN_STREAM snapshot of pasid 0.
+ */
+void kfd_dlog_stream_set_pasid(struct kfd_dlog_stream *st,
+			       struct kfd_node *node, u32 pasid)
+{
+	unsigned long flags;
+
+	if (!st || !node)
+		return;
+
+	spin_lock_irqsave(&node->dlog_streams_lock, flags);
+	st->pasid = pasid;
+	spin_unlock_irqrestore(&node->dlog_streams_lock, flags);
+}
+
 /*=========================== stream lifecycle ==========================*/
 
 void kfd_dlog_stream_get(struct kfd_dlog_stream *st)
@@ -265,18 +335,9 @@ bool kfd_dlog_stream_is_terminal(struct kfd_dlog_stream *st)
 }
 
 /*
- * Publish terminal state and disconnect the stream from its target. Idempotent.
- * This is NOT kfd_dlog_stream_detach_locked(): it does NOT free the KFD-owned BO
- * or NULL @node/@wptr/@rptr. A terminal (target-exit) stream keeps its BO
- * pinned+mapped so already-produced records remain readable through any live
- * mmap, with @node still valid until the BO-freeing detach_locked() runs at the
- * last kref put (kfd_dlog_stream_destroy()). It only clears st->target, sets
- * @terminal, and drops the process reference.
- *
- * @target_exited: this terminate is the target-process exit path. Latch
- * KFD_DLOG_STATUS_TARGET_EXITED and bump target_exit_count BEFORE clearing
- * st->target, so STATUS reports the exit on the normal exit path (not only via
- * the later pid_alive() probe, which cannot run once st->target is NULL).
+ * Publish terminal state and disconnect from the target (idempotent). NOT
+ * detach_locked(): keeps the BO pinned+mapped so final records stay readable.
+ * @target_exited latches STATUS_TARGET_EXITED before clearing st->target.
  */
 static void kfd_dlog_stream_terminate_flags(struct kfd_dlog_stream *st,
 					    bool target_exited)
@@ -288,6 +349,7 @@ static void kfd_dlog_stream_terminate_flags(struct kfd_dlog_stream *st,
 		st->target_exit_count++;
 		st->status |= KFD_DLOG_STATUS_TARGET_EXITED;
 	}
+	kfd_dlog_stream_registry_del(st);
 	target = st->target;
 	st->target = NULL;
 	WRITE_ONCE(st->terminal, true);
@@ -332,6 +394,62 @@ static void kfd_dlog_stream_destroy(struct kref *kref)
 void kfd_dlog_stream_put(struct kfd_dlog_stream *st)
 {
 	kref_put(&st->refcount, kfd_dlog_stream_destroy);
+}
+
+/*
+ * Target exiting under target->mutex (queues already destroyed): terminate each
+ * of its streams (terminal+HUP, unregister, clear st->target). Does NOT detach
+ * or free the BO; the profiler's fd/VMA refs keep the backing alive.
+ */
+void kfd_dlog_stream_notify_target_release(struct kfd_process *target)
+{
+	u32 i;
+
+	for (i = 0; i < target->n_pdds; i++) {
+		struct kfd_process_device *pdd = target->pdds[i];
+		struct kfd_dlog_stream *st;
+		struct kfd_node *node;
+		unsigned long flags;
+
+		if (!pdd || !pdd->dev)
+			continue;
+		node = pdd->dev;
+
+		for (;;) {
+			struct kfd_dlog_stream *found = NULL;
+			bool matched = false;
+
+			spin_lock_irqsave(&node->dlog_streams_lock, flags);
+			list_for_each_entry(st, &node->dlog_streams,
+					    registry_node) {
+				if (st->target != target)
+					continue;
+				/*
+				 * Unlink first, then pin: a refcount-0 husk can
+				 * still be listed; kref_get_unless_zero() rejects it.
+				 */
+				matched = true;
+				list_del_init(&st->registry_node);
+				st->registered = false;
+				if (kref_get_unless_zero(&st->refcount))
+					found = st;
+				break;
+			}
+			spin_unlock_irqrestore(&node->dlog_streams_lock, flags);
+
+			/* No matching entry left: this device is drained. */
+			if (!matched)
+				break;
+
+			/* Husk being destroyed: keep scanning for more. */
+			if (!found)
+				continue;
+
+			/* Target-exit path: latch STATUS_TARGET_EXITED. */
+			kfd_dlog_stream_terminate_flags(found, true);
+			kfd_dlog_stream_put(found);
+		}
+	}
 }
 
 static void kfd_dlog_stream_check_target_exit(struct kfd_dlog_stream *st)
@@ -540,16 +658,54 @@ unlock:
 /*==================== File operations + fd creation =====================*/
 
 /*
- * close(fd) with a live RAW_MMAP VMA does not run ->release() until the VMA's
- * file ref is dropped. Publish terminal here; the backing survives on the
- * fd/VMA refs. Do not add ->flush(): it runs on every dup'd-fd close.
+ * Unbind the PQM session: clear MQDs and drop the session's stream reference.
+ * On unbind failure the session/ref and pinned BO are retained (no firmware UAF).
+ */
+static void kfd_dlog_stream_unbind(struct kfd_dlog_stream *st)
+{
+	struct kfd_process *target;
+	u32 gpu_id;
+	int ret;
+
+	/*
+	 * Pin the target under st->lock before the pqm call, but do NOT hold
+	 * st->lock across it: that preserves the target->mutex -> st->lock order.
+	 */
+	mutex_lock(&st->lock);
+	target = st->target;
+	gpu_id = st->gpu_id;
+	if (target)
+		kref_get(&target->ref);
+	mutex_unlock(&st->lock);
+
+	if (!target)
+		return;
+
+	/* On retained-unbind, latch STATUS so a reader knows the BO outlived close. */
+	ret = pqm_disable_dispatch_log_stream(target, gpu_id, st);
+	if (ret && ret != -ENOENT) {
+		mutex_lock(&st->lock);
+		st->status |= KFD_DLOG_STATUS_UNBIND_RETAINED;
+		mutex_unlock(&st->lock);
+	}
+	kfd_unref_process(target);
+}
+
+/* Unbind the PQM session, publish terminal, and drop the caller's stream ref. */
+static void kfd_dlog_stream_teardown_session(struct kfd_dlog_stream *st)
+{
+	kfd_dlog_stream_unbind(st);
+	kfd_dlog_stream_terminate(st);
+	kfd_dlog_stream_put(st);
+}
+
+/*
+ * ->release() runs after the last fd/VMA ref is dropped. Unbind the session
+ * here; the backing survives on the fd/VMA refs. Do not add ->flush().
  */
 static int kfd_dlog_stream_release(struct inode *inode, struct file *file)
 {
-	struct kfd_dlog_stream *st = file->private_data;
-
-	kfd_dlog_stream_terminate(st);
-	kfd_dlog_stream_put(st);
+	kfd_dlog_stream_teardown_session(file->private_data);
 	return 0;
 }
 
@@ -627,15 +783,15 @@ static const struct file_operations kfd_dlog_stream_fops = {
 };
 
 /*
- * Set up the stream: allocate/zero the KFD-owned BO and prime rptr[] to wptr[]
- * (both zero on a fresh BO). Arming the target's queues is added in a later
- * commit, so a stream created here gets no records.
- *
- * The rptr prime runs under st->lock and rechecks st->torn_down, so a racing
- * detach that NULLs wptr/rptr/node is observed rather than dereferenced.
+ * Arm the stream: allocate/zero the BO, join the registry, then bind the VMID0
+ * addresses into the target's queues via PQM. On success the PQM session holds
+ * a stream reference; on failure everything is torn back down.
  */
 static int kfd_dlog_stream_setup(struct kfd_dlog_stream *st)
 {
+	struct kfd_dlog_bind_info bind;
+	struct kfd_process *target;
+	u32 gpu_id;
 	u32 i;
 	int ret;
 
@@ -646,6 +802,10 @@ static int kfd_dlog_stream_setup(struct kfd_dlog_stream *st)
 	if (ret)
 		return ret;
 
+	/*
+	 * Prime rptr[] to wptr[] and join the registry before arming, rechecking
+	 * torn_down first: membership must exist before the first firmware notify.
+	 */
 	mutex_lock(&st->lock);
 	if (st->torn_down || !st->wptr || !st->rptr) {
 		mutex_unlock(&st->lock);
@@ -653,8 +813,55 @@ static int kfd_dlog_stream_setup(struct kfd_dlog_stream *st)
 	}
 	for (i = 0; i < st->num_regions; i++)
 		WRITE_ONCE(st->rptr[i], READ_ONCE(st->wptr[i]));
+	kfd_dlog_stream_registry_add(st);
+
+	/*
+	 * Pin target and snapshot the bind geometry under st->lock before the
+	 * pqm call: once registered, a concurrent target release can terminate
+	 * the stream and drop its only process reference.
+	 */
+	target = st->target;
+	gpu_id = st->gpu_id;
+	if (target)
+		kref_get(&target->ref);
+	bind.dev = st->node;
+	bind.base_va = st->gart_addr;
+	bind.wptr_va = st->gart_addr + st->wptr_offset;
+	bind.buffer_size = st->buffer_size;
 	mutex_unlock(&st->lock);
 
+	/* Caller's put -> destroy() -> terminate() unlinks the registry. */
+	if (!target)
+		return -ESRCH;
+
+	ret = pqm_enable_dispatch_log_stream(target, gpu_id, st, &bind);
+	kfd_unref_process(target);
+	if (ret) {
+		/*
+		 * A failed bind may retain a PQM session (do NOT free the BO).
+		 * Mark terminal so a retained session is cleaned by the
+		 * retry-on-next-OPEN path; terminate() does not detach or free.
+		 */
+		kfd_dlog_stream_terminate(st);
+		return ret;
+	}
+
+	/*
+	 * Recheck under st->lock for a racing terminate()/fatal reset after
+	 * pqm_enable succeeded, and unbind the just-installed session if so.
+	 */
+	mutex_lock(&st->lock);
+	if (kfd_dlog_stream_is_terminal(st)) {
+		mutex_unlock(&st->lock);
+		/*
+		 * pqm_enable() SUCCEEDED: unbind before returning so the caller's
+		 * put lands in destroy() with nothing retaining it (retain on
+		 * unbind failure is deliberate, no firmware UAF).
+		 */
+		kfd_dlog_stream_unbind(st);
+		return -ESRCH;
+	}
+	mutex_unlock(&st->lock);
 	return 0;
 }
 
@@ -730,6 +937,7 @@ int kfd_dlog_stream_create_file(struct kfd_ioctl_dlog_args *args,
 	st->node = node;
 	kref_init(&st->refcount);
 	mutex_init(&st->lock);
+	INIT_LIST_HEAD(&st->registry_node);
 	init_waitqueue_head(&st->poll_wq);
 
 	ret = kfd_dlog_stream_compute_layout(st, args->buffer_size, num_regions);
@@ -766,13 +974,12 @@ int kfd_dlog_stream_create_file(struct kfd_ioctl_dlog_args *args,
 err_fd:
 	put_unused_fd(fd);
 err_setup:
-	/* Set up: publish terminal, then free via kref. */
-	kfd_dlog_stream_terminate(st);
-	kfd_dlog_stream_put(st);
+	/* Armed: unbind + drop the PQM session ref, then free via kref. */
+	kfd_dlog_stream_teardown_session(st);
 	return ret;
 
 err_stream:
-	/* Not yet set up: no session state, but st owns target. */
+	/* Not yet armed: no registry/session state, but st owns target. */
 	kfd_dlog_stream_put(st);
 	return ret;
 
