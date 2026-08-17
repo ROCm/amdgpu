@@ -18,6 +18,7 @@ use crate::{
     }, //
 };
 
+#[cfg(CONFIG_HAS_IOMEM)]
 pub mod mem;
 pub mod poll;
 pub mod register;
@@ -172,7 +173,82 @@ impl<T: ?Sized + KnownSize> MmioRaw<T> {
     }
 }
 
-/// Checks whether an access of type `U` at the given `base` and the given `offset`
+/// IO-mapped memory region.
+///
+/// The creator (usually a subsystem / bus such as PCI) is responsible for creating the
+/// mapping, performing an additional region request etc.
+///
+/// # Invariant
+///
+/// `addr` is the start and `maxsize` the length of valid I/O mapped memory region of size
+/// `maxsize`.
+///
+/// # Examples
+///
+/// ```no_run
+/// # #![cfg(CONFIG_HAS_IOMEM)]
+/// use kernel::{
+///     bindings,
+///     ffi::c_void,
+///     io::{
+///         Io,
+///         IoKnownSize,
+///         Mmio,
+///         MmioRaw,
+///         PhysAddr,
+///     },
+/// };
+/// use core::ops::Deref;
+///
+/// // See also `pci::Bar` for a real example.
+/// struct IoMem<const SIZE: usize>(MmioRaw<SIZE>);
+///
+/// impl<const SIZE: usize> IoMem<SIZE> {
+///     /// # Safety
+///     ///
+///     /// [`paddr`, `paddr` + `SIZE`) must be a valid MMIO region that is mappable into the CPUs
+///     /// virtual address space.
+///     unsafe fn new(paddr: usize) -> Result<Self>{
+///         // SAFETY: By the safety requirements of this function [`paddr`, `paddr` + `SIZE`) is
+///         // valid for `ioremap`.
+///         let addr = unsafe { bindings::ioremap(paddr as PhysAddr, SIZE) };
+///         if addr.is_null() {
+///             return Err(ENOMEM);
+///         }
+///
+///         Ok(IoMem(MmioRaw::new(addr as usize, SIZE)?))
+///     }
+/// }
+///
+/// impl<const SIZE: usize> Drop for IoMem<SIZE> {
+///     fn drop(&mut self) {
+///         // SAFETY: `self.0.addr()` is guaranteed to be properly mapped by `Self::new`.
+///         unsafe { bindings::iounmap(self.0.addr() as *mut c_void); };
+///     }
+/// }
+///
+/// impl<const SIZE: usize> Deref for IoMem<SIZE> {
+///    type Target = Mmio<SIZE>;
+///
+///    fn deref(&self) -> &Self::Target {
+///         // SAFETY: The memory range stored in `self` has been properly mapped in `Self::new`.
+///         unsafe { Mmio::from_raw(&self.0) }
+///    }
+/// }
+///
+///# fn no_run() -> Result<(), Error> {
+/// // SAFETY: Invalid usage for example purposes.
+/// let iomem = unsafe { IoMem::<{ core::mem::size_of::<u32>() }>::new(0xBAAAAAAD)? };
+/// iomem.write32(0x42, 0x0);
+/// assert!(iomem.try_write32(0x42, 0x0).is_ok());
+/// assert!(iomem.try_write32(0x42, 0x4).is_err());
+/// # Ok(())
+/// # }
+/// ```
+#[repr(transparent)]
+pub struct Mmio<const SIZE: usize = 0>(MmioRaw<SIZE>);
+
+/// Checks whether an access of type `U` at the given `offset`
 /// is valid within this region.
 ///
 /// The `base` is used for alignment checking only. This can be set to 0 to skip the check.
