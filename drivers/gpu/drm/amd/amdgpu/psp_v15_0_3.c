@@ -32,6 +32,7 @@
 //#include "mp/mp_15_0_3_sh_mask.h"
 
 MODULE_FIRMWARE("amdgpu/psp_15_0_3_sos.bin");
+MODULE_FIRMWARE("amdgpu/psp_15_0_3_sos_sriov.bin");
 MODULE_FIRMWARE("amdgpu/psp_15_0_3_ta.bin");
 
 /* For large FW files the time to complete can be very long */
@@ -242,6 +243,7 @@ static int psp_v15_0_3_ring_create(struct psp_context *psp,
 				   enum psp_ring_type ring_type)
 {
 	int ret = 0;
+	int i;
 	unsigned int psp_ring_reg = 0;
 	struct psp_ring *ring = &psp->km_ring;
 	struct amdgpu_device *adev = psp->adev;
@@ -272,11 +274,28 @@ static int psp_v15_0_3_ring_create(struct psp_context *psp,
 
 	} else {
 		/* Wait for sOS ready for ring creation */
-		ret = psp_wait_for(psp, SOC15_REG_OFFSET(MP0, 0, regMPASP_PCRU0_MPASP_C2PMSG_64),
-				   MBOX_TOS_READY_FLAG, MBOX_TOS_READY_MASK, 0);
-		if (ret) {
-			DRM_ERROR("Failed to wait for trust OS ready for ring creation\n");
-			return ret;
+		if (adev->aid_mask) {
+			for_each_inst(i, adev->aid_mask) {
+				ret = psp_wait_for(psp,
+						   SOC15_REG_OFFSET(MP0, i,
+								    regMPASP_PCRU0_MPASP_C2PMSG_64),
+						   MBOX_TOS_READY_FLAG,
+						   MBOX_TOS_READY_MASK, 0);
+				if (ret) {
+					DRM_ERROR("TOS ready timeout for ring creation on aid %d\n",
+						  i);
+					return ret;
+				}
+			}
+		} else {
+			ret = psp_wait_for(psp, SOC15_REG_OFFSET(MP0, 0,
+								 regMPASP_PCRU0_MPASP_C2PMSG_64),
+					   MBOX_TOS_READY_FLAG,
+					   MBOX_TOS_READY_MASK, 0);
+			if (ret) {
+				DRM_ERROR("Failed to wait for trust OS ready for ring creation\n");
+				return ret;
+			}
 		}
 
 		/* Write low address of the ring to C2PMSG_69 */
