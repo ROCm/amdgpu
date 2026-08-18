@@ -1119,7 +1119,8 @@ int amdgpu_virt_init_critical_region(struct amdgpu_device *adev)
 	/* Validation and initialization for each table entry */
 	if (IS_SRIOV_CRIT_REGN_ENTRY_VALID(init_data_hdr, AMD_SRIOV_MSG_IPD_TABLE_ID)) {
 		if (!init_data_hdr->ip_discovery_size_in_kb ||
-				init_data_hdr->ip_discovery_size_in_kb > DISCOVERY_TMR_SIZE) {
+				init_data_hdr->ip_discovery_size_in_kb >
+					(DISCOVERY_TMR_SIZE_SRIOV >> 10)) {
 			dev_err(adev->dev, "Invalid %s size: 0x%x\n",
 				amdgpu_virt_dynamic_crit_table_name[AMD_SRIOV_MSG_IPD_TABLE_ID],
 				init_data_hdr->ip_discovery_size_in_kb);
@@ -1191,14 +1192,6 @@ int amdgpu_virt_init_critical_region(struct amdgpu_device *adev)
 			init_data_hdr->bad_page_info_offset;
 		adev->virt.crit_regn_tbl[AMD_SRIOV_MSG_BAD_PAGE_INFO_TABLE_ID].size_kb =
 			init_data_hdr->bad_page_size_in_kb;
-	}
-
-	/* Validation for critical region info */
-	if (adev->virt.crit_regn_tbl[AMD_SRIOV_MSG_IPD_TABLE_ID].size_kb > DISCOVERY_TMR_SIZE) {
-		dev_err(adev->dev, "Invalid IP discovery size: 0x%x\n",
-				adev->virt.crit_regn_tbl[AMD_SRIOV_MSG_IPD_TABLE_ID].size_kb);
-		r = -EINVAL;
-		goto out;
 	}
 
 	/* reserved memory starts from crit region base offset with the size of 5MB */
