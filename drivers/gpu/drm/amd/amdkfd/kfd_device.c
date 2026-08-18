@@ -969,7 +969,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 
 	svm_range_set_max_pages(kfd->adev);
 
-	kfd_ais_init(kfd->adev);
+	if (!amdgpu_ais_disabled)
+		kfd_ais_init(kfd->adev);
 
 	kfd->init_complete = true;
 	dev_info(kfd_device, "added device %x:%x\n", kfd->adev->pdev->vendor,

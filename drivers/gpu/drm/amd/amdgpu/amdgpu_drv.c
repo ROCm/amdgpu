@@ -235,6 +235,7 @@ int amdgpu_reset_method = -1; /* auto */
 int amdgpu_num_kcq = -1;
 int amdgpu_smartshift_bias;
 int amdgpu_use_xgmi_p2p = 1;
+int amdgpu_ais_disabled;
 int amdgpu_vcnfw_log;
 int amdgpu_sg_display = -1; /* auto */
 int amdgpu_user_partt_mode = AMDGPU_AUTO_COMPUTE_PARTITION_MODE;
@@ -735,6 +736,15 @@ module_param_named_unsafe(force_asic_type, amdgpu_force_asic_type, int, 0444);
 MODULE_PARM_DESC(use_xgmi_p2p,
 	"Enable XGMI P2P interface (0 = disable; 1 = enable (default))");
 module_param_named(use_xgmi_p2p, amdgpu_use_xgmi_p2p, int, 0444);
+
+/**
+ * DOC: ais_disabled (int)
+ * Disable AMD Infinity Storage (AIS) support.
+ * 0 = enable (default), 1 = disable.
+ */
+MODULE_PARM_DESC(ais_disabled,
+	"Disable AIS (AMD Infinity Storage) support (0 = enable (default), 1 = disable)");
+module_param_named(ais_disabled, amdgpu_ais_disabled, int, 0444);
 
 
 #ifdef CONFIG_HSA_AMD
