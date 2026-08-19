@@ -25,7 +25,6 @@
 #include "amdgpu.h"
 #include "amdgpu_ras_mgr.h"
 #include "amdgpu_ras_mce.h"
-#include <asm/mce.h>
 
 #ifdef CONFIG_X86_MCE_AMD
 #include <asm/mce.h>
