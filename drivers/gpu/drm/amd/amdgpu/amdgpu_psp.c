@@ -4577,7 +4577,8 @@ int psp_config_sq_perfmon(struct psp_context *psp,
 
 	if (amdgpu_ip_version(psp->adev, MP0_HWIP, 0) != IP_VERSION(13, 0, 6) &&
 		amdgpu_ip_version(psp->adev, MP0_HWIP, 0) != IP_VERSION(13, 0, 12) &&
-		amdgpu_ip_version(psp->adev, MP0_HWIP, 0) != IP_VERSION(13, 0, 14)) {
+		amdgpu_ip_version(psp->adev, MP0_HWIP, 0) != IP_VERSION(13, 0, 14) &&
+		amdgpu_ip_version(psp->adev, MP0_HWIP, 0) != IP_VERSION(13, 0, 15)) {
 		dev_err(psp->adev->dev, "Unsupported MP0 version 0x%x for CONFIG_SQ_PERFMON command\n",
 			amdgpu_ip_version(psp->adev, MP0_HWIP, 0));
 		return -EINVAL;
