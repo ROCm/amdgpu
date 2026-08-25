@@ -34,16 +34,6 @@
 #include <net/route.h>
 #include <linux/inet.h>
 #include <linux/fs.h>
-#if IS_ENABLED(CONFIG_BLK_DEV_DM)
-/*
- * Workaround macro name conflict: AMD display driver defines dm_error as a
- * macro in os_types.h, but <linux/device-mapper.h> declares it as a function.
- * Temporarily undefine the macro, include the header, then restore the macro.
- */
-#undef dm_error
-#include <linux/device-mapper.h>
-#define dm_error(fmt, ...) DRM_ERROR(fmt, ##__VA_ARGS__)
-#endif
 #if IS_ENABLED(CONFIG_NFS_FS)
 #include <net/ip6_route.h>
 #include <linux/nfs_fs.h>
@@ -180,62 +170,18 @@ static struct pci_dev *get_rdma_nic_pci_dev(const char *disk_name)
 	return pdev;
 }
 
-#if IS_ENABLED(CONFIG_BLK_DEV_DM)
-/*
- * Check if a block device is a device-mapper device.
- */
-static inline bool ais_is_dm_device(struct block_device *bdev)
-{
-	struct mapped_device *md = dm_get_md(bdev->bd_dev);
+static struct pci_dev *get_pci_dev_from_block_stack(struct block_device *bdev,
+						    struct device *gpu_dev,
+						    struct kfd_process_device *pdd,
+						    int depth);
 
-	if (md) {
-		dm_put(md);
-		return true;
-	}
-	return false;
-}
-
-/* Forward declaration for DM-specific function */
-static struct pci_dev *get_pci_dev_from_dm(struct block_device *bdev,
-					   struct device *gpu_dev,
-					   struct kfd_process_device *pdd,
-					   int depth);
-#endif /* CONFIG_BLK_DEV_DM */
-
-/*
- * get_pci_dev_from_file - Get the PCI device that hosts file I/O
- *
- * For local NVMe/virtio, walks the block device parent chain to the
- * PCI controller. For NVMeoF-RDMA (where the parent chain ends at a
- * synthetic nvmf_device with no PCI parent), falls back to finding
- * the RDMA NIC with valid GPU P2P distance.
- *
- * Note: Device-mapper (LVM) devices are handled separately in
- * kfd_ais_rw_file() before this function is called.
- *
- * @file: The file pointer from which to derive the PCI device
- * Returns: PCI device with reference held, or NULL. Caller must pci_dev_put().
- */
-static struct pci_dev *get_pci_dev_from_file(struct file *file)
+static struct pci_dev *get_pci_dev_from_bdev(struct block_device *bdev)
 {
 	struct device *dev;
 	struct pci_dev *pdev = NULL;
-	struct block_device *bdev;
 
-	if (S_ISBLK(file_inode(file)->i_mode)) {
-		/* For block device nodes on devtmpfs, file_inode() is the
-		 * devtmpfs inode, not the bd_inode embedded in block_device.
-		 * However, blkdev_open() remaps file->f_mapping to the real
-		 * block device mapping, so f_mapping->host IS the bd_inode.
-		 */
-		bdev = I_BDEV(file->f_mapping->host);
-	} else if (file->f_path.mnt && file->f_path.mnt->mnt_sb &&
-		   file->f_path.mnt->mnt_sb->s_bdev) {
-		bdev = file->f_path.mnt->mnt_sb->s_bdev;
-	} else {
-		pr_err("Invalid file path or mount point\n");
+	if (!bdev || !bdev->bd_disk)
 		return NULL;
-	}
 
 #ifdef HAVE_BLOCK_DEVICE_BD_DEVICE
 	dev = bdev->bd_device.parent;
@@ -254,8 +200,7 @@ static struct pci_dev *get_pci_dev_from_file(struct file *file)
 	 * walk found nothing and this is an NVMe disk, the device is
 	 * NVMeoF -- find the RDMA NIC via route lookup instead.
 	 */
-	if (!pdev && bdev->bd_disk &&
-	    strncmp(bdev->bd_disk->disk_name, "nvme", 4) == 0)
+	if (!pdev && strncmp(bdev->bd_disk->disk_name, "nvme", 4) == 0)
 		pdev = get_rdma_nic_pci_dev(bdev->bd_disk->disk_name);
 
 	if (pdev)
@@ -263,7 +208,6 @@ static struct pci_dev *get_pci_dev_from_file(struct file *file)
 
 	return pdev;
 }
-
 static struct bio_vec *amdgpu_init_bvec(struct sg_table *sgt, uint64_t size,
 					unsigned int *nr_segs)
 {
@@ -511,12 +455,12 @@ static bool kfd_ais_check_p2p_cached(struct kfd_process_device *pdd,
 	return xa_load(&pdd->ais_counters_xa, kfd_ais_make_key(pdev)) != NULL;
 }
 
-#if IS_ENABLED(CONFIG_BLK_DEV_DM)
 /*
- * Context for reading DM slave devices from sysfs
+ * Context for reading block slave devices from sysfs
  */
-#define MAX_DM_SLAVES 16
-#define MAX_DM_RECURSION_DEPTH 4  /* Limit nested DM (e.g., dm-on-dm-on-dm) */
+#define MAX_BLOCK_RECURSION_DEPTH 4  /* Limit nested block devices */
+#define MAX_BLOCK_SLAVE_NAMES 1024   /* Sanity limit for slave name allocation */
+#define BLOCK_SLAVE_SPARE 8
 
 /*
  * - Old (int):  0 = continue, non-zero = stop
@@ -532,42 +476,77 @@ static bool kfd_ais_check_p2p_cached(struct kfd_process_device *pdd,
 #define FILLDIR_RET_TYPE	bool
 #endif
 
-struct dm_slave_iter_ctx {
+struct block_slave_iter_ctx {
 	struct dir_context dir_ctx;  /* Must be first for container_of */
-	char names[MAX_DM_SLAVES][BDEVNAME_SIZE];
+	char (*names)[BDEVNAME_SIZE];
 	int count;
-	bool overflow;  /* Set if more slaves than MAX_DM_SLAVES */
+	int max_count;
+	int ret;
 };
 
 /*
- * ais_dm_slave_filldir - Callback for iterate_dir to capture all slave devices
+ * ais_block_slave_count_filldir - Callback for iterate_dir to count slave devices
  */
-static FILLDIR_RET_TYPE ais_dm_slave_filldir(struct dir_context *ctx,
-					      const char *name, int namlen,
-					      loff_t offset, u64 ino,
-					      unsigned int d_type)
+static FILLDIR_RET_TYPE ais_block_slave_count_filldir(struct dir_context *ctx,
+						      const char *name, int namlen,
+						      loff_t offset, u64 ino,
+						      unsigned int d_type)
 {
-	struct dm_slave_iter_ctx *priv = container_of(ctx, struct dm_slave_iter_ctx,
-						      dir_ctx);
+	struct block_slave_iter_ctx *priv =
+		container_of(ctx, struct block_slave_iter_ctx, dir_ctx);
+
+	if (!name || namlen <= 0)
+		return FILLDIR_CONTINUE;
 
 	if (name[0] == '.')
 		return FILLDIR_CONTINUE;
 
-	/* Reject if we hit the slave limit - cannot validate all devices */
-	if (priv->count >= MAX_DM_SLAVES) {
-		priv->overflow = true;
-		return FILLDIR_STOP;
-	}
-
 	/* Reject if device name too long - cannot enumerate all devices */
 	if (namlen >= BDEVNAME_SIZE) {
-		pr_warn("AIS: DM slave name too long (%d >= %d): %.*s\n",
+		pr_warn("AIS: block slave name too long (%d >= %d): %.*s\n",
 			namlen, BDEVNAME_SIZE, namlen, name);
-		priv->overflow = true;
+		priv->ret = -ENAMETOOLONG;
 		return FILLDIR_STOP;
 	}
 
-	/* Capture this slave device name */
+	if (priv->count >= MAX_BLOCK_SLAVE_NAMES) {
+		priv->ret = -EOVERFLOW;
+		return FILLDIR_STOP;
+	}
+
+	priv->count++;
+	return FILLDIR_CONTINUE;
+}
+
+/*
+ * ais_block_slave_collect_filldir - Callback for iterate_dir to capture all slave devices
+ */
+static FILLDIR_RET_TYPE ais_block_slave_collect_filldir(struct dir_context *ctx,
+							const char *name, int namlen,
+							loff_t offset, u64 ino,
+							unsigned int d_type)
+{
+	struct block_slave_iter_ctx *priv =
+		container_of(ctx, struct block_slave_iter_ctx, dir_ctx);
+
+	if (!name || namlen <= 0)
+		return FILLDIR_CONTINUE;
+
+	if (name[0] == '.')
+		return FILLDIR_CONTINUE;
+
+	if (namlen >= BDEVNAME_SIZE) {
+		pr_warn("AIS: block slave name too long (%d >= %d): %.*s\n",
+			namlen, BDEVNAME_SIZE, namlen, name);
+		priv->ret = -ENAMETOOLONG;
+		return FILLDIR_STOP;
+	}
+
+	if (priv->count >= priv->max_count) {
+		priv->ret = -EOVERFLOW;
+		return FILLDIR_STOP;
+	}
+
 	memcpy(priv->names[priv->count], name, namlen);
 	priv->names[priv->count][namlen] = '\0';
 	priv->count++;
@@ -576,26 +555,24 @@ static FILLDIR_RET_TYPE ais_dm_slave_filldir(struct dir_context *ctx,
 }
 
 /*
- * get_pci_dev_from_dm_slave - Get PCI device from a single DM slave device
+ * get_pci_dev_from_block_slave - Get PCI device from a single block slave device
  *
- * Opens a slave device by name and walks its parent chain to find the PCI
- * controller. Handles nested DM devices (LVM on LVM) via recursion.
+ * Opens a slave device by name and resolves its block stack recursively.
  *
  * @slave_name: Name of the slave device (e.g., "nvme0n1")
  * @gpu_dev: GPU device to check P2P against (optional, can be NULL)
  * @pdd: Process device data for P2P caching (required if gpu_dev is set)
- * @depth: Current recursion depth (for nested DM limit)
+ * @depth: Current recursion depth (for nested block device limit)
  * Returns: PCI device with reference held, or NULL if not found or P2P check fails.
  *          Caller must call pci_dev_put() when done.
  */
-static struct pci_dev *get_pci_dev_from_dm_slave(const char *slave_name,
-						 struct device *gpu_dev,
-						 struct kfd_process_device *pdd,
-						 int depth)
+static struct pci_dev *get_pci_dev_from_block_slave(const char *slave_name,
+						    struct device *gpu_dev,
+						    struct kfd_process_device *pdd,
+						    int depth)
 {
 	char devpath[80];
-	struct pci_dev *pdev = NULL;
-	struct device *dev;
+	struct pci_dev *pdev;
 	struct block_device *slave_bdev;
 
 #if defined(HAVE_BLKDEV_GET_BY_PATH) || defined(HAVE_BLKDEV_GET_BY_PATH_4ARG)
@@ -615,114 +592,42 @@ static struct pci_dev *get_pci_dev_from_dm_slave(const char *slave_name,
 #if defined(HAVE_BLKDEV_GET_BY_PATH)
 	slave_bdev = blkdev_get_by_path(devpath, FMODE_READ, NULL);
 	if (IS_ERR(slave_bdev)) {
-		pr_debug("AIS: cannot open slave %s\n", devpath);
+		pr_debug("AIS: cannot open block slave %s\n", devpath);
 		return NULL;
 	}
 
-	/* Check if slave is also a DM device (nested LVM) */
-	if (ais_is_dm_device(slave_bdev)) {
-		pdev = get_pci_dev_from_dm(slave_bdev, gpu_dev, pdd, depth + 1);
-		/* Nested call already holds reference */
-	} else {
-		/* Walk parent chain to find PCI device */
-#ifdef HAVE_BLOCK_DEVICE_BD_DEVICE
-		dev = slave_bdev->bd_device.parent;
-#else
-		dev = disk_to_dev(slave_bdev->bd_disk)->parent;
-#endif
-		while (dev && !dev_is_pci(dev))
-			dev = dev->parent;
-		if (dev && dev_is_pci(dev)) {
-			pdev = to_pci_dev(dev);
-			pci_dev_get(pdev);
-		}
-	}
-
+	pdev = get_pci_dev_from_block_stack(slave_bdev, gpu_dev, pdd, depth + 1);
 	blkdev_put(slave_bdev, FMODE_READ);
 #elif defined(HAVE_BLKDEV_GET_BY_PATH_4ARG)
 	/* RHEL backport: 4-arg blkdev_get_by_path (commit 0718afd47f70c) */
 	slave_bdev = blkdev_get_by_path(devpath, FMODE_READ, NULL, NULL);
 	if (IS_ERR(slave_bdev)) {
-		pr_debug("AIS: cannot open slave %s\n", devpath);
+		pr_debug("AIS: cannot open block slave %s\n", devpath);
 		return NULL;
 	}
 
-	/* Check if slave is also a DM device (nested LVM) */
-	if (ais_is_dm_device(slave_bdev)) {
-		pdev = get_pci_dev_from_dm(slave_bdev, gpu_dev, pdd, depth + 1);
-		/* Nested call already holds reference */
-	} else {
-		/* Walk parent chain to find PCI device */
-#ifdef HAVE_BLOCK_DEVICE_BD_DEVICE
-		dev = slave_bdev->bd_device.parent;
-#else
-		dev = disk_to_dev(slave_bdev->bd_disk)->parent;
-#endif
-		while (dev && !dev_is_pci(dev))
-			dev = dev->parent;
-		if (dev && dev_is_pci(dev)) {
-			pdev = to_pci_dev(dev);
-			pci_dev_get(pdev);
-		}
-	}
-
+	pdev = get_pci_dev_from_block_stack(slave_bdev, gpu_dev, pdd, depth + 1);
 	blkdev_put(slave_bdev, NULL);
 #elif defined(HAVE_BDEV_OPEN_BY_PATH)
 	bdev_handle = bdev_open_by_path(devpath, BLK_OPEN_READ, NULL, NULL);
 	if (IS_ERR(bdev_handle)) {
-		pr_debug("AIS: cannot open slave %s\n", devpath);
+		pr_debug("AIS: cannot open block slave %s\n", devpath);
 		return NULL;
 	}
 	slave_bdev = bdev_handle->bdev;
 
-	/* Check if slave is also a DM device (nested LVM) */
-	if (ais_is_dm_device(slave_bdev)) {
-		pdev = get_pci_dev_from_dm(slave_bdev, gpu_dev, pdd, depth + 1);
-		/* Nested call already holds reference */
-	} else {
-		/* Walk parent chain to find PCI device */
-#ifdef HAVE_BLOCK_DEVICE_BD_DEVICE
-		dev = slave_bdev->bd_device.parent;
-#else
-		dev = disk_to_dev(slave_bdev->bd_disk)->parent;
-#endif
-		while (dev && !dev_is_pci(dev))
-			dev = dev->parent;
-		if (dev && dev_is_pci(dev)) {
-			pdev = to_pci_dev(dev);
-			pci_dev_get(pdev);
-		}
-	}
-
+	pdev = get_pci_dev_from_block_stack(slave_bdev, gpu_dev, pdd, depth + 1);
 	bdev_release(bdev_handle);
 #else
 	/* Default: latest kernel (6.8+) API for in-tree builds */
 	bdev_file = bdev_file_open_by_path(devpath, BLK_OPEN_READ, NULL, NULL);
 	if (IS_ERR(bdev_file)) {
-		pr_debug("AIS: cannot open slave %s\n", devpath);
+		pr_debug("AIS: cannot open block slave %s\n", devpath);
 		return NULL;
 	}
 	slave_bdev = file_bdev(bdev_file);
 
-	/* Check if slave is also a DM device */
-	if (ais_is_dm_device(slave_bdev)) {
-		pdev = get_pci_dev_from_dm(slave_bdev, gpu_dev, pdd, depth + 1);
-		/* Nested call already holds reference */
-	} else {
-		/* Walk parent chain to find PCI device */
-#ifdef HAVE_BLOCK_DEVICE_BD_DEVICE
-		dev = slave_bdev->bd_device.parent;
-#else
-		dev = disk_to_dev(slave_bdev->bd_disk)->parent;
-#endif
-		while (dev && !dev_is_pci(dev))
-			dev = dev->parent;
-		if (dev && dev_is_pci(dev)) {
-			pdev = to_pci_dev(dev);
-			pci_dev_get(pdev);
-		}
-	}
-
+	pdev = get_pci_dev_from_block_stack(slave_bdev, gpu_dev, pdd, depth + 1);
 	fput(bdev_file);
 #endif
 
@@ -730,46 +635,53 @@ static struct pci_dev *get_pci_dev_from_dm_slave(const char *slave_name,
 }
 
 /*
- * get_pci_dev_from_dm - Get PCI device from device-mapper block device
+ * get_pci_dev_from_block_stack - Get PCI device from a block stack
  *
- * Reads /sys/block/<dm-device>/slaves/ to find underlying physical devices.
- * For multi-device LVM, verifies P2P compatibility for ALL
- * slave devices if gpu_dev is provided.
+ * Reads /sys/block/<disk>/slaves/ to find underlying block devices. If the
+ * directory is empty, treats bdev as a leaf and walks its parent chain.
  *
- * @bdev: Block device that is a device-mapper device
+ * @bdev: Block device to inspect
  * @gpu_dev: GPU device to check P2P against (optional, can be NULL)
  * @pdd: Process device data for P2P caching (required if gpu_dev is set)
- * @depth: Current recursion depth (for nested DM limit)
+ * @depth: Current recursion depth (for nested block device limit)
  * Returns: PCI device of first slave with reference held, or NULL if not found
  *          or if any slave fails P2P check. Caller must call pci_dev_put().
  *
- * Note: For multi-device LVM, returns first_pdev for sysfs byte accounting.
+ * Note: For stacked block devices, returns first_pdev for sysfs byte accounting.
  * This makes per-device counters imprecise, future work could be to improve this.
  */
-static struct pci_dev *get_pci_dev_from_dm(struct block_device *bdev,
-					   struct device *gpu_dev,
-					   struct kfd_process_device *pdd,
-					   int depth)
+static struct pci_dev *get_pci_dev_from_block_stack(struct block_device *bdev,
+						    struct device *gpu_dev,
+						    struct kfd_process_device *pdd,
+						    int depth)
 {
 	char path[80];
 	struct file *dir;
-	struct dm_slave_iter_ctx iter_ctx = {
-		.dir_ctx.actor = ais_dm_slave_filldir,
+	struct block_slave_iter_ctx iter_ctx = {
+		.dir_ctx.actor = ais_block_slave_count_filldir,
+		.names = NULL,
 		.count = 0,
-		.overflow = false,
+		.max_count = 0,
+		.ret = 0,
 	};
 	struct pci_dev *first_pdev = NULL;
+	struct pci_dev *pdev;
+	char (*slave_names)[BDEVNAME_SIZE] = NULL;
 	int i, ret;
 
 	/* Guard against excessive nesting*/
-	if (depth > MAX_DM_RECURSION_DEPTH) {
-		pr_warn("AIS: DM device %s: recursion depth %d exceeds limit %d\n",
-			bdev->bd_disk->disk_name, depth, MAX_DM_RECURSION_DEPTH);
+	if (depth > MAX_BLOCK_RECURSION_DEPTH) {
+		pr_warn("AIS: block device %s: recursion depth %d exceeds limit %d\n",
+			bdev->bd_disk->disk_name, depth, MAX_BLOCK_RECURSION_DEPTH);
 		return NULL;
 	}
 
+	pdev = get_pci_dev_from_bdev(bdev);
+	if (pdev)
+		return pdev;
+
 	/*
-	 * Build sysfs path: /sys/block/dm-X/slaves
+	 * Build sysfs path: /sys/block/<disk>/slaves
 	 * Note: Accessed from caller's context, so containers/chroots without
 	 * /sys or /dev mounted will fail here.
 	 */
@@ -782,7 +694,7 @@ static struct pci_dev *get_pci_dev_from_dm(struct block_device *bdev,
 		return NULL;
 	}
 
-	/* Read directory to find all slave devices */
+	/* Read directory to count slave devices */
 	ret = iterate_dir(dir, &iter_ctx.dir_ctx);
 	filp_close(dir, NULL);
 
@@ -792,18 +704,44 @@ static struct pci_dev *get_pci_dev_from_dm(struct block_device *bdev,
 		return NULL;
 	}
 
+	if (iter_ctx.ret)
+		return NULL;
+
 	if (iter_ctx.count == 0) {
 		pr_debug("AIS: no slaves found for %s\n",
 			 bdev->bd_disk->disk_name);
-		return NULL;
+		return get_pci_dev_from_bdev(bdev);
 	}
 
-	/* Reject if we couldn't enumerate all slaves */
-	if (iter_ctx.overflow) {
-		pr_err("AIS: DM device %s: cannot enumerate all slaves, rejecting\n",
-		       bdev->bd_disk->disk_name);
+	iter_ctx.max_count = min(iter_ctx.count + BLOCK_SLAVE_SPARE,
+				     MAX_BLOCK_SLAVE_NAMES);
+	slave_names = kcalloc(iter_ctx.max_count, sizeof(*slave_names), GFP_KERNEL);
+	if (!slave_names)
 		return NULL;
+
+	dir = filp_open(path, O_RDONLY | O_DIRECTORY, 0);
+	if (IS_ERR(dir)) {
+		pr_debug("AIS: cannot reopen %s\n", path);
+		goto out_free_names;
 	}
+
+	iter_ctx.dir_ctx.actor = ais_block_slave_collect_filldir;
+	iter_ctx.names = slave_names;
+	iter_ctx.count = 0;
+	iter_ctx.ret = 0;
+
+	/* Read directory again to capture slave device names */
+	ret = iterate_dir(dir, &iter_ctx.dir_ctx);
+	filp_close(dir, NULL);
+
+	if (ret < 0) {
+		pr_warn("AIS: failed to reread slaves directory for %s: %d\n",
+			bdev->bd_disk->disk_name, ret);
+		goto out_free_names;
+	}
+
+	if (iter_ctx.ret)
+		goto out_free_names;
 
 	pr_debug("AIS: found %d slave device(s) for %s\n",
 		 iter_ctx.count, bdev->bd_disk->disk_name);
@@ -812,22 +750,20 @@ static struct pci_dev *get_pci_dev_from_dm(struct block_device *bdev,
 	for (i = 0; i < iter_ctx.count; i++) {
 		struct pci_dev *pdev;
 
-		/* Pass gpu_dev and pdd through to handle nested DM devices */
-		pdev = get_pci_dev_from_dm_slave(iter_ctx.names[i], gpu_dev, pdd, depth);
+		/* Pass gpu_dev and pdd through to handle nested block devices */
+		pdev = get_pci_dev_from_block_slave(iter_ctx.names[i], gpu_dev, pdd, depth);
 		if (!pdev) {
 			pr_debug("AIS: could not find PCI device for slave %s\n",
 				 iter_ctx.names[i]);
-			if (first_pdev)
-				pci_dev_put(first_pdev);
-			return NULL;
+			goto out_put_first;
 		}
 
 		if (i == 0)
 			first_pdev = pdev;
 
 		/* If P2P checking requested, verify this slave.
-		 * Note: For nested DM devices, P2P checking already happened
-		 * recursively in get_pci_dev_from_dm_slave(). For leaf devices
+		 * Note: For nested devices, P2P checking already happened
+		 * recursively in get_pci_dev_from_block_slave(). For leaf devices
 		 * (actual NVMe/block devices), we check here.
 		 */
 		if (gpu_dev && pdd) {
@@ -838,11 +774,9 @@ static struct pci_dev *get_pci_dev_from_dm(struct block_device *bdev,
 				if (pci_p2pdma_distance(pdev, gpu_dev, false) < 0) {
 					pr_info("AIS: P2P not accessible for slave %s (%s)\n",
 						iter_ctx.names[i], pci_name(pdev));
-					/* Release refs before failing */
-					pci_dev_put(first_pdev);
 					if (i > 0)
 						pci_dev_put(pdev);
-					return NULL;
+					goto out_put_first;
 				}
 
 				kfd_ais_create_counter(pdev, pdd);
@@ -856,9 +790,16 @@ static struct pci_dev *get_pci_dev_from_dm(struct block_device *bdev,
 			pci_dev_put(pdev);
 	}
 
+	kfree(slave_names);
 	return first_pdev;
+
+out_put_first:
+	if (first_pdev)
+		pci_dev_put(first_pdev);
+out_free_names:
+	kfree(slave_names);
+	return NULL;
 }
-#endif /* CONFIG_BLK_DEV_DM */
 
 /*
  * kfd_ais_get_storage_type - Determine the storage type for a file
@@ -1344,11 +1285,10 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 
 	switch (storage_type) {
 	case AIS_STORAGE_BLOCK:
-#if IS_ENABLED(CONFIG_BLK_DEV_DM)
 	{
 		struct block_device *bdev;
 
-		/* Get the block device */
+		/* Get the block device for stack traversal */
 		if (S_ISBLK(file_inode(filep)->i_mode)) {
 			bdev = I_BDEV(filep->f_mapping->host);
 		} else if (filep->f_path.mnt && filep->f_path.mnt->mnt_sb &&
@@ -1360,21 +1300,13 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 			goto out;
 		}
 
-		/* For device-mapper, verify P2P for all slave devices */
-		if (ais_is_dm_device(bdev)) {
-			pdev = get_pci_dev_from_dm(bdev, adev->dev, pdd, 0);
-			if (!pdev) {
-				ret = -ENODEV;
-				goto out;
-			}
-			/* get_pci_dev_from_dm() already holds reference */
-			break;
+		pdev = get_pci_dev_from_block_stack(bdev, adev->dev, pdd, 0);
+		if (!pdev) {
+			ret = -ENODEV;
+			goto out;
 		}
-	}
-#endif
-		/* For regular block devices */
-		pdev = get_pci_dev_from_file(filep);
 		break;
+	}
 #if IS_ENABLED(CONFIG_NFS_FS)
 	case AIS_STORAGE_NETWORK:
 		/*
@@ -1412,7 +1344,7 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	/* Check if P2P already validated; on miss, check and create entry */
 	if (!kfd_ais_check_p2p_cached(pdd, pdev)) {
 		/* For network storage, P2P was already verified for all transports.
-		 * For DM/LVM, P2P was already verified in the switch case above.
+		 * For block stacks, P2P was already verified in the switch case above.
 		 */
 		if (storage_type != AIS_STORAGE_NETWORK) {
 			if (pci_p2pdma_distance(pdev, adev->dev, false) < 0) {
@@ -1502,7 +1434,7 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		 * so attributing all bytes to the primary NIC (cl_addr)
 		 * would make the per-NIC sysfs counters incorrect.
 		 *
-		 * For multi-device LVM, bytes are attributed to first_pdev only.
+		 * For stacked block devices, bytes are attributed to first_pdev only.
 		 * This is imprecise, future work could be to improve this.
 		 */
 		if (pdev && storage_type != AIS_STORAGE_NETWORK)
