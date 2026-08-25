@@ -971,8 +971,9 @@ void amdgpu_ttm_tt_mark_user_pages(struct ttm_tt *ttm)
 		if (!page)
 			continue;
 
+		/* The caller does not hold the page lock. */
 		if (!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY))
-			set_page_dirty(page);
+			set_page_dirty_lock(page);
 
 		mark_page_accessed(page);
 	}
