@@ -33,6 +33,7 @@
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <kcl/kcl_rbtree.h>
+#include <kcl/kcl_stddef.h>
 #include "amdgpu.h"
 
 #ifndef HAVE_DRM_FB_HELPER_LASTCLOSE
