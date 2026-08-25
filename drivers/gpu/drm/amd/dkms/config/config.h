@@ -52,6 +52,9 @@
 /* amd_iommu_pc_supported() is available */
 /* #undef HAVE_AMD_IOMMU_PC_SUPPORTED */
 
+/* anon_inode_create_getfile() is exported */
+#define HAVE_ANON_INODE_CREATE_GETFILE 1
+
 /* aperture_remove_conflicting_pci_device() is available */
 #define HAVE_APERTURE_REMOVE_CONFLICTING_PCI_DEVICES 1
 

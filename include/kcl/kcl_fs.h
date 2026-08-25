@@ -3,7 +3,28 @@
 #define AMDKCL_FS_H
 
 #include <linux/fs.h>
+#include <linux/anon_inodes.h>
+#include <linux/printk.h>
 #include <asm/compat.h>
+
+/*
+ * The fallback returns a file on the global anon inode: @context_inode is
+ * ignored and the address_space is shared with every other anon fd. Callers
+ * must never touch file->f_mapping - a range zap there would hit unrelated
+ * mappings in other processes. amdkfd dispatch-log streams map via
+ * remap_pfn_range() and never do.
+ */
+#ifndef HAVE_ANON_INODE_CREATE_GETFILE
+static inline struct file *kcl_anon_inode_create_getfile(const char *name,
+		const struct file_operations *fops, void *priv, int flags,
+		const struct inode *context_inode)
+{
+	pr_warn_once("amdkcl: anon_inode_create_getfile() is missing, falling back to anon_inode_getfile()\n");
+
+	return anon_inode_getfile(name, fops, priv, flags);
+}
+#define anon_inode_create_getfile kcl_anon_inode_create_getfile
+#endif
 
 /* Copied from v5.4-rc2-1-g2952db0fd51b linux/fs.h */
 #ifndef HAVE_COMPAT_PTR_IOCTL
