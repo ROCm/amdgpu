@@ -1291,6 +1291,9 @@
 /* struct dma_fence_chain is available */
 #define HAVE_STRUCT_DMA_FENCE_CHAIN 1
 
+/* struct dmem_cgroup_init is available */
+#define HAVE_STRUCT_DMEM_CGROUP_INIT 1
+
 /* struct drm_atomic_state has been renamed to struct drm_atomic_commit */
 #define HAVE_STRUCT_DRM_ATOMIC_COMMIT 1
 
