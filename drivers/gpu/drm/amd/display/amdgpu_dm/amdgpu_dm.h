@@ -828,7 +828,11 @@ struct amdgpu_dm_connector {
 
 	/* we need to mind the EDID between detect
 	   and get modes due to analog/digital/tvencoder */
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	const struct drm_edid *drm_edid;
+#else
+	struct edid *edid;
+#endif
 
 	/* shared with amdgpu */
 	struct amdgpu_hpd hpd;

@@ -141,7 +141,9 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev);
 /* removes and deallocates the drm structures, created by the above function */
 static void amdgpu_dm_destroy_drm_device(struct amdgpu_display_manager *dm);
 
+#ifdef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT
 static int amdgpu_dm_atomic_setup_commit(struct drm_atomic_commit *state);
+#endif
 static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_commit *state);
 STATIC_IFN_KUNIT void dm_enable_per_frame_crtc_master_sync(struct dc_state *context);
 
@@ -3336,6 +3338,7 @@ ffu:
 			   &flip_addrs->dirty_rect_count, true);
 }
 
+#if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_commit *state,
 					    struct dc_state *dc_state,
 					    struct dsc_mst_fairness_vars *vars)
@@ -3420,6 +3423,7 @@ static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_commit *state,
 	}
 	return 0;
 }
+#endif
 
 static void manage_dm_interrupts(struct amdgpu_device *adev,
 				 struct amdgpu_crtc *acrtc,
@@ -5000,6 +5004,7 @@ static void amdgpu_dm_update_hdcp(struct drm_atomic_commit *state)
 	}
 }
 
+#ifdef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT
 static int amdgpu_dm_atomic_setup_commit(struct drm_atomic_commit *state)
 {
 	struct drm_crtc *crtc;
@@ -5032,6 +5037,7 @@ static int amdgpu_dm_atomic_setup_commit(struct drm_atomic_commit *state)
 
 	return 0;
 }
+#endif
 
 STATIC_IFN_KUNIT void set_multisync_trigger_params(
 		struct dc_stream_state *stream)
@@ -5173,10 +5179,12 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_commit *state)
 		scaling_changed = is_scaling_state_different(dm_new_con_state,
 							     dm_old_con_state);
 
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDMI_BROADCAST_RGB
 		if ((new_con_state->hdmi.broadcast_rgb != old_con_state->hdmi.broadcast_rgb) &&
 			(dm_old_crtc_state->stream->output_color_space !=
 				amdgpu_dm_get_output_color_space(&dm_new_crtc_state->stream->timing, new_con_state)))
 			output_color_space_changed = true;
+#endif
 
 		abm_changed = dm_new_crtc_state->abm_level !=
 			      dm_old_crtc_state->abm_level;
@@ -5254,8 +5262,9 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_commit *state)
 					    &stream_update);
 		mutex_unlock(&dm->dc_lock);
 		kfree(dummy_updates);
-
+#ifdef HAVE_DRM_CONNECTOR_UPDATE_PRIVACY_SCREEN
 		drm_connector_update_privacy_screen(new_con_state);
+#endif
 	}
 
 	/**
@@ -6585,7 +6594,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		struct drm_connector_list_iter iter;
 		u8 link_coding_cap;
 
-#ifndef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+#if !defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_INT) && !defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION)
 		 if (!mgr->mst_state )
                         continue;
 #endif
