@@ -145,6 +145,29 @@ enum drm_output_color_format {
 };
 #endif
 
+#ifndef HAVE_DRM_CONNECTOR_COLOR_FORMAT
+enum drm_connector_color_format {
+	DRM_CONNECTOR_COLOR_FORMAT_AUTO = 0,
+	DRM_CONNECTOR_COLOR_FORMAT_RGB444,
+	DRM_CONNECTOR_COLOR_FORMAT_YCBCR444,
+	DRM_CONNECTOR_COLOR_FORMAT_YCBCR422,
+	DRM_CONNECTOR_COLOR_FORMAT_YCBCR420,
+};
+
+static inline int
+drm_connector_attach_color_format_property(struct drm_connector *connector,
+					   u32 supported_color_formats)
+{
+	return 0;
+}
+
+/* No color format property: always behave as DRM_CONNECTOR_COLOR_FORMAT_AUTO */
+#define amdkcl_connector_state_color_format(state) \
+	((void)(state), DRM_CONNECTOR_COLOR_FORMAT_AUTO)
+#else
+#define amdkcl_connector_state_color_format(state) ((state)->color_format)
+#endif
+
 /* For Default case, driver will set the colorspace */
 #ifndef DRM_MODE_COLORIMETRY_DEFAULT
 /* For Default case, driver will set the colorspace */

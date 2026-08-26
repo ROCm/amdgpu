@@ -2298,10 +2298,10 @@ dm_validate_stream_color_format(const struct drm_connector_state *drm_state,
 {
 	enum dc_pixel_encoding encoding;
 
-	if (!drm_state->color_format)
+	if (!amdkcl_connector_state_color_format(drm_state))
 		return DC_OK;
 
-	switch (drm_state->color_format) {
+	switch (amdkcl_connector_state_color_format(drm_state)) {
 	case DRM_CONNECTOR_COLOR_FORMAT_AUTO:
 	case DRM_CONNECTOR_COLOR_FORMAT_RGB444:
 		encoding = PIXEL_ENCODING_RGB;
@@ -2408,12 +2408,12 @@ amdgpu_dm_create_validate_stream_for_sink(struct drm_connector *connector,
 	 *    the sink's advertised caps.
 	 */
 	want_420 = (aconnector->force_yuv_pixel_format == PIXEL_ENCODING_YCBCR420) ||
-		(drm_state && drm_state->color_format == DRM_CONNECTOR_COLOR_FORMAT_YCBCR420);
+		(drm_state && amdkcl_connector_state_color_format(drm_state) == DRM_CONNECTOR_COLOR_FORMAT_YCBCR420);
 	want_422 = (aconnector->force_yuv_pixel_format == PIXEL_ENCODING_YCBCR422) ||
-		(drm_state && drm_state->color_format == DRM_CONNECTOR_COLOR_FORMAT_YCBCR422);
+		(drm_state && amdkcl_connector_state_color_format(drm_state) == DRM_CONNECTOR_COLOR_FORMAT_YCBCR422);
 
 	if (drm_mode_is_420_only(info, drm_mode) &&
-	    (want_420 || (drm_state && drm_state->color_format == DRM_CONNECTOR_COLOR_FORMAT_AUTO))) {
+	    (want_420 || (drm_state && amdkcl_connector_state_color_format(drm_state) == DRM_CONNECTOR_COLOR_FORMAT_AUTO))) {
 		encoding_mask = BIT(PIXEL_ENCODING_YCBCR420);
 	} else if (drm_mode_is_420_also(info, drm_mode) && want_420) {
 		encoding_mask = BIT(PIXEL_ENCODING_YCBCR420);
@@ -2421,11 +2421,11 @@ amdgpu_dm_create_validate_stream_for_sink(struct drm_connector *connector,
 		   want_422 && is_dp_or_hdmi) {
 		encoding_mask = BIT(PIXEL_ENCODING_YCBCR422);
 	} else if (((aconnector->force_yuv_pixel_format == PIXEL_ENCODING_YCBCR444) ||
-		    (drm_state && drm_state->color_format == DRM_CONNECTOR_COLOR_FORMAT_YCBCR444)) &&
+		    (drm_state && amdkcl_connector_state_color_format(drm_state) == DRM_CONNECTOR_COLOR_FORMAT_YCBCR444)) &&
 		   (info->color_formats & BIT(DRM_OUTPUT_COLOR_FORMAT_YCBCR444)) &&
 		   is_dp_or_hdmi) {
 		encoding_mask = BIT(PIXEL_ENCODING_YCBCR444);
-	} else if (drm_state && drm_state->color_format == DRM_CONNECTOR_COLOR_FORMAT_RGB444) {
+	} else if (drm_state && amdkcl_connector_state_color_format(drm_state) == DRM_CONNECTOR_COLOR_FORMAT_RGB444) {
 		encoding_mask = BIT(PIXEL_ENCODING_RGB);
 	} else {
 		encoding_mask = BIT(PIXEL_ENCODING_RGB);

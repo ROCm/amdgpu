@@ -294,6 +294,9 @@
 /* drm_connector_attach_hdr_output_metadata_property() is available */
 #define HAVE_DRM_CONNECTOR_ATTACH_HDR_OUTPUT_METADATA_PROPERTY 1
 
+/* drm_connector_state->color_format is available */
+#define HAVE_DRM_CONNECTOR_COLOR_FORMAT 1
+
 /* drm_connector_dynamic_init is available */
 #define HAVE_DRM_CONNECTOR_DYNAMIC_INIT 1
 
