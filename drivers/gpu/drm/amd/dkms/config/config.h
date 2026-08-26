@@ -190,6 +190,9 @@
 /* dma_fence_describe() is available */
 #define HAVE_DMA_FENCE_DESCRIBE 1
 
+/* dma_fence_enable_signaling() is available */
+#define HAVE_DMA_FENCE_ENABLE_SIGNALING 1
+
 /* dma_fence_init64() is available */
 #define HAVE_DMA_FENCE_INIT64 1
 

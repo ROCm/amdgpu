@@ -57,4 +57,8 @@ static inline bool __dma_fence_is_later(u64 f1, u64 f2,
 void dma_fence_describe(struct dma_fence *fence, struct seq_file *seq);
 #endif
 
+#if !defined(HAVE_DMA_FENCE_ENABLE_SIGNALING)
+#define dma_fence_enable_signaling(f) dma_fence_enable_sw_signaling(f)
+#endif
+
 #endif /* AMDKCL_FENCE_H */
