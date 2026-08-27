@@ -3198,7 +3198,7 @@ static void amdgpu_debugfs_vm_bo_status_info(struct seq_file *m,
 
 	id = 0;
 	seq_puts(m, "\tIdle BOs:\n");
-	list_for_each_entry(base, &lists->moved, vm_status) {
+	list_for_each_entry(base, &lists->idle, vm_status) {
 		if (!base->bo)
 			continue;
 
