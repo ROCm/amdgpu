@@ -866,8 +866,7 @@ int kfd_dispatch_log_target_check_auth(struct kfd_process *target, u32 gpu_id,
 		put_user_ns(tcred_ns);
 		return -ESRCH;
 	}
-	if (get_dumpable(mm) != SUID_DUMP_USER &&
-	    !ns_capable(mm->user_ns, CAP_SYS_PTRACE)) {
+	if (kcl_task_ptrace_dumpable_denied(lead, mm)) {
 		mmput(mm);
 		goto deny;
 	}

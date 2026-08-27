@@ -1380,6 +1380,9 @@
 /* system_percpu_wq is available */
 #define HAVE_SYSTEM_PERCPU_WQ 1
 
+/* struct task_exec_state (per-task dumpability) is available */
+#define HAVE_TASK_EXEC_STATE_DUMPABLE 1
+
 /* timer_delete() is available */
 #define HAVE_TIMER_DELETE 1
 
