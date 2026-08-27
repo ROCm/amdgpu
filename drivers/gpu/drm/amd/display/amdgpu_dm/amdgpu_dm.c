@@ -714,6 +714,8 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	/* TODO: Remove after DP2 receiver gets proper support of Cable ID feature */
 	adev->dm.dc->debug.ignore_cable_id = true;
 
+	/* temporary enable immediate restore for FAMS2 */
+	adev->dm.dc->debug.fams2_imm_restore_drr = true;
 #ifndef HAVE_DRM_DP_REMOVE_RAYLOAD_PART
 	/* TODO: There is a new drm mst change where the freedom of
 	 * vc_next_start_slot update is revoked/moved into drm, instead of in
