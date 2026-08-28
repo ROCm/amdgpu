@@ -4073,7 +4073,7 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 
 	if (!adev->dm.freesync_module || !dc_supports_vrr(sink->ctx->dce_version))
 		goto update;
-#ifdef HAVE_DRM_HDMI_INFO_VRR_CAP
+#if defined(HAVE_DRM_HDMI_INFO_VRR_CAP) && defined(HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE)
 	drm_dbg_driver(adev_to_drm(adev),
 		       "VRR: enter signal=%d hdmi_vrr=%d mrange[%d-%d] hdmi.vrr_cap[sup=%d min=%d max=%d]\n",
 		       sink->sink_signal, connector->display_info.hdmi.vrr_cap.supported,
@@ -4147,6 +4147,7 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 			       vsdb_info.min_refresh_rate_hz,
 			       vsdb_info.max_refresh_rate_hz, freesync_capable);
 
+#if defined(HAVE_DRM_HDMI_INFO_VRR_CAP) && defined(HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE)
 		/*
 		 * If AMD VSDB didn't provide a valid FreeSync range, fall back to
 		 * the HDMI 2.1 VRR capability parsed from the HF-VSDB.
@@ -4193,6 +4194,7 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 					amdgpu_dm_connector->max_vfreq;
 			}
 		}
+#endif
 	}
 
 	if (amdgpu_dm_connector->dc_link)
