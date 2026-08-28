@@ -252,6 +252,7 @@ void amdgpu_dm_update_freesync_state_on_stream(
 	new_stream->vrr_infopacket = vrr_infopacket;
 	new_stream->allow_freesync = mod_freesync_get_freesync_enabled(&vrr_params);
 
+#ifdef HAVE_DRM_HDMI_INFO_ALLM
 	/*
 	 * HDMI ALLM: when Gaming-VRR is active (VRR_EN=1) and the sink
 	 * advertises ALLM in the SCDS, the Source shall transmit the HF-VSIF
@@ -280,6 +281,7 @@ void amdgpu_dm_update_freesync_state_on_stream(
 				    sink_allm,
 				    vrr_params.state, allm);
 	}
+#endif
 
 	if (new_crtc_state->freesync_vrr_info_changed)
 		drm_dbg_kms(adev_to_drm(adev), "VRR packet update: crtc=%u enabled=%d state=%d",
