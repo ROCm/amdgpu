@@ -76,7 +76,7 @@ static int reset_queues_on_hws_hang(struct device_queue_manager *dqm, bool is_sd
 static struct queue *find_queue_by_doorbell_offset(struct device_queue_manager *dqm,
 						   u32 doorbell_offset);
 static void set_queue_as_reset(struct device_queue_manager *dqm, struct queue *q,
-			       struct qcm_process_device *qpd);
+			       struct qcm_process_device *qpd, bool verbose);
 static int reset_queues_mes(struct device_queue_manager *dqm, struct queue *q);
 
 static inline
@@ -436,7 +436,7 @@ static int reset_queue_mes(struct device_queue_manager *dqm, struct queue *q,
 		return r;
 	/* Proceed remove_queue with reset=true */
 	remove_queue_mes_on_reset_option(dqm, q, &pdd->qpd, true, true);
-	set_queue_as_reset(dqm, q, &pdd->qpd);
+	set_queue_as_reset(dqm, q, &pdd->qpd, true);
 	return 0;
 }
 
@@ -2523,12 +2523,14 @@ static int map_queues_cpsch(struct device_queue_manager *dqm)
 }
 
 static void set_queue_as_reset(struct device_queue_manager *dqm, struct queue *q,
-			       struct qcm_process_device *qpd)
+			       struct qcm_process_device *qpd, bool verbose)
 {
 	struct kfd_process_device *pdd = qpd_to_pdd(qpd);
 
-	dev_err(dqm->dev->adev->dev, "queue id 0x%0x at pasid %d is reset\n",
-		q->properties.queue_id, pdd->process->lead_thread->pid);
+	if (verbose)
+		dev_err(dqm->dev->adev->dev,
+			"queue id 0x%0x at pasid %d is reset\n",
+			q->properties.queue_id, pdd->process->lead_thread->pid);
 
 	pdd->has_reset_queue = true;
 	q->properties.is_reset = true;
@@ -2536,6 +2538,26 @@ static void set_queue_as_reset(struct device_queue_manager *dqm, struct queue *q
 		q->properties.is_active = false;
 		decrement_queue_count(dqm, qpd, q);
 	}
+}
+
+void kfd_dqm_set_queues_as_reset(struct device_queue_manager *dqm)
+{
+	struct device_process_node *cur;
+	struct qcm_process_device *qpd;
+	struct queue *q;
+
+	dqm_lock(dqm);
+	if (dqm->processes_count)
+		dev_warn(dqm->dev->adev->dev,
+			 "GPU reset: queues of %d process(es) are no longer usable\n",
+			 dqm->processes_count);
+
+	list_for_each_entry(cur, &dqm->queues, list) {
+		qpd = cur->qpd;
+		list_for_each_entry(q, &qpd->queues_list, list)
+			set_queue_as_reset(dqm, q, qpd, false);
+	}
+	dqm_unlock(dqm);
 }
 
 static int detect_queue_hang(struct device_queue_manager *dqm)
@@ -2653,7 +2675,7 @@ static int reset_hung_queues(struct device_queue_manager *dqm)
 			goto reset_fail;
 		}
 
-		set_queue_as_reset(dqm, q, &pdd->qpd);
+		set_queue_as_reset(dqm, q, &pdd->qpd, true);
 		reset_count++;
 	}
 
@@ -2700,7 +2722,7 @@ static bool set_sdma_queue_as_reset(struct device_queue_manager *dqm,
 			if ((q->properties.type == KFD_QUEUE_TYPE_SDMA ||
 			     q->properties.type == KFD_QUEUE_TYPE_SDMA_XGMI) &&
 			     q->properties.doorbell_off == doorbell_off) {
-				set_queue_as_reset(dqm, q, qpd);
+				set_queue_as_reset(dqm, q, qpd, true);
 				return true;
 			}
 		}
