@@ -4073,7 +4073,7 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 
 	if (!adev->dm.freesync_module || !dc_supports_vrr(sink->ctx->dce_version))
 		goto update;
-
+#ifdef HAVE_DRM_HDMI_INFO_VRR_CAP
 	drm_dbg_driver(adev_to_drm(adev),
 		       "VRR: enter signal=%d hdmi_vrr=%d mrange[%d-%d] hdmi.vrr_cap[sup=%d min=%d max=%d]\n",
 		       sink->sink_signal, connector->display_info.hdmi.vrr_cap.supported,
@@ -4082,6 +4082,7 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 		       connector->display_info.hdmi.vrr_cap.supported,
 		       connector->display_info.hdmi.vrr_cap.vrr_min,
 		       connector->display_info.hdmi.vrr_cap.vrr_max);
+#endif
 #ifdef HAVE_DRM_DP_MST_EDID_READ
 	/* FIXME: Get rid of drm_edid_raw() */
 	edid = drm_edid_raw(drm_edid);

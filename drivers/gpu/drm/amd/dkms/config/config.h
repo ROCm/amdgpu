@@ -751,6 +751,9 @@
 /* drm_hdmi_info has max_lanes/max_frl_rate_per_lane/dsc_cap */
 #define HAVE_DRM_HDMI_INFO_MAX_LANES 1
 
+/* drm_hdmi_info has vrr_cap */
+#define HAVE_DRM_HDMI_INFO_VRR_CAP 1
+
 /* drm_helper_force_disable_all() is available */
 #define HAVE_DRM_HELPER_FORCE_DISABLE_ALL 1
 
