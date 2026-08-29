@@ -4304,3 +4304,4 @@ update:
 		drm_connector_set_vrr_capable_property(connector,
 						       freesync_capable);
 }
+EXPORT_IF_KUNIT(amdgpu_dm_update_freesync_caps);
