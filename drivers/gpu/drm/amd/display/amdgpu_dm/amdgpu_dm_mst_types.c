@@ -1776,7 +1776,7 @@ static int compute_mst_dsc_configs_for_link(struct drm_atomic_commit *state,
 	return 0;
 }
 
-static bool is_dsc_need_re_compute(
+STATIC_IFN_KUNIT bool is_dsc_need_re_compute(
 	struct drm_atomic_commit *state,
 	struct dc_state *dc_state,
 	struct dc_link *dc_link)
@@ -1907,6 +1907,7 @@ out:
 
 	return is_dsc_need_re_compute;
 }
+EXPORT_IF_KUNIT(is_dsc_need_re_compute);
 
 int compute_mst_dsc_configs_for_state(struct drm_atomic_commit *state,
 				      struct dc_state *dc_state,
