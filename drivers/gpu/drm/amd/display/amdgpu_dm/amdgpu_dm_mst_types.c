@@ -1978,6 +1978,7 @@ int compute_mst_dsc_configs_for_state(struct drm_atomic_commit *state,
 
 	return ret;
 }
+EXPORT_IF_KUNIT(compute_mst_dsc_configs_for_state);
 
 static int pre_compute_mst_dsc_configs_for_state(struct drm_atomic_commit *state,
 						 struct dc_state *dc_state,
@@ -2196,6 +2197,7 @@ clean_exit:
 
 	return ret;
 }
+EXPORT_IF_KUNIT(pre_validate_dsc);
 
 static uint32_t kbps_from_pbn(unsigned int pbn)
 {
