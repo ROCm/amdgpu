@@ -319,7 +319,7 @@ bool needs_dsc_aux_workaround(struct dc_link *link)
 }
 EXPORT_IF_KUNIT(needs_dsc_aux_workaround);
 
-#if defined(CONFIG_DRM_AMD_DC_FP)
+#if defined(CONFIG_DRM_AMD_DC_FP) || IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 static bool is_synaptics_cascaded_panamera(struct dc_link *link, struct drm_dp_mst_port *port)
 {
 	u8 branch_vendor_data[4] = { 0 }; // Vendor data 0x50C ~ 0x50F
@@ -583,8 +583,8 @@ STATIC_IFN_KUNIT int dm_dp_mst_get_modes(struct drm_connector *connector)
 #endif
 
 #if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
-#if defined(CONFIG_DRM_AMD_DC_FP)
-		if (!validate_dsc_caps_on_connector(aconnector))
+#if defined(CONFIG_DRM_AMD_DC_FP) || IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
+		if (IS_ENABLED(CONFIG_DRM_AMD_DC_FP) && !validate_dsc_caps_on_connector(aconnector))
 			memset(&aconnector->dc_sink->dsc_caps,
 			       0, sizeof(aconnector->dc_sink->dsc_caps));
 #endif
@@ -1161,7 +1161,7 @@ struct dsc_mst_fairness_params {
 };
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_FP)
+#if defined(CONFIG_DRM_AMD_DC_FP) || IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 static uint16_t get_fec_overhead_multiplier(struct dc_link *dc_link)
 {
 	u8 link_coding_cap;
@@ -2220,7 +2220,7 @@ static bool is_dsc_common_config_possible(struct dc_stream_state *stream,
 #endif
 #endif /* HAVE_DRM_DP_MST_ATOMIC_CHECK */
 
-#if defined(CONFIG_DRM_AMD_DC_FP)
+#if defined(CONFIG_DRM_AMD_DC_FP) || IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 static bool dp_get_link_current_set_bw(struct drm_dp_aux *aux, uint32_t *cur_link_bw)
 {
 	uint32_t total_data_bw_efficiency_x10000 = 0;
@@ -2286,7 +2286,7 @@ enum dc_status dm_dp_mst_is_port_support_mode(
 	struct amdgpu_dm_connector *aconnector,
 	struct dc_stream_state *stream)
 {
-#if defined(CONFIG_DRM_AMD_DC_FP)
+#if defined(CONFIG_DRM_AMD_DC_FP) || IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 	int branch_max_throughput_mps = 0;
 #if defined(HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX) && defined(HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP)
 	struct dc_link_settings cur_link_settings;
