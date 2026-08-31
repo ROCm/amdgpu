@@ -239,9 +239,9 @@ void amdgpu_dm_update_freesync_state_on_stream(
 		pack_sdp_v1_3);
 
 	/* Per HDMI 2.1, VTEM is valid on TMDS as well as FRL */
-	if (new_stream->sink->sink_signal == SIGNAL_TYPE_HDMI_FRL
+	if (new_stream->signal == SIGNAL_TYPE_HDMI_FRL
 #ifdef HAVE_DRM_HDMI_INFO_VRR_CAP
-	    || (new_stream->sink->sink_signal == SIGNAL_TYPE_HDMI_TYPE_A &&
+	    || (new_stream->signal == SIGNAL_TYPE_HDMI_TYPE_A &&
 		aconn && aconn->base.display_info.hdmi.vrr_cap.supported)
 #endif
 	   )
