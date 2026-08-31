@@ -956,6 +956,9 @@ u32 amdgpu_device_get_rev_id(struct amdgpu_device *adev)
 
 static uint32_t amdgpu_device_get_vbios_flags(struct amdgpu_device *adev)
 {
+	if (amdgpu_virt_vram_is_spm(adev))
+		return AMDGPU_VBIOS_OPTIONAL;
+
 	if (hweight32(adev->aid_mask) && (adev->flags & AMD_IS_APU))
 		return AMDGPU_VBIOS_SKIP;
 
