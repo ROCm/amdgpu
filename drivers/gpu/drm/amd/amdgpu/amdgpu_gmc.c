@@ -122,6 +122,11 @@ void amdgpu_gmc_get_pde_for_bo(struct amdgpu_bo *bo, int level,
 		break;
 	case TTM_PL_VRAM:
 		*addr = amdgpu_bo_gpu_offset(bo);
+		/* For SPM-backed VRAM, convert the MC address to a physical
+		 * address for system memory path access.
+		 */
+		if (amdgpu_virt_vram_is_spm(adev))
+			*addr = amdgpu_gmc_vram_mc2pa(adev, *addr);
 		break;
 	default:
 		*addr = 0;
@@ -1281,6 +1286,8 @@ void amdgpu_gmc_init_pdb0(struct amdgpu_device *adev)
 	flags |= AMDGPU_PTE_VALID | AMDGPU_PTE_READABLE;
 	flags |= AMDGPU_PTE_WRITEABLE;
 	flags |= AMDGPU_PTE_SNOOPED;
+	if (amdgpu_virt_vram_is_spm(adev))
+		flags |= AMDGPU_PTE_SYSTEM;
 	flags |= AMDGPU_PTE_FRAG((adev->gmc.vmid0_page_table_block_size + 9*1));
 	flags |= AMDGPU_PDE_PTE_FLAG(adev);
 
@@ -1300,6 +1307,8 @@ void amdgpu_gmc_init_pdb0(struct amdgpu_device *adev)
 	 * pointing to a 4K system page
 	 */
 	flags = AMDGPU_PTE_VALID;
+	if (amdgpu_virt_vram_is_spm(adev))
+		flags |= AMDGPU_PTE_SYSTEM;
 	flags |= AMDGPU_PTE_SNOOPED | AMDGPU_PDE_BFS_FLAG(adev, 0);
 	/* Requires gart_ptb_gpu_pa to be 4K aligned */
 	amdgpu_gmc_set_pte_pde(adev, adev->gmc.ptr_pdb0, i, gart_ptb_gpu_pa, flags);
