@@ -706,6 +706,9 @@
 /* drm_gem_is_imported() is available */
 #define HAVE_DRM_GEM_IS_IMPORTED 1
 
+/* drm_gem_object_funcs.handle_free is available */
+#define HAVE_DRM_GEM_OBJECT_FUNCS_HANDLE_FREE 1
+
 /* drm_gem_object_funcs->vmap() has 2 args */
 #define HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_2ARGS 1
 

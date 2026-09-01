@@ -352,6 +352,26 @@ static void amdgpu_gem_object_close(struct drm_gem_object *obj,
 	struct drm_exec exec;
 	long r;
 
+#ifndef HAVE_STRUCT_DRM_GEM_OBJECT_FUNCS_HANDLE_FREE
+	unsigned handle_count;
+
+	/* FIXME: This is racy. Looking at the obj->handle_count here is
+	 * no guarantee, that the handle will be freed. Another thread may
+	 * come along and increment the count before this thread will
+	 * decrement it in drm_gem_object_handle_put_unlocked. This may result
+	 * in freeing UALink exports prematurely.
+	 *
+	 * The proper upstream solution will provide a callback in
+	 * drm_gem_object_handle_put_unlocked itself when the count actually
+	 * reaches 0.
+	 */
+	mutex_lock(&obj->dev->object_name_lock);
+	handle_count = obj->handle_count;
+	mutex_unlock(&obj->dev->object_name_lock);
+	if (handle_count == 1)
+		amdgpu_ualink_revoke_exported_memory(bo);
+
+#endif
 	drm_exec_init(&exec, DRM_EXEC_IGNORE_DUPLICATES, 0);
 	drm_exec_until_all_locked(&exec) {
 		r = drm_exec_prepare_obj(&exec, &bo->tbo.base, 1);
@@ -416,13 +436,14 @@ static int amdgpu_gem_object_mmap(struct drm_gem_object *obj, struct vm_area_str
 }
 #endif
 
+#ifdef HAVE_DRM_GEM_OBJECT_FUNCS_HANDLE_FREE
 static void amdgpu_gem_object_handle_free(struct drm_gem_object *gobj)
 {
 	struct amdgpu_bo *aobj = gem_to_amdgpu_bo(gobj);
 
 	amdgpu_ualink_revoke_exported_memory(aobj);
-
 }
+#endif
 
 #ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
@@ -442,7 +463,9 @@ const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
 #endif
 	.mmap = amdgpu_gem_object_mmap,
 	.vm_ops = &amdgpu_gem_vm_ops,
+#ifdef HAVE_DRM_GEM_OBJECT_FUNCS_HANDLE_FREE
 	.handle_free = amdgpu_gem_object_handle_free
+#endif
 };
 #endif
 
