@@ -24,16 +24,62 @@
 #
 # Makefile for dml2_wrapper.
 
+# Must be evaluated before any include, otherwise MAKEFILE_LIST no longer ends
+# with this file.
+THIS_MAKEFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
+
+ifdef CONFIG_ARCH_HAS_KERNEL_FPU_SUPPORT
 dml2_wrapper_ccflags := $(CC_FLAGS_FPU)
 dml2_wrapper_rcflags := $(CC_FLAGS_NO_FPU)
+else
+ifdef CONFIG_X86
+dml2_wrapper_ccflags-$(CONFIG_CC_IS_GCC) := -mhard-float
+dml2_wrapper_ccflags := $(dml2_wrapper_ccflags-y) -msse
+endif
+
+ifdef CONFIG_PPC64
+dml2_wrapper_ccflags := -mhard-float -maltivec
+endif
+
+ifdef CONFIG_ARM64
+dml2_wrapper_rcflags := -mgeneral-regs-only
+endif
+
+ifdef CONFIG_LOONGARCH
+dml2_wrapper_ccflags := -mfpu=64
+dml2_wrapper_rcflags := -msoft-float
+endif
+
+include  $(src)/../dkms/Makefile.compiler
+
+ifdef CONFIG_CC_IS_GCC
+ifneq ($(call gcc-min-version, 70100),y)
+IS_OLD_GCC = 1
+endif
+endif
+
+ifdef CONFIG_X86
+ifdef IS_OLD_GCC
+# Stack alignment mismatch, proceed with caution.
+# GCC < 7.1 cannot compile code using `double` and -mpreferred-stack-boundary=3
+# (8B stack alignment).
+dml2_wrapper_ccflags += -mpreferred-stack-boundary=4
+else
+dml2_wrapper_ccflags += -msse2
+endif
+endif
+
+endif #CONFIG_ARCH_HAS_KERNEL_FPU_SUPPORT
 
 subdir-ccflags-y += -I$(FULL_AMD_DISPLAY_PATH)/dc/dml2_wrapper
 subdir-ccflags-y += -I$(FULL_AMD_DISPLAY_PATH)/dc/dml2_wrapper/dml21_wrapper
 
 # Add FPU flags to all dml2_wrapper files by default, remove NO_FPU flags.
 # FPU flags step 1: Find all .c files in dal/dc/dml2_wrapper and it's subfolders
-DML2_WRAPPER_ABS_PATH := $(FULL_AMD_DISPLAY_PATH)/dc/dml2_wrapper
-DML2_WRAPPER_C_FILES := $(shell find $(DML2_WRAPPER_ABS_PATH) -name '*.c' -type f)
+DML2_WRAPPER_ABS_PATH := $(patsubst %/,%,$(dir $(THIS_MAKEFILE_PATH)))
+
+rwildcard = $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$(2)) $(filter $(subst *,%,$(2)),$d))
+DML2_WRAPPER_C_FILES := $(call rwildcard,$(DML2_WRAPPER_ABS_PATH)/,*.c)
 
 # FPU flags step 2: Convert to .o and make paths relative to $(AMDDALPATH)/dc/dml2_wrapper/
 DML2_WRAPPER_RELATIVE_O_FILES := $(patsubst $(DML2_WRAPPER_ABS_PATH)/%,dc/dml2_wrapper/%,$(patsubst %.c,%.o,$(DML2_WRAPPER_C_FILES)))
