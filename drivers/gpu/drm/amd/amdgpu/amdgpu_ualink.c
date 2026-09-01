@@ -5703,15 +5703,16 @@ static void amdgpu_ualink_get_wb_addr(struct amdgpu_device *adev,
 	struct amdgpu_ualink_remote *remote = to_remote(adev);
 	u32 accel_id = ualink_accel_id(adev);
 	u32 rb_size = AMDGPU_GPU_PAGE_ALIGN(2 * AMDGPU_UALINK_RB_SIZE);
-	u64 wb, npa;
+	uintptr_t wb;
+	u64 npa;
 	u32 offset = 0;
 
 	if (ualink_addr_mode(adev) == AMDGPU_UALINK_ADDR_MODE_SOURCE_IDENT) {
-		wb = (u64)remote->rb_cpu_addr + rb_size * remote->num_accel;
+		wb = (uintptr_t)remote->rb_cpu_addr + rb_size * remote->num_accel;
 		npa = amdgpu_ualink_npa_addr(adev, RB_TYPE_TAILPTR,
 					     remote_accel_id, accel_id);
 	} else {
-		wb = (u64)remote->rptr_cpu_addr;
+		wb = (uintptr_t)remote->rptr_cpu_addr;
 		npa = remote->rptr_npa;
 		npa |= (u64)accel_id << AMDGPU_UALINK_GART_NPA_ADDR_GPUID_SHIFT;
 	}
@@ -5943,7 +5944,7 @@ static int amdgpu_ualink_peer_remote_init(struct amdgpu_device *adev)
 		 *     1 - PMI1 Remote TLB Shootdown
 		 * ReqAddr[5:0]   = 6'h0
 		 */
-		npa = 0xFFFUL << 40 | (u64)dst_accel_id << 30;
+		npa = 0xFFFULL << 40 | (u64)dst_accel_id << 30;
 		r = amdgpu_ualink_gart_map(adev, 1, npa, &interrupt->mm_node_doorbell, flags);
 		if (r)
 			break;
