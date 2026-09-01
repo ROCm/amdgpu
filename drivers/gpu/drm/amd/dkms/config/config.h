@@ -1060,6 +1060,9 @@
 /* Define to 1 if you have the <linux/fence-array.h> header file. */
 /* #undef HAVE_LINUX_FENCE_ARRAY_H */
 
+/* Define to 1 if you have the <linux/find.h> header file. */
+#define HAVE_LINUX_FIND_H 1
+
 /* Define to 1 if you have the <linux/iosys-map.h> header file. */
 #define HAVE_LINUX_IOSYS_MAP_H 1
 

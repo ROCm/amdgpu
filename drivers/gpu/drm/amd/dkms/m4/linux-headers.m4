@@ -203,4 +203,16 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #locking/mutex: split out mutex_types.h
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/mutex_types.h])
+
+	dnl #v5.16-3-g47d8c15615c0
+	dnl #include: move find.h from asm_generic to linux
+	dnl #
+	AC_MSG_CHECKING([for linux/find.h])
+	AC_KERNEL_TEST_HEADER_FILE_EXIST([linux/find.h], [
+		AC_DEFINE(HAVE_LINUX_FIND_H, 1,
+			[Define to 1 if you have the <linux/find.h> header file.])
+		AC_MSG_RESULT([yes])
+	], [
+		AC_MSG_RESULT([no])
+	])
 ])
