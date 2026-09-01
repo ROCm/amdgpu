@@ -31,6 +31,7 @@
 #include <linux/math.h>
 #include <linux/sysfs.h>
 #include <linux/string.h>
+#include <linux/fdtable.h>
 
 static int amdgpu_ualink_remote_interrupt(struct amdgpu_device *adev,
 				u32 remote_accel_id, u32 dw0, u32 dw1,
@@ -1724,6 +1725,9 @@ static int amdgpu_ualink_map_npa_to_dmabuf(struct amdgpu_device *adev,
 	struct amdgpu_bo *bo;
 	u32 handle;
 	int r;
+#ifndef HAVE_DRM_GEM_PRIME_HANDLE_TO_DMABUF
+	int fd;
+#endif
 
 	npa_addr = imp_xa_node->npa_addr;
 	size = imp_xa_node->size;
@@ -1769,8 +1773,19 @@ static int amdgpu_ualink_map_npa_to_dmabuf(struct amdgpu_device *adev,
 	}
 	drm_gem_object_put(gobj);
 
+#ifndef HAVE_DRM_GEM_PRIME_HANDLE_TO_DMABUF
+	r = drm_gem_prime_handle_to_fd(&adev->ddev, adev->ualink.client.file,
+				       handle, DRM_CLOEXEC | DRM_RDWR, &fd);
+	if (r) {
+		dmabuf = ERR_PTR(r);
+	} else {
+		dmabuf = dma_buf_get(fd);
+		close_fd(fd);
+	}
+#else
 	dmabuf = drm_gem_prime_handle_to_dmabuf(&adev->ddev, adev->ualink.client.file,
 						handle, DRM_CLOEXEC | DRM_RDWR);
+#endif
 	if (IS_ERR(dmabuf)) {
 		r = PTR_ERR(dmabuf);
 		dev_err(adev->dev,
@@ -2393,6 +2408,9 @@ int amdgpu_ualink_export_handle(struct drm_device *dev, struct drm_file *filp,
 	struct amdgpu_device *adev;
 	struct amdgpu_bo *robj;
 	int r = 0, i;
+#ifndef HAVE_DRM_GEM_PRIME_HANDLE_TO_DMABUF
+	int fd;
+#endif
 
 	gobj = drm_gem_object_lookup(filp, gem_handle);
 	if (!gobj)
@@ -2434,8 +2452,19 @@ int amdgpu_ualink_export_handle(struct drm_device *dev, struct drm_file *filp,
 			exp_xa_node->importer_entries[i].parent = exp_xa_node;
 		}
 		/* DMABuf handle for local import of fabric handles */
+#ifndef HAVE_DRM_GEM_PRIME_HANDLE_TO_DMABUF
+		r = drm_gem_prime_handle_to_fd(&adev->ddev, filp, gem_handle,
+					       DRM_CLOEXEC | DRM_RDWR, &fd);
+		if (r) {
+			exp_xa_node->dmabuf = ERR_PTR(r);
+		} else {
+			exp_xa_node->dmabuf = dma_buf_get(fd);
+			close_fd(fd);
+		}
+#else
 		exp_xa_node->dmabuf = drm_gem_prime_handle_to_dmabuf(&adev->ddev, filp,
 						gem_handle, DRM_CLOEXEC | DRM_RDWR);
+#endif
 		if (IS_ERR(exp_xa_node->dmabuf)) {
 			r = PTR_ERR(exp_xa_node->dmabuf);
 			dev_err(adev->dev, "Failed to generate DMABuf for the BO\n");
