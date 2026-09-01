@@ -2411,7 +2411,9 @@ amdgpu_dm_create_validate_stream_for_sink(struct drm_connector *connector,
 	 *    (drm_mode_is_420_also() clear), as required for HDMI compliance
 	 *    testing; dc_validate_stream() still rejects anything the link
 	 *    genuinely cannot carry. The YCbCr422/YCbCr444 forces stay gated on
-	 *    the sink's advertised caps.
+	 *    the sink's advertised caps. An RGB force pins to RGB alone and is
+	 *    always honoured, since RGB is the mandatory baseline every sink
+	 *    (DP or HDMI) supports.
 	 */
 	want_420 = (aconnector->force_yuv_pixel_format == PIXEL_ENCODING_YCBCR420) ||
 		(drm_state && amdkcl_connector_state_color_format(drm_state) == DRM_CONNECTOR_COLOR_FORMAT_YCBCR420);
@@ -2432,6 +2434,8 @@ amdgpu_dm_create_validate_stream_for_sink(struct drm_connector *connector,
 		   is_dp_or_hdmi) {
 		encoding_mask = BIT(PIXEL_ENCODING_YCBCR444);
 	} else if (drm_state && amdkcl_connector_state_color_format(drm_state) == DRM_CONNECTOR_COLOR_FORMAT_RGB444) {
+		encoding_mask = BIT(PIXEL_ENCODING_RGB);
+	} else if (aconnector->force_yuv_pixel_format == PIXEL_ENCODING_RGB) {
 		encoding_mask = BIT(PIXEL_ENCODING_RGB);
 	} else {
 		encoding_mask = BIT(PIXEL_ENCODING_RGB);
