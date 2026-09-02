@@ -3057,12 +3057,7 @@ static void amdgpu_ualink_invalidate_import_mappings(struct amdgpu_bo *bo)
 		}
 	}
 
-	/* FIXME: This should be after the "if", but needs a fix to make sure
-	 * DMABuf imports are initialized in the right VM list.
-	 */
-	amdgpu_vm_bo_invalidate(bo, false);
-	if (!bo->tbo.resource || bo->tbo.resource->mem_type == TTM_PL_SYSTEM)
-		goto fini;
+	amdgpu_vm_bo_move(bo, NULL, false);
 
 	r = ttm_bo_validate(&bo->tbo, &placement, &ctx);
 	if (r) {
