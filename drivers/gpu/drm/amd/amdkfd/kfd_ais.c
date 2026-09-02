@@ -196,6 +196,17 @@ static struct pci_dev *get_pci_dev_from_bdev(struct block_device *bdev)
 	if (dev && dev_is_pci(dev))
 		pdev = to_pci_dev(dev);
 
+	/* virtio-blk has a PCI parent and satisfies pci_p2pdma_distance()
+	 * but cannot service P2P DMA; submitting anyway wedges the device.
+	 * Test the leaf: the capability is not inherited, so a stacked
+	 * md or dm queue never carries it.
+	 */
+	if (pdev && !blk_queue_pci_p2pdma(bdev_get_queue(bdev))) {
+		pr_debug("AIS: %s does not support PCI P2PDMA\n",
+			 bdev->bd_disk->disk_name);
+		return NULL;
+	}
+
 	/* NVMeoF fallback: local NVMe always has a PCI parent. If the
 	 * walk found nothing and this is an NVMe disk, the device is
 	 * NVMeoF -- find the RDMA NIC via route lookup instead.
