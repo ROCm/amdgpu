@@ -484,18 +484,19 @@ static int dcn60_get_dtb_ref_freq_khz(struct clk_mgr *clk_mgr_base)
 
 /**
  * dcn60_override_dc_mode_limit - Override DC mode limits from the clock table.
- * @dc_limit: output DC mode limit to populate
- * @clk_table: clock table already populated (and possibly overridden)
+ * @clk_mgr: clock manager instance
+ * @bw_params: bandwidth parameters containing the clock table and DC limits
  *
  * Sets the DC mode max frequency for each clock to the highest populated DPM
  * level in the clock table. Deriving the limit from the clock table (rather
  * than the raw DAL init table) ensures any overrides applied to the clock
  * levels are respected.
  */
-static void dcn60_override_dc_mode_limit(
-		struct clk_limit_table_entry *dc_limit,
-		const struct clk_limit_table *clk_table)
+static void dcn60_override_dc_mode_limit(struct clk_mgr_internal *clk_mgr,
+		struct clk_bw_params *bw_params)
 {
+	struct clk_limit_table_entry *dc_limit = &bw_params->dc_mode_limit;
+	const struct clk_limit_table *clk_table = &bw_params->clk_table;
 	const struct clk_limit_table_entry *entries = clk_table->entries;
 	const struct clk_limit_num_entries *num_entries = &clk_table->num_entries_per_clk;
 
@@ -513,6 +514,11 @@ static void dcn60_override_dc_mode_limit(
 			entries[num_entries->num_memclk_levels - 1].memclk_mhz : 0;
 	dc_limit->fclk_mhz    = num_entries->num_fclk_levels ?
 			entries[num_entries->num_fclk_levels - 1].fclk_mhz : 0;
+
+	if (clk_mgr->base.ctx->dc->debug.disable_dtb_ref_clk_switch)
+		dc_limit->dtbclk_mhz = 0;
+
+	bw_params->dc_mode_softmax_memclk = dc_limit->memclk_mhz;
 }
 
 static unsigned int dcn60_get_dc_mode_limit_mhz(const DpmClock_t *dpm_clk)
@@ -618,16 +624,40 @@ static void dcn60_populate_clk_table(struct clk_mgr_internal *clk_mgr,
 
 /**
  * dcn60_override_clk_table - Override the clock table with hardcoded values.
+ * @clk_mgr: clock manager instance
  * @clk_table: clock table to override
  *
  * Temporary debug/bring-up override that replaces the DPM clock levels
  * populated from the DAL init table (see dcn60_populate_clk_table) with a
- * fixed set of hardcoded values. Implement any override as needed.
+ * fixed set of hardcoded values, then applies the configured minimum clock
+ * floors.
  */
-static void dcn60_override_clk_table(struct clk_limit_table *clk_table)
+static void dcn60_override_clk_table(struct clk_mgr_internal *clk_mgr,
+		struct clk_limit_table *clk_table)
 {
-	/* Override as needed */
-	(void)clk_table;
+	unsigned int i;
+
+	if (clk_mgr->base.ctx->dc->debug.min_disp_clk_khz) {
+		unsigned int min_disp_clk_mhz =
+			khz_to_mhz_ceil(clk_mgr->base.ctx->dc->debug.min_disp_clk_khz);
+
+		for (i = 0; i < clk_table->num_entries_per_clk.num_dispclk_levels; i++)
+			if (clk_table->entries[i].dispclk_mhz
+					< min_disp_clk_mhz)
+				clk_table->entries[i].dispclk_mhz
+					= min_disp_clk_mhz;
+	}
+
+	if (clk_mgr->base.ctx->dc->debug.min_dpp_clk_khz) {
+		unsigned int min_dpp_clk_mhz =
+			khz_to_mhz_ceil(clk_mgr->base.ctx->dc->debug.min_dpp_clk_khz);
+
+		for (i = 0; i < clk_table->num_entries_per_clk.num_dppclk_levels; i++)
+			if (clk_table->entries[i].dppclk_mhz
+					< min_dpp_clk_mhz)
+				clk_table->entries[i].dppclk_mhz
+					= min_dpp_clk_mhz;
+	}
 }
 
 /**
@@ -701,29 +731,8 @@ static void dcn60_override_utm_qos_model(struct clk_bw_params *bw_params)
 static void dcn60_override_bw_params(struct clk_mgr_internal *clk_mgr,
 		struct clk_bw_params *bw_params)
 {
-	struct clk_limit_table *clk_table = &bw_params->clk_table;
-	unsigned int i;
-
-	if (clk_mgr->base.ctx->dc->debug.min_disp_clk_khz) {
-		for (i = 0; i < clk_table->num_entries_per_clk.num_dispclk_levels; i++)
-			if (clk_table->entries[i].dispclk_mhz
-					< (unsigned int)khz_to_mhz_ceil(clk_mgr->base.ctx->dc->debug.min_disp_clk_khz))
-				clk_table->entries[i].dispclk_mhz
-					= (unsigned int)khz_to_mhz_ceil(clk_mgr->base.ctx->dc->debug.min_disp_clk_khz);
-	}
-
-	if (clk_mgr->base.ctx->dc->debug.min_dpp_clk_khz) {
-		for (i = 0; i < clk_table->num_entries_per_clk.num_dppclk_levels; i++)
-			if (clk_table->entries[i].dppclk_mhz
-					< (unsigned int)khz_to_mhz_ceil(clk_mgr->base.ctx->dc->debug.min_dpp_clk_khz))
-				clk_table->entries[i].dppclk_mhz
-					= (unsigned int)khz_to_mhz_ceil(clk_mgr->base.ctx->dc->debug.min_dpp_clk_khz);
-	}
-
-	if (clk_mgr->base.ctx->dc->debug.disable_dtb_ref_clk_switch)
-		bw_params->dc_mode_limit.dtbclk_mhz = 0;
-
-	bw_params->dc_mode_softmax_memclk = bw_params->dc_mode_limit.memclk_mhz;
+	dcn60_override_clk_table(clk_mgr, &bw_params->clk_table);
+	dcn60_override_dc_mode_limit(clk_mgr, bw_params);
 
 	if (dcn60_should_apply_temp_utm_override)
 		dcn60_override_utm_qos_model(bw_params);
@@ -812,8 +821,6 @@ static bool dcn60_fetch_dal_init_table(struct clk_mgr_internal *clk_mgr)
 	dcn60_populate_utm_qos_model(clk_mgr, &bw_params->utm_qos_model, init_table);
 
 	dcn60_override_bw_params(clk_mgr, bw_params);
-	dcn60_override_clk_table(&bw_params->clk_table);
-	dcn60_override_dc_mode_limit(&bw_params->dc_mode_limit, &bw_params->clk_table);
 
 	return true;
 }
