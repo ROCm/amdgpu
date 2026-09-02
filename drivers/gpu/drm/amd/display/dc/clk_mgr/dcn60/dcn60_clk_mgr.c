@@ -120,6 +120,9 @@ static const struct clk_mgr_mask clk_mgr_mask_dcn60 = {
 #define TO_DCN60_CLK_MGR(clk_mgr)\
 	container_of(clk_mgr, struct dcn60_clk_mgr, base)
 
+/* Temporary UTM override used to unblock DCN6 testing. */
+static bool dcn60_should_apply_temp_utm_override = true;
+
 static bool dcn60_is_ppclk_dpm_enabled(struct clk_mgr_internal *clk_mgr, PPCLK_e clk)
 {
 	bool ppclk_dpm_enabled = false;
@@ -627,6 +630,74 @@ static void dcn60_override_clk_table(struct clk_limit_table *clk_table)
 	(void)clk_table;
 }
 
+/**
+ * dcn60_copy_utm_qos_model_to_soc_table - Convert a UTM QoS model to the PMFW table format.
+ * @dchub: overridden DCN6 UTM QoS model
+ * @utm_table: GPU-visible PMFW UTM table to populate
+ */
+static void dcn60_copy_utm_qos_model_to_soc_table(
+		const struct utm_qos_model_dchub_v3 *dchub,
+		SocUtmTable_t *utm_table)
+{
+	unsigned int load_level_count = dchub->load_level_count;
+	unsigned int sop_count = dchub->sop_count;
+	unsigned int ll, sop;
+
+	if (load_level_count > UTM_QOS_MODEL_V3_MAX_LOAD_LEVEL_COUNT)
+		load_level_count = UTM_QOS_MODEL_V3_MAX_LOAD_LEVEL_COUNT;
+
+	if (sop_count > UTM_QOS_MODEL_V3_MAX_SOP_COUNT)
+		sop_count = UTM_QOS_MODEL_V3_MAX_SOP_COUNT;
+
+	memset(utm_table, 0, sizeof(*utm_table));
+	utm_table->Header.LoadLevelCount = load_level_count;
+	utm_table->Header.SopCount = sop_count;
+
+	for (ll = 0; ll < load_level_count; ll++) {
+		for (sop = 0; sop < sop_count; sop++) {
+			const struct utm_qos_model_dchub_v3_sop_entry *src =
+					&dchub->sops[ll][sop];
+			SocUtmSopEntry_t *dst = &utm_table->Sops[ll][sop];
+
+			dst->UrgentRampPs = src->urgent_ramp_ps;
+			dst->TripPs = src->t_trip_ps;
+			dst->MetaTripToMemPs = src->meta_trip_to_mem_ps;
+			dst->MaxReqLatencyUrgPs = src->max_req_latency_urg_ps;
+			dst->AvgReqLatencyUrgPs = src->avg_req_latency_urg_ps;
+			dst->MaxReqLatencyNonUrgPs = src->max_req_latency_non_urg_ps;
+			dst->AvgReqLatencyNonUrgPs = src->avg_req_latency_non_urg_ps;
+			dst->DfResponseTimePs = src->df_response_time_ps;
+			dst->UrgentBandwidthKBps = src->urgent_bandwidth_KBps;
+			dst->NominalBandwidthKBps = src->nominal_bandwidth_KBps;
+			dst->LsdmaBandwidthKBps = src->lsdma_bandwidth_KBps;
+		}
+	}
+}
+
+/**
+ * dcn60_override_utm_qos_model - Override the UTM QoS model.
+ * @bw_params: clock manager bandwidth parameters
+ */
+static void dcn60_override_utm_qos_model(struct clk_bw_params *bw_params)
+{
+	struct utm_qos_model *qos_model;
+	struct utm_qos_model_dchub_v3 *dchub;
+
+	if (!bw_params->utm_qos_model
+			|| bw_params->utm_qos_model->version != utm_qos_model_version_v3
+			|| !bw_params->utm_qos_model->dchub_v3)
+		return;
+
+	qos_model = (struct utm_qos_model *)bw_params->utm_qos_model;
+	dchub = (struct utm_qos_model_dchub_v3 *)qos_model->dchub_v3;
+
+	dcn6_test_initialize_utm_qos_model_v3(qos_model, dchub);
+
+	// Override for lsdma here is redundant with the above call, but this may need to outlive
+	// the test_initialize call for debug purposes so keep it here for now.
+	dcn6_test_override_lsdma_bandwidth_v3(dchub);
+}
+
 static void dcn60_override_bw_params(struct clk_mgr_internal *clk_mgr,
 		struct clk_bw_params *bw_params)
 {
@@ -654,17 +725,8 @@ static void dcn60_override_bw_params(struct clk_mgr_internal *clk_mgr,
 
 	bw_params->dc_mode_softmax_memclk = bw_params->dc_mode_limit.memclk_mhz;
 
-	/* Override as needed - temporary for debug only. */
-	if (bw_params->utm_qos_model && bw_params->utm_qos_model->dchub_v3) {
-		dcn6_test_initialize_utm_qos_model_v3(
-				(struct utm_qos_model *)bw_params->utm_qos_model,
-				(struct utm_qos_model_dchub_v3 *)bw_params->utm_qos_model->dchub_v3);
-
-		// Override for lsdma here is redundant with the above call, but this may need to outlive
-		// the test_initialize call for debug purposes so keep it here for now.
-		dcn6_test_override_lsdma_bandwidth_v3(
-				(struct utm_qos_model_dchub_v3 *)bw_params->utm_qos_model->dchub_v3);
-	}
+	if (dcn60_should_apply_temp_utm_override)
+		dcn60_override_utm_qos_model(bw_params);
 }
 
 /**
@@ -922,6 +984,32 @@ static void dcn60_clock_read_ss_info(struct clk_mgr_internal *clk_mgr)
 	}
 }
 
+/**
+ * dcn60_update_smu_utm_table - Send the current UTM QoS model to SMU.
+ * @clk_mgr: clock manager instance
+ *
+ * Return: true if SMU accepted the UTM table, false otherwise
+ */
+static bool dcn60_update_smu_utm_table(struct clk_mgr_internal *clk_mgr)
+{
+	const struct utm_qos_model *qos_model = clk_mgr->base.bw_params->utm_qos_model;
+	const struct utm_qos_model_dchub_v3 *dchub;
+	SocUtmTable_t *utm_table;
+
+	if (!qos_model
+			|| qos_model->version != utm_qos_model_version_v3
+			|| !qos_model->dchub_v3
+			|| !clk_mgr->utm_override_table)
+		return false;
+
+	dchub = qos_model->dchub_v3;
+	utm_table = (SocUtmTable_t *)clk_mgr->utm_override_table;
+
+	dcn60_copy_utm_qos_model_to_soc_table(dchub, utm_table);
+	return dcn60_smu_set_soc_utm_table(clk_mgr,
+			clk_mgr->utm_override_table_addr);
+}
+
 void dcn60_init_clocks(struct clk_mgr *clk_mgr_base)
 {
 	struct clk_mgr_internal *clk_mgr = TO_CLK_MGR_INTERNAL(clk_mgr_base);
@@ -947,6 +1035,11 @@ void dcn60_init_clocks(struct clk_mgr *clk_mgr_base)
 	if (clk_mgr->dpm_present)
 		clk_mgr_base->ctx->dc->res_pool->funcs->update_bw_bounding_box(
 				clk_mgr_base->ctx->dc, clk_mgr_base->bw_params);
+
+	if (clk_mgr->dpm_present
+			&& dcn60_should_apply_temp_utm_override
+			&& !dcn60_update_smu_utm_table(clk_mgr))
+		DC_LOG_ERROR("Failed to transfer UTM override table to SMU.\n");
 }
 
 
@@ -1751,6 +1844,12 @@ struct clk_mgr_internal *dcn60_clk_mgr_construct(
 	if (!clk_mgr->dal_init_table)
 		goto fail;
 
+	clk_mgr->utm_override_table = dm_helpers_allocate_gpu_mem(clk_mgr->base.ctx,
+			DC_MEM_ALLOC_TYPE_GART, sizeof(SocUtmTable_t),
+			&clk_mgr->utm_override_table_addr);
+	if (!clk_mgr->utm_override_table)
+		goto fail;
+
 	return &clk_mgr60->base;
 
 fail:
@@ -1763,6 +1862,10 @@ fail:
 void dcn60_clk_mgr_destroy(struct clk_mgr_internal *clk_mgr)
 {
 	kfree(clk_mgr->base.bw_params);
+
+	if (clk_mgr->utm_override_table)
+		dm_helpers_free_gpu_mem(clk_mgr->base.ctx, DC_MEM_ALLOC_TYPE_GART,
+				clk_mgr->utm_override_table);
 
 	if (clk_mgr->dal_init_table)
 		dm_helpers_free_gpu_mem(clk_mgr->base.ctx, DC_MEM_ALLOC_TYPE_GART,
