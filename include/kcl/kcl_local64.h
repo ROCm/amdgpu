@@ -5,6 +5,7 @@
 #include <linux/percpu.h>
 #include <asm/types.h>
 #include <asm/local.h>
+#include <asm/local64.h>
 
 /*
  * A signed long type for operations which are atomic for a single CPU.

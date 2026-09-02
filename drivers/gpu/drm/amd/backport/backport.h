@@ -105,6 +105,7 @@
  * include drm_damage_helper.h to fix the missing function declaration for legacy kernel.
  */
 #include <drm/drm_damage_helper.h>
+#include <linux/pid_namespace.h>
 #include <kcl/backport/kcl_drm_probe_helper.h>
 #include <kcl/kcl_rbtree.h>
 #include <kcl/kcl_delay.h>
