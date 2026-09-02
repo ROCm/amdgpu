@@ -269,13 +269,6 @@ int kfd_ais_init(struct amdgpu_device *adev)
 		return 0;
 	}
 
-#if defined(CONFIG_X86)
-	if (boot_cpu_has(X86_FEATURE_HYPERVISOR)) {
-		dev_dbg(adev->dev, "AIS: not supported in virtual machines\n");
-		return 0;
-	}
-#endif
-
 	/* AIS support limited to large BAR dGPUs */
 	if (adev->flags & AMD_IS_APU || adev->gmc.xgmi.connected_to_cpu || !is_large_bar) {
 		dev_dbg(adev->dev, "AIS: only supported for large BAR dGPU\n");
