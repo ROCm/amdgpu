@@ -3054,7 +3054,7 @@ static int amdgpu_ualink_map_npa_to_dmabuf(struct amdgpu_device *adev,
 	/*
 	 * Create the BO directly in the NPA domain.
 	 */
-	alloc_flags = AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
+	alloc_flags = AMDGPU_GEM_CREATE_NO_CPU_ACCESS | AMDGPU_GEM_CREATE_TOP_DOWN;
 	r = amdgpu_gem_object_create(adev, size * AMDGPU_GPU_PAGE_SIZE, 1,
 				     initial_domain, alloc_flags,
 				     ttm_bo_type_device, NULL, &gobj, 0);
