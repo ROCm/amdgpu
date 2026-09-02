@@ -967,9 +967,6 @@
 /* krealloc_array() is available */
 #define HAVE_KREALLOC_ARRAY 1
 
-/* ksys_fd() is available */
-/* #undef HAVE_KSYS_CLOSE_FD */
-
 /* ksys_sync_helper() is available */
 #define HAVE_KSYS_SYNC_HELPER 1
 
