@@ -353,7 +353,7 @@ struct kfd2kgd_calls {
 				    uint64_t *val);
 
 	uint32_t (*trigger_pc_sample_trap)(struct amdgpu_device *adev,
-					uint32_t vmid,
+					uint64_t proc_ctx_gpu_addr,
 					uint32_t *target_simd,
 					uint32_t *target_wave_slot,
 					enum kfd_ioctl_pc_sample_method method,

@@ -165,13 +165,13 @@ static uint32_t kgd_gfx_aldebaran_set_address_watch(
 }
 
 static uint32_t kgd_aldebaran_trigger_pc_sample_trap(struct amdgpu_device *adev,
-					    uint32_t vmid,
+					    uint64_t __always_unused proc_ctx_gpu_addr,
 					    uint32_t *target_simd,
 					    uint32_t *target_wave_slot,
 					    enum kfd_ioctl_pc_sample_method method,
 					    uint32_t inst)
 {
-	return kgd_gfx_v9_trigger_pc_sample_trap(adev, vmid, 8, 4,
+	return kgd_gfx_v9_trigger_pc_sample_trap(adev, proc_ctx_gpu_addr, 8, 4,
 					target_simd, target_wave_slot, method, inst);
 }
 

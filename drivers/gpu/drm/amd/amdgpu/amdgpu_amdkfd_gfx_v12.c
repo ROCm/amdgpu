@@ -401,11 +401,11 @@ out:
  * so target_simd is not really used for gfx12.
 */
 static uint32_t kgd_v12_trigger_pc_sample_trap(struct amdgpu_device *adev,
-					    uint32_t vmid,
-					    uint32_t __always_unused *target_simd,
-					    uint32_t *target_wave_slot,
-					    enum kfd_ioctl_pc_sample_method method,
-					    uint32_t inst)
+					uint64_t proc_ctx_gpu_addr,
+					uint32_t __always_unused *target_simd,
+					uint32_t *target_wave_slot,
+					enum kfd_ioctl_pc_sample_method method,
+					uint32_t inst)
 {
 	if (method == KFD_IOCTL_PCS_METHOD_HOSTTRAP) {
 		uint32_t value = 0;
