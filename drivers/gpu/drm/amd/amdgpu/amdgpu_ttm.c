@@ -854,7 +854,7 @@ out_unlock:
 int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages)
 {
 	struct ttm_tt *ttm = bo->tbo.ttm;
-	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	struct amdgpu_ttm_tt *gtt = ttm_to_amdgpu_ttm_tt(ttm);
 	struct mm_struct *mm = gtt->usertask->mm;
 	unsigned int flags = 0;
 	unsigned pinned = 0;
@@ -950,7 +950,7 @@ void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct amdgpu_hmm_range *r
  */
 void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct page **pages)
 {
-	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	struct amdgpu_ttm_tt *gtt = ttm_to_amdgpu_ttm_tt(ttm);
 	unsigned i;
 
 	gtt->last_set_pages = atomic_read(&gtt->mmu_invalidations);
@@ -969,7 +969,7 @@ void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct page **pages)
  */
 void amdgpu_ttm_tt_mark_user_pages(struct ttm_tt *ttm)
 {
-	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	struct amdgpu_ttm_tt *gtt = ttm_to_amdgpu_ttm_tt(ttm);
 	unsigned i;
 
 	for (i = 0; i < ttm->num_pages; ++i) {
@@ -1067,7 +1067,7 @@ static void amdgpu_ttm_tt_unpin_userptr(struct ttm_device *bdev,
 static void amdgpu_ttm_gart_bind_gfx9_mqd(struct amdgpu_device *adev,
 				struct ttm_tt *ttm, uint64_t flags)
 {
-	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	struct amdgpu_ttm_tt *gtt = ttm_to_amdgpu_ttm_tt(ttm);
 	uint64_t total_pages = ttm->num_pages;
 	int num_xcc = max(1U, adev->gfx.num_xcc_per_xcp);
 	uint64_t page_idx, pages_per_xcc;
@@ -1505,7 +1505,7 @@ int amdgpu_ttm_tt_get_userptr(const struct ttm_buffer_object *tbo,
 	if (!tbo->ttm)
 		return -EINVAL;
 
-	gtt = (void *)tbo->ttm;
+	gtt = ttm_to_amdgpu_ttm_tt(tbo->ttm);
 	*user_addr = gtt->userptr;
 	return 0;
 }
@@ -1621,7 +1621,7 @@ bool amdgpu_ttm_tt_is_userptr(struct ttm_tt *ttm)
 bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
 				  unsigned long end, unsigned long *userptr)
 {
-	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	struct amdgpu_ttm_tt *gtt = ttm_to_amdgpu_ttm_tt(ttm);
 	struct amdgpu_ttm_gup_task_list *entry;
 	unsigned long size;
 
@@ -1661,7 +1661,7 @@ bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
 bool amdgpu_ttm_tt_userptr_invalidated(struct ttm_tt *ttm,
 				       int *last_invalidated)
 {
-	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	struct amdgpu_ttm_tt *gtt = ttm_to_amdgpu_ttm_tt(ttm);
 	int prev_invalidated = *last_invalidated;
 
 	*last_invalidated = atomic_read(&gtt->mmu_invalidations);
@@ -1674,7 +1674,7 @@ bool amdgpu_ttm_tt_userptr_invalidated(struct ttm_tt *ttm,
  */
 bool amdgpu_ttm_tt_userptr_needs_pages(struct ttm_tt *ttm)
 {
-	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	struct amdgpu_ttm_tt *gtt = ttm_to_amdgpu_ttm_tt(ttm);
 
 	if (gtt == NULL || !gtt->userptr)
 		return false;
