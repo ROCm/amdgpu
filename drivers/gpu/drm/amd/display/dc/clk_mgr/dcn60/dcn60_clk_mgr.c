@@ -706,20 +706,18 @@ static void dcn60_copy_utm_qos_model_to_soc_table(
 
 /**
  * dcn60_override_utm_qos_model - Override the UTM QoS model.
+ * @clk_mgr: clock manager instance
  * @bw_params: clock manager bandwidth parameters
  */
-static void dcn60_override_utm_qos_model(struct clk_bw_params *bw_params)
+static void dcn60_override_utm_qos_model(struct clk_mgr_internal *clk_mgr,
+		struct clk_bw_params *bw_params)
 {
-	struct utm_qos_model *qos_model;
-	struct utm_qos_model_dchub_v3 *dchub;
+	struct dcn60_clk_mgr *dcn60_clk_mgr =
+			container_of(clk_mgr, struct dcn60_clk_mgr, base);
+	struct utm_qos_model *qos_model = &dcn60_clk_mgr->utm_qos_model;
+	struct utm_qos_model_dchub_v3 *dchub = &dcn60_clk_mgr->dchub_v3;
 
-	if (!bw_params->utm_qos_model
-			|| bw_params->utm_qos_model->version != utm_qos_model_version_v3
-			|| !bw_params->utm_qos_model->dchub_v3)
-		return;
-
-	qos_model = (struct utm_qos_model *)bw_params->utm_qos_model;
-	dchub = (struct utm_qos_model_dchub_v3 *)qos_model->dchub_v3;
+	bw_params->utm_qos_model = qos_model;
 
 	dcn6_test_initialize_utm_qos_model_v3(qos_model, dchub);
 
@@ -735,7 +733,7 @@ static void dcn60_override_bw_params(struct clk_mgr_internal *clk_mgr,
 	dcn60_override_dc_mode_limit(clk_mgr, bw_params);
 
 	if (dcn60_should_apply_temp_utm_override)
-		dcn60_override_utm_qos_model(bw_params);
+		dcn60_override_utm_qos_model(clk_mgr, bw_params);
 }
 
 /**
