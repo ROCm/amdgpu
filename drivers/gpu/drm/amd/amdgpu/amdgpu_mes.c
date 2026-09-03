@@ -692,6 +692,41 @@ int amdgpu_mes_hdp_flush(struct amdgpu_device *adev)
 					     ref_and_mask, ref_and_mask, 0);
 }
 
+int amdgpu_mes_set_host_trap(struct amdgpu_device *adev,
+				uint64_t process_context_addr,
+				uint32_t cmd,
+				uint32_t mode,
+				uint32_t data,
+				uint32_t wave_hw_id,
+				uint32_t xcc_id)
+{
+	struct mes_set_host_trap_input op_input = {0};
+	int r;
+
+	if (!adev->mes.funcs->send_host_trap) {
+		dev_err(adev->dev,
+			"mes send host trap is not supported!\n");
+		return -EINVAL;
+	}
+
+	op_input.xcc_id = xcc_id;
+	op_input.process_context_addr = process_context_addr;
+	op_input.cmd = cmd;
+	op_input.mode = mode;
+	op_input.data = data;
+	op_input.wave_hw_id = wave_hw_id;
+
+	amdgpu_mes_lock(&adev->mes);
+
+	r = adev->mes.funcs->send_host_trap(&adev->mes, &op_input);
+	if (r)
+		dev_err(adev->dev, "failed to send host trap\n");
+
+	amdgpu_mes_unlock(&adev->mes);
+
+	return r;
+}
+
 int amdgpu_mes_set_shader_debugger(struct amdgpu_device *adev,
 				uint64_t process_context_addr,
 				uint32_t spi_gdbg_per_vmid_cntl,

@@ -364,6 +364,17 @@ struct mes_inv_tlbs_pasid_input {
 	uint8_t         flush_type;
 };
 
+struct mes_set_host_trap_input {
+	uint32_t        xcc_id;
+	uint64_t        process_context_addr;
+	/* Below fields are used to fill in SQ_CMD register */
+	uint32_t        cmd;
+	uint32_t        mode;
+	uint32_t        data;
+	/* 0xffffffff indicates broadcast to all waves */
+	uint32_t        wave_hw_id;
+};
+
 enum mes_misc_opcode {
 	MES_MISC_OP_WRITE_REG,
 	MES_MISC_OP_READ_REG,
@@ -460,6 +471,9 @@ struct amdgpu_mes_funcs {
 
 	int (*invalidate_tlbs_pasid)(struct amdgpu_mes *mes,
 			      struct mes_inv_tlbs_pasid_input *input);
+
+	int (*send_host_trap)(struct amdgpu_mes *mes,
+			      struct mes_set_host_trap_input *input);
 };
 
 enum amdgpu_mqd_update_flag {
@@ -566,6 +580,13 @@ int amdgpu_mes_set_shader_debugger(struct amdgpu_device *adev,
 				const uint32_t *tcp_watch_cntl,
 				uint32_t flags,
 				bool trap_en,
+				uint32_t xcc_id);
+int amdgpu_mes_set_host_trap(struct amdgpu_device *adev,
+				uint64_t process_context_addr,
+				uint32_t cmd,
+				uint32_t mode,
+				uint32_t data,
+				uint32_t wave_hw_id,
 				uint32_t xcc_id);
 int amdgpu_mes_flush_shader_debugger(struct amdgpu_device *adev,
 				uint64_t process_context_addr, uint32_t xcc_id);
