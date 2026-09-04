@@ -236,13 +236,6 @@ VISIBLE_IF_KUNIT int dm_wait_for_idle(struct amdgpu_ip_block *ip_block)
 }
 EXPORT_SYMBOL_IF_KUNIT(dm_wait_for_idle);
 
-VISIBLE_IF_KUNIT int dm_soft_reset(struct amdgpu_ip_block *ip_block)
-{
-	/* XXX todo */
-	return 0;
-}
-EXPORT_SYMBOL_IF_KUNIT(dm_soft_reset);
-
 /*
  * DC will program planes with their z-order determined by their ordering
  * in the dc_surface_updates array. This comparator is used to sort them
@@ -2170,7 +2163,6 @@ static const struct amd_ip_funcs amdgpu_dm_funcs = {
 	.suspend = dm_suspend,
 	.resume = dm_resume,
 	.wait_for_idle = dm_wait_for_idle,
-	.soft_reset = dm_soft_reset,
 	.set_clockgating_state = dm_set_clockgating_state,
 	.set_powergating_state = dm_set_powergating_state,
 };
