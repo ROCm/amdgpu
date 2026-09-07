@@ -60,7 +60,7 @@ bool link_supports_psrsu(struct dc_link *link)
 	/* Temporarily disable PSR-SU to avoid glitches */
 	return false;
 }
-EXPORT_IF_KUNIT(link_supports_psrsu);
+EXPORT_SYMBOL_IF_KUNIT(link_supports_psrsu);
 
 VISIBLE_IF_KUNIT
 void amdgpu_dm_psr_fill_caps(struct dc_link *link, struct psr_caps *caps)
@@ -91,7 +91,7 @@ void amdgpu_dm_psr_fill_caps(struct dc_link *link, struct psr_caps *caps)
 	caps->rate_control_caps = 0; /* TODO: read in rc caps from aux */
 	caps->psr_power_opt_flag = power_opts;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_psr_fill_caps);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_psr_fill_caps);
 
 /*
  * amdgpu_dm_set_psr_caps() - set link psr capabilities
@@ -135,7 +135,7 @@ bool amdgpu_dm_set_psr_caps(struct dc_link *link, struct amdgpu_dm_connector *ac
 	amdgpu_dm_psr_fill_caps(link, &aconnector->psr_caps);
 	return true;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_set_psr_caps);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_psr_caps);
 
 /*
  * amdgpu_dm_psr_is_active_allowed() - check if psr is allowed on any stream
@@ -159,7 +159,7 @@ bool amdgpu_dm_psr_is_active_allowed(struct amdgpu_display_manager *dm)
 	}
 	return false;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_psr_is_active_allowed);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_psr_is_active_allowed);
 
 /*
  * amdgpu_dm_psr_set_event() - set or clear PSR event for stream
@@ -192,7 +192,7 @@ bool amdgpu_dm_psr_set_event(struct amdgpu_display_manager *dm, struct dc_stream
 	return mod_power_set_psr_event(dm->power_module, stream,
 				       set_event, event, wait_for_disable);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_psr_set_event);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_psr_set_event);
 
 #if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 /**
@@ -204,7 +204,7 @@ unsigned int amdgpu_dm_psr_get_dc_feature_mask(void)
 {
 	return amdgpu_dc_feature_mask;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_psr_get_dc_feature_mask);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_psr_get_dc_feature_mask);
 
 /**
  * amdgpu_dm_psr_set_dc_feature_mask() - Set DC feature mask for KUnit tests.
@@ -214,7 +214,7 @@ void amdgpu_dm_psr_set_dc_feature_mask(unsigned int feature_mask)
 {
 	amdgpu_dc_feature_mask = feature_mask;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_psr_set_dc_feature_mask);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_psr_set_dc_feature_mask);
 
 /**
  * amdgpu_dm_psr_get_dc_debug_mask() - Get DC debug mask for KUnit tests.
@@ -225,7 +225,7 @@ unsigned int amdgpu_dm_psr_get_dc_debug_mask(void)
 {
 	return amdgpu_dc_debug_mask;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_psr_get_dc_debug_mask);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_psr_get_dc_debug_mask);
 
 /**
  * amdgpu_dm_psr_set_dc_debug_mask() - Set DC debug mask for KUnit tests.
@@ -235,5 +235,5 @@ void amdgpu_dm_psr_set_dc_debug_mask(unsigned int debug_mask)
 {
 	amdgpu_dc_debug_mask = debug_mask;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_psr_set_dc_debug_mask);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_psr_set_dc_debug_mask);
 #endif

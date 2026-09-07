@@ -196,11 +196,9 @@ void dm_helpers_mccs_vcp_set(
 
 #if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 #define INLINE_IFN_KUNIT inline
-#define EXPORT_IF_KUNIT(symbol) EXPORT_SYMBOL(symbol)
 
 #else
 #define INLINE_IFN_KUNIT
-#define EXPORT_IF_KUNIT(symbol)
 #endif
 
 bool dm_helpers_submit_i2c_over_aux(

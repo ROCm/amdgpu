@@ -60,7 +60,7 @@ enum amdgpu_dm_pipe_crc_source dm_parse_crc_source(const char *source)
 
 	return AMDGPU_DM_PIPE_CRC_SOURCE_INVALID;
 }
-EXPORT_IF_KUNIT(dm_parse_crc_source);
+EXPORT_SYMBOL_IF_KUNIT(dm_parse_crc_source);
 
 VISIBLE_IF_KUNIT
 bool dm_is_crc_source_crtc(enum amdgpu_dm_pipe_crc_source src)
@@ -68,7 +68,7 @@ bool dm_is_crc_source_crtc(enum amdgpu_dm_pipe_crc_source src)
 	return (src == AMDGPU_DM_PIPE_CRC_SOURCE_CRTC) ||
 	       (src == AMDGPU_DM_PIPE_CRC_SOURCE_CRTC_DITHER);
 }
-EXPORT_IF_KUNIT(dm_is_crc_source_crtc);
+EXPORT_SYMBOL_IF_KUNIT(dm_is_crc_source_crtc);
 
 VISIBLE_IF_KUNIT
 bool dm_is_crc_source_dprx(enum amdgpu_dm_pipe_crc_source src)
@@ -76,7 +76,7 @@ bool dm_is_crc_source_dprx(enum amdgpu_dm_pipe_crc_source src)
 	return (src == AMDGPU_DM_PIPE_CRC_SOURCE_DPRX) ||
 	       (src == AMDGPU_DM_PIPE_CRC_SOURCE_DPRX_DITHER);
 }
-EXPORT_IF_KUNIT(dm_is_crc_source_dprx);
+EXPORT_SYMBOL_IF_KUNIT(dm_is_crc_source_dprx);
 
 VISIBLE_IF_KUNIT
 bool dm_need_crc_dither(enum amdgpu_dm_pipe_crc_source src)
@@ -85,7 +85,7 @@ bool dm_need_crc_dither(enum amdgpu_dm_pipe_crc_source src)
 	       (src == AMDGPU_DM_PIPE_CRC_SOURCE_DPRX_DITHER) ||
 	       (src == AMDGPU_DM_PIPE_CRC_SOURCE_NONE);
 }
-EXPORT_IF_KUNIT(dm_need_crc_dither);
+EXPORT_SYMBOL_IF_KUNIT(dm_need_crc_dither);
 
 /**
  * dm_need_dp_aux() - Does this source transition require the DP AUX handle?
@@ -104,7 +104,7 @@ bool dm_need_dp_aux(enum amdgpu_dm_pipe_crc_source source,
 	return dm_is_crc_source_dprx(source) ||
 	       (source == AMDGPU_DM_PIPE_CRC_SOURCE_NONE && dm_is_crc_source_dprx(cur_crc_src));
 }
-EXPORT_IF_KUNIT(dm_need_dp_aux);
+EXPORT_SYMBOL_IF_KUNIT(dm_need_dp_aux);
 
 /**
  * dm_crc_source_should_start_dprx() - Should drm_dp_start_crc() be called?
@@ -124,7 +124,7 @@ bool dm_crc_source_should_start_dprx(enum amdgpu_dm_pipe_crc_source source,
 	       amdgpu_dm_is_valid_crc_source(source) &&
 	       dm_is_crc_source_dprx(source);
 }
-EXPORT_IF_KUNIT(dm_crc_source_should_start_dprx);
+EXPORT_SYMBOL_IF_KUNIT(dm_crc_source_should_start_dprx);
 
 /**
  * dm_crc_source_should_stop_dprx() - Should drm_dp_stop_crc() be called?
@@ -144,7 +144,7 @@ bool dm_crc_source_should_stop_dprx(enum amdgpu_dm_pipe_crc_source source,
 	       !amdgpu_dm_is_valid_crc_source(source) &&
 	       dm_is_crc_source_dprx(cur_crc_src);
 }
-EXPORT_IF_KUNIT(dm_crc_source_should_stop_dprx);
+EXPORT_SYMBOL_IF_KUNIT(dm_crc_source_should_stop_dprx);
 
 const char *const *amdgpu_dm_crtc_get_crc_sources(struct drm_crtc *crtc,
 						  size_t *count)
@@ -152,7 +152,7 @@ const char *const *amdgpu_dm_crtc_get_crc_sources(struct drm_crtc *crtc,
 	*count = ARRAY_SIZE(pipe_crc_sources);
 	return pipe_crc_sources;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_crtc_get_crc_sources);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_crtc_get_crc_sources);
 
 #ifdef CONFIG_DRM_AMD_SECURE_DISPLAY
 static void update_phy_id_mapping(struct amdgpu_device *adev)
@@ -565,7 +565,7 @@ amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc, const char *src_name,
 	*values_cnt = 3;
 	return 0;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_crtc_verify_crc_source);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_crtc_verify_crc_source);
 
 int amdgpu_dm_crtc_configure_crc_source(struct drm_crtc *crtc,
 					struct dm_crtc_state *dm_crtc_state,
@@ -643,7 +643,7 @@ unlock:
 
 	return ret;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_crtc_configure_crc_source);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_crtc_configure_crc_source);
 
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name)
 {
@@ -821,7 +821,7 @@ cleanup:
 
 	return ret;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_crtc_set_crc_source);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_crtc_set_crc_source);
 
 /**
  * amdgpu_dm_crtc_handle_crc_irq: Report to DRM the CRC on given CRTC.
@@ -879,7 +879,7 @@ void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc)
 				       drm_crtc_accurate_vblank_count(crtc), crcs);
 	}
 }
-EXPORT_IF_KUNIT(amdgpu_dm_crtc_handle_crc_irq);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_crtc_handle_crc_irq);
 
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
 void amdgpu_dm_crtc_handle_crc_window_irq(struct drm_crtc *crtc)

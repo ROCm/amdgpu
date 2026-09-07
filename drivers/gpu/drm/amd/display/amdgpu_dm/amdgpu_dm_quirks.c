@@ -177,7 +177,7 @@ void retrieve_dmi_info(struct amdgpu_display_manager *dm)
 		drm_info(dev, "support_edp0_on_dp1 attached\n");
 	}
 }
-EXPORT_IF_KUNIT(retrieve_dmi_info);
+EXPORT_SYMBOL_IF_KUNIT(retrieve_dmi_info);
 
 struct amdgpu_stutter_quirk {
 	u16 chip_vendor;
@@ -209,4 +209,4 @@ bool dm_should_disable_stutter(struct pci_dev *pdev)
 	}
 	return false;
 }
-EXPORT_IF_KUNIT(dm_should_disable_stutter);
+EXPORT_SYMBOL_IF_KUNIT(dm_should_disable_stutter);

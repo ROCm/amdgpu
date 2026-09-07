@@ -327,7 +327,7 @@ void *amdgpu_dm_irq_register_interrupt(struct amdgpu_device *adev,
 
 	return handler_data;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_irq_register_interrupt);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_irq_register_interrupt);
 
 /**
  * amdgpu_dm_irq_unregister_interrupt() - Remove a handler from the DM IRQ table
@@ -372,7 +372,7 @@ void amdgpu_dm_irq_unregister_interrupt(struct amdgpu_device *adev,
 			ih, irq_source);
 	}
 }
-EXPORT_IF_KUNIT(amdgpu_dm_irq_unregister_interrupt);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_irq_unregister_interrupt);
 
 /**
  * amdgpu_dm_irq_init() - Initialize DM IRQ management
@@ -423,7 +423,7 @@ int amdgpu_dm_irq_init(struct amdgpu_device *adev)
 
 	return 0;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_irq_init);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_irq_init);
 
 /**
  * amdgpu_dm_irq_fini() - Tear down DM IRQ management
@@ -505,7 +505,7 @@ void amdgpu_dm_irq_fini(struct amdgpu_device *adev)
 		adev->dm.irq_wq = NULL;
 	}
 }
-EXPORT_IF_KUNIT(amdgpu_dm_irq_fini);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_irq_fini);
 
 void amdgpu_dm_irq_suspend(struct amdgpu_device *adev)
 {
@@ -552,7 +552,7 @@ void amdgpu_dm_irq_suspend(struct amdgpu_device *adev)
 	if (dev->mode_config.poll_enabled)
 		drm_kms_helper_poll_disable(dev);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_irq_suspend);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_irq_suspend);
 
 void amdgpu_dm_irq_resume_early(struct amdgpu_device *adev)
 {
@@ -574,7 +574,7 @@ void amdgpu_dm_irq_resume_early(struct amdgpu_device *adev)
 
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_irq_resume_early);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_irq_resume_early);
 
 void amdgpu_dm_irq_resume_late(struct amdgpu_device *adev)
 {
@@ -603,7 +603,7 @@ void amdgpu_dm_irq_resume_late(struct amdgpu_device *adev)
 	if (dev->mode_config.poll_enabled)
 		drm_kms_helper_poll_enable(dev);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_irq_resume_late);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_irq_resume_late);
 
 /*
  * amdgpu_dm_irq_schedule_work - schedule all work items registered for the
@@ -667,7 +667,7 @@ VISIBLE_IF_KUNIT void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
 out_unlock:
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_irq_schedule_work);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_irq_schedule_work);
 
 /*
  * amdgpu_dm_irq_immediate_work
@@ -692,7 +692,7 @@ VISIBLE_IF_KUNIT void amdgpu_dm_irq_immediate_work(struct amdgpu_device *adev,
 
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_irq_immediate_work);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_irq_immediate_work);
 
 bool amdgpu_dm_irq_set(struct amdgpu_device *adev, enum dc_irq_source src,
 		       bool enable)
@@ -701,7 +701,7 @@ bool amdgpu_dm_irq_set(struct amdgpu_device *adev, enum dc_irq_source src,
 
 	return dc_interrupt_set(adev->dm.dc, src, enable);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_irq_set);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_irq_set);
 
 void amdgpu_dm_irq_ack(struct amdgpu_device *adev, enum dc_irq_source src)
 {
@@ -709,7 +709,7 @@ void amdgpu_dm_irq_ack(struct amdgpu_device *adev, enum dc_irq_source src)
 
 	dc_interrupt_ack(adev->dm.dc, src);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_irq_ack);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_irq_ack);
 
 /**
  * amdgpu_dm_irq_handler - Generic DM IRQ handler
@@ -745,7 +745,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_irq_handler(struct amdgpu_device *adev,
 
 	return 0;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_irq_handler);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_irq_handler);
 
 VISIBLE_IF_KUNIT enum dc_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned int type)
 {
@@ -766,7 +766,7 @@ VISIBLE_IF_KUNIT enum dc_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned int
 		return DC_IRQ_SOURCE_INVALID;
 	}
 }
-EXPORT_IF_KUNIT(amdgpu_dm_hpd_to_dal_irq_source);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_hpd_to_dal_irq_source);
 
 VISIBLE_IF_KUNIT int amdgpu_dm_set_hpd_irq_state(struct amdgpu_device *adev,
 				       struct amdgpu_irq_src *source,
@@ -779,7 +779,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_set_hpd_irq_state(struct amdgpu_device *adev,
 	amdgpu_dm_irq_set(adev, src, st);
 	return 0;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_set_hpd_irq_state);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_hpd_irq_state);
 
 static inline int dm_irq_state(struct amdgpu_device *adev,
 			       struct amdgpu_irq_src *source,
@@ -828,7 +828,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_set_pflip_irq_state(struct amdgpu_device *adev,
 		IRQ_TYPE_PFLIP,
 		__func__);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_set_pflip_irq_state);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_pflip_irq_state);
 
 VISIBLE_IF_KUNIT int amdgpu_dm_set_crtc_irq_state(struct amdgpu_device *adev,
 					struct amdgpu_irq_src *source,
@@ -843,7 +843,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_set_crtc_irq_state(struct amdgpu_device *adev,
 		IRQ_TYPE_VBLANK,
 		__func__);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_set_crtc_irq_state);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_crtc_irq_state);
 
 VISIBLE_IF_KUNIT int amdgpu_dm_set_vline0_irq_state(struct amdgpu_device *adev,
 					struct amdgpu_irq_src *source,
@@ -858,7 +858,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_set_vline0_irq_state(struct amdgpu_device *adev,
 		IRQ_TYPE_VLINE0,
 		__func__);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_set_vline0_irq_state);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_vline0_irq_state);
 
 VISIBLE_IF_KUNIT int amdgpu_dm_set_dmub_outbox_irq_state(struct amdgpu_device *adev,
 					struct amdgpu_irq_src *source,
@@ -871,7 +871,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_set_dmub_outbox_irq_state(struct amdgpu_device *a
 	amdgpu_dm_irq_set(adev, irq_source, st);
 	return 0;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_set_dmub_outbox_irq_state);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_dmub_outbox_irq_state);
 
 VISIBLE_IF_KUNIT int amdgpu_dm_set_vupdate_irq_state(struct amdgpu_device *adev,
 					   struct amdgpu_irq_src *source,
@@ -886,7 +886,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_set_vupdate_irq_state(struct amdgpu_device *adev,
 		IRQ_TYPE_VUPDATE,
 		__func__);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_set_vupdate_irq_state);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_vupdate_irq_state);
 
 VISIBLE_IF_KUNIT int amdgpu_dm_set_dmub_trace_irq_state(struct amdgpu_device *adev,
 					   struct amdgpu_irq_src *source,
@@ -899,7 +899,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_set_dmub_trace_irq_state(struct amdgpu_device *ad
 	amdgpu_dm_irq_set(adev, irq_source, st);
 	return 0;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_set_dmub_trace_irq_state);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_dmub_trace_irq_state);
 
 static const struct amdgpu_irq_src_funcs dm_crtc_irq_funcs = {
 	.set = amdgpu_dm_set_crtc_irq_state,
@@ -959,13 +959,13 @@ void amdgpu_dm_set_irq_funcs(struct amdgpu_device *adev)
 	adev->hpd_irq.num_types = adev->mode_info.num_hpd;
 	adev->hpd_irq.funcs = &dm_hpd_irq_funcs;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_set_irq_funcs);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_irq_funcs);
 
 void amdgpu_dm_outbox_init(struct amdgpu_device *adev)
 {
 	amdgpu_dm_irq_set(adev, DC_IRQ_SOURCE_DMCUB_OUTBOX, true);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_outbox_init);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_outbox_init);
 
 /**
  * amdgpu_dm_hpd_init - hpd setup callback.
@@ -1046,7 +1046,7 @@ void amdgpu_dm_hpd_init(struct amdgpu_device *adev)
 	if (use_polling)
 		drm_kms_helper_poll_init(dev);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_hpd_init);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_hpd_init);
 
 /**
  * amdgpu_dm_hpd_fini - hpd tear down callback.
@@ -1098,7 +1098,7 @@ void amdgpu_dm_hpd_fini(struct amdgpu_device *adev)
 	if (dev->mode_config.poll_enabled)
 		drm_kms_helper_poll_fini(dev);
 }
-EXPORT_IF_KUNIT(amdgpu_dm_hpd_fini);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_hpd_fini);
 
 /* ========== HPD handling ========== */
 static void force_connector_state(
@@ -1209,7 +1209,7 @@ skip:
 	kfree(offload_work);
 
 }
-EXPORT_IF_KUNIT(dm_handle_hpd_rx_offload_work);
+EXPORT_SYMBOL_IF_KUNIT(dm_handle_hpd_rx_offload_work);
 
 struct hpd_rx_irq_offload_work_queue *amdgpu_dm_hpd_rx_irq_create_workqueue(struct amdgpu_device *adev)
 {
@@ -1246,7 +1246,7 @@ out_err:
 	kfree(hpd_rx_offload_wq);
 	return NULL;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_hpd_rx_irq_create_workqueue);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_hpd_rx_irq_create_workqueue);
 
 void amdgpu_dm_hpd_rx_irq_work_suspend(struct amdgpu_display_manager *dm)
 {
@@ -1257,7 +1257,7 @@ void amdgpu_dm_hpd_rx_irq_work_suspend(struct amdgpu_display_manager *dm)
 			flush_workqueue(dm->hpd_rx_offload_wq[i].wq);
 	}
 }
-EXPORT_IF_KUNIT(amdgpu_dm_hpd_rx_irq_work_suspend);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_hpd_rx_irq_work_suspend);
 
 VISIBLE_IF_KUNIT bool are_sinks_equal(const struct dc_sink *sink1, const struct dc_sink *sink2)
 {
@@ -1274,7 +1274,7 @@ VISIBLE_IF_KUNIT bool are_sinks_equal(const struct dc_sink *sink1, const struct 
 		return false;
 	return true;
 }
-EXPORT_IF_KUNIT(are_sinks_equal);
+EXPORT_SYMBOL_IF_KUNIT(are_sinks_equal);
 
 
 /**
@@ -1351,7 +1351,7 @@ void amdgpu_dm_hdmi_hpd_debounce_work(struct work_struct *work)
 			dc_allow_idle_optimizations(dc, true);
 	}
 }
-EXPORT_IF_KUNIT(amdgpu_dm_hdmi_hpd_debounce_work);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_hdmi_hpd_debounce_work);
 
 VISIBLE_IF_KUNIT void handle_hpd_irq_helper(struct amdgpu_dm_connector *aconnector,
 				  enum dc_detect_reason reason)
@@ -1451,7 +1451,7 @@ VISIBLE_IF_KUNIT void handle_hpd_irq_helper(struct amdgpu_dm_connector *aconnect
 		}
 	}
 }
-EXPORT_IF_KUNIT(handle_hpd_irq_helper);
+EXPORT_SYMBOL_IF_KUNIT(handle_hpd_irq_helper);
 
 VISIBLE_IF_KUNIT void handle_hpd_irq(void *param)
 {
@@ -1460,7 +1460,7 @@ VISIBLE_IF_KUNIT void handle_hpd_irq(void *param)
 	handle_hpd_irq_helper(aconnector, DETECT_REASON_HPD);
 
 }
-EXPORT_IF_KUNIT(handle_hpd_irq);
+EXPORT_SYMBOL_IF_KUNIT(handle_hpd_irq);
 
 VISIBLE_IF_KUNIT void
 schedule_hpd_rx_offload_work(struct amdgpu_device *adev,
@@ -1482,7 +1482,7 @@ schedule_hpd_rx_offload_work(struct amdgpu_device *adev,
 	queue_work(offload_wq->wq, &offload_work->work);
 	drm_dbg_kms(adev_to_drm(adev), "queue work to handle hpd_rx offload work");
 }
-EXPORT_IF_KUNIT(schedule_hpd_rx_offload_work);
+EXPORT_SYMBOL_IF_KUNIT(schedule_hpd_rx_offload_work);
 
 VISIBLE_IF_KUNIT void handle_hpd_rx_irq(void *param)
 {
@@ -1617,7 +1617,7 @@ out:
 
 	mutex_unlock(&aconnector->hpd_lock);
 }
-EXPORT_IF_KUNIT(handle_hpd_rx_irq);
+EXPORT_SYMBOL_IF_KUNIT(handle_hpd_rx_irq);
 
 /**
  * dmub_hpd_callback - DMUB HPD interrupt processing callback.
@@ -1693,7 +1693,7 @@ VISIBLE_IF_KUNIT void dmub_hpd_callback(struct amdgpu_device *adev,
 		}
 	}
 }
-EXPORT_IF_KUNIT(dmub_hpd_callback);
+EXPORT_SYMBOL_IF_KUNIT(dmub_hpd_callback);
 
 /**
  * dmub_hpd_sense_callback - DMUB HPD sense processing callback.
@@ -1708,7 +1708,7 @@ VISIBLE_IF_KUNIT void dmub_hpd_sense_callback(struct amdgpu_device *adev,
 {
 	drm_dbg_driver(adev_to_drm(adev), "DMUB HPD SENSE callback.\n");
 }
-EXPORT_IF_KUNIT(dmub_hpd_sense_callback);
+EXPORT_SYMBOL_IF_KUNIT(dmub_hpd_sense_callback);
 
 int amdgpu_dm_register_hpd_handlers(struct amdgpu_device *adev)
 {
@@ -1790,7 +1790,7 @@ int amdgpu_dm_register_hpd_handlers(struct amdgpu_device *adev)
 	}
 	return 0;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_register_hpd_handlers);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_register_hpd_handlers);
 
 /* ========== IRQ handlers ========== */
 struct amdgpu_crtc *
@@ -1813,7 +1813,7 @@ amdgpu_dm_get_crtc_by_otg_inst(struct amdgpu_device *adev,
 
 	return NULL;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_get_crtc_by_otg_inst);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_get_crtc_by_otg_inst);
 
 /**
  * dm_pflip_high_irq() - Handle pageflip interrupt
@@ -1918,7 +1918,7 @@ VISIBLE_IF_KUNIT void dm_pflip_high_irq(void *interrupt_params)
 		      "crtc:%d[%p], pflip_stat:AMDGPU_FLIP_NONE, vrr[%d]-fp %d\n",
 		      amdgpu_crtc->crtc_id, amdgpu_crtc, vrr_active, (int)!e);
 }
-EXPORT_IF_KUNIT(dm_pflip_high_irq);
+EXPORT_SYMBOL_IF_KUNIT(dm_pflip_high_irq);
 
 VISIBLE_IF_KUNIT void dm_handle_vmin_vmax_update(struct work_struct *offload_work)
 {
@@ -1935,7 +1935,7 @@ VISIBLE_IF_KUNIT void dm_handle_vmin_vmax_update(struct work_struct *offload_wor
 	kfree(work->adjust);
 	kfree(work);
 }
-EXPORT_IF_KUNIT(dm_handle_vmin_vmax_update);
+EXPORT_SYMBOL_IF_KUNIT(dm_handle_vmin_vmax_update);
 
 static void schedule_dc_vmin_vmax(struct amdgpu_device *adev,
 	struct dc_stream_state *stream,
@@ -2171,7 +2171,7 @@ VISIBLE_IF_KUNIT void dm_vupdate_high_irq(void *interrupt_params)
 		}
 	}
 }
-EXPORT_IF_KUNIT(dm_vupdate_high_irq);
+EXPORT_SYMBOL_IF_KUNIT(dm_vupdate_high_irq);
 
 /**
  * dm_crtc_high_irq() - Handles CRTC interrupt
@@ -2194,7 +2194,7 @@ VISIBLE_IF_KUNIT void dm_crtc_high_irq(void *interrupt_params)
 
 	dm_crtc_high_irq_handler(adev, acrtc);
 }
-EXPORT_IF_KUNIT(dm_crtc_high_irq);
+EXPORT_SYMBOL_IF_KUNIT(dm_crtc_high_irq);
 
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
 /**
@@ -2239,7 +2239,7 @@ VISIBLE_IF_KUNIT void dm_handle_hpd_work(struct work_struct *work)
 	kfree(dmub_hpd_wrk);
 
 }
-EXPORT_IF_KUNIT(dm_handle_hpd_work);
+EXPORT_SYMBOL_IF_KUNIT(dm_handle_hpd_work);
 
 VISIBLE_IF_KUNIT const char *dmub_notification_type_str(enum dmub_notification_type e)
 {
@@ -2264,7 +2264,7 @@ VISIBLE_IF_KUNIT const char *dmub_notification_type_str(enum dmub_notification_t
 		return "<unknown>";
 	}
 }
-EXPORT_IF_KUNIT(dmub_notification_type_str);
+EXPORT_SYMBOL_IF_KUNIT(dmub_notification_type_str);
 
 #define DMUB_TRACE_MAX_READ 64
 /**
@@ -2338,7 +2338,7 @@ VISIBLE_IF_KUNIT void dm_dmub_outbox1_low_irq(void *interrupt_params)
 		} while (notify.pending_notification);
 	}
 }
-EXPORT_IF_KUNIT(dm_dmub_outbox1_low_irq);
+EXPORT_SYMBOL_IF_KUNIT(dm_dmub_outbox1_low_irq);
 
 /* Register IRQ sources and initialize IRQ callbacks */
 int amdgpu_dm_dce110_register_irq_handlers(struct amdgpu_device *adev)
@@ -2477,7 +2477,7 @@ int amdgpu_dm_dce110_register_irq_handlers(struct amdgpu_device *adev)
 
 	return r;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_dce110_register_irq_handlers);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_dce110_register_irq_handlers);
 
 /* Register IRQ sources and initialize IRQ callbacks */
 int amdgpu_dm_dcn10_register_irq_handlers(struct amdgpu_device *adev)
@@ -2596,7 +2596,7 @@ int amdgpu_dm_dcn10_register_irq_handlers(struct amdgpu_device *adev)
 
 	return r;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_dcn10_register_irq_handlers);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_dcn10_register_irq_handlers);
 
 /* Register Outbox IRQ sources and initialize IRQ callbacks */
 int amdgpu_dm_register_outbox_irq_handlers(struct amdgpu_device *adev)
@@ -2634,4 +2634,4 @@ int amdgpu_dm_register_outbox_irq_handlers(struct amdgpu_device *adev)
 
 	return 0;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_register_outbox_irq_handlers);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_register_outbox_irq_handlers);

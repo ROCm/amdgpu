@@ -83,7 +83,7 @@ VISIBLE_IF_KUNIT void build_pm_display_cfg(
 		pm_display_cfg->displays[i].pixel_clock = dc_cfg->pixel_clock;
 	}
 }
-EXPORT_IF_KUNIT(build_pm_display_cfg);
+EXPORT_SYMBOL_IF_KUNIT(build_pm_display_cfg);
 
 bool dm_pp_apply_display_requirements(
 		const struct dc_context *ctx,
@@ -102,7 +102,7 @@ bool dm_pp_apply_display_requirements(
 
 	return true;
 }
-EXPORT_IF_KUNIT(dm_pp_apply_display_requirements);
+EXPORT_SYMBOL_IF_KUNIT(dm_pp_apply_display_requirements);
 
 VISIBLE_IF_KUNIT void get_default_clock_levels(
 		enum dm_pp_clock_type clk_type,
@@ -135,7 +135,7 @@ VISIBLE_IF_KUNIT void get_default_clock_levels(
 		break;
 	}
 }
-EXPORT_IF_KUNIT(get_default_clock_levels);
+EXPORT_SYMBOL_IF_KUNIT(get_default_clock_levels);
 
 VISIBLE_IF_KUNIT enum amd_pp_clock_type dc_to_pp_clock_type(
 		enum dm_pp_clock_type dm_pp_clk_type)
@@ -178,7 +178,7 @@ VISIBLE_IF_KUNIT enum amd_pp_clock_type dc_to_pp_clock_type(
 
 	return amd_pp_clk_type;
 }
-EXPORT_IF_KUNIT(dc_to_pp_clock_type);
+EXPORT_SYMBOL_IF_KUNIT(dc_to_pp_clock_type);
 
 VISIBLE_IF_KUNIT void pp_to_dc_clock_levels(
 		const struct amd_pp_clocks *pp_clks,
@@ -205,7 +205,7 @@ VISIBLE_IF_KUNIT void pp_to_dc_clock_levels(
 		dc_clks->clocks_in_khz[i] = pp_clks->clock[i];
 	}
 }
-EXPORT_IF_KUNIT(pp_to_dc_clock_levels);
+EXPORT_SYMBOL_IF_KUNIT(pp_to_dc_clock_levels);
 
 VISIBLE_IF_KUNIT void pp_to_dc_clock_levels_with_latency(
 		const struct pp_clock_levels_with_latency *pp_clks,
@@ -233,7 +233,7 @@ VISIBLE_IF_KUNIT void pp_to_dc_clock_levels_with_latency(
 		clk_level_info->data[i].latency_in_us = pp_clks->data[i].latency_in_us;
 	}
 }
-EXPORT_IF_KUNIT(pp_to_dc_clock_levels_with_latency);
+EXPORT_SYMBOL_IF_KUNIT(pp_to_dc_clock_levels_with_latency);
 
 VISIBLE_IF_KUNIT void pp_to_dc_clock_levels_with_voltage(
 		const struct pp_clock_levels_with_voltage *pp_clks,
@@ -262,7 +262,7 @@ VISIBLE_IF_KUNIT void pp_to_dc_clock_levels_with_voltage(
 		clk_level_info->data[i].voltage_in_mv = pp_clks->data[i].voltage_in_mv;
 	}
 }
-EXPORT_IF_KUNIT(pp_to_dc_clock_levels_with_voltage);
+EXPORT_SYMBOL_IF_KUNIT(pp_to_dc_clock_levels_with_voltage);
 
 VISIBLE_IF_KUNIT void cap_clock_levels_to_validation(
 		struct dm_pp_clock_levels *dc_clks,
@@ -296,7 +296,7 @@ VISIBLE_IF_KUNIT void cap_clock_levels_to_validation(
 		}
 	}
 }
-EXPORT_IF_KUNIT(cap_clock_levels_to_validation);
+EXPORT_SYMBOL_IF_KUNIT(cap_clock_levels_to_validation);
 
 bool dm_pp_get_clock_levels_by_type(
 		const struct dc_context *ctx,
@@ -337,7 +337,7 @@ bool dm_pp_get_clock_levels_by_type(
 
 	return true;
 }
-EXPORT_IF_KUNIT(dm_pp_get_clock_levels_by_type);
+EXPORT_SYMBOL_IF_KUNIT(dm_pp_get_clock_levels_by_type);
 
 bool dm_pp_get_clock_levels_by_type_with_latency(
 	const struct dc_context *ctx,
@@ -358,7 +358,7 @@ bool dm_pp_get_clock_levels_by_type_with_latency(
 
 	return true;
 }
-EXPORT_IF_KUNIT(dm_pp_get_clock_levels_by_type_with_latency);
+EXPORT_SYMBOL_IF_KUNIT(dm_pp_get_clock_levels_by_type_with_latency);
 
 bool dm_pp_get_clock_levels_by_type_with_voltage(
 	const struct dc_context *ctx,
@@ -379,7 +379,7 @@ bool dm_pp_get_clock_levels_by_type_with_voltage(
 
 	return true;
 }
-EXPORT_IF_KUNIT(dm_pp_get_clock_levels_by_type_with_voltage);
+EXPORT_SYMBOL_IF_KUNIT(dm_pp_get_clock_levels_by_type_with_voltage);
 
 bool dm_pp_notify_wm_clock_changes(
 	const struct dc_context *ctx,
@@ -399,7 +399,7 @@ bool dm_pp_notify_wm_clock_changes(
 
 	return false;
 }
-EXPORT_IF_KUNIT(dm_pp_notify_wm_clock_changes);
+EXPORT_SYMBOL_IF_KUNIT(dm_pp_notify_wm_clock_changes);
 
 bool dm_pp_apply_clock_for_voltage_request(
 	const struct dc_context *ctx,
@@ -421,7 +421,7 @@ bool dm_pp_apply_clock_for_voltage_request(
 
 	return true;
 }
-EXPORT_IF_KUNIT(dm_pp_apply_clock_for_voltage_request);
+EXPORT_SYMBOL_IF_KUNIT(dm_pp_apply_clock_for_voltage_request);
 
 VISIBLE_IF_KUNIT void build_wm_clock_ranges_soc15(
 		const struct pp_smu_wm_range_sets *ranges,
@@ -466,7 +466,7 @@ VISIBLE_IF_KUNIT void build_wm_clock_ranges_soc15(
 				ranges->writer_wm_sets[i].min_drain_clk_mhz * 1000;
 	}
 }
-EXPORT_IF_KUNIT(build_wm_clock_ranges_soc15);
+EXPORT_SYMBOL_IF_KUNIT(build_wm_clock_ranges_soc15);
 
 VISIBLE_IF_KUNIT void pp_rv_set_wm_ranges(struct pp_smu *pp,
 		struct pp_smu_wm_range_sets *ranges)
@@ -480,7 +480,7 @@ VISIBLE_IF_KUNIT void pp_rv_set_wm_ranges(struct pp_smu *pp,
 	amdgpu_dpm_set_watermarks_for_clocks_ranges(adev,
 						    &wm_with_clock_ranges);
 }
-EXPORT_IF_KUNIT(pp_rv_set_wm_ranges);
+EXPORT_SYMBOL_IF_KUNIT(pp_rv_set_wm_ranges);
 
 VISIBLE_IF_KUNIT void pp_rv_set_pme_wa_enable(struct pp_smu *pp)
 {
@@ -489,7 +489,7 @@ VISIBLE_IF_KUNIT void pp_rv_set_pme_wa_enable(struct pp_smu *pp)
 
 	amdgpu_dpm_notify_smu_enable_pwe(adev);
 }
-EXPORT_IF_KUNIT(pp_rv_set_pme_wa_enable);
+EXPORT_SYMBOL_IF_KUNIT(pp_rv_set_pme_wa_enable);
 
 VISIBLE_IF_KUNIT void pp_rv_set_active_display_count(struct pp_smu *pp, int count)
 {
@@ -498,7 +498,7 @@ VISIBLE_IF_KUNIT void pp_rv_set_active_display_count(struct pp_smu *pp, int coun
 
 	amdgpu_dpm_set_active_display_count(adev, count);
 }
-EXPORT_IF_KUNIT(pp_rv_set_active_display_count);
+EXPORT_SYMBOL_IF_KUNIT(pp_rv_set_active_display_count);
 
 VISIBLE_IF_KUNIT void pp_rv_set_min_deep_sleep_dcfclk(struct pp_smu *pp, int clock)
 {
@@ -507,7 +507,7 @@ VISIBLE_IF_KUNIT void pp_rv_set_min_deep_sleep_dcfclk(struct pp_smu *pp, int clo
 
 	amdgpu_dpm_set_min_deep_sleep_dcefclk(adev, clock);
 }
-EXPORT_IF_KUNIT(pp_rv_set_min_deep_sleep_dcfclk);
+EXPORT_SYMBOL_IF_KUNIT(pp_rv_set_min_deep_sleep_dcfclk);
 
 VISIBLE_IF_KUNIT void pp_rv_set_hard_min_dcefclk_by_freq(struct pp_smu *pp, int clock)
 {
@@ -516,7 +516,7 @@ VISIBLE_IF_KUNIT void pp_rv_set_hard_min_dcefclk_by_freq(struct pp_smu *pp, int 
 
 	amdgpu_dpm_set_hard_min_dcefclk_by_freq(adev, clock);
 }
-EXPORT_IF_KUNIT(pp_rv_set_hard_min_dcefclk_by_freq);
+EXPORT_SYMBOL_IF_KUNIT(pp_rv_set_hard_min_dcefclk_by_freq);
 
 VISIBLE_IF_KUNIT void pp_rv_set_hard_min_fclk_by_freq(struct pp_smu *pp, int mhz)
 {
@@ -525,7 +525,7 @@ VISIBLE_IF_KUNIT void pp_rv_set_hard_min_fclk_by_freq(struct pp_smu *pp, int mhz
 
 	amdgpu_dpm_set_hard_min_fclk_by_freq(adev, mhz);
 }
-EXPORT_IF_KUNIT(pp_rv_set_hard_min_fclk_by_freq);
+EXPORT_SYMBOL_IF_KUNIT(pp_rv_set_hard_min_fclk_by_freq);
 
 VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_set_wm_ranges(struct pp_smu *pp,
 		struct pp_smu_wm_range_sets *ranges)
@@ -537,7 +537,7 @@ VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_set_wm_ranges(struct pp_smu *pp,
 
 	return PP_SMU_RESULT_OK;
 }
-EXPORT_IF_KUNIT(pp_nv_set_wm_ranges);
+EXPORT_SYMBOL_IF_KUNIT(pp_nv_set_wm_ranges);
 
 VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_set_display_count(struct pp_smu *pp, int count)
 {
@@ -554,7 +554,7 @@ VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_set_display_count(struct pp_smu *pp, i
 
 	return PP_SMU_RESULT_OK;
 }
-EXPORT_IF_KUNIT(pp_nv_set_display_count);
+EXPORT_SYMBOL_IF_KUNIT(pp_nv_set_display_count);
 
 VISIBLE_IF_KUNIT enum pp_smu_status
 pp_nv_set_min_deep_sleep_dcfclk(struct pp_smu *pp, int mhz)
@@ -572,7 +572,7 @@ pp_nv_set_min_deep_sleep_dcfclk(struct pp_smu *pp, int mhz)
 
 	return PP_SMU_RESULT_OK;
 }
-EXPORT_IF_KUNIT(pp_nv_set_min_deep_sleep_dcfclk);
+EXPORT_SYMBOL_IF_KUNIT(pp_nv_set_min_deep_sleep_dcfclk);
 
 VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_set_hard_min_dcefclk_by_freq(
 		struct pp_smu *pp, int mhz)
@@ -596,7 +596,7 @@ VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_set_hard_min_dcefclk_by_freq(
 
 	return PP_SMU_RESULT_OK;
 }
-EXPORT_IF_KUNIT(pp_nv_set_hard_min_dcefclk_by_freq);
+EXPORT_SYMBOL_IF_KUNIT(pp_nv_set_hard_min_dcefclk_by_freq);
 
 VISIBLE_IF_KUNIT enum pp_smu_status
 pp_nv_set_hard_min_uclk_by_freq(struct pp_smu *pp, int mhz)
@@ -620,7 +620,7 @@ pp_nv_set_hard_min_uclk_by_freq(struct pp_smu *pp, int mhz)
 
 	return PP_SMU_RESULT_OK;
 }
-EXPORT_IF_KUNIT(pp_nv_set_hard_min_uclk_by_freq);
+EXPORT_SYMBOL_IF_KUNIT(pp_nv_set_hard_min_uclk_by_freq);
 
 VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_set_pstate_handshake_support(
 	struct pp_smu *pp, bool pstate_handshake_supported)
@@ -634,7 +634,7 @@ VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_set_pstate_handshake_support(
 
 	return PP_SMU_RESULT_OK;
 }
-EXPORT_IF_KUNIT(pp_nv_set_pstate_handshake_support);
+EXPORT_SYMBOL_IF_KUNIT(pp_nv_set_pstate_handshake_support);
 
 VISIBLE_IF_KUNIT bool pp_smu_nv_clock_id_to_pp(enum pp_smu_nv_clock_id clock_id,
 		enum amd_pp_clock_type *clock_type)
@@ -655,7 +655,7 @@ VISIBLE_IF_KUNIT bool pp_smu_nv_clock_id_to_pp(enum pp_smu_nv_clock_id clock_id,
 
 	return true;
 }
-EXPORT_IF_KUNIT(pp_smu_nv_clock_id_to_pp);
+EXPORT_SYMBOL_IF_KUNIT(pp_smu_nv_clock_id_to_pp);
 
 VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_set_voltage_by_freq(struct pp_smu *pp,
 		enum pp_smu_nv_clock_id clock_id, int mhz)
@@ -681,7 +681,7 @@ VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_set_voltage_by_freq(struct pp_smu *pp,
 
 	return PP_SMU_RESULT_OK;
 }
-EXPORT_IF_KUNIT(pp_nv_set_voltage_by_freq);
+EXPORT_SYMBOL_IF_KUNIT(pp_nv_set_voltage_by_freq);
 
 VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_get_maximum_sustainable_clocks(
 		struct pp_smu *pp, struct pp_smu_nv_clock_table *max_clocks)
@@ -699,7 +699,7 @@ VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_get_maximum_sustainable_clocks(
 
 	return PP_SMU_RESULT_OK;
 }
-EXPORT_IF_KUNIT(pp_nv_get_maximum_sustainable_clocks);
+EXPORT_SYMBOL_IF_KUNIT(pp_nv_get_maximum_sustainable_clocks);
 
 VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_get_uclk_dpm_states(struct pp_smu *pp,
 		unsigned int *clock_values_in_khz, unsigned int *num_states)
@@ -718,7 +718,7 @@ VISIBLE_IF_KUNIT enum pp_smu_status pp_nv_get_uclk_dpm_states(struct pp_smu *pp,
 
 	return PP_SMU_RESULT_OK;
 }
-EXPORT_IF_KUNIT(pp_nv_get_uclk_dpm_states);
+EXPORT_SYMBOL_IF_KUNIT(pp_nv_get_uclk_dpm_states);
 
 VISIBLE_IF_KUNIT enum pp_smu_status pp_rn_get_dpm_clock_table(
 		struct pp_smu *pp, struct dpm_clocks *clock_table)
@@ -735,7 +735,7 @@ VISIBLE_IF_KUNIT enum pp_smu_status pp_rn_get_dpm_clock_table(
 
 	return PP_SMU_RESULT_OK;
 }
-EXPORT_IF_KUNIT(pp_rn_get_dpm_clock_table);
+EXPORT_SYMBOL_IF_KUNIT(pp_rn_get_dpm_clock_table);
 
 void dm_pp_get_funcs(
 		struct dc_context *ctx,
@@ -791,7 +791,7 @@ void dm_pp_get_funcs(
 		break;
 	}
 }
-EXPORT_IF_KUNIT(dm_pp_get_funcs);
+EXPORT_SYMBOL_IF_KUNIT(dm_pp_get_funcs);
 
 int amdgpu_dm_smu_write_watermarks_table(struct amdgpu_device *adev)
 {
@@ -843,4 +843,4 @@ int amdgpu_dm_smu_write_watermarks_table(struct amdgpu_device *adev)
 
 	return 0;
 }
-EXPORT_IF_KUNIT(amdgpu_dm_smu_write_watermarks_table);
+EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_smu_write_watermarks_table);

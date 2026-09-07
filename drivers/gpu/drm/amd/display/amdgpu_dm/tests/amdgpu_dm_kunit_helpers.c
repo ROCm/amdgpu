@@ -192,4 +192,5 @@ struct drm_device *dm_kunit_alloc_drm_with_connector_list(struct kunit *test)
 EXPORT_SYMBOL(dm_kunit_alloc_drm_with_connector_list);
 
 MODULE_LICENSE("Dual MIT/GPL");
+MODULE_IMPORT_NS("EXPORTED_FOR_KUNIT_TESTING");
 MODULE_DESCRIPTION("KUnit test helpers for amdgpu_dm tests");
