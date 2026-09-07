@@ -284,7 +284,7 @@ static const struct amdgpu_dm_kunit_ops *amdgpu_dm_ops;
  * @array_of_surface_update: dc surface update pointer
  *
  */
-VISIBLE_IF_KUNIT INLINE_IFN_KUNIT
+VISIBLE_IF_KUNIT inline
 bool update_planes_and_stream_adapter(struct dc *dc,
 				      int planes_count,
 				      struct dc_stream_state *stream,
