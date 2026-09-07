@@ -30,6 +30,8 @@
 #ifndef __DM_HELPERS__
 #define __DM_HELPERS__
 
+#include <kunit/visibility.h>
+
 #include "modules/inc/mod_info_packet_types.h"
 #include "dc_types.h"
 #include "dc.h"
@@ -193,12 +195,10 @@ void dm_helpers_mccs_vcp_set(
 		struct dc_sink *sink);
 
 #if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
-#define STATIC_IFN_KUNIT
 #define INLINE_IFN_KUNIT inline
 #define EXPORT_IF_KUNIT(symbol) EXPORT_SYMBOL(symbol)
 
 #else
-#define STATIC_IFN_KUNIT static
 #define INLINE_IFN_KUNIT
 #define EXPORT_IF_KUNIT(symbol)
 #endif

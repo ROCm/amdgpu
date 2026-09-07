@@ -44,7 +44,7 @@ static const char *const pipe_crc_sources[] = {
 	"auto",
 };
 
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 enum amdgpu_dm_pipe_crc_source dm_parse_crc_source(const char *source)
 {
 	if (!source || !strcmp(source, "none"))
@@ -62,7 +62,7 @@ enum amdgpu_dm_pipe_crc_source dm_parse_crc_source(const char *source)
 }
 EXPORT_IF_KUNIT(dm_parse_crc_source);
 
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 bool dm_is_crc_source_crtc(enum amdgpu_dm_pipe_crc_source src)
 {
 	return (src == AMDGPU_DM_PIPE_CRC_SOURCE_CRTC) ||
@@ -70,7 +70,7 @@ bool dm_is_crc_source_crtc(enum amdgpu_dm_pipe_crc_source src)
 }
 EXPORT_IF_KUNIT(dm_is_crc_source_crtc);
 
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 bool dm_is_crc_source_dprx(enum amdgpu_dm_pipe_crc_source src)
 {
 	return (src == AMDGPU_DM_PIPE_CRC_SOURCE_DPRX) ||
@@ -78,7 +78,7 @@ bool dm_is_crc_source_dprx(enum amdgpu_dm_pipe_crc_source src)
 }
 EXPORT_IF_KUNIT(dm_is_crc_source_dprx);
 
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 bool dm_need_crc_dither(enum amdgpu_dm_pipe_crc_source src)
 {
 	return (src == AMDGPU_DM_PIPE_CRC_SOURCE_CRTC_DITHER) ||
@@ -97,7 +97,7 @@ EXPORT_IF_KUNIT(dm_need_crc_dither);
  *
  * Return: true if the DP AUX handle is needed, false otherwise.
  */
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 bool dm_need_dp_aux(enum amdgpu_dm_pipe_crc_source source,
 		    enum amdgpu_dm_pipe_crc_source cur_crc_src)
 {
@@ -116,7 +116,7 @@ EXPORT_IF_KUNIT(dm_need_dp_aux);
  *
  * Return: true if drm_dp_start_crc() should be called, false otherwise.
  */
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 bool dm_crc_source_should_start_dprx(enum amdgpu_dm_pipe_crc_source source,
 				      enum amdgpu_dm_pipe_crc_source cur_crc_src)
 {
@@ -136,7 +136,7 @@ EXPORT_IF_KUNIT(dm_crc_source_should_start_dprx);
  *
  * Return: true if drm_dp_stop_crc() should be called, false otherwise.
  */
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 bool dm_crc_source_should_stop_dprx(enum amdgpu_dm_pipe_crc_source source,
 				     enum amdgpu_dm_pipe_crc_source cur_crc_src)
 {

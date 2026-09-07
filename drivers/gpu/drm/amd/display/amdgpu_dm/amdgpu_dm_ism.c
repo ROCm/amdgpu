@@ -44,7 +44,7 @@
  * This function defines the idle state management FSM. Invalid transitions
  * are ignored and will not progress the FSM.
  */
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 bool dm_ism_next_state(enum amdgpu_dm_ism_state current_state,
 		       enum amdgpu_dm_ism_event event,
 		       enum amdgpu_dm_ism_state *next_state)
@@ -130,7 +130,7 @@ bool dm_ism_next_state(enum amdgpu_dm_ism_state current_state,
 }
 EXPORT_IF_KUNIT(dm_ism_next_state);
 
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 uint64_t dm_ism_get_sso_delay(const struct amdgpu_dm_ism *ism,
 				     const struct dc_stream_state *stream)
 {
@@ -163,7 +163,7 @@ EXPORT_IF_KUNIT(dm_ism_get_sso_delay);
  * Calculates the delay before allowing idle optimizations based on recent
  * idle history and the current stream timing.
  */
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 uint64_t dm_ism_get_idle_allow_delay(const struct amdgpu_dm_ism *ism,
 				     const struct dc_stream_state *stream)
 {
@@ -230,7 +230,7 @@ EXPORT_IF_KUNIT(dm_ism_get_idle_allow_delay);
  * dm_ism_insert_record - Insert a record into the circular history buffer
  * @ism: ISM instance
  */
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 void dm_ism_insert_record(struct amdgpu_dm_ism *ism)
 {
 	struct amdgpu_dm_ism_record *record;
@@ -249,7 +249,7 @@ void dm_ism_insert_record(struct amdgpu_dm_ism *ism)
 EXPORT_IF_KUNIT(dm_ism_insert_record);
 
 
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 void dm_ism_set_last_idle_ts(struct amdgpu_dm_ism *ism)
 {
 	ism->last_idle_timestamp_ns = ktime_get_ns();
@@ -257,7 +257,7 @@ void dm_ism_set_last_idle_ts(struct amdgpu_dm_ism *ism)
 EXPORT_IF_KUNIT(dm_ism_set_last_idle_ts);
 
 
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 bool dm_ism_trigger_event(struct amdgpu_dm_ism *ism,
 				 enum amdgpu_dm_ism_event event)
 {
@@ -332,7 +332,7 @@ static void dm_ism_commit_idle_optimization_state(struct amdgpu_dm_ism *ism,
 	}
 }
 
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 enum amdgpu_dm_ism_event dm_ism_dispatch_next_event(
 	enum amdgpu_dm_ism_state current_state,
 	uint64_t delay_ns,

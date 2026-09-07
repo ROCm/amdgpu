@@ -32,7 +32,7 @@
 #include "modules/power/power_helpers.h"
 #include "dm_helpers.h"
 
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 bool link_supports_psrsu(struct dc_link *link)
 {
 	struct dc *dc = link->ctx->dc;
@@ -62,7 +62,7 @@ bool link_supports_psrsu(struct dc_link *link)
 }
 EXPORT_IF_KUNIT(link_supports_psrsu);
 
-STATIC_IFN_KUNIT
+VISIBLE_IF_KUNIT
 void amdgpu_dm_psr_fill_caps(struct dc_link *link, struct psr_caps *caps)
 {
 	struct dpcd_caps *dpcd_caps = &link->dpcd_caps;

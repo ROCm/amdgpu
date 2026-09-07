@@ -56,7 +56,7 @@
  * Translate a failed AUX transaction's operation result into an errno-style
  * return value. @result is returned unchanged for AUX_RET_SUCCESS.
  */
-STATIC_IFN_KUNIT ssize_t dm_dp_aux_transfer_result(ssize_t result,
+VISIBLE_IF_KUNIT ssize_t dm_dp_aux_transfer_result(ssize_t result,
 						   enum aux_return_code_type operation_result)
 {
 	switch (operation_result) {
@@ -84,7 +84,7 @@ EXPORT_IF_KUNIT(dm_dp_aux_transfer_result);
 /*
  * Derive the AUX payload transaction flags from a DP AUX request field.
  */
-STATIC_IFN_KUNIT void dm_dp_aux_fill_payload_flags(u8 request,
+VISIBLE_IF_KUNIT void dm_dp_aux_fill_payload_flags(u8 request,
 						   struct aux_payload *payload)
 {
 	payload->i2c_over_aux = (request & DP_AUX_NATIVE_WRITE) == 0;
@@ -98,7 +98,7 @@ EXPORT_IF_KUNIT(dm_dp_aux_fill_payload_flags);
 /*
  * This function handles both native AUX and I2C-Over-AUX transactions.
  */
-STATIC_IFN_KUNIT ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux,
+VISIBLE_IF_KUNIT ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux,
 					    struct drm_dp_aux_msg *msg)
 {
 	ssize_t result = 0;
@@ -185,7 +185,7 @@ dm_dp_mst_detect(struct drm_connector *connector, bool force)
 }
 #endif
 
-STATIC_IFN_KUNIT void
+VISIBLE_IF_KUNIT void
 dm_dp_mst_connector_destroy(struct drm_connector *connector)
 {
 	struct amdgpu_dm_connector *aconnector =
@@ -214,7 +214,7 @@ dm_dp_mst_connector_destroy(struct drm_connector *connector)
 EXPORT_IF_KUNIT(dm_dp_mst_connector_destroy);
 
 #if defined(HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER)
-STATIC_IFN_KUNIT int
+VISIBLE_IF_KUNIT int
 amdgpu_dm_mst_connector_late_register(struct drm_connector *connector)
 {
 	struct amdgpu_dm_connector *amdgpu_dm_connector =
@@ -235,7 +235,7 @@ amdgpu_dm_mst_connector_late_register(struct drm_connector *connector)
 EXPORT_IF_KUNIT(amdgpu_dm_mst_connector_late_register);
 #endif /* HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER */
 
-STATIC_IFN_KUNIT void
+VISIBLE_IF_KUNIT void
 amdgpu_dm_mst_reset_mst_connector_setting(struct amdgpu_dm_connector *aconnector)
 {
 #ifdef HAVE_DRM_DP_MST_EDID_READ
@@ -253,7 +253,7 @@ amdgpu_dm_mst_reset_mst_connector_setting(struct amdgpu_dm_connector *aconnector
 EXPORT_IF_KUNIT(amdgpu_dm_mst_reset_mst_connector_setting);
 
 #if defined(HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER)
-STATIC_IFN_KUNIT void
+VISIBLE_IF_KUNIT void
 amdgpu_dm_mst_connector_early_unregister(struct drm_connector *connector)
 {
 	struct amdgpu_dm_connector *aconnector =
@@ -320,7 +320,7 @@ bool needs_dsc_aux_workaround(struct dc_link *link)
 EXPORT_IF_KUNIT(needs_dsc_aux_workaround);
 
 #if defined(CONFIG_DRM_AMD_DC_FP) || IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
-STATIC_IFN_KUNIT bool is_synaptics_cascaded_panamera(struct dc_link *link, struct drm_dp_mst_port *port)
+VISIBLE_IF_KUNIT bool is_synaptics_cascaded_panamera(struct dc_link *link, struct drm_dp_mst_port *port)
 {
 	u8 branch_vendor_data[4] = { 0 }; // Vendor data 0x50C ~ 0x50F
 
@@ -337,7 +337,7 @@ STATIC_IFN_KUNIT bool is_synaptics_cascaded_panamera(struct dc_link *link, struc
 EXPORT_IF_KUNIT(is_synaptics_cascaded_panamera);
 
 #if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
-STATIC_IFN_KUNIT bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnector)
+VISIBLE_IF_KUNIT bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnector)
 {
 	struct dc_sink *dc_sink = aconnector->dc_sink;
 	struct drm_dp_mst_port *port = aconnector->mst_output_port;
@@ -384,7 +384,7 @@ EXPORT_IF_KUNIT(validate_dsc_caps_on_connector);
 #endif
 #endif
 
-STATIC_IFN_KUNIT bool retrieve_downstream_port_device(struct amdgpu_dm_connector *aconnector)
+VISIBLE_IF_KUNIT bool retrieve_downstream_port_device(struct amdgpu_dm_connector *aconnector)
 {
 	union dp_downstream_port_present ds_port_present;
 
@@ -404,7 +404,7 @@ STATIC_IFN_KUNIT bool retrieve_downstream_port_device(struct amdgpu_dm_connector
 }
 EXPORT_IF_KUNIT(retrieve_downstream_port_device);
 
-STATIC_IFN_KUNIT bool retrieve_branch_specific_data(struct amdgpu_dm_connector *aconnector)
+VISIBLE_IF_KUNIT bool retrieve_branch_specific_data(struct amdgpu_dm_connector *aconnector)
 {
 	struct drm_connector *connector = &aconnector->base;
 	struct drm_dp_mst_port *port = aconnector->mst_output_port;
@@ -438,7 +438,7 @@ STATIC_IFN_KUNIT bool retrieve_branch_specific_data(struct amdgpu_dm_connector *
 }
 EXPORT_IF_KUNIT(retrieve_branch_specific_data);
 
-STATIC_IFN_KUNIT int dm_dp_mst_get_modes(struct drm_connector *connector)
+VISIBLE_IF_KUNIT int dm_dp_mst_get_modes(struct drm_connector *connector)
 {
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 	int ret = 0;
@@ -611,7 +611,7 @@ STATIC_IFN_KUNIT int dm_dp_mst_get_modes(struct drm_connector *connector)
 }
 EXPORT_IF_KUNIT(dm_dp_mst_get_modes);
 
-STATIC_IFN_KUNIT struct drm_encoder *
+VISIBLE_IF_KUNIT struct drm_encoder *
 dm_mst_atomic_best_encoder(struct drm_connector *connector,
 #ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_BEST_ENCODER_ARG_DRM_ATOMIC_STATE
 			   struct drm_atomic_commit *state)
@@ -630,7 +630,7 @@ dm_mst_atomic_best_encoder(struct drm_connector *connector,
 EXPORT_IF_KUNIT(dm_mst_atomic_best_encoder);
 
 #ifdef HAVE_DRM_DP_MST_DETECT_PORT_PPPP
-STATIC_IFN_KUNIT int
+VISIBLE_IF_KUNIT int
 dm_dp_mst_detect(struct drm_connector *connector,
 		 struct drm_modeset_acquire_ctx *ctx, bool force)
 {
@@ -704,7 +704,7 @@ EXPORT_IF_KUNIT(dm_dp_mst_detect);
 #endif
 
 #if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
-STATIC_IFN_KUNIT int dm_dp_mst_atomic_check(struct drm_connector *connector,
+VISIBLE_IF_KUNIT int dm_dp_mst_atomic_check(struct drm_connector *connector,
 					    struct drm_atomic_commit *state)
 {
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
@@ -778,7 +778,7 @@ dm_dp_create_fake_mst_encoders(struct amdgpu_device *adev)
 }
 EXPORT_IF_KUNIT(dm_dp_create_fake_mst_encoders);
 
-STATIC_IFN_KUNIT struct drm_connector *
+VISIBLE_IF_KUNIT struct drm_connector *
 dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 			struct drm_dp_mst_port *port,
 			const char *pathprop)
@@ -878,7 +878,7 @@ EXPORT_IF_KUNIT(dm_dp_add_mst_connector);
  * Select the ESI[1] mask used to filter the MST sideband ready bits for a
  * given message-ready event type.
  */
-STATIC_IFN_KUNIT u8 dm_mst_msg_ready_mask(enum mst_msg_ready_type msg_rdy_type)
+VISIBLE_IF_KUNIT u8 dm_mst_msg_ready_mask(enum mst_msg_ready_type msg_rdy_type)
 {
 	switch (msg_rdy_type) {
 	case DOWN_REP_MSG_RDY_EVENT:
@@ -897,7 +897,7 @@ EXPORT_IF_KUNIT(dm_mst_msg_ready_mask);
 /*
  * Select the DPCD ESI address and read length based on the DPCD revision.
  */
-STATIC_IFN_KUNIT void dm_mst_select_esi_dpcd(u8 dpcd_rev, int *dpcd_addr,
+VISIBLE_IF_KUNIT void dm_mst_select_esi_dpcd(u8 dpcd_rev, int *dpcd_addr,
 					     u8 *dpcd_bytes_to_read)
 {
 	if (dpcd_rev < 0x12) {
@@ -1022,7 +1022,7 @@ void dm_handle_mst_sideband_msg_ready_event(
 EXPORT_IF_KUNIT(dm_handle_mst_sideband_msg_ready_event);
 
 #ifdef HAVE_DRM_DP_MST_TOPOLOGY_CBS_POLL_HPD_IRQ
-STATIC_IFN_KUNIT void dm_handle_mst_down_rep_msg_ready(struct drm_dp_mst_topology_mgr *mgr)
+VISIBLE_IF_KUNIT void dm_handle_mst_down_rep_msg_ready(struct drm_dp_mst_topology_mgr *mgr)
 {
 	dm_handle_mst_sideband_msg_ready_event(mgr, DOWN_REP_MSG_RDY_EVENT);
 }
@@ -1510,7 +1510,7 @@ static int try_disable_dsc(struct drm_atomic_commit *state,
 	return 0;
 }
 
-STATIC_IFN_KUNIT bool get_conv_frl_bw(struct amdgpu_dm_connector *aconnector,
+VISIBLE_IF_KUNIT bool get_conv_frl_bw(struct amdgpu_dm_connector *aconnector,
 				      uint32_t *bw_in_kbps, uint32_t *dsc_bw_in_kbps)
 {
 	unsigned int max_conv_bw_in_kbps = 0;
@@ -1582,7 +1582,7 @@ static void build_frl_mst_dsc_params(struct amdgpu_dm_connector *aconnector,
 	}
 }
 
-STATIC_IFN_KUNIT void log_dsc_params(int count, struct dsc_mst_fairness_vars *vars, int k)
+VISIBLE_IF_KUNIT void log_dsc_params(int count, struct dsc_mst_fairness_vars *vars, int k)
 {
 	int i;
 
@@ -1783,7 +1783,7 @@ static int compute_mst_dsc_configs_for_link(struct drm_atomic_commit *state,
 	return 0;
 }
 
-STATIC_IFN_KUNIT bool is_dsc_need_re_compute(
+VISIBLE_IF_KUNIT bool is_dsc_need_re_compute(
 	struct drm_atomic_commit *state,
 	struct dc_state *dc_state,
 	struct dc_link *dc_link)
@@ -1987,7 +1987,7 @@ int compute_mst_dsc_configs_for_state(struct drm_atomic_commit *state,
 }
 EXPORT_IF_KUNIT(compute_mst_dsc_configs_for_state);
 
-STATIC_IFN_KUNIT int pre_compute_mst_dsc_configs_for_state(struct drm_atomic_commit *state,
+VISIBLE_IF_KUNIT int pre_compute_mst_dsc_configs_for_state(struct drm_atomic_commit *state,
 							   struct dc_state *dc_state,
 							   struct dsc_mst_fairness_vars *vars)
 {
@@ -2041,7 +2041,7 @@ STATIC_IFN_KUNIT int pre_compute_mst_dsc_configs_for_state(struct drm_atomic_com
 }
 EXPORT_IF_KUNIT(pre_compute_mst_dsc_configs_for_state);
 
-STATIC_IFN_KUNIT int find_crtc_index_in_state_by_stream(struct drm_atomic_commit *state,
+VISIBLE_IF_KUNIT int find_crtc_index_in_state_by_stream(struct drm_atomic_commit *state,
 							struct dc_stream_state *stream)
 {
 	int i;
@@ -2073,7 +2073,7 @@ static bool is_link_to_dschub(struct dc_link *dc_link)
 	return true;
 }
 
-STATIC_IFN_KUNIT bool is_dsc_precompute_needed(struct drm_atomic_commit *state)
+VISIBLE_IF_KUNIT bool is_dsc_precompute_needed(struct drm_atomic_commit *state)
 {
 	int i;
 	struct drm_crtc *crtc;
@@ -2239,7 +2239,7 @@ static bool is_dsc_common_config_possible(struct dc_stream_state *stream,
 #endif /* HAVE_DRM_DP_MST_ATOMIC_CHECK */
 
 #if defined(CONFIG_DRM_AMD_DC_FP) || IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
-STATIC_IFN_KUNIT bool dp_get_link_current_set_bw(struct drm_dp_aux *aux, uint32_t *cur_link_bw)
+VISIBLE_IF_KUNIT bool dp_get_link_current_set_bw(struct drm_dp_aux *aux, uint32_t *cur_link_bw)
 {
 	uint32_t total_data_bw_efficiency_x10000 = 0;
 	uint32_t link_rate_per_lane_kbps = 0;

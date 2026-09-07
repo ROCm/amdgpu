@@ -170,7 +170,7 @@ bool amdgpu_dm_is_headless(struct amdgpu_device *adev)
 }
 EXPORT_IF_KUNIT(amdgpu_dm_is_headless);
 
-STATIC_IFN_KUNIT void amdgpu_dm_idle_worker(struct work_struct *work)
+VISIBLE_IF_KUNIT void amdgpu_dm_idle_worker(struct work_struct *work)
 {
 	struct idle_workqueue *idle_work;
 
@@ -223,7 +223,7 @@ struct idle_workqueue *idle_create_workqueue(struct amdgpu_device *adev)
 }
 EXPORT_IF_KUNIT(idle_create_workqueue);
 
-STATIC_IFN_KUNIT void amdgpu_dm_crtc_vblank_control_worker(struct work_struct *work)
+VISIBLE_IF_KUNIT void amdgpu_dm_crtc_vblank_control_worker(struct work_struct *work)
 {
 	struct vblank_control_work *vblank_work =
 		container_of(work, struct vblank_control_work, work);
@@ -251,7 +251,7 @@ STATIC_IFN_KUNIT void amdgpu_dm_crtc_vblank_control_worker(struct work_struct *w
 EXPORT_IF_KUNIT(amdgpu_dm_crtc_vblank_control_worker);
 
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY) || IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
-STATIC_IFN_KUNIT int amdgpu_dm_crtc_set_vline0_irq(struct drm_crtc *crtc, int irq_type,
+VISIBLE_IF_KUNIT int amdgpu_dm_crtc_set_vline0_irq(struct drm_crtc *crtc, int irq_type,
 						   bool enable)
 {
 	struct amdgpu_device *adev = drm_to_adev(crtc->dev);
@@ -426,7 +426,7 @@ void amdgpu_dm_crtc_disable_vblank(struct drm_crtc *crtc)
 }
 EXPORT_IF_KUNIT(amdgpu_dm_crtc_disable_vblank);
 
-STATIC_IFN_KUNIT void amdgpu_dm_crtc_destroy_state(struct drm_crtc *crtc,
+VISIBLE_IF_KUNIT void amdgpu_dm_crtc_destroy_state(struct drm_crtc *crtc,
 				  struct drm_crtc_state *state)
 {
 	struct dm_crtc_state *cur = to_dm_crtc_state(state);
@@ -443,7 +443,7 @@ STATIC_IFN_KUNIT void amdgpu_dm_crtc_destroy_state(struct drm_crtc *crtc,
 }
 EXPORT_IF_KUNIT(amdgpu_dm_crtc_destroy_state);
 
-STATIC_IFN_KUNIT struct drm_crtc_state *amdgpu_dm_crtc_duplicate_state(struct drm_crtc *crtc)
+VISIBLE_IF_KUNIT struct drm_crtc_state *amdgpu_dm_crtc_duplicate_state(struct drm_crtc *crtc)
 {
 	struct dm_crtc_state *state, *cur;
 
@@ -480,7 +480,7 @@ STATIC_IFN_KUNIT struct drm_crtc_state *amdgpu_dm_crtc_duplicate_state(struct dr
 }
 EXPORT_IF_KUNIT(amdgpu_dm_crtc_duplicate_state);
 
-STATIC_IFN_KUNIT void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc)
+VISIBLE_IF_KUNIT void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc)
 {
 	/*
 	 * ISM workers are intentionally quiesced by amdgpu_dm_ism_disable()
@@ -493,7 +493,7 @@ STATIC_IFN_KUNIT void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc)
 }
 EXPORT_IF_KUNIT(amdgpu_dm_crtc_destroy);
 
-STATIC_IFN_KUNIT void amdgpu_dm_crtc_reset_state(struct drm_crtc *crtc)
+VISIBLE_IF_KUNIT void amdgpu_dm_crtc_reset_state(struct drm_crtc *crtc)
 {
 	struct dm_crtc_state *state;
 
@@ -509,7 +509,7 @@ STATIC_IFN_KUNIT void amdgpu_dm_crtc_reset_state(struct drm_crtc *crtc)
 EXPORT_IF_KUNIT(amdgpu_dm_crtc_reset_state);
 
 #ifdef CONFIG_DEBUG_FS
-STATIC_IFN_KUNIT int amdgpu_dm_crtc_late_register(struct drm_crtc *crtc)
+VISIBLE_IF_KUNIT int amdgpu_dm_crtc_late_register(struct drm_crtc *crtc)
 {
 	crtc_debugfs_init(crtc);
 
@@ -615,7 +615,7 @@ static void amdgpu_dm_crtc_helper_disable(struct drm_crtc *crtc)
 {
 }
 
-STATIC_IFN_KUNIT int amdgpu_dm_crtc_count_crtc_active_planes(struct drm_crtc_state *new_crtc_state)
+VISIBLE_IF_KUNIT int amdgpu_dm_crtc_count_crtc_active_planes(struct drm_crtc_state *new_crtc_state)
 {
 	struct drm_atomic_commit *state = new_crtc_state->state;
 	struct drm_plane *plane;
@@ -648,7 +648,7 @@ STATIC_IFN_KUNIT int amdgpu_dm_crtc_count_crtc_active_planes(struct drm_crtc_sta
 }
 EXPORT_IF_KUNIT(amdgpu_dm_crtc_count_crtc_active_planes);
 
-STATIC_IFN_KUNIT void amdgpu_dm_crtc_update_crtc_active_planes(struct drm_crtc *crtc,
+VISIBLE_IF_KUNIT void amdgpu_dm_crtc_update_crtc_active_planes(struct drm_crtc *crtc,
 						     struct drm_crtc_state *new_crtc_state)
 {
 	struct dm_crtc_state *dm_new_crtc_state =
@@ -664,7 +664,7 @@ STATIC_IFN_KUNIT void amdgpu_dm_crtc_update_crtc_active_planes(struct drm_crtc *
 }
 EXPORT_IF_KUNIT(amdgpu_dm_crtc_update_crtc_active_planes);
 
-STATIC_IFN_KUNIT bool amdgpu_dm_crtc_helper_mode_fixup(struct drm_crtc *crtc,
+VISIBLE_IF_KUNIT bool amdgpu_dm_crtc_helper_mode_fixup(struct drm_crtc *crtc,
 					       const struct drm_display_mode *mode,
 					       struct drm_display_mode *adjusted_mode)
 {
@@ -672,7 +672,7 @@ STATIC_IFN_KUNIT bool amdgpu_dm_crtc_helper_mode_fixup(struct drm_crtc *crtc,
 }
 EXPORT_IF_KUNIT(amdgpu_dm_crtc_helper_mode_fixup);
 
-STATIC_IFN_KUNIT int amdgpu_dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
+VISIBLE_IF_KUNIT int amdgpu_dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
 #ifdef HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE
 						struct drm_atomic_commit *state)
 {
