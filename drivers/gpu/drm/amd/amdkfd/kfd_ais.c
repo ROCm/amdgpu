@@ -639,12 +639,11 @@ static struct pci_dev *get_pci_dev_from_block_slave(const char *slave_name,
 }
 
 /*
- * get_pci_dev_from_block_stack - Get PCI device from a block stack
+ * get_pci_dev_from_block_name - Get PCI device from a named block stack
  *
- * Reads /sys/block/<disk>/slaves/ to find underlying block devices. If the
- * directory is empty, treats bdev as a leaf and walks its parent chain.
+ * Reads /sys/block/<name>/slaves/ to find underlying block devices.
  *
- * @bdev: Block device to inspect
+ * @name: Block device name to inspect (e.g. "dm-0")
  * @gpu_dev: GPU device to check P2P against (optional, can be NULL)
  * @pdd: Process device data for P2P caching (required if gpu_dev is set)
  * @depth: Current recursion depth (for nested block device limit)
@@ -654,10 +653,10 @@ static struct pci_dev *get_pci_dev_from_block_slave(const char *slave_name,
  * Note: For stacked block devices, returns first_pdev for sysfs byte accounting.
  * This makes per-device counters imprecise, future work could be to improve this.
  */
-static struct pci_dev *get_pci_dev_from_block_stack(struct block_device *bdev,
-						    struct device *gpu_dev,
-						    struct kfd_process_device *pdd,
-						    int depth)
+static struct pci_dev *get_pci_dev_from_block_name(const char *name,
+						   struct device *gpu_dev,
+						   struct kfd_process_device *pdd,
+						   int depth)
 {
 	char path[80];
 	struct file *dir;
@@ -669,28 +668,15 @@ static struct pci_dev *get_pci_dev_from_block_stack(struct block_device *bdev,
 		.ret = 0,
 	};
 	struct pci_dev *first_pdev = NULL;
-	struct pci_dev *pdev;
 	char (*slave_names)[BDEVNAME_SIZE] = NULL;
 	int i, ret;
 
-	/* Guard against excessive nesting*/
-	if (depth > MAX_BLOCK_RECURSION_DEPTH) {
-		pr_warn("AIS: block device %s: recursion depth %d exceeds limit %d\n",
-			bdev->bd_disk->disk_name, depth, MAX_BLOCK_RECURSION_DEPTH);
-		return NULL;
-	}
-
-	pdev = get_pci_dev_from_bdev(bdev);
-	if (pdev)
-		return pdev;
-
 	/*
-	 * Build sysfs path: /sys/block/<disk>/slaves
+	 * Build sysfs path: /sys/block/<name>/slaves
 	 * Note: Accessed from caller's context, so containers/chroots without
 	 * /sys or /dev mounted will fail here.
 	 */
-	snprintf(path, sizeof(path), "/sys/block/%s/slaves",
-		 bdev->bd_disk->disk_name);
+	snprintf(path, sizeof(path), "/sys/block/%s/slaves", name);
 
 	dir = filp_open(path, O_RDONLY | O_DIRECTORY, 0);
 	if (IS_ERR(dir)) {
@@ -704,7 +690,7 @@ static struct pci_dev *get_pci_dev_from_block_stack(struct block_device *bdev,
 
 	if (ret < 0) {
 		pr_warn("AIS: failed to read slaves directory for %s: %d\n",
-			bdev->bd_disk->disk_name, ret);
+			name, ret);
 		return NULL;
 	}
 
@@ -712,9 +698,8 @@ static struct pci_dev *get_pci_dev_from_block_stack(struct block_device *bdev,
 		return NULL;
 
 	if (iter_ctx.count == 0) {
-		pr_debug("AIS: no slaves found for %s\n",
-			 bdev->bd_disk->disk_name);
-		return get_pci_dev_from_bdev(bdev);
+		pr_debug("AIS: no slaves found for %s\n", name);
+		return NULL;
 	}
 
 	iter_ctx.max_count = min(iter_ctx.count + BLOCK_SLAVE_SPARE,
@@ -740,7 +725,7 @@ static struct pci_dev *get_pci_dev_from_block_stack(struct block_device *bdev,
 
 	if (ret < 0) {
 		pr_warn("AIS: failed to reread slaves directory for %s: %d\n",
-			bdev->bd_disk->disk_name, ret);
+			name, ret);
 		goto out_free_names;
 	}
 
@@ -748,7 +733,7 @@ static struct pci_dev *get_pci_dev_from_block_stack(struct block_device *bdev,
 		goto out_free_names;
 
 	pr_debug("AIS: found %d slave device(s) for %s\n",
-		 iter_ctx.count, bdev->bd_disk->disk_name);
+		 iter_ctx.count, name);
 
 	/* Process all slave devices */
 	for (i = 0; i < iter_ctx.count; i++) {
@@ -803,6 +788,35 @@ out_put_first:
 out_free_names:
 	kfree(slave_names);
 	return NULL;
+}
+
+/*
+ * Entry point for the caller's own block device. Tests @bdev itself, then
+ * resolves its backing devices by name.
+ */
+static struct pci_dev *get_pci_dev_from_block_stack(struct block_device *bdev,
+						    struct device *gpu_dev,
+						    struct kfd_process_device *pdd,
+						    int depth)
+{
+	struct pci_dev *pdev;
+
+	if (!bdev || !bdev->bd_disk)
+		return NULL;
+
+	/* Guard against excessive nesting*/
+	if (depth > MAX_BLOCK_RECURSION_DEPTH) {
+		pr_warn("AIS: block device %s: recursion depth %d exceeds limit %d\n",
+			bdev->bd_disk->disk_name, depth, MAX_BLOCK_RECURSION_DEPTH);
+		return NULL;
+	}
+
+	pdev = get_pci_dev_from_bdev(bdev);
+	if (pdev)
+		return pdev;
+
+	return get_pci_dev_from_block_name(bdev->bd_disk->disk_name,
+					   gpu_dev, pdd, depth);
 }
 
 /*
