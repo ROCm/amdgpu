@@ -176,6 +176,7 @@ void amdgpu_amdkfd_interrupt(struct amdgpu_device *adev,
 void amdgpu_amdkfd_device_probe(struct amdgpu_device *adev);
 void amdgpu_amdkfd_device_init(struct amdgpu_device *adev);
 void amdgpu_amdkfd_device_fini_sw(struct amdgpu_device *adev);
+int amdgpu_amdkfd_prepare_partition_switch(struct amdgpu_device *adev);
 int amdgpu_amdkfd_check_and_lock_kfd(struct amdgpu_device *adev);
 void amdgpu_amdkfd_unlock_kfd(struct amdgpu_device *adev);
 int amdgpu_amdkfd_submit_ib(struct amdgpu_device *adev,
@@ -504,6 +505,7 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			 const struct kgd2kfd_shared_resources *gpu_resources);
 void kgd2kfd_device_exit(struct kfd_dev *kfd);
 void kgd2kfd_suspend(struct kfd_dev *kfd, bool suspend_proc, bool force);
+void kgd2kfd_device_fini(struct kfd_dev *kfd);
 int kgd2kfd_resume(struct kfd_dev *kfd, bool resume_proc);
 void kgd2kfd_suspend_process(struct kfd_dev *kfd, bool force);
 int kgd2kfd_resume_process(struct kfd_dev *kfd);
@@ -558,6 +560,10 @@ static inline void kgd2kfd_device_exit(struct kfd_dev *kfd)
 }
 
 static inline void kgd2kfd_suspend(struct kfd_dev *kfd, bool suspend_proc, bool force)
+{
+}
+
+static inline void kgd2kfd_device_fini(struct kfd_dev *kfd)
 {
 }
 
