@@ -19,3 +19,20 @@ AC_DEFUN([AC_AMDGPU_DMA_MAP_SGTABLE], [
 		)
 	])
 ])
+
+dnl #
+dnl # v6.1-159bf19270e8f
+dnl # dma-mapping: add flags to dma_map_ops to indicate PCI P2PDMA support
+dnl #
+AC_DEFUN([AC_AMDGPU_DMA_PCI_P2PDMA_SUPPORTED], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE_SYMBOL([
+			#include <linux/dma-mapping.h>
+		], [
+			dma_pci_p2pdma_supported(NULL);
+		], [dma_pci_p2pdma_supported], [kernel/dma/mapping.c], [
+			AC_DEFINE(HAVE_DMA_PCI_P2PDMA_SUPPORTED, 1,
+				[dma_pci_p2pdma_supported() is available])
+		])
+	])
+])
