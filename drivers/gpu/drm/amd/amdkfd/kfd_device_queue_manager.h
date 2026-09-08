@@ -281,7 +281,6 @@ struct device_queue_manager {
 	uint32_t		wait_times;
 
 	wait_queue_head_t	destroy_wait;
-	struct delayed_work	notify_unmap_work;
 
 	/* for per-queue reset support */
 	struct dqm_detect_hang_info *detect_hang_info;
