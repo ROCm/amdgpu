@@ -2872,6 +2872,9 @@ void dc_link_set_preferred_training_settings(struct dc *dc,
 		struct dc_link *link,
 		bool skip_immediate_retrain);
 
+/* Configure the sink-specific policy for future DP link training. */
+void dc_link_set_skip_link_bw_clear(struct dc_link *link, bool skip);
+
 /* return - true if FEC is supported with connected DP RX, false otherwise */
 bool dc_link_is_fec_supported(const struct dc_link *link);
 
