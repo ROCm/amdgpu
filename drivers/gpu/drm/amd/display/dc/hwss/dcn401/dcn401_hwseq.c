@@ -2575,7 +2575,8 @@ void dcn401_program_pipe_sequence(
 			false,
 			pipe_ctx->stream_res.test_pattern_params.width,
 			pipe_ctx->stream_res.test_pattern_params.height,
-			pipe_ctx->stream_res.test_pattern_params.offset);
+			pipe_ctx->stream_res.test_pattern_params.offset,
+			dc->debug.disable_dynamic_expansion_for_test_pattern);
 	}
 
 	if (pipe_ctx->plane_state
@@ -3364,7 +3365,8 @@ void dcn401_blank_pixel_data_sequence(
 			true,
 			odm_slice_src.width,
 			odm_slice_src.height,
-			odm_slice_src.x);
+			odm_slice_src.x,
+			dc->debug.disable_dynamic_expansion_for_test_pattern);
 
 		odm_pipe = odm_pipe->next_odm_pipe;
 	}
@@ -3381,7 +3383,8 @@ void dcn401_blank_pixel_data_sequence(
 		true,
 		odm_slice_src.width,
 		odm_slice_src.height,
-		odm_slice_src.x);
+		odm_slice_src.x,
+		dc->debug.disable_dynamic_expansion_for_test_pattern);
 
 	/* Handle ABM level setting when not blanking */
 	if (!blank) {

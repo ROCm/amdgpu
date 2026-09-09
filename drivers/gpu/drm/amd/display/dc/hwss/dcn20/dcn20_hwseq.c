@@ -458,7 +458,8 @@ void dcn20_init_blank(
 			&black_color,
 			otg_active_width,
 			otg_active_height,
-			0);
+			0,
+			dc->debug.disable_dynamic_expansion_for_test_pattern);
 
 	if (num_opps == 2) {
 		bottom_opp->funcs->opp_set_disp_pattern_generator(
@@ -469,7 +470,8 @@ void dcn20_init_blank(
 				&black_color,
 				otg_active_width,
 				otg_active_height,
-				0);
+				0,
+				dc->debug.disable_dynamic_expansion_for_test_pattern);
 	}
 
 	hws->funcs.wait_for_blank_complete(opp);
@@ -3339,7 +3341,7 @@ void dcn20_set_disp_pattern_generator(const struct dc *dc,
 		const struct tg_color *solid_color,
 		int width, int height, int offset)
 {
-	(void)dc;
 	pipe_ctx->stream_res.opp->funcs->opp_set_disp_pattern_generator(pipe_ctx->stream_res.opp, test_pattern,
-			color_space, color_depth, solid_color, width, height, offset);
+			color_space, color_depth, solid_color, width, height, offset,
+			dc->debug.disable_dynamic_expansion_for_test_pattern);
 }

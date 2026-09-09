@@ -1753,7 +1753,8 @@ void dcn32_init_blank(
 				&black_color,
 				otg_active_width,
 				otg_active_height,
-				0);
+				0,
+				dc->debug.disable_dynamic_expansion_for_test_pattern);
 
 	if (num_opps == 2) {
 		if (bottom_opp && bottom_opp->funcs->opp_set_disp_pattern_generator) {
@@ -1765,7 +1766,8 @@ void dcn32_init_blank(
 					&black_color,
 					otg_active_width,
 					otg_active_height,
-					0);
+					0,
+					dc->debug.disable_dynamic_expansion_for_test_pattern);
 			hws->funcs.wait_for_blank_complete(bottom_opp);
 		}
 	}

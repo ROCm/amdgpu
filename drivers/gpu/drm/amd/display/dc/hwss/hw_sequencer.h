@@ -429,6 +429,7 @@ struct opp_set_disp_pattern_generator_params {
 	int width;
 	int height;
 	int offset;
+	bool disable_dyn_exp_for_test_pattern;
 };
 
 struct set_abm_pipe_params {
@@ -2349,7 +2350,8 @@ void hwss_add_opp_set_disp_pattern_generator(struct block_sequence_state *seq_st
 		bool use_solid_color,
 		int width,
 		int height,
-		int offset);
+		int offset,
+		bool disable_dyn_exp_for_test_pattern);
 
 void hwss_add_opp_program_bit_depth_reduction(struct block_sequence_state *seq_state,
 		struct output_pixel_processor *opp,

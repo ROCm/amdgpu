@@ -3537,10 +3537,12 @@ void hwss_opp_set_disp_pattern_generator(union block_sequence_params *params)
 	int width = params->opp_set_disp_pattern_generator_params.width;
 	int height = params->opp_set_disp_pattern_generator_params.height;
 	int offset = params->opp_set_disp_pattern_generator_params.offset;
+	bool disable_dyn_exp =
+		params->opp_set_disp_pattern_generator_params.disable_dyn_exp_for_test_pattern;
 
 	if (opp && opp->funcs->opp_set_disp_pattern_generator) {
 		opp->funcs->opp_set_disp_pattern_generator(opp, test_pattern, color_space,
-			color_depth, solid_color, width, height, offset);
+			color_depth, solid_color, width, height, offset, disable_dyn_exp);
 	}
 }
 
@@ -4862,19 +4864,27 @@ void hwss_add_opp_set_disp_pattern_generator(struct block_sequence_state *seq_st
 		bool use_solid_color,
 		int width,
 		int height,
-		int offset)
+		int offset,
+		bool disable_dyn_exp_for_test_pattern)
 {
 	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
-		seq_state->steps[*seq_state->num_steps].func = OPP_SET_DISP_PATTERN_GENERATOR;
-		seq_state->steps[*seq_state->num_steps].params.opp_set_disp_pattern_generator_params.opp = opp;
-		seq_state->steps[*seq_state->num_steps].params.opp_set_disp_pattern_generator_params.test_pattern = test_pattern;
-		seq_state->steps[*seq_state->num_steps].params.opp_set_disp_pattern_generator_params.color_space = color_space;
-		seq_state->steps[*seq_state->num_steps].params.opp_set_disp_pattern_generator_params.color_depth = color_depth;
-		seq_state->steps[*seq_state->num_steps].params.opp_set_disp_pattern_generator_params.solid_color = solid_color;
-		seq_state->steps[*seq_state->num_steps].params.opp_set_disp_pattern_generator_params.use_solid_color = use_solid_color;
-		seq_state->steps[*seq_state->num_steps].params.opp_set_disp_pattern_generator_params.width = width;
-		seq_state->steps[*seq_state->num_steps].params.opp_set_disp_pattern_generator_params.height = height;
-		seq_state->steps[*seq_state->num_steps].params.opp_set_disp_pattern_generator_params.offset = offset;
+		struct block_sequence *step = &seq_state->steps[*seq_state->num_steps];
+		union block_sequence_params *step_params = &step->params;
+		struct opp_set_disp_pattern_generator_params *pattern_params =
+			&step_params->opp_set_disp_pattern_generator_params;
+
+		step->func = OPP_SET_DISP_PATTERN_GENERATOR;
+		pattern_params->opp = opp;
+		pattern_params->test_pattern = test_pattern;
+		pattern_params->color_space = color_space;
+		pattern_params->color_depth = color_depth;
+		pattern_params->solid_color = solid_color;
+		pattern_params->use_solid_color = use_solid_color;
+		pattern_params->width = width;
+		pattern_params->height = height;
+		pattern_params->offset = offset;
+		pattern_params->disable_dyn_exp_for_test_pattern =
+				disable_dyn_exp_for_test_pattern;
 		(*seq_state->num_steps)++;
 	}
 }
