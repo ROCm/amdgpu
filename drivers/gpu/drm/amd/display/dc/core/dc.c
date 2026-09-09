@@ -4107,21 +4107,14 @@ static void add_update_info_frame_sequence(
 
 static void add_link_update_dsc_config_sequence(
 		struct block_sequence_state *seq_state,
-		struct pipe_ctx *pipe_ctx,
-		struct dsc_config *dsc_cfg,
-		struct dsc_optc_config *dsc_optc_cfg)
+		struct pipe_ctx *pipe_ctx)
 {
 	struct display_stream_compressor *dsc = pipe_ctx->stream_res.dsc;
 	struct dc_stream_state *stream = pipe_ctx->stream;
-	struct dc *dc = stream->ctx->dc;
-	struct dccg *dccg = dc->res_pool->dccg;
 	struct pipe_ctx *top_pipe = pipe_ctx;
-	struct pipe_ctx *odm_pipe = NULL;
-	int opp_cnt = 1;
-	bool should_use_dto_dscclk = false;
-	struct dsc_config dsc_pps_cfg;
+	struct dsc_optc_config dsc_optc_cfg = {};
+	struct dsc_config dsc_pps_cfg = {};
 	uint8_t *dsc_packed_pps = stream->dsc_packed_pps;
-	int last_dsc_set_config_step = 0;
 
 	if (!stream->timing.flags.DSC || !dsc)
 		return;
@@ -4129,60 +4122,13 @@ static void add_link_update_dsc_config_sequence(
 	while (top_pipe->prev_odm_pipe)
 		top_pipe = top_pipe->prev_odm_pipe;
 
-	for (odm_pipe = top_pipe->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe)
-		opp_cnt++;
-
-	memset(dsc_cfg, 0, sizeof(*dsc_cfg));
-	memset(dsc_optc_cfg, 0, sizeof(*dsc_optc_cfg));
-
-	dsc_cfg->pic_width = (stream->timing.h_addressable +
-		top_pipe->dsc_padding_params.dsc_hactive_padding +
-		stream->timing.h_border_left +
-		stream->timing.h_border_right) / opp_cnt;
-	dsc_cfg->pic_height = stream->timing.v_addressable +
-		stream->timing.v_border_top +
-		stream->timing.v_border_bottom;
-	dsc_cfg->pixel_encoding = stream->timing.pixel_encoding;
-	dsc_cfg->color_depth = stream->timing.display_color_depth;
-	dsc_cfg->is_odm = top_pipe->next_odm_pipe ? true : false;
-	dsc_cfg->dc_dsc_cfg = stream->timing.dsc_cfg;
-	ASSERT(dsc_cfg->dc_dsc_cfg.num_slices_h % opp_cnt == 0);
-	dsc_cfg->dc_dsc_cfg.num_slices_h /= opp_cnt;
-	dsc_cfg->dsc_padding = 0;
-
-	if (dccg && dccg->funcs->set_dto_dscclk &&
-			stream->timing.pix_clk_100hz > 480000)
-		should_use_dto_dscclk = true;
-
-	if (should_use_dto_dscclk)
-		hwss_add_dccg_set_dto_dscclk(seq_state, dccg, dsc->inst,
-			dsc_cfg->dc_dsc_cfg.num_slices_h);
-
-	last_dsc_set_config_step = *seq_state->num_steps;
-	hwss_add_dsc_set_config(seq_state, dsc, dsc_cfg, dsc_optc_cfg);
-	hwss_add_dsc_enable_with_opp(seq_state, top_pipe);
-
-	for (odm_pipe = top_pipe->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe) {
-		struct display_stream_compressor *odm_dsc = odm_pipe->stream_res.dsc;
-
-		if (should_use_dto_dscclk)
-			hwss_add_dccg_set_dto_dscclk(seq_state, dccg, odm_dsc->inst,
-				dsc_cfg->dc_dsc_cfg.num_slices_h);
-
-		last_dsc_set_config_step = *seq_state->num_steps;
-		hwss_add_dsc_set_config(seq_state, odm_dsc, dsc_cfg, dsc_optc_cfg);
-		hwss_add_dsc_enable_with_opp(seq_state, odm_pipe);
-	}
+	if (!hwss_add_dsc_sequence_for_stream(seq_state, top_pipe, 0, &dsc_optc_cfg))
+		return;
 
 	if (dc_is_dp_signal(stream->signal) && !dp_is_128b_132b_signal(pipe_ctx))
 		hwss_add_stream_enc_dp_set_dsc_config(seq_state,
-			pipe_ctx->stream_res.stream_enc,
-			&seq_state->steps[last_dsc_set_config_step].params.dsc_set_config_simple_params.dsc_optc_cfg);
+			pipe_ctx->stream_res.stream_enc, &dsc_optc_cfg);
 
-	hwss_add_tg_set_dsc_config(seq_state, top_pipe->stream_res.tg,
-		&seq_state->steps[last_dsc_set_config_step].params.dsc_set_config_simple_params.dsc_optc_cfg, true);
-
-	memset(&dsc_pps_cfg, 0, sizeof(dsc_pps_cfg));
 	dsc_pps_cfg.pic_width = stream->timing.h_addressable +
 		stream->timing.h_border_left + stream->timing.h_border_right;
 	dsc_pps_cfg.pic_height = stream->timing.v_addressable +
@@ -4225,7 +4171,6 @@ static void commit_planes_do_stream_update_sequence(struct dc *dc,
 {
 	int j;
 	struct block_sequence_state seq_state = { .steps = block_sequence, .num_steps = num_steps };
-	unsigned int dsc_cfg_index = 0;
 	*num_steps = 0; // Initialize to 0
 
 	// Stream updates
@@ -4296,15 +4241,7 @@ static void commit_planes_do_stream_update_sequence(struct dc *dc,
 				continue;
 
 			if (stream_update->dsc_config)
-				if (dsc_cfg_index < MAX_PIPES) {
-					struct dsc_config dsc_cfg;
-					struct dsc_optc_config dsc_optc_cfg;
-
-					add_link_update_dsc_config_sequence(&seq_state,
-						pipe_ctx,
-						&dsc_cfg,
-						&dsc_optc_cfg);
-				}
+				add_link_update_dsc_config_sequence(&seq_state, pipe_ctx);
 
 			if (stream_update->mst_bw_update) {
 				if (stream_update->mst_bw_update->is_increase)

@@ -1845,9 +1845,6 @@ void hwss_execute_sequence(struct dc *dc,
 		case DSC_READ_STATE:
 			hwss_dsc_read_state(params);
 			break;
-		case DSC_CALCULATE_AND_SET_CONFIG:
-			hwss_dsc_calculate_and_set_config(params);
-			break;
 		case DSC_ENABLE_WITH_OPP:
 			hwss_dsc_enable_with_opp(params);
 			break;
@@ -2157,9 +2154,6 @@ void hwss_execute_sequence(struct dc *dc,
 			break;
 		case STREAM_ENC_UPDATE_DP_INFO_PACKETS:
 			hwss_stream_enc_update_dp_info_packets(params);
-			break;
-		case DSC_SET_CONFIG_SIMPLE:
-			hwss_dsc_set_config_simple(params);
 			break;
 		case STREAM_ENC_DP_SET_DSC_CONFIG:
 			hwss_stream_enc_dp_set_dsc_config(params);
@@ -3287,12 +3281,15 @@ void hwss_dccg_set_dto_dscclk(union block_sequence_params *params)
 
 void hwss_dsc_set_config(union block_sequence_params *params)
 {
-	struct display_stream_compressor *dsc = params->dsc_set_config_params.dsc;
-	struct dsc_config *dsc_cfg = params->dsc_set_config_params.dsc_cfg;
-	struct dsc_optc_config *dsc_optc_cfg = params->dsc_set_config_params.dsc_optc_cfg;
+	struct display_stream_compressor *dsc;
 
-	if (dsc && dsc->funcs->dsc_set_config)
-		dsc->funcs->dsc_set_config(dsc, dsc_cfg, dsc_optc_cfg);
+	if (!params)
+		return;
+
+	dsc = params->dsc_set_config_params.dsc;
+
+	if (dsc && dsc->funcs && dsc->funcs->dsc_set_config)
+		dsc->funcs->dsc_set_config(dsc);
 }
 
 void hwss_dsc_enable(union block_sequence_params *params)
@@ -3306,24 +3303,18 @@ void hwss_dsc_enable(union block_sequence_params *params)
 
 void hwss_tg_set_dsc_config(union block_sequence_params *params)
 {
-	struct timing_generator *tg = params->tg_set_dsc_config_params.tg;
-	enum optc_dsc_mode optc_dsc_mode = OPTC_DSC_DISABLED;
-	uint32_t bytes_per_pixel = 0;
-	uint32_t slice_width = 0;
+	struct timing_generator *tg;
 
-	if (params->tg_set_dsc_config_params.enable) {
-		struct dsc_optc_config *dsc_optc_cfg = params->tg_set_dsc_config_params.dsc_optc_cfg;
+	if (!params)
+		return;
 
-		if (dsc_optc_cfg) {
-			bytes_per_pixel = dsc_optc_cfg->bytes_per_pixel;
-			slice_width = dsc_optc_cfg->slice_width;
-			optc_dsc_mode = dsc_optc_cfg->is_pixel_format_444 ?
-				OPTC_DSC_ENABLED_444 : OPTC_DSC_ENABLED_NATIVE_SUBSAMPLED;
-		}
-	}
+	tg = params->tg_set_dsc_config_params.tg;
 
-	if (tg && tg->funcs->set_dsc_config)
-		tg->funcs->set_dsc_config(tg, optc_dsc_mode, bytes_per_pixel, slice_width);
+	if (tg && tg->funcs && tg->funcs->set_dsc_config)
+		tg->funcs->set_dsc_config(tg,
+			params->tg_set_dsc_config_params.dsc_mode,
+			params->tg_set_dsc_config_params.bytes_per_pixel,
+			params->tg_set_dsc_config_params.slice_width);
 }
 
 void hwss_dsc_disconnect(union block_sequence_params *params)
@@ -3341,41 +3332,6 @@ void hwss_dsc_read_state(union block_sequence_params *params)
 
 	if (dsc && dsc->funcs->dsc_read_state)
 		dsc->funcs->dsc_read_state(dsc, dsc_state);
-}
-
-void hwss_dsc_calculate_and_set_config(union block_sequence_params *params)
-{
-	struct pipe_ctx *pipe_ctx = params->dsc_calculate_and_set_config_params.pipe_ctx;
-	struct pipe_ctx *top_pipe = pipe_ctx;
-	bool enable = params->dsc_calculate_and_set_config_params.enable;
-	int opp_cnt = params->dsc_calculate_and_set_config_params.opp_cnt;
-
-	struct display_stream_compressor *dsc = pipe_ctx->stream_res.dsc;
-	struct dc_stream_state *stream = pipe_ctx->stream;
-
-	if (!dsc || !enable)
-		return;
-
-	/* Calculate DSC configuration - extracted from dcn32_update_dsc_on_stream */
-	struct dsc_config dsc_cfg;
-
-	while (top_pipe->prev_odm_pipe)
-		top_pipe = top_pipe->prev_odm_pipe;
-
-	dsc_cfg.pic_width = (stream->timing.h_addressable + top_pipe->dsc_padding_params.dsc_hactive_padding +
-			stream->timing.h_border_left + stream->timing.h_border_right) / opp_cnt;
-	dsc_cfg.pic_height = stream->timing.v_addressable + stream->timing.v_border_top + stream->timing.v_border_bottom;
-	dsc_cfg.pixel_encoding = stream->timing.pixel_encoding;
-	dsc_cfg.color_depth = stream->timing.display_color_depth;
-	dsc_cfg.is_odm = top_pipe->next_odm_pipe ? true : false;
-	dsc_cfg.dc_dsc_cfg = stream->timing.dsc_cfg;
-	dsc_cfg.dc_dsc_cfg.num_slices_h /= opp_cnt;
-	dsc_cfg.dsc_padding = top_pipe->dsc_padding_params.dsc_hactive_padding;
-
-	/* Set DSC configuration */
-	if (dsc->funcs->dsc_set_config)
-		dsc->funcs->dsc_set_config(dsc, &dsc_cfg,
-			&params->dsc_calculate_and_set_config_params.dsc_optc_cfg);
 }
 
 void hwss_dsc_enable_with_opp(union block_sequence_params *params)
@@ -4474,24 +4430,18 @@ void hwss_stream_enc_update_dp_info_packets(union block_sequence_params *params)
 
 void hwss_stream_enc_dp_set_dsc_config(union block_sequence_params *params)
 {
-	if (params->stream_enc_dp_set_dsc_config_params.stream_enc &&
-	    params->stream_enc_dp_set_dsc_config_params.stream_enc->funcs->dp_set_dsc_config) {
-		enum optc_dsc_mode dsc_mode = OPTC_DSC_DISABLED;
-		uint32_t dsc_bytes_per_pixel = 0;
-		uint32_t dsc_slice_width = 0;
-		const struct dsc_optc_config *dsc_optc_cfg = params->stream_enc_dp_set_dsc_config_params.dsc_optc_cfg;
+	struct stream_encoder *stream_enc;
 
-		if (dsc_optc_cfg) {
-			dsc_mode = dsc_optc_cfg->is_pixel_format_444 ?
-				OPTC_DSC_ENABLED_444 : OPTC_DSC_ENABLED_NATIVE_SUBSAMPLED;
-			dsc_bytes_per_pixel = dsc_optc_cfg->bytes_per_pixel;
-			dsc_slice_width = dsc_optc_cfg->slice_width;
-		}
+	if (!params)
+		return;
 
-		params->stream_enc_dp_set_dsc_config_params.stream_enc->funcs->dp_set_dsc_config(
-			params->stream_enc_dp_set_dsc_config_params.stream_enc,
-			dsc_mode, dsc_bytes_per_pixel, dsc_slice_width);
-	}
+	stream_enc = params->stream_enc_dp_set_dsc_config_params.stream_enc;
+
+	if (stream_enc && stream_enc->funcs && stream_enc->funcs->dp_set_dsc_config)
+		stream_enc->funcs->dp_set_dsc_config(stream_enc,
+			params->stream_enc_dp_set_dsc_config_params.dsc_mode,
+			params->stream_enc_dp_set_dsc_config_params.bytes_per_pixel,
+			params->stream_enc_dp_set_dsc_config_params.slice_width);
 }
 
 void hwss_hpo_dp_stream_enc_dp_set_dsc_pps_info_packet(union block_sequence_params *params)
@@ -4640,16 +4590,6 @@ void hwss_link_set_dpms_on(union block_sequence_params *params)
 		pipe_ctx->stream->link->dc->link_srv->set_dpms_on(state, pipe_ctx);
 }
 
-void hwss_dsc_set_config_simple(union block_sequence_params *params)
-{
-	struct display_stream_compressor *dsc = params->dsc_set_config_simple_params.dsc;
-	struct dsc_config *dsc_cfg = &params->dsc_set_config_simple_params.dsc_cfg;
-	struct dsc_optc_config *dsc_optc_cfg = &params->dsc_set_config_simple_params.dsc_optc_cfg;
-
-	if (dsc && dsc->funcs && dsc->funcs->dsc_set_config)
-		dsc->funcs->dsc_set_config(dsc, dsc_cfg, dsc_optc_cfg);
-}
-
 /*
  * Clock manager executor functions
  */
@@ -4726,16 +4666,57 @@ void hwss_add_dccg_set_dto_dscclk(struct block_sequence_state *seq_state,
 	}
 }
 
-void hwss_add_dsc_calculate_and_set_config(struct block_sequence_state *seq_state,
-		struct pipe_ctx *pipe_ctx, bool enable, int opp_cnt)
+bool hwss_prepare_dsc_config_for_pipe(
+		struct pipe_ctx *pipe_ctx, int opp_cnt, uint32_t dsc_padding,
+		struct dsc_optc_config *dsc_optc_cfg)
 {
-	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
-		seq_state->steps[*seq_state->num_steps].func = DSC_CALCULATE_AND_SET_CONFIG;
-		seq_state->steps[*seq_state->num_steps].params.dsc_calculate_and_set_config_params.pipe_ctx = pipe_ctx;
-		seq_state->steps[*seq_state->num_steps].params.dsc_calculate_and_set_config_params.enable = enable;
-		seq_state->steps[*seq_state->num_steps].params.dsc_calculate_and_set_config_params.opp_cnt = opp_cnt;
-		(*seq_state->num_steps)++;
-	}
+	struct dsc_config dsc_cfg = {};
+	struct dsc_optc_config optc = {};
+	struct display_stream_compressor *dsc;
+	struct pipe_ctx *top_pipe = pipe_ctx;
+	struct dc_stream_state *stream;
+	bool is_config_ok;
+
+	if (dsc_optc_cfg)
+		memset(dsc_optc_cfg, 0, sizeof(*dsc_optc_cfg));
+
+	if (!pipe_ctx || !pipe_ctx->stream || !pipe_ctx->stream_res.dsc ||
+			opp_cnt <= 0 || opp_cnt > MAX_PIPES)
+		return false;
+
+	dsc = pipe_ctx->stream_res.dsc;
+
+	if (!dsc->funcs || !dsc->funcs->dsc_prepare_config || !dsc->funcs->dsc_set_config)
+		return false;
+
+	stream = pipe_ctx->stream;
+
+	if (!stream->timing.dsc_cfg.num_slices_h ||
+			stream->timing.dsc_cfg.num_slices_h % opp_cnt)
+		return false;
+
+	while (top_pipe->prev_odm_pipe)
+		top_pipe = top_pipe->prev_odm_pipe;
+
+	dsc_cfg.pic_width =
+		(stream->timing.h_addressable + top_pipe->dsc_padding_params.dsc_hactive_padding +
+		 stream->timing.h_border_left + stream->timing.h_border_right) / opp_cnt;
+	dsc_cfg.pic_height = stream->timing.v_addressable +
+		stream->timing.v_border_top + stream->timing.v_border_bottom;
+	dsc_cfg.pixel_encoding = stream->timing.pixel_encoding;
+	dsc_cfg.color_depth = stream->timing.display_color_depth;
+	dsc_cfg.is_odm = top_pipe->next_odm_pipe ? true : false;
+	dsc_cfg.dc_dsc_cfg = stream->timing.dsc_cfg;
+	dsc_cfg.dc_dsc_cfg.num_slices_h /= opp_cnt;
+	dsc_cfg.dsc_padding = dsc_padding;
+
+	is_config_ok = dsc->funcs->dsc_prepare_config(dsc, &dsc_cfg, &optc);
+	ASSERT(is_config_ok);
+	if (!is_config_ok)
+		return false;
+	if (dsc_optc_cfg)
+		*dsc_optc_cfg = optc;
+	return true;
 }
 
 void hwss_add_mpc_remove_mpcc(struct block_sequence_state *seq_state,
@@ -4777,13 +4758,28 @@ void hwss_add_dsc_enable_with_opp(struct block_sequence_state *seq_state,
 }
 
 void hwss_add_tg_set_dsc_config(struct block_sequence_state *seq_state,
-		struct timing_generator *tg, struct dsc_optc_config *dsc_optc_cfg, bool enable)
+		struct timing_generator *tg, const struct dsc_optc_config *dsc_optc_cfg, bool enable)
 {
+	if (!seq_state || !seq_state->steps || !seq_state->num_steps ||
+			!tg || !tg->funcs || !tg->funcs->set_dsc_config || (enable && !dsc_optc_cfg))
+		return;
+
 	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
+		struct tg_set_dsc_config_params *p =
+			&seq_state->steps[*seq_state->num_steps].params.tg_set_dsc_config_params;
+
 		seq_state->steps[*seq_state->num_steps].func = TG_SET_DSC_CONFIG;
-		seq_state->steps[*seq_state->num_steps].params.tg_set_dsc_config_params.tg = tg;
-		seq_state->steps[*seq_state->num_steps].params.tg_set_dsc_config_params.dsc_optc_cfg = dsc_optc_cfg;
-		seq_state->steps[*seq_state->num_steps].params.tg_set_dsc_config_params.enable = enable;
+		p->tg = tg;
+		p->dsc_mode = OPTC_DSC_DISABLED;
+		p->bytes_per_pixel = 0;
+		p->slice_width = 0;
+
+		if (enable && dsc_optc_cfg) {
+			p->dsc_mode = dsc_optc_cfg->is_pixel_format_444 ?
+				OPTC_DSC_ENABLED_444 : OPTC_DSC_ENABLED_NATIVE_SUBSAMPLED;
+			p->bytes_per_pixel = dsc_optc_cfg->bytes_per_pixel;
+			p->slice_width = dsc_optc_cfg->slice_width;
+		}
 		(*seq_state->num_steps)++;
 	}
 }
@@ -6106,28 +6102,157 @@ void hwss_add_stream_enc_update_dp_info_packets(struct block_sequence_state *seq
 	}
 }
 
-void hwss_add_dsc_set_config(struct block_sequence_state *seq_state,
-		struct display_stream_compressor *dsc,
-		const struct dsc_config *dsc_cfg,
-		const struct dsc_optc_config *dsc_optc_cfg)
+bool hwss_add_dsc_set_config(struct block_sequence_state *seq_state,
+		struct display_stream_compressor *dsc)
 {
-	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
-		seq_state->steps[*seq_state->num_steps].func = DSC_SET_CONFIG_SIMPLE;
-		seq_state->steps[*seq_state->num_steps].params.dsc_set_config_simple_params.dsc = dsc;
-		seq_state->steps[*seq_state->num_steps].params.dsc_set_config_simple_params.dsc_cfg = *dsc_cfg;
-		seq_state->steps[*seq_state->num_steps].params.dsc_set_config_simple_params.dsc_optc_cfg = *dsc_optc_cfg;
-		(*seq_state->num_steps)++;
+	if (!seq_state || !seq_state->steps || !seq_state->num_steps ||
+			*seq_state->num_steps >= MAX_HWSS_BLOCK_SEQUENCE_SIZE ||
+			!dsc || !dsc->funcs || !dsc->funcs->dsc_set_config)
+		return false;
+	seq_state->steps[*seq_state->num_steps].func = DSC_SET_CONFIG;
+	seq_state->steps[*seq_state->num_steps].params.dsc_set_config_params.dsc = dsc;
+	(*seq_state->num_steps)++;
+	return true;
+}
+
+bool hwss_add_dsc_sequence_for_pipe(struct block_sequence_state *seq_state,
+		struct pipe_ctx *pipe_ctx, int opp_cnt, uint32_t dsc_padding,
+		struct dsc_optc_config *dsc_optc_cfg)
+{
+	if (dsc_optc_cfg)
+		memset(dsc_optc_cfg, 0, sizeof(*dsc_optc_cfg));
+	if (!seq_state || !seq_state->steps || !seq_state->num_steps ||
+			*seq_state->num_steps > MAX_HWSS_BLOCK_SEQUENCE_SIZE - 2 ||
+			!pipe_ctx || !pipe_ctx->stream_res.opp || !pipe_ctx->stream_res.dsc ||
+			!pipe_ctx->stream_res.dsc->funcs || !pipe_ctx->stream_res.dsc->funcs->dsc_enable)
+		return false;
+
+	if (!hwss_prepare_dsc_config_for_pipe(pipe_ctx, opp_cnt, dsc_padding, dsc_optc_cfg))
+		return false;
+
+	if (!hwss_add_dsc_set_config(seq_state, pipe_ctx->stream_res.dsc))
+		return false;
+
+	hwss_add_dsc_enable_with_opp(seq_state, pipe_ctx);
+	return true;
+}
+
+bool hwss_add_dsc_sequence_for_stream(struct block_sequence_state *seq_state,
+		struct pipe_ctx *pipe_ctx, uint32_t dsc_padding,
+		struct dsc_optc_config *dsc_optc_cfg)
+{
+	struct pipe_ctx *top_pipe = pipe_ctx;
+	struct pipe_ctx *odm_pipe;
+	struct dc_stream_state *stream;
+	struct display_stream_compressor *dsc;
+	struct dccg *dccg = NULL;
+	struct dsc_optc_config optc = {};
+	int opp_cnt = 0;
+	int num_slices_h;
+	unsigned int initial_steps;
+	unsigned int required_steps;
+	bool should_use_dto_dscclk = false;
+
+	if (dsc_optc_cfg)
+		memset(dsc_optc_cfg, 0, sizeof(*dsc_optc_cfg));
+
+	if (!seq_state || !seq_state->steps || !seq_state->num_steps || !top_pipe ||
+			*seq_state->num_steps > MAX_HWSS_BLOCK_SEQUENCE_SIZE)
+		return false;
+
+	while (top_pipe->prev_odm_pipe)
+		top_pipe = top_pipe->prev_odm_pipe;
+
+	if (!top_pipe->stream || !top_pipe->stream->timing.flags.DSC ||
+			!top_pipe->stream_res.tg || !top_pipe->stream_res.tg->funcs ||
+			!top_pipe->stream_res.tg->funcs->set_dsc_config)
+		return false;
+
+	dsc = top_pipe->stream_res.dsc;
+	stream = top_pipe->stream;
+
+	if (stream->ctx && stream->ctx->dc && stream->ctx->dc->res_pool)
+		dccg = stream->ctx->dc->res_pool->dccg;
+
+	for (odm_pipe = top_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe) {
+		struct display_stream_compressor *odm_dsc = odm_pipe->stream_res.dsc;
+
+		if (++opp_cnt > MAX_PIPES || odm_pipe->stream != stream ||
+				!odm_pipe->stream_res.opp || !odm_dsc || !odm_dsc->funcs ||
+				!odm_dsc->funcs->dsc_prepare_config || !odm_dsc->funcs->dsc_set_config ||
+				!odm_dsc->funcs->dsc_enable)
+			return false;
 	}
+
+	if (!stream->timing.dsc_cfg.num_slices_h || stream->timing.dsc_cfg.num_slices_h % opp_cnt)
+		return false;
+	num_slices_h = stream->timing.dsc_cfg.num_slices_h / opp_cnt;
+
+	if (dccg && dccg->funcs && dccg->funcs->set_dto_dscclk &&
+			stream->timing.pix_clk_100hz > 480000)
+		should_use_dto_dscclk = true;
+
+	initial_steps = *seq_state->num_steps;
+	required_steps = opp_cnt * (should_use_dto_dscclk ? 3 : 2) + 1;
+	if (required_steps > MAX_HWSS_BLOCK_SEQUENCE_SIZE - initial_steps)
+		return false;
+
+	/* Step 1: Set DTO DSCCLK for master DSC if needed */
+	if (should_use_dto_dscclk)
+		hwss_add_dccg_set_dto_dscclk(seq_state, dccg, dsc->inst, num_slices_h);
+
+	/* Step 2: Configure and enable master DSC + OPP */
+	if (!hwss_add_dsc_sequence_for_pipe(seq_state, top_pipe, opp_cnt, dsc_padding, &optc))
+		goto fail;
+
+	/* Step 3: Configure and enable ODM DSC blocks + OPP */
+	for (odm_pipe = top_pipe->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe) {
+		struct display_stream_compressor *odm_dsc = odm_pipe->stream_res.dsc;
+
+		if (should_use_dto_dscclk)
+			hwss_add_dccg_set_dto_dscclk(seq_state, dccg, odm_dsc->inst, num_slices_h);
+
+		if (!hwss_add_dsc_sequence_for_pipe(seq_state, odm_pipe, opp_cnt, dsc_padding, NULL))
+			goto fail;
+	}
+
+	/* Step 4: Configure DSC in timing generator (OPTC) */
+	hwss_add_tg_set_dsc_config(seq_state, top_pipe->stream_res.tg, &optc, true);
+
+	if (dsc_optc_cfg)
+		*dsc_optc_cfg = optc;
+
+	return true;
+
+fail:
+	*seq_state->num_steps = initial_steps;
+	return false;
 }
 
 void hwss_add_stream_enc_dp_set_dsc_config(struct block_sequence_state *seq_state,
 		struct stream_encoder *stream_enc,
 		const struct dsc_optc_config *dsc_optc_cfg)
 {
+	if (!seq_state || !seq_state->steps || !seq_state->num_steps ||
+			!stream_enc || !stream_enc->funcs || !stream_enc->funcs->dp_set_dsc_config)
+		return;
+
 	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
+		struct stream_enc_dp_set_dsc_config_params *p =
+			&seq_state->steps[*seq_state->num_steps].params.stream_enc_dp_set_dsc_config_params;
+
 		seq_state->steps[*seq_state->num_steps].func = STREAM_ENC_DP_SET_DSC_CONFIG;
-		seq_state->steps[*seq_state->num_steps].params.stream_enc_dp_set_dsc_config_params.stream_enc = stream_enc;
-		seq_state->steps[*seq_state->num_steps].params.stream_enc_dp_set_dsc_config_params.dsc_optc_cfg = dsc_optc_cfg;
+		p->stream_enc = stream_enc;
+		p->dsc_mode = OPTC_DSC_DISABLED;
+		p->bytes_per_pixel = 0;
+		p->slice_width = 0;
+
+		if (dsc_optc_cfg) {
+			p->dsc_mode = dsc_optc_cfg->is_pixel_format_444 ?
+				OPTC_DSC_ENABLED_444 : OPTC_DSC_ENABLED_NATIVE_SUBSAMPLED;
+			p->bytes_per_pixel = dsc_optc_cfg->bytes_per_pixel;
+			p->slice_width = dsc_optc_cfg->slice_width;
+		}
 		(*seq_state->num_steps)++;
 	}
 }

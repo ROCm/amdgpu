@@ -279,8 +279,6 @@ struct dccg_set_dto_dscclk_params {
 
 struct dsc_set_config_params {
 	struct display_stream_compressor *dsc;
-	struct dsc_config *dsc_cfg;
-	struct dsc_optc_config *dsc_optc_cfg;
 };
 
 struct dsc_enable_params {
@@ -290,8 +288,9 @@ struct dsc_enable_params {
 
 struct tg_set_dsc_config_params {
 	struct timing_generator *tg;
-	struct dsc_optc_config *dsc_optc_cfg;
-	bool enable;
+	enum optc_dsc_mode dsc_mode;
+	uint32_t bytes_per_pixel;
+	uint32_t slice_width;
 };
 
 struct dsc_disconnect_params {
@@ -301,13 +300,6 @@ struct dsc_disconnect_params {
 struct dsc_read_state_params {
 	struct display_stream_compressor *dsc;
 	struct dcn_dsc_state *dsc_state;
-};
-
-struct dsc_calculate_and_set_config_params {
-	struct pipe_ctx *pipe_ctx;
-	struct dsc_optc_config dsc_optc_cfg;
-	bool enable;
-	int opp_cnt;
 };
 
 struct dsc_enable_with_opp_params {
@@ -936,15 +928,11 @@ struct stream_enc_update_dp_info_packets_params {
 	struct pipe_ctx *pipe_ctx;
 };
 
-struct dsc_set_config_simple_params {
-	struct display_stream_compressor *dsc;
-	struct dsc_config dsc_cfg;
-	struct dsc_optc_config dsc_optc_cfg;
-};
-
 struct stream_enc_dp_set_dsc_config_params {
 	struct stream_encoder *stream_enc;
-	const struct dsc_optc_config *dsc_optc_cfg;
+	enum optc_dsc_mode dsc_mode;
+	uint32_t bytes_per_pixel;
+	uint32_t slice_width;
 };
 
 struct hpo_dp_stream_enc_dp_set_dsc_pps_info_packet_params {
@@ -1084,7 +1072,6 @@ union block_sequence_params {
 	struct tg_set_dsc_config_params tg_set_dsc_config_params;
 	struct dsc_disconnect_params dsc_disconnect_params;
 	struct dsc_read_state_params dsc_read_state_params;
-	struct dsc_calculate_and_set_config_params dsc_calculate_and_set_config_params;
 	struct dsc_enable_with_opp_params dsc_enable_with_opp_params;
 	struct program_tg_params program_tg_params;
 	struct tg_program_global_sync_params tg_program_global_sync_params;
@@ -1194,7 +1181,6 @@ union block_sequence_params {
 	struct hpo_dp_stream_enc_update_dp_info_packets_params hpo_dp_stream_enc_update_dp_info_packets_params;
 	struct stream_enc_update_dp_info_packets_sdp_line_num_params stream_enc_update_dp_info_packets_sdp_line_num_params;
 	struct stream_enc_update_dp_info_packets_params stream_enc_update_dp_info_packets_params;
-	struct dsc_set_config_simple_params dsc_set_config_simple_params;
 	struct stream_enc_dp_set_dsc_config_params stream_enc_dp_set_dsc_config_params;
 	struct hpo_dp_stream_enc_dp_set_dsc_pps_info_packet_params hpo_dp_stream_enc_dp_set_dsc_pps_info_packet_params;
 	struct stream_enc_dp_set_dsc_pps_info_packet_params stream_enc_dp_set_dsc_pps_info_packet_params;
@@ -1259,7 +1245,6 @@ enum block_sequence_func {
 	TG_SET_DSC_CONFIG,
 	DSC_DISCONNECT,
 	DSC_READ_STATE,
-	DSC_CALCULATE_AND_SET_CONFIG,
 	DSC_ENABLE_WITH_OPP,
 	TG_PROGRAM_GLOBAL_SYNC,
 	TG_WAIT_FOR_STATE,
@@ -1350,7 +1335,6 @@ enum block_sequence_func {
 	HPO_DP_STREAM_ENC_UPDATE_DP_INFO_PACKETS,
 	STREAM_ENC_UPDATE_DP_INFO_PACKETS_SDP_LINE_NUM,
 	STREAM_ENC_UPDATE_DP_INFO_PACKETS,
-	DSC_SET_CONFIG_SIMPLE,
 	STREAM_ENC_DP_SET_DSC_CONFIG,
 	HPO_DP_STREAM_ENC_DP_SET_DSC_PPS_INFO_PACKET,
 	STREAM_ENC_DP_SET_DSC_PPS_INFO_PACKET,
@@ -1900,11 +1884,7 @@ void hwss_dsc_disconnect(union block_sequence_params *params);
 
 void hwss_dsc_read_state(union block_sequence_params *params);
 
-void hwss_dsc_calculate_and_set_config(union block_sequence_params *params);
-
 void hwss_dsc_enable_with_opp(union block_sequence_params *params);
-
-void hwss_dsc_set_config_simple(union block_sequence_params *params);
 
 void hwss_stream_enc_update_hdmi_info_packets(union block_sequence_params *params);
 
@@ -2284,8 +2264,9 @@ void hwss_add_tg_wait_double_buffer_pending(struct block_sequence_state *seq_sta
 void hwss_add_dccg_set_dto_dscclk(struct block_sequence_state *seq_state,
 		struct dccg *dccg, int inst, int num_slices_h);
 
-void hwss_add_dsc_calculate_and_set_config(struct block_sequence_state *seq_state,
-		struct pipe_ctx *pipe_ctx, bool enable, int opp_cnt);
+/* Resolves DSC geometry and driver state for pipe; pass NULL if the caller does not need OPTC parameters. */
+bool hwss_prepare_dsc_config_for_pipe(struct pipe_ctx *pipe_ctx, int opp_cnt, uint32_t dsc_padding,
+			struct dsc_optc_config *dsc_optc_cfg);
 
 void hwss_add_mpc_remove_mpcc(struct block_sequence_state *seq_state,
 		struct mpc *mpc, struct mpc_tree *mpc_tree_params, struct mpcc *mpcc_to_remove);
@@ -2641,7 +2622,7 @@ void hwss_add_hubbub_apply_dedcn21_147_wa(struct block_sequence_state *seq_state
 
 void hwss_add_tg_set_dsc_config(struct block_sequence_state *seq_state,
 		struct timing_generator *tg,
-		struct dsc_optc_config *dsc_optc_cfg,
+		const struct dsc_optc_config *dsc_optc_cfg,
 		bool enable);
 
 void hwss_add_opp_program_left_edge_extra_pixel(struct block_sequence_state *seq_state,
@@ -2694,10 +2675,18 @@ void hwss_add_stream_enc_update_dp_info_packets_sdp_line_num(struct block_sequen
 void hwss_add_stream_enc_update_dp_info_packets(struct block_sequence_state *seq_state,
 		struct pipe_ctx *pipe_ctx);
 
-void hwss_add_dsc_set_config(struct block_sequence_state *seq_state,
-		struct display_stream_compressor *dsc,
-		const struct dsc_config *dsc_cfg,
-		const struct dsc_optc_config *dsc_optc_cfg);
+bool hwss_add_dsc_set_config(struct block_sequence_state *seq_state,
+		struct display_stream_compressor *dsc);
+
+/* Composes DSC sub-sequence (prepare, set config, enable with OPP) for a pipe. */
+bool hwss_add_dsc_sequence_for_pipe(struct block_sequence_state *seq_state,
+		struct pipe_ctx *pipe_ctx, int opp_cnt, uint32_t dsc_padding,
+		struct dsc_optc_config *dsc_optc_cfg);
+
+/* Composes full DSC sequence (DCCG DTO clocks, DSC, OPP, TG) for a stream. */
+bool hwss_add_dsc_sequence_for_stream(struct block_sequence_state *seq_state,
+		struct pipe_ctx *pipe_ctx, uint32_t dsc_padding,
+		struct dsc_optc_config *dsc_optc_cfg);
 
 void hwss_add_stream_enc_dp_set_dsc_config(struct block_sequence_state *seq_state,
 		struct stream_encoder *stream_enc,
