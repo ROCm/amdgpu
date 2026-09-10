@@ -798,9 +798,11 @@ amdgpu_dm_get_output_color_space(const struct dc_crtc_timing *dc_crtc_timing,
 	case DRM_MODE_COLORIMETRY_BT2020_RGB:
 	case DRM_MODE_COLORIMETRY_BT2020_YCC:
 		if (dc_crtc_timing->pixel_encoding == PIXEL_ENCODING_RGB) {
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDMI_BROADCAST_RGB
 			if (connector_state->hdmi.broadcast_rgb == DRM_HDMI_BROADCAST_RGB_LIMITED)
 				color_space = COLOR_SPACE_2020_RGB_LIMITEDRANGE;
 			else
+#endif
 				color_space = COLOR_SPACE_2020_RGB_FULLRANGE;
 		} else {
 			color_space = COLOR_SPACE_2020_YCBCR_LIMITED;
