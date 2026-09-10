@@ -367,6 +367,7 @@ struct kfd2kgd_calls {
 					enum kfd_ioctl_pc_sample_type type,
 					uint64_t intval,
 					uint32_t inst);
+	void (*hqd_gfx_clean_fault)(struct amdgpu_device *adev);
 };
 
 #endif	/* KGD_KFD_INTERFACE_H_INCLUDED */

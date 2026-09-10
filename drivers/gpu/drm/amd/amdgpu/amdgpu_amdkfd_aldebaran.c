@@ -208,4 +208,5 @@ const struct kfd2kgd_calls aldebaran_kfd2kgd = {
 	.hqd_sdma_get_doorbell = kgd_gfx_v9_hqd_sdma_get_doorbell,
 	.trigger_pc_sample_trap = kgd_aldebaran_trigger_pc_sample_trap,
 	.override_core_cg = kgd_gfx_v9_override_core_cg,
+	.hqd_gfx_clean_fault = kgd_gfx_v9_clean_fault
 };

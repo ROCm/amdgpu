@@ -126,3 +126,4 @@ uint32_t kgd_gfx_v9_trigger_pc_sample_trap(struct amdgpu_device *adev,
 void kgd_gfx_v9_override_core_cg(struct amdgpu_device *adev,
 					    uint32_t value,
 					    uint32_t inst);
+void kgd_gfx_v9_clean_fault(struct amdgpu_device *adev);
