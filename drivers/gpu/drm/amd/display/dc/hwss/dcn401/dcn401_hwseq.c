@@ -3301,8 +3301,10 @@ void dcn401_plane_atomic_disconnect_sequence(struct dc *dc,
 	// Phantom pipes have OTG disabled by default, so MPCC_STATUS will never assert idle,
 	// so don't wait for MPCC_IDLE in the programming sequence
 	if (dc_state_get_pipe_subvp_type(state, pipe_ctx) != SUBVP_PHANTOM) {
-		/* Step 2: Set MPCC disconnect pending flag */
-		hwss_add_opp_set_mpcc_disconnect_pending(seq_state, opp, pipe_ctx->plane_res.mpcc_inst, true);
+		/* Step 2: Set MPCC disconnect pending flag. Set here rather than as a sequence step
+		 * because the post-unlock build phase reads it to decide what to emit.
+		 */
+		opp->mpcc_disconnect_pending[pipe_ctx->plane_res.mpcc_inst] = true;
 	}
 
 	/* Step 3: Set optimized required flag */

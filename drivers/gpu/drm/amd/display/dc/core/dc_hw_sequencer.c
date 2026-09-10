@@ -1888,9 +1888,6 @@ void hwss_execute_sequence(struct dc *dc,
 		case MPC_REMOVE_MPCC:
 			hwss_mpc_remove_mpcc(params);
 			break;
-		case OPP_SET_MPCC_DISCONNECT_PENDING:
-			hwss_opp_set_mpcc_disconnect_pending(params);
-			break;
 		case DC_SET_OPTIMIZED_REQUIRED:
 			hwss_dc_set_optimized_required(params);
 			break;
@@ -3581,15 +3578,6 @@ void hwss_mpc_remove_mpcc(union block_sequence_params *params)
 	mpc->funcs->remove_mpcc(mpc, mpc_tree_params, mpcc_to_remove);
 }
 
-void hwss_opp_set_mpcc_disconnect_pending(union block_sequence_params *params)
-{
-	struct output_pixel_processor *opp = params->opp_set_mpcc_disconnect_pending_params.opp;
-	int mpcc_inst = params->opp_set_mpcc_disconnect_pending_params.mpcc_inst;
-	bool pending = params->opp_set_mpcc_disconnect_pending_params.pending;
-
-	opp->mpcc_disconnect_pending[mpcc_inst] = pending;
-}
-
 void hwss_dc_set_optimized_required(union block_sequence_params *params)
 {
 	struct dc *dc = params->dc_set_optimized_required_params.dc;
@@ -4769,18 +4757,6 @@ void hwss_add_mpc_remove_mpcc(struct block_sequence_state *seq_state,
 		seq_state->steps[*seq_state->num_steps].params.mpc_remove_mpcc_params.mpc = mpc;
 		seq_state->steps[*seq_state->num_steps].params.mpc_remove_mpcc_params.mpc_tree_params = mpc_tree_params;
 		seq_state->steps[*seq_state->num_steps].params.mpc_remove_mpcc_params.mpcc_to_remove = mpcc_to_remove;
-		(*seq_state->num_steps)++;
-	}
-}
-
-void hwss_add_opp_set_mpcc_disconnect_pending(struct block_sequence_state *seq_state,
-		struct output_pixel_processor *opp, int mpcc_inst, bool pending)
-{
-	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
-		seq_state->steps[*seq_state->num_steps].func = OPP_SET_MPCC_DISCONNECT_PENDING;
-		seq_state->steps[*seq_state->num_steps].params.opp_set_mpcc_disconnect_pending_params.opp = opp;
-		seq_state->steps[*seq_state->num_steps].params.opp_set_mpcc_disconnect_pending_params.mpcc_inst = mpcc_inst;
-		seq_state->steps[*seq_state->num_steps].params.opp_set_mpcc_disconnect_pending_params.pending = pending;
 		(*seq_state->num_steps)++;
 	}
 }

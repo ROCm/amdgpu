@@ -486,12 +486,6 @@ struct mpc_remove_mpcc_params {
 	struct mpcc *mpcc_to_remove;
 };
 
-struct opp_set_mpcc_disconnect_pending_params {
-	struct output_pixel_processor *opp;
-	int mpcc_inst;
-	bool pending;
-};
-
 struct dc_set_optimized_required_params {
 	struct dc *dc;
 	bool optimized_required;
@@ -1128,7 +1122,6 @@ union block_sequence_params {
 	struct set_abm_immediate_disable_params set_abm_immediate_disable_params;
 	struct set_disp_pattern_generator_params set_disp_pattern_generator_params;
 	struct mpc_remove_mpcc_params mpc_remove_mpcc_params;
-	struct opp_set_mpcc_disconnect_pending_params opp_set_mpcc_disconnect_pending_params;
 	struct dc_set_optimized_required_params dc_set_optimized_required_params;
 	struct hubp_disconnect_params hubp_disconnect_params;
 	struct hubbub_force_pstate_change_control_params hubbub_force_pstate_change_control_params;
@@ -1299,7 +1292,6 @@ enum block_sequence_func {
 	ABM_SET_LEVEL,
 	ABM_SET_IMMEDIATE_DISABLE,
 	MPC_REMOVE_MPCC,
-	OPP_SET_MPCC_DISCONNECT_PENDING,
 	DC_SET_OPTIMIZED_REQUIRED,
 	HUBP_DISCONNECT,
 	HUBBUB_FORCE_PSTATE_CHANGE_CONTROL,
@@ -2007,8 +1999,6 @@ void hwss_set_abm_immediate_disable(union block_sequence_params *params);
 
 void hwss_mpc_remove_mpcc(union block_sequence_params *params);
 
-void hwss_opp_set_mpcc_disconnect_pending(union block_sequence_params *params);
-
 void hwss_dc_set_optimized_required(union block_sequence_params *params);
 
 void hwss_hubp_disconnect(union block_sequence_params *params);
@@ -2322,9 +2312,6 @@ void hwss_add_dsc_calculate_and_set_config(struct block_sequence_state *seq_stat
 
 void hwss_add_mpc_remove_mpcc(struct block_sequence_state *seq_state,
 		struct mpc *mpc, struct mpc_tree *mpc_tree_params, struct mpcc *mpcc_to_remove);
-
-void hwss_add_opp_set_mpcc_disconnect_pending(struct block_sequence_state *seq_state,
-		struct output_pixel_processor *opp, int mpcc_inst, bool pending);
 
 void hwss_add_hubp_disconnect(struct block_sequence_state *seq_state,
 		struct hubp *hubp);
