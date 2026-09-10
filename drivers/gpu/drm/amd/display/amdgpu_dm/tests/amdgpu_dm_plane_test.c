@@ -2266,7 +2266,7 @@ static void dm_test_plane_reset_initializes_state(struct kunit *test)
 	 * destroy-existing-state path. The destroy hook frees this state, so it
 	 * must be a plain (non-KUnit-managed) allocation.
 	 */
-	old_state = kzalloc(sizeof(*old_state), GFP_KERNEL);
+	old_state = kzalloc_obj(*old_state, GFP_KERNEL);
 	KUNIT_ASSERT_NOT_NULL(test, old_state);
 	plane->funcs = &dm_test_plane_reset_funcs;
 	plane->state = &old_state->base;
@@ -2428,7 +2428,7 @@ static void dm_test_plane_destroy_state_minimal(struct kunit *test)
 	KUNIT_ASSERT_NOT_NULL(test, plane);
 
 	/* destroy_state frees the state itself, so use a plain allocation. */
-	dm_plane_state = kzalloc(sizeof(*dm_plane_state), GFP_KERNEL);
+	dm_plane_state = kzalloc_obj(*dm_plane_state, GFP_KERNEL);
 	KUNIT_ASSERT_NOT_NULL(test, dm_plane_state);
 
 	amdgpu_dm_plane_drm_plane_destroy_state(plane, &dm_plane_state->base);
@@ -2456,7 +2456,7 @@ static void dm_test_plane_destroy_state_releases_resources(struct kunit *test)
 	KUNIT_ASSERT_NOT_NULL(test, dc_plane_state);
 
 	/* destroy_state frees the state itself, so use a plain allocation. */
-	dm_plane_state = kzalloc(sizeof(*dm_plane_state), GFP_KERNEL);
+	dm_plane_state = kzalloc_obj(*dm_plane_state, GFP_KERNEL);
 	KUNIT_ASSERT_NOT_NULL(test, dm_plane_state);
 
 	/* Hold an extra reference so the release does not free KUnit memory. */
