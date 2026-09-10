@@ -660,8 +660,10 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 	if (args->flags & AMDGPU_GEM_USERPTR_VALIDATE) {
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 		range = amdgpu_hmm_range_alloc(NULL);
-		if (unlikely(!range))
-			return -ENOMEM;
+		if (unlikely(!range)) {
+			r = -ENOMEM;
+			goto release_object;
+		}
 		r = amdgpu_ttm_tt_get_user_pages(bo, range);
 #else
 		r = amdgpu_ttm_tt_get_user_pages(bo, bo->tbo.ttm->pages);
