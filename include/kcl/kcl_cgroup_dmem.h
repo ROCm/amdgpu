@@ -108,6 +108,7 @@ static inline void kcl_dmem_cgroup_pool_state_put(struct dmem_cgroup_pool_state 
 #include <linux/cgroup_dmem.h>
 #include <linux/stdarg.h>
 #include <linux/string.h>
+#include <linux/slab.h>
 
 struct dmem_cgroup_ops {
 	int (*reclaim)(struct dmem_cgroup_pool_state *pool,
@@ -156,19 +157,27 @@ struct dmem_cgroup_pool_state *kcl_dmem_cgroup_get_common_ancestor(struct dmem_c
  * commas that the preprocessor would treat as macro argument separators.
  * Forward through a variadic wrapper instead: the region name is formatted
  * locally and the .ops/.reclaim_priv fields are ignored on such kernels.
+ *
+ * Format the name with kvasprintf() just like the kernel does, so there is no
+ * fixed-length buffer or silent truncation regardless of name_fmt length.
  */
 static inline __printf(2, 3) struct dmem_cgroup_region *
 kcl_dmem_cgroup_register_region(const struct dmem_cgroup_init *init,
 				const char *name_fmt, ...)
 {
-	char name[64];
+	struct dmem_cgroup_region *region;
 	va_list args;
+	char *name;
 
 	va_start(args, name_fmt);
-	vsnprintf(name, sizeof(name), name_fmt, args);
+	name = kvasprintf(GFP_KERNEL, name_fmt, args);
 	va_end(args);
+	if (!name)
+		return ERR_PTR(-ENOMEM);
 
-	return dmem_cgroup_register_region(init->size, "%s", name);
+	region = dmem_cgroup_register_region(init->size, "%s", name);
+	kvfree(name);
+	return region;
 }
 
 #define dmem_cgroup_register_region(...) \
