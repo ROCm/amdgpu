@@ -4286,6 +4286,12 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 #endif
 	}
 
+	/* HDMI/PCON without an EDID FreeSync VCP code is not FreeSync-capable. */
+	if ((sink->sink_signal == SIGNAL_TYPE_HDMI_TYPE_A ||
+	     as_type == FREESYNC_TYPE_PCON_IN_WHITELIST) &&
+	    !sink->edid_caps.freesync_vcp_code)
+		freesync_capable = false;
+
 	/* Handle MCCS */
 	if (do_mccs) {
 		dm_helpers_read_mccs_caps(adev->dm.dc->ctx, amdgpu_dm_connector->dc_link, sink);
