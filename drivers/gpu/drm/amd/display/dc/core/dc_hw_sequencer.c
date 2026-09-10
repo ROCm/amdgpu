@@ -1165,14 +1165,19 @@ void hwss_build_post_unlock_full_sequence(struct dc *dc,
 			dc->current_state->stream_status[0].plane_count == 1 &&
 			context->stream_status[0].plane_count > 1) {
 
-		hwss_add_hubbub_allow_self_refresh_control(&seq_state, dc->res_pool->hubbub, false,
-			&hwseq->wa_state.disallow_self_refresh_during_multi_plane_transition_applied);
+		hwss_add_hubbub_allow_self_refresh_control(&seq_state, dc->res_pool->hubbub, false);
 
 		/* Get frame count for WA state tracking - this needs to be done immediately after the above call */
 		if (dc->res_pool->timing_generators[0]->funcs->get_frame_count) {
 			hwss_add_tg_get_frame_count(&seq_state, dc->res_pool->timing_generators[0],
 				&hwseq->wa_state.disallow_self_refresh_during_multi_plane_transition_applied_on_frame);
 		}
+
+		/*
+		 * Set here rather than as a sequence step: the executor must not
+		 * write to logical objects.
+		 */
+		hwseq->wa_state.disallow_self_refresh_during_multi_plane_transition_applied = true;
 	}
 }
 
@@ -3685,9 +3690,6 @@ void hwss_hubbub_allow_self_refresh_control(union block_sequence_params *params)
 	bool allow = params->hubbub_allow_self_refresh_control_params.allow;
 
 	hubbub->funcs->allow_self_refresh_control(hubbub, allow);
-
-	if (!allow && params->hubbub_allow_self_refresh_control_params.disallow_self_refresh_applied)
-		*params->hubbub_allow_self_refresh_control_params.disallow_self_refresh_applied = true;
 }
 
 void hwss_tg_get_frame_count(union block_sequence_params *params)
@@ -5881,14 +5883,12 @@ void hwss_add_hubbub_apply_dedcn21_147_wa(struct block_sequence_state *seq_state
 
 void hwss_add_hubbub_allow_self_refresh_control(struct block_sequence_state *seq_state,
 		struct hubbub *hubbub,
-		bool allow,
-		bool *disallow_self_refresh_applied)
+		bool allow)
 {
 	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
 		seq_state->steps[*seq_state->num_steps].func = HUBBUB_ALLOW_SELF_REFRESH_CONTROL;
 		seq_state->steps[*seq_state->num_steps].params.hubbub_allow_self_refresh_control_params.hubbub = hubbub;
 		seq_state->steps[*seq_state->num_steps].params.hubbub_allow_self_refresh_control_params.allow = allow;
-		seq_state->steps[*seq_state->num_steps].params.hubbub_allow_self_refresh_control_params.disallow_self_refresh_applied = disallow_self_refresh_applied;
 		(*seq_state->num_steps)++;
 	}
 }

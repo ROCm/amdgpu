@@ -528,7 +528,6 @@ struct hubbub_apply_dedcn21_147_wa_params {
 struct hubbub_allow_self_refresh_control_params {
 	struct hubbub *hubbub;
 	bool allow;
-	bool *disallow_self_refresh_applied;
 };
 
 struct tg_get_frame_count_params {
@@ -2665,8 +2664,7 @@ void hwss_add_hubbub_apply_dedcn21_147_wa(struct block_sequence_state *seq_state
 
 void hwss_add_hubbub_allow_self_refresh_control(struct block_sequence_state *seq_state,
 		struct hubbub *hubbub,
-		bool allow,
-		bool *disallow_self_refresh_applied);
+		bool allow);
 
 void hwss_add_tg_get_frame_count(struct block_sequence_state *seq_state,
 		struct timing_generator *tg,
