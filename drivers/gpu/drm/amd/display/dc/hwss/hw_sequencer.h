@@ -498,7 +498,7 @@ struct hubp_disconnect_params {
 struct hubbub_force_pstate_change_control_params {
 	struct hubbub *hubbub;
 	bool enable;
-	bool wait;
+	bool allow;
 };
 
 struct tg_enable_crtc_params {
@@ -2276,7 +2276,7 @@ void hwss_add_hubp_program_mcache_id(struct block_sequence_state *seq_state,
 		struct hubp *hubp, struct dml2_hubp_pipe_mcache_regs *mcache_regs);
 
 void hwss_add_hubbub_force_pstate_change_control(struct block_sequence_state *seq_state,
-		struct hubbub *hubbub, bool enable, bool wait);
+		struct hubbub *hubbub, bool enable, bool allow);
 
 void hwss_add_hubp_program_det_segments(struct block_sequence_state *seq_state,
 		struct hubbub *hubbub, unsigned int hubp_inst, unsigned int det_size);

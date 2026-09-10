@@ -2775,13 +2775,16 @@ void hwss_add_hubp_program_mcache_id(struct block_sequence_state *seq_state,
 void hwss_add_hubbub_force_pstate_change_control(struct block_sequence_state *seq_state,
 		struct hubbub *hubbub,
 		bool enable,
-		bool wait)
+		bool allow)
 {
 	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
-		seq_state->steps[*seq_state->num_steps].params.hubbub_force_pstate_change_control_params.hubbub = hubbub;
-		seq_state->steps[*seq_state->num_steps].params.hubbub_force_pstate_change_control_params.enable = enable;
-		seq_state->steps[*seq_state->num_steps].params.hubbub_force_pstate_change_control_params.wait = wait;
-		seq_state->steps[*seq_state->num_steps].func = HUBBUB_FORCE_PSTATE_CHANGE_CONTROL;
+		struct block_sequence *step = &seq_state->steps[*seq_state->num_steps];
+		union block_sequence_params *step_params = &step->params;
+
+		step_params->hubbub_force_pstate_change_control_params.hubbub = hubbub;
+		step_params->hubbub_force_pstate_change_control_params.enable = enable;
+		step_params->hubbub_force_pstate_change_control_params.allow = allow;
+		step->func = HUBBUB_FORCE_PSTATE_CHANGE_CONTROL;
 		(*seq_state->num_steps)++;
 	}
 }
@@ -3598,10 +3601,10 @@ void hwss_hubbub_force_pstate_change_control(union block_sequence_params *params
 {
 	struct hubbub *hubbub = params->hubbub_force_pstate_change_control_params.hubbub;
 	bool enable = params->hubbub_force_pstate_change_control_params.enable;
-	bool wait = params->hubbub_force_pstate_change_control_params.wait;
+	bool allow = params->hubbub_force_pstate_change_control_params.allow;
 
 	if (hubbub->funcs->force_pstate_change_control) {
-		hubbub->funcs->force_pstate_change_control(hubbub, enable, wait);
+		hubbub->funcs->force_pstate_change_control(hubbub, enable, allow);
 		/* Add delay when enabling pstate change control */
 		if (enable)
 			udelay(500);
