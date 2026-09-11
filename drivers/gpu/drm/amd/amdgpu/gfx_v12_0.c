@@ -914,6 +914,10 @@ static void gfx_v12_0_select_me_pipe_q(struct amdgpu_device *adev,
 	soc24_grbm_select(adev, me, pipe, q, vm);
 }
 
+static bool gfx_v12_0_detect_hung_queue(struct amdgpu_device *adev,
+					u32 doorbell_index,
+					u32 *me, u32 *pipe, u32 *queue);
+
 /* all sizes are in bytes */
 #define MQD_SHADOW_BASE_SIZE      73728
 #define MQD_SHADOW_BASE_ALIGNMENT 256
@@ -953,6 +957,7 @@ static const struct amdgpu_gfx_funcs gfx_v12_0_gfx_funcs = {
 	.read_wave_sgprs = &gfx_v12_0_read_wave_sgprs,
 	.read_wave_vgprs = &gfx_v12_0_read_wave_vgprs,
 	.select_me_pipe_q = &gfx_v12_0_select_me_pipe_q,
+	.detect_hung_queue = &gfx_v12_0_detect_hung_queue,
 	.update_perfmon_mgcg = &gfx_v12_0_update_perf_clk,
 	.get_gfx_shadow_info = &gfx_v12_0_get_gfx_shadow_info,
 	.get_hdp_flush_mask = &amdgpu_gfx_get_hdp_flush_mask,
@@ -5138,6 +5143,43 @@ static int gfx_v12_0_set_priv_inst_fault_state(struct amdgpu_device *adev,
 	}
 
 	return 0;
+}
+
+static bool gfx_v12_0_detect_hung_queue(struct amdgpu_device *adev,
+					u32 doorbell_index,
+					u32 *me, u32 *pipe, u32 *queue)
+{
+	u32 i, k, p, db_ctrl, dboff;
+	bool found = false;
+
+	amdgpu_gfx_off_ctrl(adev, false);
+	mutex_lock(&adev->srbm_mutex);
+	for (i = 0; i < adev->gfx.me.num_me && !found; i++) {
+		for (p = 0; p < adev->gfx.me.num_pipe_per_me && !found; p++) {
+			for (k = 0; k < adev->gfx.me.num_queue_per_pipe; k++) {
+				soc24_grbm_select(adev, i, p, k, 0);
+				db_ctrl = RREG32_SOC15(GC, 0,
+						       regCP_RB_DOORBELL_CONTROL);
+				if (!(db_ctrl & CP_RB_DOORBELL_CONTROL__DOORBELL_EN_MASK))
+					continue;
+				dboff = (db_ctrl &
+					 CP_RB_DOORBELL_CONTROL__DOORBELL_OFFSET_MASK) >>
+					CP_RB_DOORBELL_CONTROL__DOORBELL_OFFSET__SHIFT;
+				if (dboff == doorbell_index) {
+					*me = i;
+					*pipe = p;
+					*queue = k;
+					found = true;
+					break;
+				}
+			}
+		}
+	}
+	soc24_grbm_select(adev, 0, 0, 0, 0);
+	mutex_unlock(&adev->srbm_mutex);
+	amdgpu_gfx_off_ctrl(adev, true);
+
+	return found;
 }
 
 /*
