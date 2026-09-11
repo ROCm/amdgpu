@@ -729,8 +729,10 @@ static void dcn60_override_utm_qos_model(struct clk_mgr_internal *clk_mgr,
 static void dcn60_override_bw_params(struct clk_mgr_internal *clk_mgr,
 		struct clk_bw_params *bw_params)
 {
-	dcn60_override_clk_table(clk_mgr, &bw_params->clk_table);
-	dcn60_override_dc_mode_limit(clk_mgr, bw_params);
+	if (!ASICREV_IS_DCN6_VARIANT_LITE3(clk_mgr->base.ctx->asic_id.hw_internal_rev)) {
+		dcn60_override_clk_table(clk_mgr, &bw_params->clk_table);
+		dcn60_override_dc_mode_limit(clk_mgr, bw_params);
+	}
 
 	if (dcn60_should_apply_temp_utm_override)
 		dcn60_override_utm_qos_model(clk_mgr, bw_params);
