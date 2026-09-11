@@ -382,6 +382,9 @@ struct amdgpu_gfx_funcs {
 	int (*get_xccs_per_xcp)(struct amdgpu_device *adev);
 	void (*get_hdp_flush_mask)(struct amdgpu_ring *ring,
 				uint32_t *ref_and_mask, uint32_t *reg_mem_engine);
+	/* find the gfx HQD slot (me/pipe/queue) for a doorbell */
+	bool (*detect_hung_queue)(struct amdgpu_device *adev, u32 doorbell_index,
+				  u32 *me, u32 *pipe, u32 *queue);
 };
 
 struct sq_work {
