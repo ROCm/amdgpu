@@ -1468,7 +1468,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 7.1.0"
+#define PACKAGE_STRING "amdgpu-dkms 7.2.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
@@ -1477,7 +1477,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "7.1.0"
+#define PACKAGE_VERSION "7.2.0"
 
 /* drm_file->debugfs_client is available */
 #define STRUCT_DRM_FILE_DEBUGFS_CLIENT 1
