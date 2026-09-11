@@ -881,7 +881,7 @@ int amdgpu_ras_mgr_early_init_service(struct amdgpu_device *adev)
 	}
 
 	ret = ras_core_eeprom_early_init_service(ras_mgr->ras_core);
-	if (ret)
+	if (ret && (ret != -EOPNOTSUPP))
 		RAS_DEV_WARN(adev, "RAS early init service failure! ret:%d\n", ret);
 
 	return ret;
