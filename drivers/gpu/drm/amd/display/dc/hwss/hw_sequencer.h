@@ -602,7 +602,6 @@ struct hubp_disable_control_params {
 
 struct hubbub_soft_reset_params {
 	struct hubbub *hubbub;
-	void (*hubbub_soft_reset)(struct hubbub *hubbub, bool reset);
 	bool reset;
 };
 
@@ -2416,7 +2415,6 @@ void hwss_add_hubp_disable_control(struct block_sequence_state *seq_state,
 
 void hwss_add_hubbub_soft_reset(struct block_sequence_state *seq_state,
 		struct hubbub *hubbub,
-		void (*hubbub_soft_reset)(struct hubbub *hubbub, bool reset),
 		bool reset);
 
 void hwss_add_hubbub_perfmon_reset(struct block_sequence_state *seq_state,

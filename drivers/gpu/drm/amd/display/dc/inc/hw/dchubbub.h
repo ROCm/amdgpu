@@ -216,6 +216,8 @@ struct hubbub_funcs {
 
 	void (*apply_DEDCN21_147_wa)(struct hubbub *hubbub);
 
+	void (*soft_reset)(struct hubbub *hubbub, bool reset);
+
 	void (*force_wm_propagate_to_pipes)(struct hubbub *hubbub);
 
 	void (*hubbub_read_state)(struct hubbub *hubbub, struct dcn_hubbub_state *hubbub_state);

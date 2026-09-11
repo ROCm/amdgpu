@@ -530,6 +530,7 @@ static const struct hubbub_funcs hubbub42_funcs = {
 	.program_watermarks = hubbub42_program_watermarks,
 	.allow_self_refresh_control = hubbub42_allow_self_refresh_control,
 	.is_allow_self_refresh_enabled = hubbub1_is_allow_self_refresh_enabled,
+	.soft_reset = hubbub1_soft_reset,
 	.force_wm_propagate_to_pipes = hubbub32_force_wm_propagate_to_pipes,
 	.force_pstate_change_control = hubbub3_force_pstate_change_control,
 	.init_watermarks = hubbub35_init_watermarks,

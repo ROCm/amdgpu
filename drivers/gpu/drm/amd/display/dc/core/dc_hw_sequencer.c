@@ -3822,8 +3822,8 @@ void hwss_hubbub_soft_reset(union block_sequence_params *params)
 	struct hubbub *hubbub = params->hubbub_soft_reset_params.hubbub;
 	bool reset = params->hubbub_soft_reset_params.reset;
 
-	if (hubbub)
-		params->hubbub_soft_reset_params.hubbub_soft_reset(hubbub, reset);
+	if (hubbub->funcs->soft_reset)
+		hubbub->funcs->soft_reset(hubbub, reset);
 }
 
 void hwss_hubbub_perfmon_reset(union block_sequence_params *params)
@@ -5176,13 +5176,11 @@ void hwss_add_hubp_disable_control(struct block_sequence_state *seq_state,
 
 void hwss_add_hubbub_soft_reset(struct block_sequence_state *seq_state,
 		struct hubbub *hubbub,
-		void (*hubbub_soft_reset)(struct hubbub *hubbub, bool reset),
 		bool reset)
 {
 	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
 		seq_state->steps[*seq_state->num_steps].func = HUBBUB_SOFT_RESET;
 		seq_state->steps[*seq_state->num_steps].params.hubbub_soft_reset_params.hubbub = hubbub;
-		seq_state->steps[*seq_state->num_steps].params.hubbub_soft_reset_params.hubbub_soft_reset = hubbub_soft_reset;
 		seq_state->steps[*seq_state->num_steps].params.hubbub_soft_reset_params.reset = reset;
 		(*seq_state->num_steps)++;
 	}

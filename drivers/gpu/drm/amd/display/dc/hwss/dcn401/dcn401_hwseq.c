@@ -30,7 +30,6 @@
 
 #include "dce/dmub_hw_lock_mgr.h"
 #include "dcn10/dcn10_cm_common.h"
-#include "dcn10/dcn10_hubbub.h"
 #include "dcn20/dcn20_optc.h"
 #include "dcn20/dcn20_hwseq.h"
 #include "dcn30/dcn30_cm_common.h"
@@ -4161,7 +4160,7 @@ bool dcn401_hw_wa_force_recovery_sequence(struct dc *dc,
 	}
 
 	/* Step 2: DCHUBBUB_GLOBAL_SOFT_RESET=1 */
-	hwss_add_hubbub_soft_reset(seq_state, dc->res_pool->hubbub, hubbub1_soft_reset, true);
+	hwss_add_hubbub_soft_reset(seq_state, dc->res_pool->hubbub, true);
 
 	/* Step 3: Set HUBP_DISABLE=1 for all active pipes */
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
@@ -4186,7 +4185,7 @@ bool dcn401_hw_wa_force_recovery_sequence(struct dc *dc,
 	}
 
 	/* Step 5: DCHUBBUB_GLOBAL_SOFT_RESET=0 */
-	hwss_add_hubbub_soft_reset(seq_state, dc->res_pool->hubbub, hubbub1_soft_reset, false);
+	hwss_add_hubbub_soft_reset(seq_state, dc->res_pool->hubbub, false);
 
 	/* Step 6: Set HUBP_BLANK_EN=0 for all active pipes */
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
