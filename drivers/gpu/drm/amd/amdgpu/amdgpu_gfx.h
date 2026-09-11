@@ -710,6 +710,7 @@ int amdgpu_gfx_mes_reset_queue(struct amdgpu_ring *ring,
 			       unsigned int vmid,
 			       struct amdgpu_fence *timedout_fence,
 			       bool use_mmio);
+void amdgpu_gfx_mqd_reset_restore(struct amdgpu_ring *ring);
 
 static inline const char *amdgpu_gfx_compute_mode_desc(int mode)
 {
