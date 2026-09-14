@@ -1507,11 +1507,23 @@ static u32 gfx_v12_1_get_sa_active_bitmap(struct amdgpu_device *adev,
 	return sa_mask & (~(gc_disabled_sa_mask | gc_user_disabled_sa_mask));
 }
 
+static u32 gfx_v12_1_get_sh_mem_config(struct amdgpu_device *adev)
+{
+	u32 sh_mem_config = DEFAULT_SH_MEM_CONFIG;
+
+	/* GC 12.1.0 A0 requires RETRY_DISABLE in SH_MEM_CONFIG. */
+	if (SOC_V1_0_DIE_REV_XCD(adev->rev_id) == 0)
+		sh_mem_config |= 1 << SH_MEM_CONFIG__RETRY_DISABLE__SHIFT;
+
+	return sh_mem_config;
+}
+
 static void gfx_v12_1_xcc_init_compute_vmid(struct amdgpu_device *adev,
 					    int xcc_id)
 {
 	int i;
 	uint32_t sh_mem_bases;
+	uint32_t sh_mem_config;
 	uint32_t data;
 
 	/*
@@ -1523,12 +1535,13 @@ static void gfx_v12_1_xcc_init_compute_vmid(struct amdgpu_device *adev,
 				     (adev->gmc.private_aperture_start >> 58));
 	sh_mem_bases = REG_SET_FIELD(sh_mem_bases, SH_MEM_BASES, SHARED_BASE,
 				     (adev->gmc.shared_aperture_start >> 48));
+	sh_mem_config = gfx_v12_1_get_sh_mem_config(adev);
 
 	mutex_lock(&adev->srbm_mutex);
 	for (i = adev->vm_manager.first_kfd_vmid; i < AMDGPU_NUM_VMID; i++) {
 		soc_v1_0_grbm_select(adev, 0, 0, 0, i, GET_INST(GC, xcc_id));
 		/* CP and shaders */
-		WREG32_SOC15(GC, GET_INST(GC, xcc_id), regSH_MEM_CONFIG, DEFAULT_SH_MEM_CONFIG);
+		WREG32_SOC15(GC, GET_INST(GC, xcc_id), regSH_MEM_CONFIG, sh_mem_config);
 		WREG32_SOC15(GC, GET_INST(GC, xcc_id), regSH_MEM_BASES, sh_mem_bases);
 
 		/* Enable trap for each kfd vmid. */
@@ -1562,7 +1575,10 @@ static void gfx_v12_1_xcc_constants_init(struct amdgpu_device *adev,
 					 int xcc_id)
 {
 	u32 tmp;
+	u32 sh_mem_config;
 	int i;
+
+	sh_mem_config = gfx_v12_1_get_sh_mem_config(adev);
 
 	/* XXX SH_MEM regs */
 	/* where to put LDS, scratch, GPUVM in FSA64 space */
@@ -1571,7 +1587,7 @@ static void gfx_v12_1_xcc_constants_init(struct amdgpu_device *adev,
 		soc_v1_0_grbm_select(adev, 0, 0, 0, i, GET_INST(GC, xcc_id));
 		/* CP and shaders */
 		WREG32_SOC15(GC, GET_INST(GC, xcc_id),
-			     regSH_MEM_CONFIG, DEFAULT_SH_MEM_CONFIG);
+			     regSH_MEM_CONFIG, sh_mem_config);
 		if (i != 0) {
 			tmp = REG_SET_FIELD(0, SH_MEM_BASES, PRIVATE_BASE,
 				(adev->gmc.private_aperture_start >> 58));
