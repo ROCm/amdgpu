@@ -3326,8 +3326,10 @@ void hdmi_frl_status_polling_work(struct work_struct *work)
 			if (dc_link->frl_link_settings.frl_link_rate == 0)
 				continue;
 
-		link_update =
-			dc_link_frl_poll_status_flag(dc_link);
+			if (!dc_link->link_status.link_active)
+				continue;
+
+			link_update = dc_link_frl_poll_status_flag(dc_link);
 			if (link_update) {
 				link_detected =
 					dc_link_detect(

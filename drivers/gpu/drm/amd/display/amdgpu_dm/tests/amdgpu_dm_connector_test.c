@@ -9141,6 +9141,7 @@ static struct dc_link *dm_test_frl_add_hdmi_link(struct kunit *test, struct dm_t
 	KUNIT_ASSERT_NOT_NULL(test, link->local_sink);
 	link->connector_signal = SIGNAL_TYPE_HDMI_TYPE_A;
 	link->frl_link_settings.frl_link_rate = HDMI_FRL_LINK_RATE_3GBPS;
+	link->link_status.link_active = true;
 
 	return link;
 }
