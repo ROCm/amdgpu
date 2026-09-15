@@ -2084,6 +2084,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 					mem->bo->tbo.ttm->num_pages);
 			kvfree(mem->user_pages);
 		}
+		mem->user_pages = NULL;
 #endif
 	}
 
