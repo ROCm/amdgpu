@@ -51,6 +51,7 @@
 #include "dml/dml1_frl_cap_chk.h"
 
 #include "sspl/dc_spl_types.h"
+#include "inc/dc_core_interface.h"
 
 struct abm_save_restore;
 
@@ -1392,6 +1393,7 @@ struct dc_init_data {
 	uint32_t *nbio_reg_offsets;
 	uint32_t *clk_reg_offsets;
 	void *bb_from_dmub;
+	enum dc2_selection dc2_selection;
 };
 
 struct dc_callback_init {
