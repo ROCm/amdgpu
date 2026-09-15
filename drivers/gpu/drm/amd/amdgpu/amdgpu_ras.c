@@ -1513,7 +1513,8 @@ int amdgpu_ras_reset_error_count(struct amdgpu_device *adev,
 		return -EOPNOTSUPP;
 
 	/* skip ras error reset in gpu reset */
-	if (amdgpu_in_reset(adev) || amdgpu_ras_in_recovery(adev))
+	if ((amdgpu_in_reset(adev) || amdgpu_ras_in_recovery(adev)) &&
+	     amdgpu_uniras_enabled(adev))
 		return -EOPNOTSUPP;
 
 	if (block_obj->hw_ops->reset_ras_error_count)
