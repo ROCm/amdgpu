@@ -525,16 +525,6 @@ struct hubbub_apply_dedcn21_147_wa_params {
 	struct hubbub *hubbub;
 };
 
-struct hubbub_allow_self_refresh_control_params {
-	struct hubbub *hubbub;
-	bool allow;
-};
-
-struct tg_get_frame_count_params {
-	struct timing_generator *tg;
-	unsigned int *frame_count;
-};
-
 struct mpc_set_dwb_mux_params {
 	struct mpc *mpc;
 	int dwb_id;
@@ -1128,8 +1118,6 @@ union block_sequence_params {
 	struct tg_wait_double_buffer_pending_params tg_wait_double_buffer_pending_params;
 	struct update_force_pstate_params update_force_pstate_params;
 	struct hubbub_apply_dedcn21_147_wa_params hubbub_apply_dedcn21_147_wa_params;
-	struct hubbub_allow_self_refresh_control_params hubbub_allow_self_refresh_control_params;
-	struct tg_get_frame_count_params tg_get_frame_count_params;
 	struct mpc_set_dwb_mux_params mpc_set_dwb_mux_params;
 	struct mpc_disable_dwb_mux_params mpc_disable_dwb_mux_params;
 	struct mcif_wb_config_buf_params mcif_wb_config_buf_params;
@@ -1301,8 +1289,6 @@ enum block_sequence_func {
 	UPDATE_FORCE_PSTATE,
 	PROGRAM_MALL_PIPE_CONFIG,
 	HUBBUB_APPLY_DEDCN21_147_WA,
-	HUBBUB_ALLOW_SELF_REFRESH_CONTROL,
-	TG_GET_FRAME_COUNT,
 	MPC_SET_DWB_MUX,
 	MPC_DISABLE_DWB_MUX,
 	MCIF_WB_CONFIG_BUF,
@@ -2018,10 +2004,6 @@ void hwss_update_force_pstate(union block_sequence_params *params);
 
 void hwss_hubbub_apply_dedcn21_147_wa(union block_sequence_params *params);
 
-void hwss_hubbub_allow_self_refresh_control(union block_sequence_params *params);
-
-void hwss_tg_get_frame_count(union block_sequence_params *params);
-
 void hwss_mpc_set_dwb_mux(union block_sequence_params *params);
 
 void hwss_mpc_disable_dwb_mux(union block_sequence_params *params);
@@ -2659,14 +2641,6 @@ void hwss_add_update_force_pstate(struct block_sequence_state *seq_state,
 
 void hwss_add_hubbub_apply_dedcn21_147_wa(struct block_sequence_state *seq_state,
 		struct hubbub *hubbub);
-
-void hwss_add_hubbub_allow_self_refresh_control(struct block_sequence_state *seq_state,
-		struct hubbub *hubbub,
-		bool allow);
-
-void hwss_add_tg_get_frame_count(struct block_sequence_state *seq_state,
-		struct timing_generator *tg,
-		unsigned int *frame_count);
 
 void hwss_add_tg_set_dsc_config(struct block_sequence_state *seq_state,
 		struct timing_generator *tg,

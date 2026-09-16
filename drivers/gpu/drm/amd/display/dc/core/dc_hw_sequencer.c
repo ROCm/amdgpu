@@ -1160,25 +1160,6 @@ void hwss_build_post_unlock_full_sequence(struct dc *dc,
 	if (hwseq && hwseq->wa.DEGVIDCN21)
 		hwss_add_hubbub_apply_dedcn21_147_wa(&seq_state, dc->res_pool->hubbub);
 
-	/* Handle stutter underflow WA during MPO transitions */
-	if (hwseq && hwseq->wa.disallow_self_refresh_during_multi_plane_transition &&
-			dc->current_state->stream_status[0].plane_count == 1 &&
-			context->stream_status[0].plane_count > 1) {
-
-		hwss_add_hubbub_allow_self_refresh_control(&seq_state, dc->res_pool->hubbub, false);
-
-		/* Get frame count for WA state tracking - this needs to be done immediately after the above call */
-		if (dc->res_pool->timing_generators[0]->funcs->get_frame_count) {
-			hwss_add_tg_get_frame_count(&seq_state, dc->res_pool->timing_generators[0],
-				&hwseq->wa_state.disallow_self_refresh_during_multi_plane_transition_applied_on_frame);
-		}
-
-		/*
-		 * Set here rather than as a sequence step: the executor must not
-		 * write to logical objects.
-		 */
-		hwseq->wa_state.disallow_self_refresh_during_multi_plane_transition_applied = true;
-	}
 }
 
 static uint32_t get_dcc_meta_propagation_delay(struct dc *dc, struct pipe_ctx *pipe_ctx)
@@ -1923,12 +1904,6 @@ void hwss_execute_sequence(struct dc *dc,
 			break;
 		case HUBBUB_APPLY_DEDCN21_147_WA:
 			hwss_hubbub_apply_dedcn21_147_wa(params);
-			break;
-		case HUBBUB_ALLOW_SELF_REFRESH_CONTROL:
-			hwss_hubbub_allow_self_refresh_control(params);
-			break;
-		case TG_GET_FRAME_COUNT:
-			hwss_tg_get_frame_count(params);
 			break;
 		case MPC_SET_DWB_MUX:
 			hwss_mpc_set_dwb_mux(params);
@@ -3682,22 +3657,6 @@ void hwss_hubbub_apply_dedcn21_147_wa(union block_sequence_params *params)
 	struct hubbub *hubbub = params->hubbub_apply_dedcn21_147_wa_params.hubbub;
 
 	hubbub->funcs->apply_DEDCN21_147_wa(hubbub);
-}
-
-void hwss_hubbub_allow_self_refresh_control(union block_sequence_params *params)
-{
-	struct hubbub *hubbub = params->hubbub_allow_self_refresh_control_params.hubbub;
-	bool allow = params->hubbub_allow_self_refresh_control_params.allow;
-
-	hubbub->funcs->allow_self_refresh_control(hubbub, allow);
-}
-
-void hwss_tg_get_frame_count(union block_sequence_params *params)
-{
-	struct timing_generator *tg = params->tg_get_frame_count_params.tg;
-	unsigned int *frame_count = params->tg_get_frame_count_params.frame_count;
-
-	*frame_count = tg->funcs->get_frame_count(tg);
 }
 
 void hwss_mpc_set_dwb_mux(union block_sequence_params *params)
@@ -5875,30 +5834,6 @@ void hwss_add_hubbub_apply_dedcn21_147_wa(struct block_sequence_state *seq_state
 	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
 		seq_state->steps[*seq_state->num_steps].func = HUBBUB_APPLY_DEDCN21_147_WA;
 		seq_state->steps[*seq_state->num_steps].params.hubbub_apply_dedcn21_147_wa_params.hubbub = hubbub;
-		(*seq_state->num_steps)++;
-	}
-}
-
-void hwss_add_hubbub_allow_self_refresh_control(struct block_sequence_state *seq_state,
-		struct hubbub *hubbub,
-		bool allow)
-{
-	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
-		seq_state->steps[*seq_state->num_steps].func = HUBBUB_ALLOW_SELF_REFRESH_CONTROL;
-		seq_state->steps[*seq_state->num_steps].params.hubbub_allow_self_refresh_control_params.hubbub = hubbub;
-		seq_state->steps[*seq_state->num_steps].params.hubbub_allow_self_refresh_control_params.allow = allow;
-		(*seq_state->num_steps)++;
-	}
-}
-
-void hwss_add_tg_get_frame_count(struct block_sequence_state *seq_state,
-		struct timing_generator *tg,
-		unsigned int *frame_count)
-{
-	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
-		seq_state->steps[*seq_state->num_steps].func = TG_GET_FRAME_COUNT;
-		seq_state->steps[*seq_state->num_steps].params.tg_get_frame_count_params.tg = tg;
-		seq_state->steps[*seq_state->num_steps].params.tg_get_frame_count_params.frame_count = frame_count;
 		(*seq_state->num_steps)++;
 	}
 }
