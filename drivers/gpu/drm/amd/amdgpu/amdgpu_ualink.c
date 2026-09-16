@@ -4101,10 +4101,15 @@ int amdgpu_gem_ualink_handle_ioctl(struct drm_device *dev, void *data,
 	u32 gem_handle;
 	int r, fd = -1;
 
-	if (adev->ualink.info->accel_state !=
-	    AMDGPU_UALINK_ACCEL_STATE_ACTIVE) {
-		dev_err(adev->dev,
-			"ualink device is not in active state in vpod\n");
+	/* The ioctl is registered for every amdgpu device, but the UALink
+	 * software state only exists on ASICs that instantiate the UALink IP
+	 * block. Bail out if it is absent, and short-circuit before the
+	 * accel_state dereference below.
+	 */
+	if (!adev->ualink.info ||
+	    adev->ualink.info->accel_state != AMDGPU_UALINK_ACCEL_STATE_ACTIVE) {
+		dev_dbg(adev->dev,
+			"ualink device not available or not in active state\n");
 		return -EOPNOTSUPP;
 	}
 
