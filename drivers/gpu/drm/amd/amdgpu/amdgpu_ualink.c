@@ -4052,9 +4052,7 @@ int amdgpu_ualink_export_handle(struct drm_device *dev, struct drm_file *filp,
 		if (IS_ERR(exp_xa_node->dmabuf)) {
 			r = PTR_ERR(exp_xa_node->dmabuf);
 			dev_err(adev->dev, "Failed to generate DMABuf for the BO\n");
-			amdgpu_bo_unref(&exp_xa_node->bo);
-			kfree(exp_xa_node);
-			goto out;
+			goto err_unref_bo;
 		}
 
 		xa_lock(&adev->ualink.exp_xa);
@@ -4065,13 +4063,22 @@ int amdgpu_ualink_export_handle(struct drm_device *dev, struct drm_file *filp,
 		xa_unlock(&adev->ualink.exp_xa);
 		if (r) {
 			dev_err(adev->dev, "Failed to insert exp_xa_node into XA: %d\n", r);
-			dma_buf_put(exp_xa_node->dmabuf);
-			amdgpu_bo_unref(&exp_xa_node->bo);
-			kfree(exp_xa_node);
-			goto out;
+			goto err_put_dmabuf;
+		}
+
+		r = amdgpu_bo_reserve(robj, false);
+		if (r)
+			goto err_erase_xa;
+
+		if (robj->ualink_handle_lo) {
+			amdgpu_bo_unreserve(robj);
+			r = -EAGAIN;
+			goto err_erase_xa;
 		}
 
 		robj->ualink_handle_lo = handle.handle_lo;
+		amdgpu_bo_unreserve(robj);
+
 		/* Return the generated handle back to the caller */
 		*handle_out = handle;
 	} else {
@@ -4088,6 +4095,16 @@ int amdgpu_ualink_export_handle(struct drm_device *dev, struct drm_file *filp,
 			handle_out->handle_hi = exp_xa_node->handle.handle_hi;
 	}
 
+	drm_gem_object_put(gobj);
+	return 0;
+
+err_erase_xa:
+	xa_erase(&adev->ualink.exp_xa, handle.handle_lo);
+err_put_dmabuf:
+	dma_buf_put(exp_xa_node->dmabuf);
+err_unref_bo:
+	amdgpu_bo_unref(&exp_xa_node->bo);
+	kfree(exp_xa_node);
 out:
 	drm_gem_object_put(gobj);
 	return r;
