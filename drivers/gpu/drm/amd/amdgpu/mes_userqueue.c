@@ -240,6 +240,12 @@ int mes_userq_reset(struct amdgpu_usermode_queue *queue)
 	if (queue->state == AMDGPU_USERQ_STATE_HUNG)
 		return 0;
 
+	/* A GFX pipe reset also affects the kernel rings on that pipe. */
+	if (queue->queue_type == AMDGPU_HW_IP_GFX &&
+	    adev->gfx.funcs->detect_hung_queue &&
+	    amdgpu_gfx_me_pipe_reset_supported(adev))
+		return amdgpu_gfx_reset_mes_gfx(adev, NULL, NULL, queue, 0, true);
+
 	memset(&queue_input, 0x0, sizeof(struct mes_reset_queue_input));
 	queue_input.doorbell_offset = queue->doorbell_index;
 	queue_input.queue_type = queue->queue_type;
