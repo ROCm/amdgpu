@@ -43,6 +43,51 @@
 #include "link_service.h"
 #include "custom_float.h"
 
+static union dmub_inbox0_cmd_lock_hw hwss_build_dmub_lock_command(bool lock)
+{
+	union dmub_inbox0_cmd_lock_hw command = { 0 };
+
+	command.bits.command_code = DMUB_INBOX0_CMD__HW_LOCK;
+	command.bits.hw_lock_client = HW_LOCK_CLIENT_DRIVER;
+	command.bits.lock = lock;
+	command.bits.should_release = !lock;
+
+	return command;
+}
+
+void hwss_add_dmub_hw_control_lock_fast(struct block_sequence_state *seq_state,
+		struct dc *dc, bool lock)
+{
+	struct dmub_hw_control_lock_fast_params *params;
+
+	if (!seq_state || !seq_state->steps || !seq_state->num_steps || !dc || !dc->ctx ||
+			!dc->ctx->dmub_srv || !dc->ctx->dmub_srv->dmub ||
+			*seq_state->num_steps >= MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
+		/* Dropping a lock or unlock step can leave the pair unbalanced. */
+		ASSERT(!seq_state || !seq_state->num_steps ||
+				*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE);
+		return;
+	}
+
+	params = &seq_state->steps[*seq_state->num_steps].params.dmub_hw_control_lock_fast_params;
+	params->dmub_srv = dc->ctx->dmub_srv;
+	params->command = hwss_build_dmub_lock_command(lock);
+	seq_state->steps[(*seq_state->num_steps)++].func = DMUB_HW_CONTROL_LOCK_FAST;
+}
+
+void hwss_dmub_hw_control_lock_fast(union block_sequence_params *params)
+{
+	struct dmub_hw_control_lock_fast_params *p;
+
+	if (!params)
+		return;
+
+	p = &params->dmub_hw_control_lock_fast_params;
+
+	if (p->dmub_srv && p->dmub_srv->dmub)
+		dmub_hw_lock_mgr_inbox0_cmd(p->dmub_srv, p->command);
+}
+
 #define MAX_NUM_MCACHE 8
 
 /* used as index in array of black_color_format */
@@ -1207,27 +1252,21 @@ void hwss_build_fast_sequence(struct dc *dc,
 		block_sequence[*num_steps].func = HUBP_WAIT_FOR_DCC_META_PROP;
 		(*num_steps)++;
 	}
-	if (dc->hwss.subvp_pipe_control_lock_fast) {
-		block_sequence[*num_steps].params.subvp_pipe_control_lock_fast_params.dc = dc;
-		block_sequence[*num_steps].params.subvp_pipe_control_lock_fast_params.lock = true;
-		block_sequence[*num_steps].params.subvp_pipe_control_lock_fast_params.subvp_immediate_flip =
-				plane->flip_immediate && stream_status->mall_stream_config.type == SUBVP_MAIN;
-		block_sequence[*num_steps].func = DMUB_SUBVP_PIPE_CONTROL_LOCK_FAST;
-		(*num_steps)++;
-	}
-	if (dc->hwss.dmub_hw_control_lock_fast) {
-		is_dmub_lock_required = dc_state_is_fams2_in_use(dc, context) ||
-					dmub_hw_lock_mgr_does_link_require_lock(dc, stream->link);
 
-		block_sequence[*num_steps].params.dmub_hw_control_lock_fast_params.dc = dc;
-		block_sequence[*num_steps].params.dmub_hw_control_lock_fast_params.lock = true;
-		block_sequence[*num_steps].params.dmub_hw_control_lock_fast_params.is_required = is_dmub_lock_required;
-		block_sequence[*num_steps].func = DMUB_HW_CONTROL_LOCK_FAST;
-		(*num_steps)++;
+	if (plane->flip_immediate && stream_status->mall_stream_config.type == SUBVP_MAIN &&
+			dc->hwss.is_subvp_hw_lock_supported && dc->hwss.is_subvp_hw_lock_supported(dc))
+		is_dmub_lock_required = true;
+
+	if (dc->hwss.is_dmub_hw_lock_supported && dc->hwss.is_dmub_hw_lock_supported(dc)) {
+		/* is_dmub_lock_required is reused by the matching unlock step below. */
+		is_dmub_lock_required |= dc_state_is_fams2_in_use(dc, context) ||
+					dmub_hw_lock_mgr_does_link_require_lock(dc, stream->link);
 	}
-	hwss_add_optc_pipe_control_lock(
-			&(struct block_sequence_state){ block_sequence, num_steps },
-			dc, pipe_ctx, true);
+
+	if (is_dmub_lock_required)
+		hwss_add_dmub_hw_control_lock_fast(&seq_state, dc, true);
+
+	hwss_add_optc_pipe_control_lock(&seq_state, dc, pipe_ctx, true);
 
 	for (i = 0; i < dmub_cmd_count; i++) {
 		block_sequence[*num_steps].params.send_dmcub_cmd_params.ctx = dc->ctx;
@@ -1622,24 +1661,9 @@ void hwss_build_fast_sequence(struct dc *dc,
 		current_pipe = current_pipe->next_odm_pipe;
 	}
 
-	hwss_add_optc_pipe_control_lock(
-			&(struct block_sequence_state){ block_sequence, num_steps },
-			dc, pipe_ctx, false);
-	if (dc->hwss.subvp_pipe_control_lock_fast) {
-		block_sequence[*num_steps].params.subvp_pipe_control_lock_fast_params.dc = dc;
-		block_sequence[*num_steps].params.subvp_pipe_control_lock_fast_params.lock = false;
-		block_sequence[*num_steps].params.subvp_pipe_control_lock_fast_params.subvp_immediate_flip =
-				plane->flip_immediate && stream_status->mall_stream_config.type == SUBVP_MAIN;
-		block_sequence[*num_steps].func = DMUB_SUBVP_PIPE_CONTROL_LOCK_FAST;
-		(*num_steps)++;
-	}
-	if (dc->hwss.dmub_hw_control_lock_fast) {
-		block_sequence[*num_steps].params.dmub_hw_control_lock_fast_params.dc = dc;
-		block_sequence[*num_steps].params.dmub_hw_control_lock_fast_params.lock = false;
-		block_sequence[*num_steps].params.dmub_hw_control_lock_fast_params.is_required = is_dmub_lock_required;
-		block_sequence[*num_steps].func = DMUB_HW_CONTROL_LOCK_FAST;
-		(*num_steps)++;
-	}
+	hwss_add_optc_pipe_control_lock(&seq_state, dc, pipe_ctx, false);
+	if (is_dmub_lock_required)
+		hwss_add_dmub_hw_control_lock_fast(&seq_state, dc, false);
 
 	current_pipe = pipe_ctx;
 	while (current_pipe) {
@@ -1677,9 +1701,6 @@ void hwss_execute_sequence(struct dc *dc,
 		params = &(block_sequence[i].params);
 		switch (block_sequence[i].func) {
 
-		case DMUB_SUBVP_PIPE_CONTROL_LOCK_FAST:
-			dc->hwss.subvp_pipe_control_lock_fast(params);
-			break;
 		case TG_LOCK:
 			dc->hwss.tg_lock(&params->tg_lock_params);
 			break;
@@ -1774,7 +1795,7 @@ void hwss_execute_sequence(struct dc *dc,
 			dc->hwss.wait_for_dcc_meta_propagation(params->wait_for_dcc_meta_propagation_params.delay);
 			break;
 		case DMUB_HW_CONTROL_LOCK_FAST:
-			dc->hwss.dmub_hw_control_lock_fast(params);
+			hwss_dmub_hw_control_lock_fast(params);
 			break;
 		case HUBP_PROGRAM_SURFACE_CONFIG:
 			hwss_program_surface_config(params);

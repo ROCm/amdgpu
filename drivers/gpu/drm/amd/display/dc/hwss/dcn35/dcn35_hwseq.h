@@ -120,6 +120,6 @@ void dcn35_disable_link_output(struct dc_link *link,
 		const struct link_resource *link_res,
 		enum signal_type signal);
 bool dcn35_dmub_hw_control_lock(struct dc *dc, struct dc_state *context, bool lock);
-void dcn35_dmub_hw_control_lock_fast(union block_sequence_params *params);
+bool dcn35_is_dmub_hw_lock_supported(const struct dc *dc);
 
 #endif /* __DC_HWSS_DCN35_H__ */

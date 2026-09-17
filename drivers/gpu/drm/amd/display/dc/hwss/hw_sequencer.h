@@ -35,6 +35,7 @@
 #include "inc/hw/dchubbub.h"
 #include "dsc/dsc.h"
 #include "link_service_types.h"
+#include "dmub/inc/dmub_cmd.h"
 
 struct pipe_ctx;
 struct dc_state;
@@ -62,11 +63,6 @@ struct hpo_frl_stream_encoder;
 struct link_training_settings;
 struct dc_link;
 struct dc_crtc_timing;
-struct subvp_pipe_control_lock_fast_params {
-	struct dc *dc;
-	bool lock;
-	bool subvp_immediate_flip;
-};
 
 struct tg_lock_params {
 	struct dc *dc;
@@ -216,9 +212,8 @@ struct wait_for_dcc_meta_propagation_params {
 };
 
 struct dmub_hw_control_lock_fast_params {
-	struct dc *dc;
-	bool is_required;
-	bool lock;
+	struct dc_dmub_srv *dmub_srv;
+	union dmub_inbox0_cmd_lock_hw command;
 };
 
 struct program_surface_config_params {
@@ -1051,7 +1046,6 @@ struct link_set_dpms_on_params {
 
 union block_sequence_params {
 	struct update_plane_addr_params update_plane_addr_params;
-	struct subvp_pipe_control_lock_fast_params subvp_pipe_control_lock_fast_params;
 	struct tg_lock_params tg_lock_params;
 	struct tg_3dlut_wa_unlock_params tg_3dlut_wa_unlock_params;
 	struct set_flip_control_gsl_params set_flip_control_gsl_params;
@@ -1222,7 +1216,7 @@ union block_sequence_params {
 };
 
 enum block_sequence_func {
-	DMUB_SUBVP_PIPE_CONTROL_LOCK_FAST = 0,
+	DMUB_SUBVP_PIPE_CONTROL_LOCK_FAST = 0, /* not used */
 	TG_LOCK,
 	TG_3DLUT_WA_UNLOCK,
 	HUBP_SET_FLIP_CONTROL_GSL,
@@ -1656,7 +1650,7 @@ struct hw_sequencer_funcs {
 			bool should_lock_all_pipes,
 			struct pipe_ctx *top_pipe_to_program,
 			bool subvp_prev_use);
-	void (*subvp_pipe_control_lock_fast)(union block_sequence_params *params);
+	bool (*is_subvp_hw_lock_supported)(const struct dc *dc);
 
 	void (*z10_restore)(const struct dc *dc);
 	void (*z10_save_init)(struct dc *dc);
@@ -1702,7 +1696,7 @@ struct hw_sequencer_funcs {
 	void (*fams2_update_config)(struct dc *dc,
 			struct dc_state *context,
 			bool enable);
-	void (*dmub_hw_control_lock_fast)(union block_sequence_params *params);
+	bool (*is_dmub_hw_lock_supported)(const struct dc *dc);
 	void (*set_long_vtotal)(struct pipe_ctx **pipe_ctx, int num_pipes, uint32_t v_total_min, uint32_t v_total_max);
 	void (*program_outstanding_updates)(struct dc *dc,
 			struct dc_state *context);
@@ -2802,5 +2796,9 @@ void hwss_add_hubbub_program_compbuf_segments(struct block_sequence_state *seq_s
 		struct hubbub *hubbub,
 		unsigned int compbuf_size,
 		bool safe_to_lower);
+
+void hwss_dmub_hw_control_lock_fast(union block_sequence_params *params);
+void hwss_add_dmub_hw_control_lock_fast(struct block_sequence_state *seq_state,
+		struct dc *dc, bool lock);
 
 #endif /* __DC_HW_SEQUENCER_H__ */
