@@ -1980,6 +1980,7 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 		write_scdc_data(
 			stream->link->ddc,
 			stream->phy_pix_clk,
+			dc_is_hdmi_frl_signal(pipe_ctx->stream->signal),
 			(stream->timing.flags.LTE_340MCSC_SCRAMBLE != 0));
 
 	if (dc->debug.enable_hdmi_idcc) {
@@ -2520,6 +2521,7 @@ enum dc_status link_set_dpms_off(struct pipe_ctx *pipe_ctx)
 		write_scdc_data(
 			link->ddc,
 			165000,//vbios only handles 165Mhz.
+			dc_is_hdmi_frl_signal(stream->signal),
 			false);
 		if (masked_chip_caps == AMD_EXT_DISPLAY_PATH_CAPS__HDMI20_TISN65DP159RSBT) {
 			/* DP159, Retimer settings */
