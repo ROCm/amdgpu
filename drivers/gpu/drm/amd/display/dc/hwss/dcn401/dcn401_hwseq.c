@@ -1740,6 +1740,22 @@ void dcn401_update_odm(struct dc *dc, struct dc_state *context,
 				opp_heads[i]->stream_res.opp,
 				opp_heads[i]->stream->timing.pixel_encoding,
 				resource_is_pipe_type(opp_heads[i], OTG_MASTER));
+
+		// Plane-less OPP heads are skipped by program_pipe, where the OPP
+		// formatter is normally configured, so set it up for them here.
+		if (!opp_heads[i]->plane_state &&
+				opp_heads[i]->stream_res.opp->funcs->opp_set_dyn_expansion &&
+				opp_heads[i]->stream_res.opp->funcs->opp_program_fmt) {
+			opp_heads[i]->stream_res.opp->funcs->opp_set_dyn_expansion(
+					opp_heads[i]->stream_res.opp,
+					COLOR_SPACE_YCBCR601,
+					opp_heads[i]->stream->timing.display_color_depth,
+					opp_heads[i]->stream->signal);
+			opp_heads[i]->stream_res.opp->funcs->opp_program_fmt(
+					opp_heads[i]->stream_res.opp,
+					&opp_heads[i]->stream->bit_depth_params,
+					&opp_heads[i]->stream->clamping);
+		}
 	}
 
 	update_dsc_for_odm_change(dc, context, otg_master);
@@ -1876,6 +1892,20 @@ void dcn401_update_odm_sequence(struct dc *dc, struct dc_state *context,
 		/* Add OPP program left edge extra pixel operation */
 		hwss_add_opp_program_left_edge_extra_pixel(seq_state, opp_heads[i]->stream_res.opp,
 			opp_heads[i]->stream->timing.pixel_encoding, resource_is_pipe_type(opp_heads[i], OTG_MASTER));
+
+		//Plane-less OPP heads are skipped by program_pipe, where the OPP
+		// formatter is normally configured, so set it up for them here.
+		if (!opp_heads[i]->plane_state &&
+				opp_heads[i]->stream_res.opp->funcs->opp_set_dyn_expansion &&
+				opp_heads[i]->stream_res.opp->funcs->opp_program_fmt) {
+			hwss_add_opp_set_dyn_expansion(seq_state, opp_heads[i]->stream_res.opp,
+				COLOR_SPACE_YCBCR601,
+				opp_heads[i]->stream->timing.display_color_depth,
+				opp_heads[i]->stream->signal);
+			hwss_add_opp_program_fmt(seq_state, opp_heads[i]->stream_res.opp,
+				&opp_heads[i]->stream->bit_depth_params,
+				&opp_heads[i]->stream->clamping);
+		}
 	}
 
 	/* Add DSC update operations to sequence */
