@@ -226,6 +226,8 @@ struct hubbub_funcs {
 
 	void (*hubbub_read_reg_state)(struct hubbub *hubbub, struct dcn_hubbub_reg_state *hubbub_reg_state);
 
+	void (*set_sdpif_port_control)(struct hubbub *hubbub, bool ignore_cstate_req);
+
 	/**
 	 * @program_det_size:
 	 *
