@@ -2186,13 +2186,19 @@ int amdgpu_gfx_mes_reset_queue(struct amdgpu_ring *ring,
 			       struct amdgpu_fence *timedout_fence,
 			       bool use_mmio)
 {
+	struct amdgpu_device *adev = ring->adev;
 	int r;
 
-	r = amdgpu_gfx_mes_reset_queue_start(ring, vmid, timedout_fence,
-					      use_mmio);
-	if (r)
-		return r;
-	return amdgpu_ring_reset_helper_end(ring, timedout_fence);
+	if (!amdgpu_gfx_me_pipe_reset_supported(adev)) {
+		r = amdgpu_gfx_mes_reset_queue_start(ring, vmid, timedout_fence,
+						     use_mmio);
+		if (r)
+			return r;
+		return amdgpu_ring_reset_helper_end(ring, timedout_fence);
+	}
+
+	return amdgpu_gfx_reset_mes_gfx(adev, ring, timedout_fence, NULL, vmid,
+				      use_mmio);
 }
 
 static DEVICE_ATTR(run_cleaner_shader, 0200,
