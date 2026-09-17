@@ -776,11 +776,11 @@ MODULE_PARM_DESC(hws_max_conc_proc,
  * DOC: cwsr_enable (int)
  * CWSR(compute wave store and resume) allows the GPU to preempt shader execution in
  * the middle of a compute wave. Default is 1 to enable this feature. Setting 0
- * disables it.
+ * disables it as only in non-HWS mode.
  */
 int cwsr_enable = 1;
 module_param(cwsr_enable, int, 0444);
-MODULE_PARM_DESC(cwsr_enable, "CWSR enable (0 = Off, 1 = On (Default))");
+MODULE_PARM_DESC(cwsr_enable, "CWSR enable (0 = Off (debugging only), 1 = On (Default))");
 
 /**
  * DOC: max_num_of_queues_per_device (int)
