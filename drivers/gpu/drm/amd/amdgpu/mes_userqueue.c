@@ -207,12 +207,34 @@ static int mes_userq_unmap(struct amdgpu_usermode_queue *queue)
 	return 0;
 }
 
+int mes_userq_reset_hw(struct amdgpu_usermode_queue *queue,
+		       struct mes_reset_queue_input *input)
+{
+	struct amdgpu_userq_mgr *uq_mgr = queue->userq_mgr;
+	struct amdgpu_device *adev = uq_mgr->adev;
+	int r;
+
+	amdgpu_mes_lock(&adev->mes);
+	r = adev->mes.funcs->reset_hw_queue(&adev->mes, input);
+	amdgpu_mes_unlock(&adev->mes);
+	if (r)
+		return r;
+
+	r = mes_userq_unmap(queue);
+	if (r)
+		return r;
+
+	/* Prevent the restore worker from resubmitting the guilty job. */
+	trace_amdgpu_userq_state_changed(queue, AMDGPU_USERQ_STATE_HUNG);
+	queue->state = AMDGPU_USERQ_STATE_HUNG;
+	return 0;
+}
+
 int mes_userq_reset(struct amdgpu_usermode_queue *queue)
 {
 	struct amdgpu_userq_mgr *uq_mgr = queue->userq_mgr;
 	struct amdgpu_device *adev = uq_mgr->adev;
 	struct mes_reset_queue_input queue_input;
-	int r;
 
 	/* already reset by an earlier job's hang-detect; just signal and bail */
 	if (queue->state == AMDGPU_USERQ_STATE_HUNG)
@@ -244,25 +266,7 @@ int mes_userq_reset(struct amdgpu_usermode_queue *queue)
 		}
 	}
 
-	amdgpu_mes_lock(&adev->mes);
-	r = adev->mes.funcs->reset_hw_queue(&adev->mes, &queue_input);
-	amdgpu_mes_unlock(&adev->mes);
-	if (r)
-		return r;
-
-	/* drop the queue from MES */
-	r = mes_userq_unmap(queue);
-	if (r)
-		return r;
-
-	/*
-	 * HUNG, not UNMAPPED: the guilty job is still in the ring, so the
-	 * restore worker must not re-map and re-run it.
-	 */
-	trace_amdgpu_userq_state_changed(queue, AMDGPU_USERQ_STATE_HUNG);
-	queue->state = AMDGPU_USERQ_STATE_HUNG;
-
-	return 0;
+	return mes_userq_reset_hw(queue, &queue_input);
 }
 
 int mes_userq_reset_queue(struct amdgpu_device *adev,
