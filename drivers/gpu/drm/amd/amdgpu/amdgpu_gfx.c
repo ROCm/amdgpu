@@ -2099,6 +2099,84 @@ static int amdgpu_gfx_mes_reset_queue_start(struct amdgpu_ring *ring,
 	return 0;
 }
 
+/*
+ * Reset one GFX queue and preserve collateral kernel rings on its pipe.
+ * Exactly one of @ring / @queue is non-NULL.
+ * This helper takes the reset mutex; callers must not already hold it.
+ */
+int amdgpu_gfx_reset_mes_gfx(struct amdgpu_device *adev,
+			     struct amdgpu_ring *ring,
+			     struct amdgpu_fence *guilty_fence,
+			     struct amdgpu_usermode_queue *queue,
+			     unsigned int vmid, bool use_mmio)
+{
+	struct mes_reset_queue_input queue_input = { 0 };
+	struct amdgpu_gfx_pipe_reset_ctx ctx;
+	u32 me = U32_MAX, pipe = U32_MAX;
+	int i, r, resume_r;
+
+	mutex_lock(&adev->gfx.mec.reset_mutex);
+
+	/*
+	 * Suspend before detecting the HQD to avoid resolving a slot MES remaps.
+	 * A hung queue can prevent suspend; still try reset and always resume.
+	 */
+	amdgpu_mes_suspend(adev, 0);
+
+	if (queue) {
+		u32 hw_queue_id;
+
+		queue_input.queue_type = queue->queue_type;
+		queue_input.doorbell_offset = queue->doorbell_index;
+		if (adev->gfx.funcs->detect_hung_queue(adev,
+				queue->doorbell_index, &me, &pipe,
+				&hw_queue_id)) {
+			queue_input.use_mmio = true;
+			queue_input.me_id = me;
+			queue_input.pipe_id = pipe;
+			queue_input.queue_id = hw_queue_id;
+		}
+	} else {
+		me = ring->me;
+		pipe = ring->pipe;
+	}
+
+	amdgpu_gfx_pipe_reset_prepare(adev, ring, me, pipe, &ctx);
+
+	if (ring)
+		r = amdgpu_gfx_mes_reset_queue_start(ring, vmid, guilty_fence,
+						     use_mmio);
+	else
+		r = mes_userq_reset_hw(queue, &queue_input);
+
+	resume_r = amdgpu_mes_resume(adev, 0);
+	if (!r)
+		r = resume_r;
+
+	/* MES must run before ring tests or replay. */
+	if (!r && ring)
+		r = amdgpu_ring_reset_helper_end(ring, guilty_fence);
+
+	for (i = 0; !r && i < adev->gfx.num_gfx_rings; i++) {
+		struct amdgpu_ring *cring = &adev->gfx.gfx_ring[i];
+
+		/* MQD rebuild clears wptr; replay only rings rebuilt by pipe reset. */
+		if ((ctx.replay_mask & BIT(i)) && !cring->wptr)
+			r = amdgpu_ring_reset_helper_end(cring, NULL);
+	}
+
+	/* Leave stopped schedulers to GPU recovery if any part failed. */
+	if (!r) {
+		for (i = 0; i < adev->gfx.num_gfx_rings; i++) {
+			if (ctx.sched_mask & BIT(i))
+				drm_sched_wqueue_start(&adev->gfx.gfx_ring[i].sched);
+		}
+	}
+
+	mutex_unlock(&adev->gfx.mec.reset_mutex);
+	return r;
+}
+
 int amdgpu_gfx_mes_reset_queue(struct amdgpu_ring *ring,
 			       unsigned int vmid,
 			       struct amdgpu_fence *timedout_fence,
@@ -2296,6 +2374,41 @@ static void amdgpu_gfx_reset_stop_compute_scheds(struct amdgpu_device *adev,
 		if (ring == guilty_ring)
 			continue;
 		drm_sched_wqueue_stop(&ring->sched);
+	}
+}
+
+/* Caller holds reset_mutex and attempted MES suspend before HQD lookup. */
+void amdgpu_gfx_pipe_reset_prepare(struct amdgpu_device *adev,
+				   struct amdgpu_ring *guilty_ring,
+				   u32 me, u32 pipe,
+				   struct amdgpu_gfx_pipe_reset_ctx *ctx)
+{
+	struct amdgpu_ring *ring;
+	int i;
+
+	lockdep_assert_held(&adev->gfx.mec.reset_mutex);
+	ctx->sched_mask = 0;
+	ctx->replay_mask = 0;
+
+	for (i = 0; i < adev->gfx.num_gfx_rings; i++) {
+		ring = &adev->gfx.gfx_ring[i];
+		/* An unresolved userq slot requires protecting every GFX pipe. */
+		if (ring == guilty_ring ||
+		    (me != U32_MAX && ring->me != me) ||
+		    (pipe != U32_MAX && ring->pipe != pipe) ||
+		    !amdgpu_ring_sched_ready(ring))
+			continue;
+
+		if (!drm_sched_is_stopped(&ring->sched)) {
+			drm_sched_wqueue_stop(&ring->sched);
+			ctx->sched_mask |= BIT(i);
+		}
+
+		if (amdgpu_fence_count_emitted(ring)) {
+			amdgpu_ring_reset_helper_begin(ring, NULL);
+			if (ring->ring_backup_entries_to_copy)
+				ctx->replay_mask |= BIT(i);
+		}
 	}
 }
 
@@ -3096,4 +3209,3 @@ int amdgpu_gfx_ring_preempt_ib(struct amdgpu_ring *ring)
 
 	return 0;
 }
-

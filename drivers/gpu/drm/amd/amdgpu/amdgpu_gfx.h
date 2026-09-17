@@ -711,6 +711,22 @@ int amdgpu_gfx_mes_reset_queue(struct amdgpu_ring *ring,
 			       struct amdgpu_fence *timedout_fence,
 			       bool use_mmio);
 void amdgpu_gfx_mqd_reset_restore(struct amdgpu_ring *ring);
+struct amdgpu_gfx_pipe_reset_ctx {
+	/* Schedulers stopped by this reset. */
+	unsigned long sched_mask;
+	/* Rings with backed-up commands. */
+	unsigned long replay_mask;
+};
+
+void amdgpu_gfx_pipe_reset_prepare(struct amdgpu_device *adev,
+				   struct amdgpu_ring *guilty_ring,
+				   u32 me, u32 pipe,
+				   struct amdgpu_gfx_pipe_reset_ctx *ctx);
+int amdgpu_gfx_reset_mes_gfx(struct amdgpu_device *adev,
+			     struct amdgpu_ring *ring,
+			     struct amdgpu_fence *guilty_fence,
+			     struct amdgpu_usermode_queue *queue,
+			     unsigned int vmid, bool use_mmio);
 
 static inline const char *amdgpu_gfx_compute_mode_desc(int mode)
 {
