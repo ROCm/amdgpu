@@ -2381,6 +2381,16 @@ static void amdgpu_gfx_reset_stop_compute_scheds(struct amdgpu_device *adev,
 	}
 }
 
+bool amdgpu_gfx_me_pipe_reset_supported(struct amdgpu_device *adev)
+{
+	if (!!(adev->gfx.gfx_supported_reset & AMDGPU_RESET_TYPE_PER_PIPE))
+		return true;
+	else
+		dev_warn_once(adev->dev, "Please use the latest ME version to see whether support pipe reset\n");
+
+	return false;
+}
+
 /* Caller holds reset_mutex and attempted MES suspend before HQD lookup. */
 void amdgpu_gfx_pipe_reset_prepare(struct amdgpu_device *adev,
 				   struct amdgpu_ring *guilty_ring,

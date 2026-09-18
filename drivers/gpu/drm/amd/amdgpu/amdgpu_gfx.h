@@ -718,6 +718,7 @@ struct amdgpu_gfx_pipe_reset_ctx {
 	unsigned long replay_mask;
 };
 
+bool amdgpu_gfx_me_pipe_reset_supported(struct amdgpu_device *adev);
 void amdgpu_gfx_pipe_reset_prepare(struct amdgpu_device *adev,
 				   struct amdgpu_ring *guilty_ring,
 				   u32 me, u32 pipe,
