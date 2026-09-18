@@ -6576,6 +6576,29 @@ static int gfx_v11_0_eop_irq(struct amdgpu_device *adev,
 
 	DRM_DEBUG("IH: CP EOP\n");
 
+	if (((entry->ring_id & 0x0c) >> 2) == 3) {
+		u32 type = amdgpu_mes_ih_int_type(doorbell_offset);
+
+		switch (type) {
+		case AMDGPU_MES_IH_INT_TYPE_DBGMSG:
+			/*
+			 * MES firmware debug-extension ("mes_dbgext")
+			 * messages are delivered as an EOP interrupt from
+			 * the MES pipe (me 3), carrying MES_DBGMSG (type 7)
+			 * in context dword bits 31:26.  Route them to the
+			 * mes_dbgext drain instead of the (gfx/compute) EOP
+			 * fence handling below.
+			 */
+			if (adev->mes.dbgext_active)
+				amdgpu_mes_dbgext_notify(adev, doorbell_offset);
+			break;
+		default:
+			/* other MES host interrupt types are not handled */
+			break;
+		}
+		return 0;
+	}
+
 	if (!adev->gfx.disable_kq) {
 		u8 me_id = (entry->ring_id & 0x0c) >> 2;
 		u8 pipe_id = (entry->ring_id & 0x03) >> 0;

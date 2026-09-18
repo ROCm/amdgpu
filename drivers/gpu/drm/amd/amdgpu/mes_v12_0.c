@@ -990,6 +990,13 @@ static int mes_v12_0_misc_op(struct amdgpu_mes *mes,
 		misc_pkt.change_config.option.bits.limit_single_process =
 				input->change_config.option.limit_single_process;
 		break;
+	case MES_MISC_OP_SETUP_MES_DBGEXT:
+		misc_pkt.opcode = MESAPI_MISC__SETUP_MES_DBGEXT;
+		misc_pkt.dbgext_init_data.dbg_ext_mc_addr =
+				input->setup_mes_dbgext.log_buffer_mc_addr;
+		misc_pkt.dbgext_init_data.u64_all =
+				input->setup_mes_dbgext.log_options;
+		break;
 
 	default:
 		DRM_ERROR("unsupported misc op (%d)\n", input->op);
@@ -1321,6 +1328,45 @@ static int mes_v12_0_set_host_trap(struct amdgpu_mes *mes,
 			offsetof(union MESAPI__SEND_HOST_TRAP, api_status));
 }
 
+/*
+ * Enable/disable delivery of the MES firmware host interrupts at the CP.  The
+ * MES firmware debug-message ("mes_dbgext") interrupt is delivered to the IH
+ * as a CP EOP (src_id 181) on the MES scheduler pipe (me 3) and handled in
+ * gfx_v12_0_eop_irq(); it is gated by CPC_INT_CNTL in the me3/MES pipe context,
+ * selected via GRBM_GFX_CNTL.  Must run in process context (takes srbm_mutex).
+ *
+ * Although the firmware C code passes Rs64HostIntrGeneric1IntEnable, the RS64
+ * library routine that actually raises the interrupt (AsmRs64SetHostIntr)
+ * hardcodes the TIME_STAMP assertion bit (CP_INT_STAT_DEBUG bit 26).  So
+ * TIME_STAMP_INT_ENABLE - not GENERIC1_INT_ENABLE - is the CPC_INT_CNTL bit
+ * that lets the CP forward the assertion to the host IH.  CPC_INT_CNTL is
+ * per-(me,pipe); the enable must be set on both me3 pipes (0 and 1), matching
+ * the Windows/SR-IOV KMD path - setting it only on the scheduler pipe is not
+ * sufficient.
+ */
+static int mes_v12_0_enable_dbgext_irq(struct amdgpu_mes *mes, bool enable)
+{
+	struct amdgpu_device *adev = mes->adev;
+	u32 cp_int_cntl;
+	int pipe;
+
+	mutex_lock(&adev->srbm_mutex);
+
+	for (pipe = 0; pipe < 2; pipe++) {
+		soc24_grbm_select(adev, 3, pipe, 0, 0);
+
+		cp_int_cntl = RREG32_SOC15(GC, 0, regCPC_INT_CNTL);
+		cp_int_cntl = REG_SET_FIELD(cp_int_cntl, CPC_INT_CNTL,
+					    TIME_STAMP_INT_ENABLE, enable ? 1 : 0);
+		WREG32_SOC15(GC, 0, regCPC_INT_CNTL, cp_int_cntl);
+	}
+
+	soc24_grbm_select(adev, 0, 0, 0, 0);
+	mutex_unlock(&adev->srbm_mutex);
+
+	return 0;
+}
+
 static const struct amdgpu_mes_funcs mes_v12_0_funcs = {
 	.add_hw_queue = mes_v12_0_add_hw_queue,
 	.remove_hw_queue = mes_v12_0_remove_hw_queue,
@@ -1333,6 +1379,7 @@ static const struct amdgpu_mes_funcs mes_v12_0_funcs = {
 	.invalidate_tlbs_pasid = mes_v12_0_inv_tlbs_pasid,
 	.send_host_trap = mes_v12_0_set_host_trap,
 	.detect_and_reset_hung_queues = mes_v12_0_detect_and_reset_hung_queues,
+	.enable_dbgext_irq = mes_v12_0_enable_dbgext_irq,
 };
 
 static int mes_v12_0_allocate_ucode_buffer(struct amdgpu_device *adev,
@@ -2223,6 +2270,8 @@ out:
 	adev->gfx.kiq[0].ring.sched.ready = false;
 	adev->mes.ring[0].sched.ready = true;
 
+	amdgpu_mes_dbgext_start(adev);
+
 	return 0;
 
 failure:
@@ -2232,6 +2281,9 @@ failure:
 
 static int mes_v12_0_hw_fini(struct amdgpu_ip_block *ip_block)
 {
+	struct amdgpu_device *adev = ip_block->adev;
+
+	amdgpu_mes_dbgext_stop(adev);
 	return 0;
 }
 

@@ -1051,6 +1051,13 @@ static int mes_v11_0_misc_op(struct amdgpu_mes *mes,
 		misc_pkt.opcode = MESAPI_MISC__NOTIFY_WORK_ON_UNMAPPED_QUEUE;
 		misc_pkt.queue_sch_level = AMD_PRIORITY_LEVEL_NORMAL;
 		break;
+	case MES_MISC_OP_SETUP_MES_DBGEXT:
+		misc_pkt.opcode = MESAPI_MISC__SETUP_MES_DBGEXT;
+		misc_pkt.dbgext_init_data.dbg_ext_mc_addr =
+				input->setup_mes_dbgext.log_buffer_mc_addr;
+		misc_pkt.dbgext_init_data.u64_all =
+				input->setup_mes_dbgext.log_options;
+		break;
 	default:
 		drm_err(adev_to_drm(mes->adev), "unsupported misc op (%d)\n", input->op);
 		return -EINVAL;
@@ -1220,6 +1227,32 @@ static int mes_v11_0_detect_and_reset_hung_queues(struct amdgpu_mes *mes,
 			offsetof(union MESAPI__RESET, api_status));
 }
 
+/*
+ * Enable/disable delivery of the MES firmware host interrupts at the CP.  The
+ * MES firmware debug-message interrupt is delivered as a CP EOP from the MES
+ * pipe (me 3) and handled in gfx_v11_0_eop_irq(); it is gated by CPC_INT_CNTL
+ * in that ME/pipe context, selected via GRBM_GFX_CNTL.  Mirrors the Windows KMD
+ * MES interrupt-enable path.  Must run in process context (takes srbm_mutex).
+ */
+static int mes_v11_0_enable_dbgext_irq(struct amdgpu_mes *mes, bool enable)
+{
+	struct amdgpu_device *adev = mes->adev;
+	u32 cp_int_cntl;
+
+	mutex_lock(&adev->srbm_mutex);
+	soc21_grbm_select(adev, 3, AMDGPU_MES_SCHED_PIPE, 0, 0);
+
+	cp_int_cntl = RREG32_SOC15(GC, 0, regCPC_INT_CNTL);
+	cp_int_cntl = REG_SET_FIELD(cp_int_cntl, CPC_INT_CNTL,
+					TIME_STAMP_INT_ENABLE, enable ? 1 : 0);
+	WREG32_SOC15(GC, 0, regCPC_INT_CNTL, cp_int_cntl);
+
+	soc21_grbm_select(adev, 0, 0, 0, 0);
+	mutex_unlock(&adev->srbm_mutex);
+
+	return 0;
+}
+
 static const struct amdgpu_mes_funcs mes_v11_0_funcs = {
 	.add_hw_queue = mes_v11_0_add_hw_queue,
 	.remove_hw_queue = mes_v11_0_remove_hw_queue,
@@ -1228,6 +1261,7 @@ static const struct amdgpu_mes_funcs mes_v11_0_funcs = {
 	.suspend_gang = mes_v11_0_suspend_gang,
 	.resume_gang = mes_v11_0_resume_gang,
 	.misc_op = mes_v11_0_misc_op,
+	.enable_dbgext_irq = mes_v11_0_enable_dbgext_irq,
 	.reset_hw_queue = mes_v11_0_reset_hw_queue,
 	.detect_and_reset_hung_queues = mes_v11_0_detect_and_reset_hung_queues,
 };
@@ -2125,6 +2159,8 @@ out:
 	adev->gfx.kiq[0].ring.sched.ready = false;
 	adev->mes.ring[0].sched.ready = true;
 
+	amdgpu_mes_dbgext_start(adev);
+
 	return 0;
 
 failure:
@@ -2134,6 +2170,10 @@ failure:
 
 static int mes_v11_0_hw_fini(struct amdgpu_ip_block *ip_block)
 {
+	struct amdgpu_device *adev = ip_block->adev;
+
+	amdgpu_mes_dbgext_stop(adev);
+
 	return 0;
 }
 
