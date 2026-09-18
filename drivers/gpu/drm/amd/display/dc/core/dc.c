@@ -1342,6 +1342,7 @@ bool dc_stream_adjust_vmin_vmax(struct dc *dc,
 		struct dc_crtc_timing_adjust *adjust)
 {
 	int i;
+	bool drr_unchanged;
 
 	/*
 	 * Don't adjust DRR while there's bandwidth optimizations pending to
@@ -1356,6 +1357,19 @@ bool dc_stream_adjust_vmin_vmax(struct dc *dc,
 		}
 	}
 
+	/* timing_adjust_pending tracks whether stream->adjust still describes the
+	 * OTG, so a cleared flag plus matching values means hw is already current.
+	 */
+	drr_unchanged = !stream->adjust.timing_adjust_pending &&
+			stream->adjust.v_total_min == adjust->v_total_min &&
+			stream->adjust.v_total_max == adjust->v_total_max &&
+			stream->adjust.v_total_mid == adjust->v_total_mid &&
+			stream->adjust.v_total_mid_frame_num == adjust->v_total_mid_frame_num &&
+			stream->adjust.allow_otg_v_count_halt == adjust->allow_otg_v_count_halt;
+
+	if (drr_unchanged)
+		return true;
+
 	dc_exit_ips_for_hw_access(dc);
 
 	stream->adjust.v_total_max = adjust->v_total_max;
@@ -1366,11 +1380,13 @@ bool dc_stream_adjust_vmin_vmax(struct dc *dc,
 
 	if (dc->caps.max_v_total != 0 &&
 		(adjust->v_total_max > dc->caps.max_v_total || adjust->v_total_min > dc->caps.max_v_total)) {
-		stream->adjust.timing_adjust_pending = false;
-		if (adjust->allow_otg_v_count_halt)
+		if (adjust->allow_otg_v_count_halt) {
+			stream->adjust.timing_adjust_pending = false;
 			return set_long_vtotal(dc, stream, adjust);
-		else
-			return false;
+		}
+		/* Nothing reached hw, so stream->adjust no longer describes the OTG. */
+		stream->adjust.timing_adjust_pending = true;
+		return false;
 	}
 
 	for (i = 0; i < MAX_PIPES; i++) {
