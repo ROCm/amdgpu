@@ -424,13 +424,6 @@ int gfx_v12_0_request_gfx_index_mutex(struct amdgpu_device *adev,
 	return 0;
 }
 
-static bool mes_v12_0_pipe_reset_support(struct amdgpu_device *adev)
-{
-	/* Disable the pipe reset until the CPFW fully support it.*/
-	dev_warn_once(adev->dev, "The CPFW hasn't support pipe reset yet.\n");
-	return false;
-}
-
 /* Use MES callbacks directly while holding the MES lock. */
 static int mes_v12_0_restore_gfx_kernel_queue(struct amdgpu_device *adev,
 					      u32 me, u32 pipe, u32 guilty_queue,
@@ -499,7 +492,7 @@ static int mes_v12_0_reset_gfx_pipe_mmio(struct amdgpu_device *adev,
 	uint32_t reset_pipe, clean_pipe;
 	int i;
 
-	if (!mes_v12_0_pipe_reset_support(adev))
+	if (!amdgpu_gfx_me_pipe_reset_supported(adev))
 		return -EOPNOTSUPP;
 
 	amdgpu_gfx_rlc_enter_safe_mode(adev, 0);
