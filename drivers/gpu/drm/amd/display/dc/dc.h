@@ -1317,6 +1317,7 @@ struct dc_debug_options {
 	unsigned int auxless_alpm_lfps_t1t2_us;
 	short auxless_alpm_lfps_t1t2_offset_us;
 	bool disable_stutter_for_wm_program;
+	unsigned int urgent_watermark_override;
 	bool enable_block_sequence_programming;
 	uint32_t custom_psp_footer_size;
 	bool disable_deferred_minimal_transitions;
