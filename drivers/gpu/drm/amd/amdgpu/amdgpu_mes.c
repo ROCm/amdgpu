@@ -257,8 +257,8 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 		}
 
 		adev->gfx.mec.mes_hung_db_array =
-			kcalloc(amdgpu_mes_get_hung_queue_db_array_size(adev),
-				sizeof(u32), GFP_KERNEL);
+			kzalloc_objs(*adev->gfx.mec.mes_hung_db_array,
+				     amdgpu_mes_get_hung_queue_db_array_size(adev));
 
 		if (!adev->gfx.mec.mes_hung_db_array) {
 			r = -ENOMEM;
