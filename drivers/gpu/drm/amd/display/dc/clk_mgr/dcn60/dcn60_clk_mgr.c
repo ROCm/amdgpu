@@ -1804,6 +1804,7 @@ struct clk_mgr_internal *dcn60_clk_mgr_construct(
 {
 	struct dcn60_clk_mgr *clk_mgr60 = kzalloc(sizeof(struct dcn60_clk_mgr), GFP_KERNEL);
 	struct clk_mgr_internal *clk_mgr;
+	bool variant_clocks = ASICREV_IS_DCN6_VARIANT_LITE3(ctx->asic_id.hw_internal_rev);
 
 	if (!clk_mgr60)
 		return NULL;
@@ -1828,14 +1829,14 @@ struct clk_mgr_internal *dcn60_clk_mgr_construct(
 	 * dcn60_dump_clk_registers from 4 * dentist_vco_freq_khz /
 	 * dprefclk DID divider
 	 */
-	clk_mgr->base.dprefclk_khz = 720000;
+	clk_mgr->base.dprefclk_khz = variant_clocks ? 607407 : 720000;
 
 		/* integer part is now VCO frequency in kHz */
 		clk_mgr->base.dentist_vco_freq_khz = dcn60_get_vco_frequency_from_reg(clk_mgr);
 
 		/* in case we don't get a value from the register, use default */
 		if (clk_mgr->base.dentist_vco_freq_khz == 0)
-			clk_mgr->base.dentist_vco_freq_khz = 4500000;
+			clk_mgr->base.dentist_vco_freq_khz = variant_clocks ? 4100000 : 4500000;
 
 	clk_mgr->dfs_bypass_enabled = false;
 
