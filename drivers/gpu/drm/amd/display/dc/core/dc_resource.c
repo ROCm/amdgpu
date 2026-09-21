@@ -4886,7 +4886,7 @@ static void calculate_timing_params_for_dsc_with_padding(struct pipe_ctx *pipe_c
 #if defined(CONFIG_DRM_AMD_DC_FP)
 	uint32_t hactive;
 	uint32_t ceil_slice_width;
-	if (stream && stream->timing.flags.DSC) {
+	if (stream && stream->timing.flags.DSC && stream->signal == SIGNAL_TYPE_HDMI_FRL) {
 		hactive = stream->timing.h_addressable + stream->timing.h_border_left + stream->timing.h_border_right;
 
 		/* Assume if determined slices does not divide Hactive evenly, Hborrow is needed for padding*/
