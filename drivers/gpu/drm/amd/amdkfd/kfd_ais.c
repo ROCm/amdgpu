@@ -218,13 +218,40 @@ static struct pci_dev *get_pci_dev_from_bdev(struct block_device *bdev)
 
 	return pdev;
 }
-static struct bio_vec *amdgpu_init_bvec(struct sg_table *sgt, uint64_t size,
+
+/*
+ * kfd_ais_page_usable - Check a page may back an AIS bio_vec
+ *
+ * On CPU attached XGMI the transfer targets VRAM's system physical address
+ * through the data fabric, so the pages come from the AIS pagemap rather than
+ * from the PCI P2PDMA allocator.
+ *
+ * @adev: The GPU that owns the VRAM
+ * @page: Page derived from the scatterlist entry
+ * Return: true if the page may be handed to the block layer
+ */
+static bool kfd_ais_page_usable(struct amdgpu_device *adev, struct page *page)
+{
+	if (adev->kfd.ais_pgmap)
+		return is_zone_device_page(page) &&
+#ifdef HAVE_PAGE_PGMAP
+		       page_pgmap(page) == adev->kfd.ais_pgmap;
+#else
+		       page->pgmap == adev->kfd.ais_pgmap;
+#endif
+
+	return is_pci_p2pdma_page(page);
+}
+
+static struct bio_vec *amdgpu_init_bvec(struct amdgpu_device *adev,
+					struct sg_table *sgt, uint64_t size,
 					unsigned int *nr_segs)
 {
 	struct scatterlist *sg;
 	struct bio_vec *bvec;
 	uint64_t sg_len;
 	int64_t sg_offset = 0;
+	unsigned long pfn;
 	struct page *page;
 	unsigned int i, k = 0;
 
@@ -233,10 +260,10 @@ static struct bio_vec *amdgpu_init_bvec(struct sg_table *sgt, uint64_t size,
 		return NULL;
 
 	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
-		page = pfn_to_page(PHYS_PFN(sg_dma_address(sg)));
-		if (!page || !is_pci_p2pdma_page(page)) {
-			/* If the page is not PCI P2P, we cannot use it */
-			pr_err("Invalid PCI P2P page!\n");
+		pfn = PHYS_PFN(sg_dma_address(sg));
+		page = pfn_valid(pfn) ? pfn_to_page(pfn) : NULL;
+		if (!page || !kfd_ais_page_usable(adev, page)) {
+			pr_err("Invalid AIS page!\n");
 			kvfree(bvec);
 			return NULL;
 		}
@@ -264,30 +291,24 @@ static struct bio_vec *amdgpu_init_bvec(struct sg_table *sgt, uint64_t size,
 	return bvec;
 }
 
-int kfd_ais_init(struct amdgpu_device *adev)
+/*
+ * kfd_ais_init_p2pdma - Expose VRAM through the PCI P2PDMA allocator
+ *
+ * Used by discrete GPUs, where VRAM is reachable through a large PCI BAR.
+ *
+ * @adev: The GPU that owns the VRAM
+ * @size: Size of the VRAM range, rounded up to the subsection size
+ * Return: 0 on success, negative error code on failure
+ */
+static int kfd_ais_init_p2pdma(struct amdgpu_device *adev, unsigned long size)
 {
 #ifdef CONFIG_PCI_P2PDMA
-	int ret;
-	struct page *p2p_page =  NULL;
 	unsigned long pci_start_pfn = PHYS_PFN(pci_resource_start(adev->pdev, 0));
-	unsigned long size = ALIGN(adev->gmc.real_vram_size, 2ULL << 20);
-	bool is_large_bar = adev->gmc.visible_vram_size &&
-		adev->gmc.real_vram_size == adev->gmc.visible_vram_size;
-
-	if (amdgpu_sriov_vf(adev)) {
-		dev_dbg(adev->dev, "AIS: not supported on SRIOV\n");
-		return 0;
-	}
-
-	/* AIS support limited to large BAR dGPUs */
-	if (adev->flags & AMD_IS_APU || adev->gmc.xgmi.connected_to_cpu || !is_large_bar) {
-		dev_dbg(adev->dev, "AIS: only supported for large BAR dGPU\n");
-		return 0;
-	}
+	struct page *p2p_page;
+	int ret;
 
 	p2p_page = pfn_valid(pci_start_pfn) ? pfn_to_page(pci_start_pfn) : NULL;
 	if (p2p_page && is_pci_p2pdma_page(p2p_page)) {
-		adev->kfd.dev->ais_initialized = true;
 		dev_dbg(adev->dev, "AIS: PCI P2PDMA resource already exists\n");
 		return 0;
 	}
@@ -296,18 +317,114 @@ int kfd_ais_init(struct amdgpu_device *adev)
 				      0 /*offset*/);
 	if (ret) {
 		dev_dbg(adev->dev, "AIS: Failed to add PCI P2PDMA resource for VRAM %d\n", ret);
-		return 0;
+		return ret;
 	}
 	dev_dbg(adev->dev, "AIS: reserve %ldMB system memory for VRAM (P2P) pages struct\n",
 		 AIS_P2P_PAGE_STRUCT_SIZE(size) >> 20);
 
 	amdgpu_amdkfd_reserve_system_mem(AIS_P2P_PAGE_STRUCT_SIZE(size));
-	dev_info(adev->dev, "AIS: registered %ldMB device memory\n", size >> 20);
-
-	adev->kfd.dev->ais_initialized = true;
+	return 0;
 #else
 	dev_dbg(adev->dev, "AIS: not supported. Check CONFIG_PCI_P2PDMA\n");
+	return -ENODEV;
 #endif
+}
+
+/*
+ * kfd_ais_init_xgmi - Expose VRAM's XGMI address range for AIS
+ *
+ * On CPU attached XGMI the GPU's local HBM carries no PCI BAR, so the P2PDMA
+ * allocator cannot describe it. The memory is however reachable at a system
+ * physical address through the data fabric, so create struct pages for that
+ * range directly.
+ *
+ * MEMORY_DEVICE_GENERIC is used rather than MEMORY_DEVICE_COHERENT because it
+ * needs no dev_pagemap_ops and is not an HMM migration target, which keeps the
+ * range invisible to SVM.
+ *
+ * @adev: The GPU that owns the VRAM
+ * @size: Size of the VRAM range, rounded up to the subsection size
+ * Return: 0 on success, negative error code on failure
+ */
+static int kfd_ais_init_xgmi(struct amdgpu_device *adev, unsigned long size)
+{
+#if defined(CONFIG_ZONE_DEVICE)
+	struct dev_pagemap *pgmap;
+	void *r;
+
+	/* Re-run on GPU reset and on compute partition mode switches, while
+	 * the mapping only goes away when the device itself is released.
+	 */
+	if (adev->kfd.ais_pgmap) {
+		dev_dbg(adev->dev, "AIS: VRAM address range already mapped\n");
+		return 0;
+	}
+
+	pgmap = devm_kzalloc(adev->dev, sizeof(*pgmap), GFP_KERNEL);
+	if (!pgmap)
+		return -ENOMEM;
+
+	pgmap->type = MEMORY_DEVICE_GENERIC;
+	pgmap->nr_range = 1;
+	pgmap->range.start = adev->gmc.aper_base;
+	pgmap->range.end = adev->gmc.aper_base + size - 1;
+
+	r = devm_memremap_pages(adev->dev, pgmap);
+	if (IS_ERR(r)) {
+		dev_dbg(adev->dev,
+			"AIS: Failed to map VRAM address range %#llx-%#llx: %ld\n",
+			pgmap->range.start, pgmap->range.end, PTR_ERR(r));
+		devm_kfree(adev->dev, pgmap);
+		return PTR_ERR(r);
+	}
+
+	dev_dbg(adev->dev, "AIS: reserve %ldMB system memory for VRAM pages struct\n",
+		AIS_P2P_PAGE_STRUCT_SIZE(size) >> 20);
+
+	amdgpu_amdkfd_reserve_system_mem(AIS_P2P_PAGE_STRUCT_SIZE(size));
+	adev->kfd.ais_pgmap = pgmap;
+	return 0;
+#else
+	dev_dbg(adev->dev, "AIS: not supported. Check CONFIG_ZONE_DEVICE\n");
+	return -ENODEV;
+#endif
+}
+
+int kfd_ais_init(struct amdgpu_device *adev)
+{
+	unsigned long size = ALIGN(adev->gmc.real_vram_size, 2ULL << 20);
+	bool is_large_bar = adev->gmc.visible_vram_size &&
+		adev->gmc.real_vram_size == adev->gmc.visible_vram_size;
+	int ret;
+
+	if (amdgpu_sriov_vf(adev)) {
+		dev_dbg(adev->dev, "AIS: not supported on SRIOV\n");
+		return 0;
+	}
+
+	/* AIS support limited to large BAR dGPUs. CPU attached XGMI reports
+	 * the full VRAM as visible, so it satisfies the same condition.
+	 */
+	if (adev->flags & AMD_IS_APU || !is_large_bar) {
+		dev_dbg(adev->dev, "AIS: only supported for large BAR dGPU\n");
+		return 0;
+	}
+
+	if (!adev->gmc.xgmi.connected_to_cpu) {
+		ret = kfd_ais_init_p2pdma(adev, size);
+	} else if (amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(12, 1, 0)) {
+		ret = kfd_ais_init_xgmi(adev, size);
+	} else {
+		dev_dbg(adev->dev, "AIS: XGMI attached VRAM not supported on this GPU\n");
+		return 0;
+	}
+
+	if (ret)
+		return 0;
+
+	dev_info(adev->dev, "AIS: registered %ldMB device memory\n", size >> 20);
+	adev->kfd.dev->ais_initialized = true;
+
 	return 0;
 }
 
@@ -456,6 +573,26 @@ static bool kfd_ais_check_p2p_cached(struct kfd_process_device *pdd,
 				     struct pci_dev *pdev)
 {
 	return xa_load(&pdd->ais_counters_xa, kfd_ais_make_key(pdev)) != NULL;
+}
+
+/**
+ * kfd_ais_peer_allowed() - Check a peer device may target VRAM directly
+ * @adev: The GPU that owns the VRAM
+ * @pdev: The device that would perform the transfer
+ *
+ * Returns: true if the device is permitted to access VRAM
+ *
+ * Not every device reaches HBM safely over CPU attached XGMI, so that path is
+ * restricted to NVMe controllers. Devices using the PCI P2PDMA path keep their
+ * existing validation.
+ */
+static bool kfd_ais_peer_allowed(struct amdgpu_device *adev,
+				 struct pci_dev *pdev)
+{
+	if (!adev->kfd.ais_pgmap)
+		return true;
+
+	return pdev->class == PCI_CLASS_STORAGE_EXPRESS;
 }
 
 /*
@@ -1411,6 +1548,16 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 #if IS_ENABLED(CONFIG_NFS_FS)
 	case AIS_STORAGE_NETWORK:
 		/*
+		 * Network storage reaches VRAM through a NIC, which is not
+		 * permitted on CPU attached XGMI.
+		 */
+		if (adev->kfd.ais_pgmap) {
+			dev_dbg(adev->dev,
+				"AIS: network storage unsupported on XGMI attached VRAM\n");
+			ret = -ENODEV;
+			goto out;
+		}
+		/*
 		 * For NFS, first verify P2P accessibility for all transports.
 		 * NFSv4.1+ can have multiple transports (trunking/multipath)
 		 * going over different NICs - we must verify all of them.
@@ -1444,10 +1591,21 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 
 	/* Check if P2P already validated; on miss, check and create entry */
 	if (!kfd_ais_check_p2p_cached(pdd, pdev)) {
-		/* For network storage, P2P was already verified for all transports.
+		if (!kfd_ais_peer_allowed(adev, pdev)) {
+			dev_dbg(adev->dev, "AIS: device %s not permitted to access VRAM\n",
+				pci_name(pdev));
+			ret = -ENODEV;
+			goto out;
+		}
+		/*
+		 * VRAM on CPU attached XGMI is reached at a system physical
+		 * address through the data fabric rather than over PCI, so the
+		 * P2P distance does not describe the transfer.
+		 *
+		 * For network storage, P2P was already verified for all transports.
 		 * For block stacks, P2P was already verified in the switch case above.
 		 */
-		if (storage_type != AIS_STORAGE_NETWORK) {
+		if (!adev->kfd.ais_pgmap && storage_type != AIS_STORAGE_NETWORK) {
 			if (pci_p2pdma_distance(pdev, adev->dev, false) < 0) {
 				dev_info(adev->dev, "AIS: P2P DMA not accessible\n");
 				ret = -ENODEV;
@@ -1485,7 +1643,7 @@ int kfd_ais_rw_file(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		goto out;
 	}
 
-	bvec = amdgpu_init_bvec(sgt, in->size, &nr_segs);
+	bvec = amdgpu_init_bvec(adev, sgt, in->size, &nr_segs);
 	if (!bvec) {
 		ret = -ENOMEM;
 		goto put_sg;

@@ -124,6 +124,11 @@ struct amdgpu_kfd_dev {
 	/* Client for KFD BO GEM handle allocations */
 	struct drm_client_dev client;
 
+	/* AIS mapping of VRAM's XGMI system physical address range. Kept
+	 * separate from @pgmap so that SVM migration behaviour is unchanged.
+	 */
+	struct dev_pagemap *ais_pgmap;
+
 	/* HMM page migration MEMORY_DEVICE_PRIVATE mapping
 	 * Must be last --ends in a flexible-array member.
 	 */
