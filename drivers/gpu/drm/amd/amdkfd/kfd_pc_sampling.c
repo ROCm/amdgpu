@@ -97,11 +97,15 @@ static int kfd_pc_sample_thread(void *param)
 	ktime_t next_trap_time;
 	bool need_wait;
 	uint32_t inst;
+	int ret = 0;
 
+	/*
+	 * STOP can drop active_count before a newly-created thread is scheduled.
+	 * The sampling configuration remains valid until STOP joins this thread.
+	 */
 	mutex_lock(&node->pcs_data.mutex);
-	if (node->pcs_data.hosttrap_entry.base.active_count &&
-		node->pcs_data.hosttrap_entry.base.pc_sample_info.interval &&
-		node->kfd2kgd->trigger_pc_sample_trap) {
+	if (node->pcs_data.hosttrap_entry.base.pc_sample_info.interval &&
+	    node->kfd2kgd->trigger_pc_sample_trap) {
 		switch (node->pcs_data.hosttrap_entry.base.pc_sample_info.type) {
 		case KFD_IOCTL_PCS_TYPE_TIME_US:
 			timeout = (uint32_t)node->pcs_data.hosttrap_entry.base.pc_sample_info.interval;
@@ -112,8 +116,10 @@ static int kfd_pc_sample_thread(void *param)
 		}
 	}
 	mutex_unlock(&node->pcs_data.mutex);
-	if (!timeout)
-		return -EINVAL;
+	if (!timeout) {
+		ret = -EINVAL;
+		goto thread_out;
+	}
 
 	adev = node->adev;
 	need_wait = false;
@@ -179,28 +185,33 @@ static int kfd_pc_sample_thread(void *param)
 
 	node->pcs_data.hosttrap_entry.target_simd = 0;
 	node->pcs_data.hosttrap_entry.target_wave_slot = 0;
+thread_out:
 	node->pcs_data.hosttrap_entry.pc_sample_thread = NULL;
 
-	return 0;
+	return ret;
 }
 
 static int kfd_pc_sample_thread_start(struct kfd_node *node)
 {
+	struct task_struct *thread;
 	char thread_name[16];
-	int ret = 0;
+	int ret;
 
 	snprintf(thread_name, 16, "pcs_%d", node->adev->ddev.render->index);
-	node->pcs_data.hosttrap_entry.pc_sample_thread =
-		kthread_run(kfd_pc_sample_thread, node, thread_name);
+	thread = kthread_create(kfd_pc_sample_thread, node, thread_name);
 
-	if (IS_ERR(node->pcs_data.hosttrap_entry.pc_sample_thread)) {
-		ret = PTR_ERR(node->pcs_data.hosttrap_entry.pc_sample_thread);
-		node->pcs_data.hosttrap_entry.pc_sample_thread = NULL;
+	if (IS_ERR(thread)) {
+		ret = PTR_ERR(thread);
 		pr_debug("Failed to create pc sample thread for %s with ret = %d.",
 			thread_name, ret);
+		return ret;
 	}
 
-	return ret;
+	/* Visible to STOP before START returns. */
+	node->pcs_data.hosttrap_entry.pc_sample_thread = thread;
+	wake_up_process(thread);
+
+	return 0;
 }
 
 static int kfd_pc_sample_query_cap(struct kfd_process_device *pdd,
@@ -363,7 +374,9 @@ static int kfd_pc_sample_stop(struct kfd_process_device *pdd,
 
 	if (pc_sampling_stop) {
 		if (pcs_entry->method == KFD_IOCTL_PCS_METHOD_HOSTTRAP) {
-			kthread_stop(pdd->dev->pcs_data.hosttrap_entry.pc_sample_thread);
+			/* NULL if thread creation failed or the worker took a SIGKILL */
+			if (pdd->dev->pcs_data.hosttrap_entry.pc_sample_thread)
+				kthread_stop(pdd->dev->pcs_data.hosttrap_entry.pc_sample_thread);
 		} else {/* KFD_IOCTL_PCS_METHOD_STOCHASTIC */
 			struct amdgpu_device *adev = pdd->dev->adev;
 			struct kfd_node *node = pdd->dev;
