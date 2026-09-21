@@ -669,7 +669,8 @@ static int mes_v12_0_reset_compute_pipe_mmio(struct amdgpu_device *adev,
 
 static int mes_v12_0_reset_queue_mmio(struct amdgpu_mes *mes, uint32_t queue_type,
 				      uint32_t me_id, uint32_t pipe_id,
-				      uint32_t queue_id, uint32_t vmid)
+				      uint32_t queue_id, uint32_t vmid,
+				      bool is_kq)
 {
 	struct amdgpu_device *adev = mes->adev;
 	uint32_t value, reg;
@@ -678,11 +679,15 @@ static int mes_v12_0_reset_queue_mmio(struct amdgpu_mes *mes, uint32_t queue_typ
 	amdgpu_gfx_rlc_enter_safe_mode(adev, 0);
 
 	if (queue_type == AMDGPU_RING_TYPE_GFX) {
-		dev_info(adev->dev, "reset gfx queue (%d:%d:%d: vmid:%d)\n",
-			 me_id, pipe_id, queue_id, vmid);
-
 		mutex_lock(&adev->gfx.reset_sem_mutex);
 		gfx_v12_0_request_gfx_index_mutex(adev, true);
+		mutex_lock(&adev->srbm_mutex);
+		soc24_grbm_select(adev, me_id, pipe_id, queue_id, 0);
+		/* Userq VMIDs are assigned by MES; KGQ uses the supplied IB VMID. */
+		if (!is_kq) {
+			value = RREG32_SOC15(GC, 0, regCP_GFX_HQD_VMID);
+			vmid = REG_GET_FIELD(value, CP_GFX_HQD_VMID, VMID);
+		}
 		/* all se allow writes */
 		WREG32_SOC15(GC, 0, regGRBM_GFX_INDEX,
 			     (uint32_t)(0x1 << GRBM_GFX_INDEX__SE_BROADCAST_WRITES__SHIFT));
@@ -692,6 +697,8 @@ static int mes_v12_0_reset_queue_mmio(struct amdgpu_mes *mes, uint32_t queue_typ
 		else
 			value = REG_SET_FIELD(value, CP_VMID_RESET, PIPE1_QUEUES, 1 << queue_id);
 		WREG32_SOC15(GC, 0, regCP_VMID_RESET, value);
+		soc24_grbm_select(adev, 0, 0, 0, 0);
+		mutex_unlock(&adev->srbm_mutex);
 		gfx_v12_0_request_gfx_index_mutex(adev, false);
 		mutex_unlock(&adev->gfx.reset_sem_mutex);
 
@@ -1188,7 +1195,8 @@ static int mes_v12_0_reset_hw_queue(struct amdgpu_mes *mes,
 	if (input->use_mmio) {
 		int r = mes_v12_0_reset_queue_mmio(mes, input->queue_type,
 						   input->me_id, input->pipe_id,
-						   input->queue_id, input->vmid);
+						   input->queue_id, input->vmid,
+						   input->is_kq);
 		if (r)
 			return mes_v12_0_reset_pipe_mmio(mes, input->queue_type,
 							 input->me_id, input->pipe_id,
