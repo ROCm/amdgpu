@@ -3168,11 +3168,16 @@ static void dcn10_update_dchubp_dpp(
 	if (pipe_ctx->stream->cursor_attributes.address.quad_part != 0) {
 		if (dc_dmub_srv_is_cursor_offload_enabled(dc) && dc->hwss.abort_cursor_offload_update) {
 			struct pipe_ctx *top_pipe = resource_get_otg_master(pipe_ctx);
+			struct dpp *dpp[MAX_PIPES];
+			struct hubp *hubp[MAX_PIPES];
 
-			if (top_pipe)
+			if (top_pipe) {
+				uint8_t pipe_count =
+					hwss_build_cursor_offload_pipe_list(pipe_ctx, dpp, hubp);
+
 				dc->hwss.abort_cursor_offload_update(dc->ctx->dmub_srv->dmub,
-					pipe_ctx->plane_res.dpp, pipe_ctx->plane_res.hubp,
-					top_pipe->pipe_idx);
+					dpp, hubp, pipe_count, top_pipe->pipe_idx);
+			}
 		}
 
 		dc->hwss.set_cursor_attribute(pipe_ctx);

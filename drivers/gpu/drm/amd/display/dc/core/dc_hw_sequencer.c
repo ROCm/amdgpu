@@ -4242,6 +4242,7 @@ void hwss_begin_cursor_offload_update(struct dc *dc, union block_sequence_params
 			params->begin_cursor_offload_update_params.dmub,
 			params->begin_cursor_offload_update_params.dpp,
 			params->begin_cursor_offload_update_params.hubp,
+			params->begin_cursor_offload_update_params.pipe_count,
 			params->begin_cursor_offload_update_params.stream_idx);
 }
 
@@ -4252,6 +4253,7 @@ void hwss_commit_cursor_offload_update(struct dc *dc, union block_sequence_param
 			params->commit_cursor_offload_update_params.dmub,
 			params->commit_cursor_offload_update_params.dpp,
 			params->commit_cursor_offload_update_params.hubp,
+			params->commit_cursor_offload_update_params.pipe_count,
 			params->commit_cursor_offload_update_params.stream_idx);
 }
 
@@ -4273,6 +4275,7 @@ void hwss_abort_cursor_offload_update(struct dc *dc, union block_sequence_params
 			params->abort_cursor_offload_update_params.dmub,
 			params->abort_cursor_offload_update_params.dpp,
 			params->abort_cursor_offload_update_params.hubp,
+			params->abort_cursor_offload_update_params.pipe_count,
 			params->abort_cursor_offload_update_params.stream_idx);
 }
 
@@ -5912,25 +5915,47 @@ void hwss_add_update_cursor_offload_pipe(struct block_sequence_state *seq_state,
 	}
 }
 
+uint8_t hwss_build_cursor_offload_pipe_list(struct pipe_ctx *pipe_ctx,
+		struct dpp **dpp,
+		struct hubp **hubp)
+{
+	struct pipe_ctx *otg_master = resource_get_otg_master(pipe_ctx);
+	struct pipe_ctx *odm_pipe;
+	struct pipe_ctx *mpc_pipe;
+	uint8_t count = 0;
+
+	if (!otg_master)
+		return 0;
+
+	for (odm_pipe = otg_master; odm_pipe != NULL; odm_pipe = odm_pipe->next_odm_pipe) {
+		for (mpc_pipe = odm_pipe; mpc_pipe != NULL; mpc_pipe = mpc_pipe->bottom_pipe) {
+			if (count >= MAX_PIPES)
+				return count;
+			dpp[count] = mpc_pipe->plane_res.dpp;
+			hubp[count] = mpc_pipe->plane_res.hubp;
+			count++;
+		}
+	}
+
+	return count;
+}
+
 void hwss_add_commit_cursor_offload_update(struct block_sequence_state *seq_state,
 		struct dc *dc,
 		struct pipe_ctx *pipe_ctx)
 {
 	const struct pipe_ctx *top_pipe = resource_get_otg_master(pipe_ctx);
+	struct commit_cursor_offload_update_params *p;
 
 	if (!top_pipe)
 		return;
 
 	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
 		seq_state->steps[*seq_state->num_steps].func = HWSS_COMMIT_CURSOR_OFFLOAD_UPDATE;
-		seq_state->steps[*seq_state->num_steps].params.commit_cursor_offload_update_params.dmub =
-			dc->ctx->dmub_srv->dmub;
-		seq_state->steps[*seq_state->num_steps].params.commit_cursor_offload_update_params.stream_idx =
-			top_pipe->pipe_idx;
-		seq_state->steps[*seq_state->num_steps].params.commit_cursor_offload_update_params.dpp =
-			 pipe_ctx->plane_res.dpp;
-		seq_state->steps[*seq_state->num_steps].params.commit_cursor_offload_update_params.hubp =
-			pipe_ctx->plane_res.hubp;
+		p = &seq_state->steps[*seq_state->num_steps].params.commit_cursor_offload_update_params;
+		p->dmub = dc->ctx->dmub_srv->dmub;
+		p->stream_idx = top_pipe->pipe_idx;
+		p->pipe_count = hwss_build_cursor_offload_pipe_list(pipe_ctx, p->dpp, p->hubp);
 		(*seq_state->num_steps)++;
 	}
 }
@@ -5940,20 +5965,17 @@ void hwss_add_begin_cursor_offload_update(struct block_sequence_state *seq_state
 		struct pipe_ctx *pipe_ctx)
 {
 	const struct pipe_ctx *top_pipe = resource_get_otg_master(pipe_ctx);
+	struct begin_cursor_offload_update_params *p;
 
 	if (!top_pipe)
 		return;
 
 	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
 		seq_state->steps[*seq_state->num_steps].func = HWSS_BEGIN_CURSOR_OFFLOAD_UPDATE;
-		seq_state->steps[*seq_state->num_steps].params.begin_cursor_offload_update_params.dmub =
-			dc->ctx->dmub_srv->dmub;
-		seq_state->steps[*seq_state->num_steps].params.begin_cursor_offload_update_params.stream_idx =
-			top_pipe->pipe_idx;
-		seq_state->steps[*seq_state->num_steps].params.begin_cursor_offload_update_params.dpp =
-			 pipe_ctx->plane_res.dpp;
-		seq_state->steps[*seq_state->num_steps].params.begin_cursor_offload_update_params.hubp =
-			pipe_ctx->plane_res.hubp;
+		p = &seq_state->steps[*seq_state->num_steps].params.begin_cursor_offload_update_params;
+		p->dmub = dc->ctx->dmub_srv->dmub;
+		p->stream_idx = top_pipe->pipe_idx;
+		p->pipe_count = hwss_build_cursor_offload_pipe_list(pipe_ctx, p->dpp, p->hubp);
 		(*seq_state->num_steps)++;
 	}
 }
@@ -5963,20 +5985,17 @@ void hwss_add_abort_cursor_offload_update(struct block_sequence_state *seq_state
 		struct pipe_ctx *pipe_ctx)
 {
 	const struct pipe_ctx *top_pipe = resource_get_otg_master(pipe_ctx);
+	struct abort_cursor_offload_update_params *p;
 
 	if (!top_pipe)
 		return;
 
 	if (*seq_state->num_steps < MAX_HWSS_BLOCK_SEQUENCE_SIZE) {
 		seq_state->steps[*seq_state->num_steps].func = ABORT_CURSOR_OFFLOAD_UPDATE;
-		seq_state->steps[*seq_state->num_steps].params.abort_cursor_offload_update_params.dmub =
-			dc->ctx->dmub_srv->dmub;
-		seq_state->steps[*seq_state->num_steps].params.abort_cursor_offload_update_params.stream_idx =
-			top_pipe->pipe_idx;
-		seq_state->steps[*seq_state->num_steps].params.abort_cursor_offload_update_params.dpp =
-			 pipe_ctx->plane_res.dpp;
-		seq_state->steps[*seq_state->num_steps].params.abort_cursor_offload_update_params.hubp =
-			pipe_ctx->plane_res.hubp;
+		p = &seq_state->steps[*seq_state->num_steps].params.abort_cursor_offload_update_params;
+		p->dmub = dc->ctx->dmub_srv->dmub;
+		p->stream_idx = top_pipe->pipe_idx;
+		p->pipe_count = hwss_build_cursor_offload_pipe_list(pipe_ctx, p->dpp, p->hubp);
 		(*seq_state->num_steps)++;
 	}
 }

@@ -887,8 +887,9 @@ struct phantom_hubp_post_enable_params {
 
 struct begin_cursor_offload_update_params {
 	struct dmub_srv *dmub;
-	struct dpp *dpp;
-	struct hubp *hubp;
+	struct dpp *dpp[MAX_PIPES];
+	struct hubp *hubp[MAX_PIPES];
+	uint8_t pipe_count;
 	uint32_t stream_idx;
 };
 
@@ -902,15 +903,17 @@ struct update_cursor_offload_pipe_params {
 
 struct commit_cursor_offload_update_params {
 	struct dmub_srv *dmub;
-	struct dpp *dpp;
-	struct hubp *hubp;
+	struct dpp *dpp[MAX_PIPES];
+	struct hubp *hubp[MAX_PIPES];
+	uint8_t pipe_count;
 	uint32_t stream_idx;
 };
 
 struct abort_cursor_offload_update_params {
 	struct dmub_srv *dmub;
-	struct dpp *dpp;
-	struct hubp *hubp;
+	struct dpp *dpp[MAX_PIPES];
+	struct hubp *hubp[MAX_PIPES];
+	uint8_t pipe_count;
 	uint32_t stream_idx;
 };
 
@@ -1526,12 +1529,12 @@ struct hw_sequencer_funcs {
 	void (*set_cursor_position_legacy)(struct pipe_ctx *pipe);
 	void (*set_cursor_attribute)(struct pipe_ctx *pipe);
 	void (*set_cursor_sdr_white_level)(struct pipe_ctx *pipe);
-	void (*abort_cursor_offload_update)(struct dmub_srv *dmub, struct dpp *dpp,
-			struct hubp *hubp, uint32_t stream_idx);
-	void (*begin_cursor_offload_update)(struct dmub_srv *dmub, struct dpp *dpp,
-			struct hubp *hubp, uint32_t stream_idx);
-	void (*commit_cursor_offload_update)(struct dmub_srv *dmub, struct dpp *dpp,
-			struct hubp *hubp, uint32_t stream_idx);
+	void (*abort_cursor_offload_update)(struct dmub_srv *dmub, struct dpp **dpp,
+			struct hubp **hubp, uint8_t pipe_count, uint32_t stream_idx);
+	void (*begin_cursor_offload_update)(struct dmub_srv *dmub, struct dpp **dpp,
+			struct hubp **hubp, uint8_t pipe_count, uint32_t stream_idx);
+	void (*commit_cursor_offload_update)(struct dmub_srv *dmub, struct dpp **dpp,
+			struct hubp **hubp, uint8_t pipe_count, uint32_t stream_idx);
 	void (*update_cursor_offload_pipe)(struct dmub_srv *dmub,
 			uint32_t stream_idx,
 			uint8_t pipe_idx,
@@ -2654,6 +2657,10 @@ void hwss_add_opp_program_left_edge_extra_pixel(struct block_sequence_state *seq
 
 void hwss_add_hubp_enable_3dlut_fl(struct block_sequence_state *seq_state,
 		struct hubp *hubp);
+
+uint8_t hwss_build_cursor_offload_pipe_list(struct pipe_ctx *pipe_ctx,
+		struct dpp **dpp,
+		struct hubp **hubp);
 
 void hwss_add_begin_cursor_offload_update(struct block_sequence_state *seq_state,
 		struct dc *dc,

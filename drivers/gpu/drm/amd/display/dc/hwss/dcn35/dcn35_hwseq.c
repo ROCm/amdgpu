@@ -1646,9 +1646,30 @@ void dcn35_hardware_release(struct dc *dc)
 		dc->hwss.hw_block_power_up(dc, &pg_update_state);
 }
 
-void dcn35_abort_cursor_offload_update(struct dmub_srv *dmub, struct dpp *dpp, struct hubp *hubp, uint32_t stream_idx)
+/* Set the cursor offload flag on every resolved hubp/dpp in the pipe tree. */
+static void dcn35_set_cursor_offload(struct dpp **dpp, struct hubp **hubp,
+		uint8_t pipe_count, bool enable)
 {
-	struct dc *dc = dpp->ctx->dc;
+	uint8_t i;
+
+	for (i = 0; i < pipe_count; i++) {
+		if (hubp[i])
+			hubp[i]->cursor_offload = enable;
+		if (dpp[i])
+			dpp[i]->cursor_offload = enable;
+	}
+}
+
+void dcn35_abort_cursor_offload_update(struct dmub_srv *dmub, struct dpp **dpp,
+		struct hubp **hubp, uint8_t pipe_count, uint32_t stream_idx)
+{
+	struct dc *dc;
+	uint8_t i;
+
+	if (pipe_count == 0 || dpp[0] == NULL)
+		return;
+
+	dc = dpp[0]->ctx->dc;
 
 	/*
 	 * Insert a blank update to modify the write index and set pipe_mask to 0.
@@ -1667,10 +1688,10 @@ void dcn35_abort_cursor_offload_update(struct dmub_srv *dmub, struct dpp *dpp, s
 	 */
 
 	if (dc->hwss.begin_cursor_offload_update)
-		dc->hwss.begin_cursor_offload_update(dmub, dpp, hubp, stream_idx);
+		dc->hwss.begin_cursor_offload_update(dmub, dpp, hubp, pipe_count, stream_idx);
 
 	if (dc->hwss.commit_cursor_offload_update)
-		dc->hwss.commit_cursor_offload_update(dmub, dpp, hubp, stream_idx);
+		dc->hwss.commit_cursor_offload_update(dmub, dpp, hubp, pipe_count, stream_idx);
 
 	/*
 	 * The aborted payload is dropped by firmware, so resync the SW cursor
@@ -1678,13 +1699,16 @@ void dcn35_abort_cursor_offload_update(struct dmub_srv *dmub, struct dpp *dpp, s
 	 * set_cursor_position re-program CURSOR_ENABLE instead of skipping it
 	 * because of a stale cache.
 	 */
-	if (dpp->funcs->refresh_cursor_state)
-		dpp->funcs->refresh_cursor_state(dpp);
-	if (hubp && hubp->funcs->refresh_cursor_state)
-		hubp->funcs->refresh_cursor_state(hubp);
+	for (i = 0; i < pipe_count; i++) {
+		if (dpp[i] && dpp[i]->funcs->refresh_cursor_state)
+			dpp[i]->funcs->refresh_cursor_state(dpp[i]);
+		if (hubp[i] && hubp[i]->funcs->refresh_cursor_state)
+			hubp[i]->funcs->refresh_cursor_state(hubp[i]);
+	}
 }
 
-void dcn35_begin_cursor_offload_update(struct dmub_srv *dmub, struct dpp *dpp, struct hubp *hubp, uint32_t stream_idx)
+void dcn35_begin_cursor_offload_update(struct dmub_srv *dmub, struct dpp **dpp,
+		struct hubp **hubp, uint8_t pipe_count, uint32_t stream_idx)
 {
 	volatile struct dmub_cursor_offload_v1 *cs = dmub->cursor_offload_v1;
 	uint32_t write_idx, payload_idx;
@@ -1695,24 +1719,17 @@ void dcn35_begin_cursor_offload_update(struct dmub_srv *dmub, struct dpp *dpp, s
 	cs->offload_streams[stream_idx].payloads[payload_idx].write_idx_start = write_idx;
 	cs->offload_streams[stream_idx].payloads[payload_idx].pipe_mask = 0;
 
-	if (hubp)
-		hubp->cursor_offload = true;
-
-	if (dpp)
-		dpp->cursor_offload = true;
+	dcn35_set_cursor_offload(dpp, hubp, pipe_count, true);
 }
 
-void dcn35_commit_cursor_offload_update(struct dmub_srv *dmub, struct dpp *dpp, struct hubp *hubp, uint32_t stream_idx)
+void dcn35_commit_cursor_offload_update(struct dmub_srv *dmub, struct dpp **dpp,
+		struct hubp **hubp, uint8_t pipe_count, uint32_t stream_idx)
 {
 	volatile struct dmub_cursor_offload_v1 *cs = dmub->cursor_offload_v1;
 	volatile struct dmub_shared_state_cursor_offload_stream_v1 *shared_stream;
 	uint32_t write_idx, payload_idx;
 
-	if (hubp)
-		hubp->cursor_offload = false;
-
-	if (dpp)
-		dpp->cursor_offload = false;
+	dcn35_set_cursor_offload(dpp, hubp, pipe_count, false);
 
 	write_idx = cs->offload_streams[stream_idx].write_idx + 1; /*  new payload (+1) */
 	payload_idx = write_idx % ARRAY_SIZE(cs->offload_streams[stream_idx].payloads);
