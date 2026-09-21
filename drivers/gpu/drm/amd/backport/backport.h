@@ -4,6 +4,12 @@
 
 #include <linux/version.h>
 #include <linux/kernel.h>
+/*
+ * <linux/fs.h> only forward-declares struct vfsmount; its definition lives in
+ * <linux/mount.h>. Newer kernels pull that in indirectly, older ones do not,
+ * which breaks code dereferencing vfsmount (e.g. kfd_chardev.c).
+ */
+#include <linux/mount.h>
 #include <kcl/kcl_types.h>
 #include <kcl/kcl_moduleparam.h>
 #include <kcl/kcl_idr.h>
