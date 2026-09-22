@@ -812,13 +812,33 @@ enum drm_bus_flags {
  * struct drm_amd_vsdb_info - AMD-specific VSDB information
  *
  * This structure holds information parsed from the AMD Vendor-Specific Data
- * Block (VSDB) version 3.
+ * Block (VSDB) versions 1 to 3.
  */
 struct drm_amd_vsdb_info {
 	/**
 	 * @version: Version of the Vendor-Specific Data Block (VSDB)
 	 */
 	u8 version;
+
+	/**
+	 * @freesync_supported: FreeSync (variable refresh rate) supported by panel
+	 */
+	bool freesync_supported;
+
+	/**
+	 * @min_frame_rate: FreeSync minimum refresh rate in Hz
+	 */
+	u16 min_frame_rate;
+
+	/**
+	 * @max_frame_rate: FreeSync maximum refresh rate in Hz
+	 */
+	u16 max_frame_rate;
+
+	/**
+	 * @freesync_vcp_code: MCCS VCP code for FreeSync
+	 */
+	u8 freesync_vcp_code;
 
 	/**
 	 * @replay_mode: Panel Replay supported
