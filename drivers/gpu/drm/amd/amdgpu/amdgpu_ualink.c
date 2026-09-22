@@ -2937,19 +2937,12 @@ static void amdgpu_ualink_exp_cleanup_worker(struct work_struct *work)
 	amdgpu_bo_unref(&bo);
 	exp_xa_node->bo = NULL;
 
-	/* Build the full npa_release_bitmap before sending any NPA-REVOKE. */
-	for_each_set_bit(remote_acc_id, exp_xa_node->importers_bitmap,
-				 AMDGPU_UALINK_ACCEL_MAX) {
-		imp_entry = &exp_xa_node->importer_entries[remote_acc_id];
-		if (!amdgpu_ualink_check_conn_ready(adev, remote_acc_id,
-					imp_entry->generation_count)) {
-			clear_bit(remote_acc_id,
-				  exp_xa_node->importers_bitmap);
-			continue;
-		}
-
-		set_bit(remote_acc_id, exp_xa_node->npa_release_bitmap);
-	}
+	/* Seed npa_release_bitmap with all importers before any NPA-REVOKE, so
+	 * the release IRQ only sees it empty once every responder has replied.
+	 * Dead peers are dropped from it in the send loop below.
+	 */
+	bitmap_copy(exp_xa_node->npa_release_bitmap,
+		    exp_xa_node->importers_bitmap, AMDGPU_UALINK_ACCEL_MAX);
 
 	/* Send NPA-REVOKE to all importers which have imported this memory.
 	 * On send failure clear the bit (no response will arrive) and mark the
@@ -2957,6 +2950,21 @@ static void amdgpu_ualink_exp_cleanup_worker(struct work_struct *work)
 	 */
 	for_each_set_bit(remote_acc_id, exp_xa_node->importers_bitmap,
 				 AMDGPU_UALINK_ACCEL_MAX) {
+		imp_entry = &exp_xa_node->importer_entries[remote_acc_id];
+
+		/* Re-check the connection right before the send: concurrent
+		 * cleanup workers all seed the bitmap while the peer is still
+		 * ESTABLISHED, so once its egress dies and the first worker
+		 * marks it NOT_READY, this skips the rest instead of flooding
+		 * the log with failed LSDMA sends to the same dead peer.
+		 */
+		if (!amdgpu_ualink_check_conn_ready(adev, remote_acc_id,
+					imp_entry->generation_count)) {
+			clear_bit(remote_acc_id,
+				  exp_xa_node->npa_release_bitmap);
+			continue;
+		}
+
 		dev_dbg(adev->dev,
 			"EXP-CLEANUP: Sending NPA-REVOKE to remote:%u\n",
 			remote_acc_id);
@@ -2967,7 +2975,6 @@ static void amdgpu_ualink_exp_cleanup_worker(struct work_struct *work)
 				remote_acc_id);
 			clear_bit(remote_acc_id, exp_xa_node->npa_release_bitmap);
 
-			imp_entry = &exp_xa_node->importer_entries[remote_acc_id];
 			amdgpu_ualink_handle_connection_reset(adev, remote_acc_id,
 						AMDGPU_UALINK_CONN_NOT_READY,
 						imp_entry->generation_count);
