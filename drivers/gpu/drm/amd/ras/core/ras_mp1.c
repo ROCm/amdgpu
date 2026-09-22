@@ -34,6 +34,7 @@ static const struct ras_mp1_ip_func *ras_mp1_get_ip_funcs(
 	case IP_VERSION(13, 0, 6):
 	case IP_VERSION(13, 0, 14):
 	case IP_VERSION(13, 0, 12):
+	case IP_VERSION(13, 0, 15):
 		return &mp1_ras_func_v13_0;
 	case IP_VERSION(15, 0, 8):
 	case IP_VERSION(15, 0, 3):
