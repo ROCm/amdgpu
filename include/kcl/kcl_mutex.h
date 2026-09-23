@@ -18,4 +18,8 @@
 DEFINE_GUARD(mutex, struct mutex *, mutex_lock(_T), mutex_unlock(_T))
 #endif
 
+#ifdef KCL_DEFINE_GUARD_COND_BACKPORT
+DEFINE_GUARD_COND(mutex, _try, mutex_trylock(_T))
+#endif
+
 #endif /* __LINUX_MUTEX_H */

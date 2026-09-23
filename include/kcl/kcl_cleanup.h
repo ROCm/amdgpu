@@ -27,10 +27,15 @@ static inline _type class_##_name##_constructor(_init_args)		\
 	class_##_name##_t var __cleanup(class_##_name##_destructor) =	\
 		class_##_name##_constructor
 
+#define EXTEND_CLASS(_name, ext, _init, _init_args...)			\
+typedef class_##_name##_t class_##_name##ext##_t;			\
+static inline void class_##_name##ext##_destructor(class_##_name##_t *p)\
+{ class_##_name##_destructor(p); }					\
+static inline class_##_name##_t class_##_name##ext##_constructor(_init_args) \
+{ class_##_name##_t t = _init; return t; }
+
 #define guard(_name) \
 	CLASS(_name, __UNIQUE_ID(guard))
-
-#define __guard_ptr(_name) class_##_name##_lock_ptr
 
 #define scoped_guard(_name, args...)					\
 	for (CLASS(_name, scope)(args),					\
@@ -112,6 +117,24 @@ __DEFINE_CLASS_IS_CONDITIONAL(_name, false);				\
 __DEFINE_UNLOCK_GUARD(_name, _type, _unlock, __VA_ARGS__)		\
 __DEFINE_LOCK_GUARD_1(_name, _type, _lock)
 
+#endif
+
+#ifndef DEFINE_GUARD_COND
+#define KCL_DEFINE_GUARD_COND_BACKPORT 1
+#define DEFINE_GUARD_COND(_name, _ext, _condlock)			\
+	EXTEND_CLASS(_name, _ext,					\
+		     ({ void *_t = _T; if (_T && !(_condlock)) _t = NULL; _t; }), \
+		     class_##_name##_t _T)				\
+	static inline void * class_##_name##_ext##_lock_ptr(class_##_name##_t *_T) \
+	{ return *_T; }
+
+#define __guard_ptr(_name) class_##_name##_lock_ptr
+
+#define scoped_cond_guard(_name, _fail, args...)			\
+	for (CLASS(_name, scope)(args),					\
+	     *done = NULL; !done; done = (void *)1)			\
+		if (!__guard_ptr(_name)(&scope)) _fail;			\
+		else
 #endif
 
 #endif /* KCL_CLEANUP_H_ */
