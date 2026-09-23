@@ -561,6 +561,16 @@ static enum link_result hdmi_frl_perform_link_training(struct ddc_service *ddc_s
 				prev_flt_update = scdc_update.fields.FLT_UPDATE;
 			}
 
+			if (flt_no_timeout) {
+				offset = HDMI_SCDC_SOURCE_TEST_REQ;
+				link_query_ddc_data(ddc_service, slave_address, &offset,
+						sizeof(offset), &test_req.byte, sizeof(test_req.byte));
+				if (test_req.fields.FLT_NO_TIMEOUT == 0) {
+					FRL_INFO("FRL TEST REQ:  FLT_no_timeout = %d \n", test_req.fields.FLT_NO_TIMEOUT);
+					return LINK_RESULT_SUCCESS;
+				}
+			}
+
 			/*Set TxFFE = TxFFE0*/
 			/*Program FFE_Levels - scdc_config has this field at 0 */
 			if (override_FFE) {
@@ -583,7 +593,7 @@ static enum link_result hdmi_frl_perform_link_training(struct ddc_service *ddc_s
 				FRL_INFO("FRL LINK TRAINING:  TxFFE = %d.\n", current_FFE);
 				override_FFE = false;
 			}
-			if (scdc_update.fields.FLT_UPDATE || flt_no_timeout) {
+			if (scdc_update.fields.FLT_UPDATE) {
 				offset = HDMI_SCDC_LTP_REQ;
 				link_query_ddc_data(ddc_service, slave_address,
 								&offset, sizeof(offset), ltp_req.byte,
