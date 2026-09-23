@@ -237,7 +237,8 @@ int amdgpu_amdkfd_reserve_mem_limit(struct amdgpu_device *adev,
 	if (adev && xcp_id >= 0 && (!adev->apu_prefer_gtt || adev->gmc.is_app_apu)) {
 		uint64_t vram_available =
 			vram_size - reserved_for_pt - reserved_for_ras -
-			atomic64_read(&adev->vram_pin_size);
+			atomic64_read(&adev->vram_pin_size) +
+			atomic64_read(&adev->kfd.vram_pinned);
 		if (adev->kfd.vram_used[xcp_id] + vram_needed > vram_available) {
 			ret = -ENOMEM;
 			goto release;
