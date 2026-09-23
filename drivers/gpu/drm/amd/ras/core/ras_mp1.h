@@ -48,29 +48,9 @@ enum ras_mp1_msg_id {
 };
 
 struct eeprom_err_record {
-	union {
-		struct {
-			u32 timestamp_low;
-			u32 timestamp_high;
-		};
-		u64 timestamp;
-	};
-
-	union {
-		struct {
-			u32 mca_addr_low;
-			u32 mca_addr_high;
-		};
-		u64 mca_addr;
-	};
-
-	union {
-		struct {
-			u32 ipid_low;
-			u32 ipid_high;
-		};
-		u64 ipid;
-	};
+	u64 timestamp;
+	u64 mca_addr;
+	u64 ipid;
 };
 
 enum ras_err_type;
