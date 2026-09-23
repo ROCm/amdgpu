@@ -91,7 +91,6 @@ uint32_t link_get_fixed_vs_pe_retimer_write_address(struct dc_link *link);
 void write_scdc_data(
 		struct ddc_service *ddc_service,
 		uint32_t pix_clk,
-		bool is_frl,
 		bool lte_340_scramble);
 
 void read_scdc_data(

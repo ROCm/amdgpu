@@ -570,7 +570,6 @@ struct ddc *get_ddc_pin(struct ddc_service *ddc_service)
 
 void write_scdc_data(struct ddc_service *ddc_service,
 		uint32_t pix_clk,
-		bool is_frl,
 		bool lte_340_scramble)
 {
 	bool over_340_mhz = pix_clk > 340000 ? 1 : 0;
@@ -587,10 +586,9 @@ void write_scdc_data(struct ddc_service *ddc_service,
 		(ddc_service->link->local_sink->edid_caps.panel_patch.skip_scdc_overwrite ||
 		!ddc_service->link->local_sink->edid_caps.scdc_present))
 		return;
-	if (is_frl) {
-		hdmi_frl_LTS_clear_Link_Setting(ddc_service);
-		hdmi_frl_LTS_clear_Update_flag(ddc_service);
-	}
+	hdmi_frl_LTS_clear_Link_Setting(ddc_service);
+	hdmi_frl_LTS_clear_Update_flag(ddc_service);
+
 	link_query_ddc_data(ddc_service, slave_address, &offset,
 			sizeof(offset), &sink_version, sizeof(sink_version));
 	if (sink_version == 1) {
