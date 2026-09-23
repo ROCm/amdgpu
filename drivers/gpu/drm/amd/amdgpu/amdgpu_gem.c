@@ -261,7 +261,7 @@ static int amdgpu_gem_object_open(struct drm_gem_object *obj,
 	struct amdgpu_bo_va *bo_va;
 	struct mm_struct *mm;
 	struct drm_exec exec;
-	int r;
+	int r = 0;
 
 	mm = amdgpu_ttm_tt_get_usermm(abo->tbo.ttm);
 	if (mm && mm != current->mm)
@@ -270,6 +270,42 @@ static int amdgpu_gem_object_open(struct drm_gem_object *obj,
 	if (abo->flags & AMDGPU_GEM_CREATE_VM_ALWAYS_VALID &&
 	    !amdgpu_vm_is_bo_always_valid(vm, abo))
 		return -EPERM;
+
+	/* Validate and add eviction fence to DMABuf imports with dynamic
+	 * attachment in compute VMs. Re-validation will be done by
+	 * amdgpu_vm_validate. Fences are on the reservation shared with the
+	 * export, which is currently required to be validated and fenced
+	 * already by amdgpu_amdkfd_gpuvm_restore_process_bos.
+	 *
+	 * This runs before the BO is added to the VM: drm_gem_handle_create_tail()
+	 * does not call the close() callback when open() fails, so nothing that
+	 * would need unwinding may exist yet.
+	 *
+	 * Nested locking below for the case that a GEM object is opened in
+	 * kfd_mem_export_dmabuf. Since the lock below is only taken for imports,
+	 * but not for export, this is a different lock class that cannot lead to
+	 * circular lock dependencies.
+	 */
+	if (vm->is_compute_context && vm->process_info &&
+	    drm_gem_is_imported(obj) &&
+	    dma_buf_is_dynamic(obj->import_attach->dmabuf)) {
+		mutex_lock_nested(&vm->process_info->lock, 1);
+		if (!WARN_ON(!vm->process_info->eviction_fence))
+			r = amdgpu_amdkfd_bo_validate_and_fence(abo,
+					AMDGPU_GEM_DOMAIN_GTT,
+					&vm->process_info->eviction_fence->base);
+		mutex_unlock(&vm->process_info->lock);
+		if (r) {
+			struct amdgpu_task_info *ti = amdgpu_vm_get_task_info_vm(vm);
+
+			dev_warn(adev->dev, "validate_and_fence failed: %d\n", r);
+			if (ti) {
+				dev_warn(adev->dev, "pid %d\n", ti->task.pid);
+				amdgpu_vm_put_task_info(ti);
+			}
+			return r;
+		}
+	}
 
 	drm_exec_init(&exec, DRM_EXEC_IGNORE_DUPLICATES, 0);
 	drm_exec_until_all_locked(&exec) {
@@ -288,47 +324,21 @@ static int amdgpu_gem_object_open(struct drm_gem_object *obj,
 	bo_va = amdgpu_vm_bo_find(vm, abo);
 	if (!bo_va) {
 		bo_va = amdgpu_vm_bo_add(adev, vm, abo);
-		r = amdgpu_evf_mgr_attach_fence(&fpriv->evf_mgr, abo);
-		if (r)
+		if (!bo_va) {
+			r = -ENOMEM;
 			goto out_unlock;
+		}
+		r = amdgpu_evf_mgr_attach_fence(&fpriv->evf_mgr, abo);
+		if (r) {
+			amdgpu_vm_bo_del(adev, bo_va);
+			goto out_unlock;
+		}
 	} else {
 		++bo_va->ref_count;
 	}
 
 	drm_exec_fini(&exec);
-
-	/* Validate and add eviction fence to DMABuf imports with dynamic
-	 * attachment in compute VMs. Re-validation will be done by
-	 * amdgpu_vm_validate. Fences are on the reservation shared with the
-	 * export, which is currently required to be validated and fenced
-	 * already by amdgpu_amdkfd_gpuvm_restore_process_bos.
-	 *
-	 * Nested locking below for the case that a GEM object is opened in
-	 * kfd_mem_export_dmabuf. Since the lock below is only taken for imports,
-	 * but not for export, this is a different lock class that cannot lead to
-	 * circular lock dependencies.
-	 */
-	if (!vm->is_compute_context || !vm->process_info)
-		return 0;
-	if (!drm_gem_is_imported(obj) ||
-	    !dma_buf_is_dynamic(obj->import_attach->dmabuf))
-		return 0;
-	mutex_lock_nested(&vm->process_info->lock, 1);
-	if (!WARN_ON(!vm->process_info->eviction_fence)) {
-		r = amdgpu_amdkfd_bo_validate_and_fence(abo, AMDGPU_GEM_DOMAIN_GTT,
-							&vm->process_info->eviction_fence->base);
-		if (r) {
-			struct amdgpu_task_info *ti = amdgpu_vm_get_task_info_vm(vm);
-
-			dev_warn(adev->dev, "validate_and_fence failed: %d\n", r);
-			if (ti) {
-				dev_warn(adev->dev, "pid %d\n", ti->task.pid);
-				amdgpu_vm_put_task_info(ti);
-			}
-		}
-	}
-	mutex_unlock(&vm->process_info->lock);
-	return r;
+	return 0;
 
 out_unlock:
 	drm_exec_fini(&exec);
