@@ -1597,12 +1597,12 @@ static u32 amdgpu_virt_rlcg_vfi_reg_rw(struct amdgpu_device *adev, u32 offset, u
 	spin_unlock_irqrestore(&adev->virt.rlcg_reg_lock, flags);
 
 	if (is_err)
-		dev_err(adev->dev, "VFi: [grbm_cntl=0x%x grbm_idx=0x%x] addr=0x%x (byte addr 0x%x), data=0x%x, cmd=0x%x\n",
-			grbm_cntl_data, grbm_idx_data,
+		dev_err(adev->dev, "VFi: xcc%u [grbm_cntl=0x%x grbm_idx=0x%x] addr=0x%x (byte addr 0x%x), data=0x%x, cmd=0x%x\n",
+			xcc_id, grbm_cntl_data, grbm_idx_data,
 			addr, addr * 4, data, cmd);
 	else
-		dev_dbg(adev->dev, "VFi: [grbm_cntl=0x%x grbm_idx=0x%x] addr=0x%x (byte addr 0x%x), data=0x%x, cmd=0x%x\n",
-			grbm_cntl_data, grbm_idx_data,
+		dev_dbg(adev->dev, "VFi: xcc%u [grbm_cntl=0x%x grbm_idx=0x%x] addr=0x%x (byte addr 0x%x), data=0x%x, cmd=0x%x\n",
+			xcc_id, grbm_cntl_data, grbm_idx_data,
 			addr, addr * 4, data, cmd);
 
 	return data;
