@@ -33,6 +33,7 @@
 #include <linux/dma-buf.h>
 #include <linux/dma-fence-unwrap.h>
 #include <linux/uaccess.h>
+#include <linux/pm_runtime.h>
 
 #include <drm/amdgpu_drm.h>
 #include <drm/drm_drv.h>
@@ -504,6 +505,12 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 	struct drm_gem_object *gobj;
 	uint32_t handle, initial_domain;
 	int r;
+
+	PM_RUNTIME_ACQUIRE_IF_ENABLED_AUTOSUSPEND(dev->dev, lock);
+
+	r = PM_RUNTIME_ACQUIRE_ERR(&lock);
+	if (r)
+		return r;
 
 	/* reject invalid gem flags */
 	if (flags & ~AMDGPU_GEM_CREATE_SETTABLE_MASK)
