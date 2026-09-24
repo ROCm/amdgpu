@@ -58,9 +58,8 @@ DECLARE_EVENT_CLASS(amdgpu_dc_reg_template,
 				   *count = *count + 1;
 		    ),
 
-		    TP_printk("reg=0x%08lx, value=0x%08lx",
-			      (unsigned long)__entry->reg,
-			      (unsigned long)__entry->value)
+		    TP_printk("reg=0x%08x, value=0x%08x",
+			      __entry->reg, __entry->value)
 );
 
 DEFINE_EVENT(amdgpu_dc_reg_template, amdgpu_dc_rreg,
