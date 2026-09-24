@@ -2445,8 +2445,10 @@ static int gfx_v12_1_xcc_cp_resume(struct amdgpu_device *adev, uint16_t xcc_mask
 				return r;
 		}
 
-		gfx_v12_1_xcc_update_medium_grain_clock_gating(adev, false,
-							       xcc_id, true);
+		/* MGCG is device wide and owned by the PF */
+		if (!amdgpu_sriov_vf(adev))
+			gfx_v12_1_xcc_update_medium_grain_clock_gating(adev, false,
+								       xcc_id, true);
 		/* GFX CGCG and LS is disabled by rlc fw */
 		gfx_v12_1_xcc_enable_gui_idle_interrupt(adev, false, xcc_id);
 
@@ -2468,8 +2470,9 @@ static int gfx_v12_1_xcc_cp_resume(struct amdgpu_device *adev, uint16_t xcc_mask
 			if (r)
 				return r;
 		}
-		gfx_v12_1_xcc_update_medium_grain_clock_gating(adev, true,
-							       xcc_id, true);
+		if (!amdgpu_sriov_vf(adev))
+			gfx_v12_1_xcc_update_medium_grain_clock_gating(adev, true,
+								       xcc_id, true);
 	}
 
 	return 0;
