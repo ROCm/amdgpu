@@ -3019,7 +3019,7 @@ static inline int find_fixed_dio_link_enc(const struct dc_link *link)
 {
 	/* virtual links own their link encoder directly and are never
 	 * registered into pool->link_encoders[]. */
-	if (link->connector_signal == SIGNAL_TYPE_VIRTUAL)
+	if (link->link_id.id == CONNECTOR_ID_VIRTUAL)
 		return -1;
 
 	/* the 8b10b dp phy can only use fixed link encoder */
