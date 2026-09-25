@@ -1042,6 +1042,8 @@ struct dc_virtual_addr_space_config {
 struct dc_bounding_box_overrides {
 	unsigned int sr_exit_time_ns;
 	unsigned int sr_enter_plus_exit_time_ns;
+	unsigned int sr_lp_exit_time_ns;
+	unsigned int sr_lp_enter_plus_exit_time_ns;
 	unsigned int sr_exit_z8_time_ns;
 	unsigned int sr_enter_plus_exit_z8_time_ns;
 	unsigned int urgent_latency_ns;
