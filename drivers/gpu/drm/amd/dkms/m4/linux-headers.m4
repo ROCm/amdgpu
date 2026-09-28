@@ -174,6 +174,11 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl
 	AC_KERNEL_CHECK_HEADERS([kunit/test-bug.h])
 
+	dnl #v6.2 commit 9c988fae6f6a
+	dnl #kunit: add macro to allow conditionally exposing static symbols to tests
+	dnl
+	AC_KERNEL_CHECK_HEADERS([kunit/visibility.h])
+
 	dnl #v5.5-rc2-4-gaf628aae8640
 	dnl #device.h: move dev_printk()-like functions to dev_printk.h
 	dnl #

@@ -988,6 +988,9 @@
 /* Define to 1 if you have the <kunit/test-bug.h> header file. */
 #define HAVE_KUNIT_TEST_BUG_H 1
 
+/* Define to 1 if you have the <kunit/visibility.h> header file. */
+#define HAVE_KUNIT_VISIBILITY_H 1
+
 /* kvrealloc() has 3 arguments */
 #define HAVE_KVREALLOC_3ARG 1
 
