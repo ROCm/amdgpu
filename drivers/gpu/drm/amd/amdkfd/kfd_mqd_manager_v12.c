@@ -33,23 +33,27 @@
 #include "amdgpu_amdkfd.h"
 
 /*
- * Assert every dispatch-record DW individually: all are u32, so an endpoint-only
- * check would let a wptr/notify DW swap pass silently. Live block is DW310-315.
+ * Assert every CP-tracing DW individually: all are u32, so an endpoint-only
+ * check would let a wptr/notify DW swap pass silently. Live block is DW340-345;
+ * pin the reserved DWs immediately before and after it to catch a whole-block
+ * shift too.
  */
-static_assert(offsetof(struct v12_compute_mqd, dispatch_record_buffer_addr_lo) ==
-	      310 * sizeof(uint32_t));
-static_assert(offsetof(struct v12_compute_mqd, dispatch_record_buffer_addr_hi) ==
-	      311 * sizeof(uint32_t));
-static_assert(offsetof(struct v12_compute_mqd, dispatch_record_buffer_size) ==
-	      312 * sizeof(uint32_t));
-static_assert(offsetof(struct v12_compute_mqd, dispatch_record_wptr_addr_lo) ==
-	      313 * sizeof(uint32_t));
-static_assert(offsetof(struct v12_compute_mqd, dispatch_record_wptr_addr_hi) ==
-	      314 * sizeof(uint32_t));
-static_assert(offsetof(struct v12_compute_mqd, dispatch_record_notify_interval) ==
-	      315 * sizeof(uint32_t));
-static_assert(offsetof(struct v12_compute_mqd, reserved_316) ==
-	      316 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, reserved_339) ==
+	      339 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, tracing_record_buf_addr_lo) ==
+	      340 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, tracing_record_buf_addr_hi) ==
+	      341 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, tracing_record_pipe_buf_size) ==
+	      342 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, tracing_record_wptr_addr_lo) ==
+	      343 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, tracing_record_wptr_addr_hi) ==
+	      344 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, tracing_record_notify_interval) ==
+	      345 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_compute_mqd, reserved_346) ==
+	      346 * sizeof(uint32_t));
 
 static inline struct v12_compute_mqd *get_mqd(void *mqd)
 {
@@ -274,20 +278,26 @@ static void update_mqd(struct mqd_manager *mm, void *mqd,
 
 	if (dispatch_record_supported_v12(mm->dev)) {
 		uint64_t base = q->dispatch_record_buffer_addr;
+		uint64_t wptr = q->dispatch_record_wptr_addr;
 
 		/*
 		 * Program unconditionally so an unbind (all-zero fields) always
 		 * reaches the live HQD; a base-addr guard would leave it armed.
+		 * On unbind base/wptr/size/notify are all zero together: a zero
+		 * base disarms tracing (firmware gates on buf_addr != 0 before
+		 * touching pipe size), and a zero notify exponent disables the IRQ,
+		 * so the zeroed state is inert.
 		 */
-		m->dispatch_record_buffer_addr_lo = lower_32_bits(base);
-		m->dispatch_record_buffer_addr_hi = upper_32_bits(base);
-		m->dispatch_record_buffer_size = q->dispatch_record_buffer_size;
-		m->dispatch_record_wptr_addr_lo =
-			lower_32_bits(q->dispatch_record_wptr_addr);
-		m->dispatch_record_wptr_addr_hi =
-			upper_32_bits(q->dispatch_record_wptr_addr);
-		/* DW315: dispatch-notify interval (50 armed / 0 disabled). */
-		m->dispatch_record_notify_interval =
+		m->tracing_record_buf_addr_lo = lower_32_bits(base);
+		m->tracing_record_buf_addr_hi = upper_32_bits(base);
+		/* DW342: per-pipe ring size as a pow2 exponent. */
+		m->tracing_record_pipe_buf_size =
+			q->dispatch_record_pipe_size_exponent;
+		/* DW343/344: public per-pipe wptr[] (wrapping slot index). */
+		m->tracing_record_wptr_addr_lo = lower_32_bits(wptr);
+		m->tracing_record_wptr_addr_hi = upper_32_bits(wptr);
+		/* DW345: notify interval as a pow2 exponent (1..9 armed, 0 off). */
+		m->tracing_record_notify_interval =
 			q->dispatch_record_notify_interval;
 	}
 

@@ -22,6 +22,7 @@
  *
  */
 
+#include <linux/build_bug.h>
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
@@ -33,9 +34,45 @@
 #include "kfd_device_queue_manager.h"
 #include "gmc_v12_1.h"
 
+/*
+ * Assert every CP-tracing DW individually: all are u32, so an endpoint-only
+ * check would let a wptr/notify DW swap pass silently. Live block is DW340-345;
+ * pin the reserved DWs immediately before and after it to catch a whole-block
+ * shift too. Also pin compute_dc_tg_counters_lo/hi (DW316/317), which share this
+ * region but are unrelated to dispatch-log, and the overall MQD size so a field
+ * insertion anywhere ahead of the block is caught.
+ */
+static_assert(sizeof(struct v12_1_compute_mqd) == 1024 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_1_compute_mqd, compute_dc_tg_counters_lo) ==
+	      316 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_1_compute_mqd, compute_dc_tg_counters_hi) ==
+	      317 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_1_compute_mqd, reserved_339) ==
+	      339 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_1_compute_mqd, tracing_record_buf_addr_lo) ==
+	      340 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_1_compute_mqd, tracing_record_buf_addr_hi) ==
+	      341 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_1_compute_mqd, tracing_record_pipe_buf_size) ==
+	      342 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_1_compute_mqd, tracing_record_wptr_addr_lo) ==
+	      343 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_1_compute_mqd, tracing_record_wptr_addr_hi) ==
+	      344 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_1_compute_mqd, tracing_record_notify_interval) ==
+	      345 * sizeof(uint32_t));
+static_assert(offsetof(struct v12_1_compute_mqd, reserved_346) ==
+	      346 * sizeof(uint32_t));
+
 static void update_mqd(struct mqd_manager *mm, void *mqd,
 		       struct queue_properties *q,
 		       struct mqd_update_info *minfo);
+
+/* KFD-owned VMID0 dispatch-log is only implemented for gfx12.5.0 (GC12.1.0). */
+static bool dispatch_record_supported_v12_1(struct kfd_node *dev)
+{
+	return KFD_GC_VERSION(dev) == IP_VERSION(12, 1, 0);
+}
 
 static inline struct v12_1_compute_mqd *get_mqd(void *mqd)
 {
@@ -344,6 +381,31 @@ static void update_mqd(struct mqd_manager *mm, void *mqd,
 		m->cp_hqd_ctx_save_control = 0;
 
 	set_priority(m, q);
+
+	if (dispatch_record_supported_v12_1(mm->dev)) {
+		uint64_t base = q->dispatch_record_buffer_addr;
+		uint64_t wptr = q->dispatch_record_wptr_addr;
+
+		/*
+		 * Program unconditionally so an unbind (all-zero fields) always
+		 * reaches the live HQD; a base-addr guard would leave it armed.
+		 * On unbind base/wptr/size/notify are all zero together: a zero
+		 * base disarms tracing (firmware gates on buf_addr != 0 before
+		 * touching pipe size), and a zero notify exponent disables the IRQ,
+		 * so the zeroed state is inert.
+		 */
+		m->tracing_record_buf_addr_lo = lower_32_bits(base);
+		m->tracing_record_buf_addr_hi = upper_32_bits(base);
+		/* DW342: per-pipe ring size as a pow2 exponent. */
+		m->tracing_record_pipe_buf_size =
+			q->dispatch_record_pipe_size_exponent;
+		/* DW343/344: public per-pipe wptr[] (wrapping slot index). */
+		m->tracing_record_wptr_addr_lo = lower_32_bits(wptr);
+		m->tracing_record_wptr_addr_hi = upper_32_bits(wptr);
+		/* DW345: notify interval as a pow2 exponent (1..9 armed, 0 off). */
+		m->tracing_record_notify_interval =
+			q->dispatch_record_notify_interval;
+	}
 
 	q->is_active = QUEUE_IS_ACTIVE(*q);
 }

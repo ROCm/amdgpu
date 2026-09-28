@@ -1767,9 +1767,10 @@ enum kfd_profiler_dlog_op {
  * Args for KFD_IOC_PROFILER_DLOG. @dlog_op/@gpu_id stay at fixed offsets (0, 4)
  * so the kernel reads them before dispatch. Size @buffer_size without a prior
  * INFO call: records are KFD_DISPATCH_LOG_FW_RECORD_BYTES (20) each, split into
- * num_regions equal power-of-two rings (gfx9.5.0: 4, gfx12: 2; else -EOPNOTSUPP).
+ * num_regions equal power-of-two rings (gfx9.5.0: 4, gfx12.0.x: 2, GC12.1.0: 4;
+ * else -EOPNOTSUPP).
  * @buffer_size must be a multiple of num_regions*20 yielding a power-of-two
- * per-region count. BO layout: records | u64 wptr[] | u64 rptr[] | pad.
+ * per-region count. BO layout: records | u64 wptr[] | pad.
  */
 struct kfd_ioctl_dlog_args {
 	__u32 dlog_op;			/* IN: enum kfd_profiler_dlog_op */
@@ -1873,7 +1874,7 @@ struct kfd_ioctl_ais_args {
 };
 
 /* Dispatch-log profiler stream (anon_inode fd; KFD-owned GTT BO, RAW mmap) */
-#define KFD_DLOG_STREAM_ABI_VERSION		3
+#define KFD_DLOG_STREAM_ABI_VERSION		4
 #define KFD_DISPATCH_LOG_FW_RECORD_BYTES	20U
 
 #define KFD_DLOG_STATUS_TARGET_EXITED		(1ULL << 2)
@@ -1882,16 +1883,32 @@ struct kfd_ioctl_ais_args {
 #define KFD_DLOG_STATUS_UNBIND_RETAINED		(1ULL << 6)
 
 /*
- * RAW_MMAP layout: 20-byte records | u64 wptr[num_regions] (firmware producer) |
- * u64 rptr[num_regions] (consumer); offsets from kfd_dlog_stream_info. Firmware
- * publishes payload before wptr[]; read wptr[], barrier, then payload. Skip a
- * record with record_type==0 or doorbell_off==0 (padding/not-yet-written).
+ * RAW_MMAP layout: 20-byte records | u64 wptr[num_regions] | pad. Offsets come
+ * from kfd_dlog_stream_info. The mapping is a SINGLE read-only shared region;
+ * the consumer keeps its own private cursor (there is no shared rptr[]).
  *
- * wptr[]/rptr[] are FREE-RUNNING u64 counts (slot = counter % region_record_count,
- * a power-of-two mask). Use the UNSIGNED delta (u64)(wptr-rptr) for unconsumed
- * count, never < / >. Firmware never sees rptr[] and does not throttle: a delta >
- * region_record_count is an overrun; fast-forward rptr to wptr-region_record_count.
- * Each counter has a single writer; a 32-bit reader must read hi/lo seqlock-style.
+ * wptr[i] is the firmware producer cursor for region i, and its raw encoding is
+ * ASIC-dependent: on gfx12/GC12.1 firmware writes a WRAPPING slot index in
+ * [0, region_record_count-1] into the low 32 bits (upper word zero); gfx950
+ * legacy firmware writes a free-running record count. Either way the consumer
+ * uses only the low 32 bits, so the same masked arithmetic applies. Read it with
+ * a 32-bit acquire load, then read the payload (firmware publishes payload before
+ * advancing wptr[i]). Skip a record with record_type==0 or doorbell_off==0
+ * (padding/not-yet-written); demux by doorbell_off.
+ *
+ * Consumer arithmetic (r = private cursor, N = region_record_count, a power of
+ * two): slot = idx & (N-1); unread = (w - r) & (N-1); after draining set r = w.
+ * Limitations: a full lap between two reads is undetectable, "exactly full" (N
+ * unread) looks empty, and the producer does not see the consumer or throttle,
+ * so the consumer must drain faster than one ring per pipe.
+ *
+ * poll() EPOLLIN is level-triggered on a pending notify count, raised by the
+ * firmware notify (every 512 records per pipe at the default cadence) and by
+ * queue destroy. read(fd, &u64, 8) returns and clears that count (-EAGAIN when
+ * zero, -EINVAL if the buffer is < 8 bytes; it never blocks, even without
+ * O_NONBLOCK). After each wake, read() the count, then drain every region up to
+ * its wptr[i]; records below one notify interval are seen by draining on a poll
+ * timeout.
  */
 struct kfd_dlog_stream_info {
 	__u32	abi_version;
@@ -1902,13 +1919,7 @@ struct kfd_dlog_stream_info {
 	__u64	buffer_size;
 	__u64	mmap_size;
 	__u64	records_offset;
-	/*
-	 * wptr[] is user-writable only because the BO is mapped shared R/W as one
-	 * region; a corrupted wptr[] may steer firmware, so do NOT assume it is
-	 * harmless without confirming the firmware contract (rptr[] never can).
-	 */
 	__u64	wptr_offset;
-	__u64	rptr_offset;
 	__u32	gpu_id;
 	__u32	target_pid;
 	__u32	pasid;

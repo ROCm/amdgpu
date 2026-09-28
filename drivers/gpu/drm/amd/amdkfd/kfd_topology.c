@@ -427,13 +427,15 @@ static const char kfd_dlog_stream_format_ksy_gfx12[] =
 "  bit-endian: le\n"
 "  ks-version: \"0.10\"\n"
 "doc: |\n"
-"  RAW_MMAP layout of the KFD-owned VMID0 dispatch-log stream (ABI v3).\n"
-"  mmap(stream_fd) maps: fw_record[N] then u64 wptr[num_regions] then\n"
-"  u64 rptr[num_regions]. Read the byte offsets (records_offset,\n"
-"  wptr_offset, rptr_offset), num_regions and region_record_count from\n"
+"  RAW_MMAP layout of the KFD-owned VMID0 dispatch-log stream (ABI v4).\n"
+"  mmap(stream_fd) is a single read-only region: fw_record[N] then\n"
+"  u64 wptr[num_regions]. Read the byte offsets (records_offset,\n"
+"  wptr_offset), num_regions and region_record_count from\n"
 "  KFD_DLOG_STREAM_IOC (op=KFD_DLOG_STREAM_OP_INFO); do not assume them.\n"
-"  Each region is region_record_count fixed 20-byte fw_records; wptr[i]/\n"
-"  rptr[i] count records in region i. Userspace owns rptr[] advancement.\n"
+"  Each region is region_record_count fixed 20-byte fw_records; wptr[i]\n"
+"  is the firmware-written WRAPPING slot index (low 32 bits) for region i.\n"
+"  The consumer keeps its own private cursor r: slot = idx & (N-1);\n"
+"  unread = (wptr - r) & (N-1).\n"
 "  Consumers MUST skip padding records (record_type == 0 or\n"
 "  doorbell_off == 0) and demux interleaved records by doorbell_off.\n"
 "params:\n"
@@ -452,12 +454,7 @@ static const char kfd_dlog_stream_format_ksy_gfx12[] =
 "    type: u8\n"
 "    repeat: expr\n"
 "    repeat-expr: n_regions\n"
-"    doc: firmware producer, one free-running record count per region.\n"
-"  - id: rptr\n"
-"    type: u8\n"
-"    repeat: expr\n"
-"    repeat-expr: n_regions\n"
-"    doc: host consumer cursor, one free-running record count per region.\n"
+"    doc: firmware wrapping slot index (low 32 bits), one per region.\n"
 "types:\n"
 "  records_region:\n"
 "    seq:\n"
@@ -498,14 +495,16 @@ static const char kfd_dlog_stream_format_ksy_gfx950[] =
 "  bit-endian: le\n"
 "  ks-version: \"0.10\"\n"
 "doc: |\n"
-"  RAW_MMAP layout of the KFD-owned VMID0 dispatch-log stream (ABI v3).\n"
-"  mmap(stream_fd) maps: fw_record[N] then u64 wptr[num_regions] then\n"
-"  u64 rptr[num_regions]. Read the byte offsets (records_offset,\n"
-"  wptr_offset, rptr_offset), num_regions and region_record_count from\n"
+"  RAW_MMAP layout of the KFD-owned VMID0 dispatch-log stream (ABI v4).\n"
+"  mmap(stream_fd) is a single read-only region: fw_record[N] then\n"
+"  u64 wptr[num_regions]. Read the byte offsets (records_offset,\n"
+"  wptr_offset), num_regions and region_record_count from\n"
 "  KFD_DLOG_STREAM_IOC (op=KFD_DLOG_STREAM_OP_INFO); do not assume them.\n"
 "  On gfx950 firmware writes four regions (one per MEC pipe). Each region\n"
-"  is region_record_count fixed 20-byte fw_records; wptr[i]/rptr[i] count\n"
-"  records in region i. Userspace owns rptr[] advancement.\n"
+"  is region_record_count fixed 20-byte fw_records; wptr[i] is a firmware\n"
+"  free-running count whose masked low bits give the slot. The consumer\n"
+"  keeps its own private cursor r: slot = idx & (N-1);\n"
+"  unread = (wptr - r) & (N-1).\n"
 "  Consumers MUST skip padding records (record_type == 0 or\n"
 "  doorbell_off == 0) and demux interleaved records by doorbell_off.\n"
 "params:\n"
@@ -524,12 +523,7 @@ static const char kfd_dlog_stream_format_ksy_gfx950[] =
 "    type: u8\n"
 "    repeat: expr\n"
 "    repeat-expr: n_regions\n"
-"    doc: firmware producer, one free-running record count per region.\n"
-"  - id: rptr\n"
-"    type: u8\n"
-"    repeat: expr\n"
-"    repeat-expr: n_regions\n"
-"    doc: host consumer cursor, one free-running record count per region.\n"
+"    doc: firmware free-running count (masked low bits = slot), per region.\n"
 "types:\n"
 "  records_region:\n"
 "    seq:\n"
@@ -558,9 +552,9 @@ static const char kfd_dlog_stream_format_ksy_gfx950[] =
 "    2: eop\n";
 
 /*
- * The KFD-owned VMID0 stream (kfd_dlog_stream.c) is supported on gfx12.0.x and
- * gfx950/GC9.5.0. No other GC version has an in-tree producer, so no
- * stream-format file is served for them (GC9.4.3/9.4.4 use the old
+ * The KFD-owned VMID0 stream (kfd_dlog_stream.c) is supported on gfx12.0.x,
+ * GC12.1.0 and gfx950/GC9.5.0. No other GC version has an in-tree producer, so
+ * no stream-format file is served for them (GC9.4.3/9.4.4 use the old
  * pre-existing dispatch-log format instead).
  */
 static const char *kfd_dlog_stream_format_ksy(struct kfd_node *dev)
@@ -570,6 +564,8 @@ static const char *kfd_dlog_stream_format_ksy(struct kfd_node *dev)
 	switch (KFD_GC_VERSION(dev)) {
 	case IP_VERSION(12, 0, 0):
 	case IP_VERSION(12, 0, 1):
+	/* gfx12.5.0 (GC12.1.0): same 20-byte fw_record; region count from INFO. */
+	case IP_VERSION(12, 1, 0):
 		return kfd_dlog_stream_format_ksy_gfx12;
 	case IP_VERSION(9, 5, 0):
 		return kfd_dlog_stream_format_ksy_gfx950;

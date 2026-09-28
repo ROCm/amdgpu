@@ -336,8 +336,21 @@ static void kfd_dlog_set_queue_props(struct queue_properties *p,
 	p->dispatch_record_buffer_addr = info->base_va;
 	p->dispatch_record_buffer_size =
 		info->buffer_size / KFD_DISPATCH_LOG_FW_RECORD_BYTES;
+	/* Per-pipe ring size exponent for the gfx12 MQD (DW342); v9 ignores it. */
+	p->dispatch_record_pipe_size_exponent = info->size_exponent;
 	p->dispatch_record_wptr_addr = info->wptr_va;
-	p->dispatch_record_notify_interval = KFD_DISPATCH_LOG_NOTIFY_INTERVAL;
+	/*
+	 * The exponent-contract ASICs program DW345 as a pow2 exponent derived
+	 * from the per-pipe size; the geometry gate guarantees size_exponent >= 2
+	 * here so the derived exponent is armed and strictly below it. gfx950 (v9)
+	 * keeps the raw-count notify interval.
+	 */
+	if (kfd_dlog_uses_exponent_contract(info->dev))
+		p->dispatch_record_notify_interval =
+			kfd_dlog_notify_exponent(info->size_exponent);
+	else
+		p->dispatch_record_notify_interval =
+			KFD_DISPATCH_LOG_NOTIFY_INTERVAL;
 }
 
 /* Program the stream-owned VMID0 addresses into a queue's MQD. */
@@ -792,6 +805,10 @@ u32 kfd_dispatch_log_node_num_regions(struct kfd_node *dev)
 	case IP_VERSION(12, 0, 1):
 		num_regions = 2;
 		break;
+	/* gfx12.5.0 (GC12.1.0): four regions (one per MEC pipe). */
+	case IP_VERSION(12, 1, 0):
+		num_regions = 4;
+		break;
 	default:
 		return 0;
 	}
@@ -890,12 +907,14 @@ static int kfd_dispatch_log_unbind_queue(struct queue *q)
 	struct queue_properties *p = &q->properties;
 	u64 buffer_addr = p->dispatch_record_buffer_addr;
 	u32 buffer_size = p->dispatch_record_buffer_size;
+	u32 pipe_size_exponent = p->dispatch_record_pipe_size_exponent;
 	u64 wptr_addr = p->dispatch_record_wptr_addr;
 	u32 notify_interval = p->dispatch_record_notify_interval;
 	int err;
 
 	p->dispatch_record_buffer_addr = 0;
 	p->dispatch_record_buffer_size = 0;
+	p->dispatch_record_pipe_size_exponent = 0;
 	p->dispatch_record_wptr_addr = 0;
 	p->dispatch_record_notify_interval = 0;
 	err = q->device->dqm->ops.update_queue(q->device->dqm, q, NULL);
@@ -903,6 +922,7 @@ static int kfd_dispatch_log_unbind_queue(struct queue *q)
 		/* Restore so the pessimistic "still bound" state is honest. */
 		p->dispatch_record_buffer_addr = buffer_addr;
 		p->dispatch_record_buffer_size = buffer_size;
+		p->dispatch_record_pipe_size_exponent = pipe_size_exponent;
 		p->dispatch_record_wptr_addr = wptr_addr;
 		p->dispatch_record_notify_interval = notify_interval;
 		pr_warn("dispatch_log: unbind update_queue failed (%d); MQD may retain addrs\n",

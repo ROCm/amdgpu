@@ -97,7 +97,7 @@ struct kfd_dlog_stream {
 	wait_queue_head_t	poll_wq;
 	/*
 	 * Set under @lock by detach_locked() once every raw pointer (@node/@bo/
-	 * @wptr/@rptr) is NULLed; read lock-free to reject a detached stream.
+	 * @wptr) is NULLed; read lock-free to reject a detached stream.
 	 */
 	bool			torn_down;
 	/* Target gone (exit), HUP published; write-once under st->lock. */
@@ -107,8 +107,8 @@ struct kfd_dlog_stream {
 	 * NOT tear down, clear @target, or free the BO.
 	 */
 	bool			fatal;
-	/* One-shot queue-destroy nudge so a quiet-ring tail is not lost. */
-	bool			drain_pending;
+	/* Pending notify count, guarded by node->dlog_streams_lock (irqsave). */
+	u64			notify_count;
 
 	/*
 	 * KFD-owned GTT BO (pinned+GART-bound+kmapped): stable VMID0 @gart_addr.
@@ -118,14 +118,18 @@ struct kfd_dlog_stream {
 	/* True once bo_size was reserved against the global pinned-GTT cap. */
 	bool			bo_accounted;
 	u64			gart_addr;
-	u64			*wptr;		/* firmware producer, num_regions */
-	u64			*rptr;		/* SDK consumer, num_regions */
+	/*
+	 * Firmware producer, one 8-byte slot per region (DW343/344 point here).
+	 * Firmware stores a wrapping 32-bit slot index into the low word only.
+	 */
+	u64			*wptr;
 	u32			buffer_size;	/* records region bytes */
 	u32			num_regions;
 	u32			region_record_count;
+	u32			size_exponent;	/* log2(region_record_count) */
 	u64			bo_size;
 	u64			wptr_offset;
-	u64			rptr_offset;
+
 	/*
 	 * Caps live RAW_MMAP mappings at one. Each mapping holds its own stream
 	 * kref, so destroy() (which frees the BO) cannot run while any is live.
@@ -142,39 +146,81 @@ struct kfd_dlog_stream {
 /*========================= geometry / validation =======================*/
 
 /*
- * Validate the requested records-region size and compute the BO layout:
- *   records[buffer_size] | wptr[num_regions] | rptr[num_regions] | pad
+ * Ring geometry derived from a requested records-region byte size and pipe
+ * count: firmware divides the records region into num_regions equal per-pipe
+ * rings; @per_pipe_records is a power of two and @size_exponent == log2 of it,
+ * which is what the MQD per-pipe size field (DW342) must encode.
  */
-static int kfd_dlog_stream_compute_layout(struct kfd_dlog_stream *st,
-					  u32 buffer_size, u32 num_regions)
+struct kfd_dlog_geometry {
+	u32			per_pipe_records;
+	u32			size_exponent;
+};
+
+/*
+ * Single source of truth for the ring geometry: split the records region into
+ * @num_regions equal, power-of-two per-pipe rings and derive the per-pipe size
+ * exponent the firmware MQD encodes. Rejects sizes that do not split evenly into
+ * power-of-two per-pipe rings.
+ */
+static int kfd_dlog_compute_geometry(u32 buffer_size, u32 num_regions,
+				     struct kfd_dlog_geometry *geo)
 {
 	u64 region_bytes = (u64)num_regions * KFD_DISPATCH_LOG_FW_RECORD_BYTES;
-	u64 arr_bytes = (u64)num_regions * sizeof(u64);
-	u32 per_region_records;
-	u64 rptr_off, tail;
+	u32 per_pipe_records;
 
-	if (!num_regions || !buffer_size)
+	if (!geo || !num_regions || !buffer_size)
 		return -EINVAL;
 	if (buffer_size > KFD_DISPATCH_LOG_MAX_BUFFER_SIZE)
 		return -EINVAL;
 
-	/* Must split into equal, power-of-two per-region rings. */
+	/* Must split into equal, power-of-two per-pipe rings. */
 	if (buffer_size % region_bytes)
 		return -EINVAL;
 
-	per_region_records = buffer_size / (u32)region_bytes;
-	if (!is_power_of_2(per_region_records))
+	per_pipe_records = buffer_size / (u32)region_bytes;
+	if (!is_power_of_2(per_pipe_records))
 		return -EINVAL;
 
-	rptr_off = (u64)buffer_size + arr_bytes;
-	tail = rptr_off + arr_bytes;
+	geo->per_pipe_records = per_pipe_records;
+	geo->size_exponent = ilog2(per_pipe_records);
+	return 0;
+}
+
+/*
+ * Validate the requested records-region size and compute the BO layout:
+ *   records[buffer_size] | wptr[num_regions] | pad
+ *
+ * @wptr[] is one 8-byte slot per pipe; firmware DW343/344 point at it directly.
+ */
+static int kfd_dlog_stream_compute_layout(struct kfd_dlog_stream *st,
+					  u32 buffer_size, u32 num_regions)
+{
+	u64 arr_bytes = (u64)num_regions * sizeof(u64);
+	struct kfd_dlog_geometry geo;
+	int ret;
+
+	ret = kfd_dlog_compute_geometry(buffer_size, num_regions, &geo);
+	if (ret)
+		return ret;
+
+	/*
+	 * The exponent-contract ASICs (gfx1200/gfx1201, GC12.1.0) arm a pow2
+	 * notify exponent strictly below the per-pipe size exponent so a poller
+	 * is woken well within a wrap. A per-pipe ring below
+	 * KFD_DISPATCH_LOG_MIN_SIZE_EXP has no such armed exponent; reject rather
+	 * than silently arm a starving notify (KFD liveness policy). gfx950 (v9)
+	 * uses raw-count notify and is unaffected.
+	 */
+	if (kfd_dlog_uses_exponent_contract(st->node) &&
+	    geo.size_exponent < KFD_DISPATCH_LOG_MIN_SIZE_EXP)
+		return -EINVAL;
 
 	st->buffer_size = buffer_size;
 	st->num_regions = num_regions;
-	st->region_record_count = per_region_records;
+	st->region_record_count = geo.per_pipe_records;
+	st->size_exponent = geo.size_exponent;
 	st->wptr_offset = buffer_size;
-	st->rptr_offset = rptr_off;
-	st->bo_size = PAGE_ALIGN(tail);
+	st->bo_size = PAGE_ALIGN((u64)buffer_size + arr_bytes);
 	return 0;
 }
 
@@ -207,7 +253,6 @@ static int kfd_dlog_stream_alloc_bo(struct kfd_dlog_stream *st)
 	st->bo = mem_obj;
 	st->gart_addr = gpu_addr;
 	st->wptr = (u64 *)((char *)cpu_ptr + st->wptr_offset);
-	st->rptr = (u64 *)((char *)cpu_ptr + st->rptr_offset);
 
 	memset(cpu_ptr, 0, st->bo_size);
 	/* Records/wptr must be zero before firmware (device DMA) is armed. */
@@ -218,7 +263,7 @@ static int kfd_dlog_stream_alloc_bo(struct kfd_dlog_stream *st)
 
 /*
  * Single detach under st->lock (last kref put only): unlink, NULL every raw
- * pointer, set @torn_down, hand the BO out via *bo_out for free_finish().
+ * pointer, set @torn_down, hand the BO out for free_finish().
  */
 static void kfd_dlog_stream_detach_locked(struct kfd_dlog_stream *st,
 					  struct amdgpu_bo **bo_out,
@@ -246,19 +291,18 @@ static void kfd_dlog_stream_detach_locked(struct kfd_dlog_stream *st,
 	st->bo = NULL;
 	st->bo_accounted = false;
 	st->wptr = NULL;
-	st->rptr = NULL;
 	st->node = NULL;
 }
 
-/* Free the BO (outside st->lock) and release GTT accounting. */
-static void kfd_dlog_stream_free_finish(struct amdgpu_bo *bo, bool unreserve,
-					u64 bo_size)
+/* Free a KFD-owned dlog BO (outside st->lock) and release GTT accounting. */
+static void kfd_dlog_stream_free_bo(struct amdgpu_bo *bo, bool unreserve,
+				    u64 bytes)
 {
 	if (bo)
 		amdgpu_amdkfd_free_kernel_mem(amdgpu_ttm_adev(bo->tbo.bdev),
 					      (void **)&bo);
 	if (unreserve)
-		kfd_dlog_gtt_unreserve(bo_size);
+		kfd_dlog_gtt_unreserve(bytes);
 }
 
 /*======= Per-node active-stream registry + poll wake (IRQ-safe) =======*/
@@ -329,12 +373,10 @@ static void kfd_dlog_stream_wake_locked(struct kfd_dlog_stream *st)
 }
 
 /*
- * Wake every stream registered for (node, pasid); returns the number woken.
- * @set_drain_pending latches drain_pending before the wake (store-before-wake
- * under the same lock) so a quiet-ring wake is still pollable.
+ * Count a notify on every stream registered for (node, pasid) and wake it;
+ * returns the number woken. The count is level state read/cleared by read().
  */
-static u32 kfd_dlog_stream_notify(struct kfd_node *node, u32 pasid,
-				  bool set_drain_pending)
+static u32 kfd_dlog_stream_notify(struct kfd_node *node, u32 pasid)
 {
 	struct kfd_dlog_stream *st;
 	unsigned long flags;
@@ -344,8 +386,7 @@ static u32 kfd_dlog_stream_notify(struct kfd_node *node, u32 pasid,
 	list_for_each_entry(st, &node->dlog_streams, registry_node) {
 		if (st->pasid != pasid)
 			continue;
-		if (set_drain_pending)
-			st->drain_pending = true;
+		st->notify_count++;
 		kfd_dlog_stream_wake_locked(st);
 		matched++;
 		/* Identify the woken stream; a count alone can't spot a cross-wake. */
@@ -362,7 +403,7 @@ void kfd_dlog_stream_notify_queue_destroyed(struct kfd_node *node, u32 pasid)
 {
 	if (!node)
 		return;
-	kfd_dlog_stream_notify(node, pasid, true);
+	kfd_dlog_stream_notify(node, pasid);
 }
 
 /*
@@ -378,7 +419,7 @@ static bool kfd_dlog_notify_client(struct kfd_node *node, u32 client_id)
 		return client_id >= SOC15_IH_CLIENTID_SE0SH &&
 		       client_id <= SOC15_IH_CLIENTID_SE3SH;
 
-	/* gfx12.0.x: only GRBM_CP or GFX (numerically SOC15 SE0SH). */
+	/* gfx12 (gfx12.0.x and GC12.1.0): only GRBM_CP or GFX. */
 	return client_id == SOC21_IH_CLIENTID_GFX;
 }
 
@@ -413,8 +454,7 @@ bool kfd_dlog_ih_route_notify(struct kfd_node *node,
 	vmid = SOC15_VMID_FROM_IH_ENTRY(ih_ring_entry);
 	pipe_id = context_id0 & KFD_DISPATCH_LOG_NOTIFY_PIPE_MASK;
 
-	/* Data-notify means records exist; no drain_pending latch needed. */
-	matched = kfd_dlog_stream_notify(node, pasid, false);
+	matched = kfd_dlog_stream_notify(node, pasid);
 	trace_kfd_dlog_notify_interrupt(node->id, source_id, client_id, pasid,
 					vmid, pipe_id, context_id0, matched);
 	/* Always consume a tagged notify; matched==0 is the no-live-stream case. */
@@ -502,7 +542,7 @@ static void kfd_dlog_stream_destroy(struct kref *kref)
 	kfd_dlog_stream_detach_locked(st, &bo, &unreserve);
 	mutex_unlock(&st->lock);
 
-	kfd_dlog_stream_free_finish(bo, unreserve, st->bo_size);
+	kfd_dlog_stream_free_bo(bo, unreserve, st->bo_size);
 
 	mutex_destroy(&st->lock);
 	kfree(st);
@@ -597,10 +637,9 @@ static void kfd_dlog_stream_fill_info(struct kfd_dlog_stream *st,
 	info->region_record_count = st->region_record_count;
 	info->buffer_size = st->buffer_size;
 	info->mmap_size = st->bo_size;
-	/* Records region at BO offset 0: records | wptr[] | rptr[] | pad. */
+	/* Records region at BO offset 0: records | wptr[] | pad. */
 	info->records_offset = 0;
 	info->wptr_offset = st->wptr_offset;
-	info->rptr_offset = st->rptr_offset;
 	info->gpu_id = st->gpu_id;
 	info->target_pid = st->target_pid;
 	info->pasid = st->pasid;
@@ -736,12 +775,16 @@ static int kfd_dlog_stream_mmap(struct file *file, struct vm_area_struct *vma)
 		return -EINVAL;
 	if (size != st->bo_size)
 		return -EINVAL;
-	if (vma->vm_flags & VM_EXEC)
+	/*
+	 * Map the whole BO read-only: firmware DMA-writes wptr[], so userspace
+	 * must never write it. Clear VM_MAYWRITE/VM_MAYEXEC so mprotect() cannot
+	 * later upgrade the mapping to writable or executable.
+	 */
+	if (vma->vm_flags & (VM_WRITE | VM_EXEC))
 		return -EINVAL;
-	/* RAW_MMAP writes rptr[] through this VMA; require shared read/write. */
-	if (!(vma->vm_flags & VM_SHARED) || !(vma->vm_flags & VM_READ) ||
-	    !(vma->vm_flags & VM_WRITE))
+	if (!(vma->vm_flags & VM_MAYSHARE) || !(vma->vm_flags & VM_READ))
 		return -EINVAL;
+	vm_flags_clear(vma, VM_MAYWRITE | VM_MAYEXEC);
 
 	mutex_lock(&st->lock);
 	/* Reject once torn down so mmap_pages() never touches a freed BO. */
@@ -828,40 +871,19 @@ static int kfd_dlog_stream_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-/*=============================== poll() ================================*/
+/*=========================== poll() / read() ==========================*/
 
 /*
- * Level check under st->lock: wptr != rptr means unconsumed records. Firmware
- * DMA-publishes wptr[] independently, so dma_rmb() before sampling it.
+ * Side-effect-free level check: EPOLLIN iff notify_count != 0. Reading the
+ * count under dlog_streams_lock (the notify path's lock) is guarded by st->lock
+ * only to keep st->node stable against a concurrent detach.
  */
-static bool kfd_dlog_stream_has_records(struct kfd_dlog_stream *st)
-{
-	u32 i;
-
-	lockdep_assert_held(&st->lock);
-
-	/* torn_down NULLs wptr/rptr; a husk has no records to report. */
-	if (st->torn_down || !st->wptr || !st->rptr)
-		return false;
-
-	/* Observe the firmware's DMA wptr publish before comparing. */
-	dma_rmb();
-
-	for (i = 0; i < st->num_regions; i++) {
-		if (READ_ONCE(st->wptr[i]) != READ_ONCE(st->rptr[i]))
-			return true;
-	}
-	return false;
-}
-
 static __poll_t kfd_dlog_stream_poll(struct file *file,
 				     struct poll_table_struct *wait)
 {
 	struct kfd_dlog_stream *st = file->private_data;
 	struct kfd_node *node;
 	unsigned long flags;
-	bool drain_pending_now = false;
-	bool has_records;
 	__poll_t mask = 0;
 
 	/* Register on the waitqueue before the level check (poll contract). */
@@ -873,31 +895,59 @@ static __poll_t kfd_dlog_stream_poll(struct file *file,
 		mask |= EPOLLERR;
 
 	mutex_lock(&st->lock);
-	has_records = kfd_dlog_stream_has_records(st);
-	/*
-	 * Read-and-clear the one-shot drain_pending nudge under the IRQ-safe
-	 * dlog_streams_lock. Clear only once the ring is dry so the nudge
-	 * survives until the final tail is drained.
-	 */
 	node = st->node;
 	if (node) {
 		spin_lock_irqsave(&node->dlog_streams_lock, flags);
-		drain_pending_now = st->drain_pending;
-		if (drain_pending_now && !has_records)
-			st->drain_pending = false;
+		if (st->notify_count)
+			mask |= EPOLLIN | EPOLLRDNORM;
 		spin_unlock_irqrestore(&node->dlog_streams_lock, flags);
 	}
 	mutex_unlock(&st->lock);
 
-	if (has_records || drain_pending_now)
-		mask |= EPOLLIN | EPOLLRDNORM;
-
 	return mask;
+}
+
+/*
+ * read(fd, &u64, 8): take and zero the pending notify count. Always
+ * non-blocking (regardless of O_NONBLOCK): -EAGAIN when zero, -EINVAL if the
+ * buffer is smaller than a u64. A detached stream has no live notify path and
+ * reads as -EAGAIN.
+ */
+static ssize_t kfd_dlog_stream_read(struct file *file, char __user *buf,
+				    size_t count, loff_t *ppos)
+{
+	struct kfd_dlog_stream *st = file->private_data;
+	struct kfd_node *node;
+	unsigned long flags;
+	u64 v = 0;
+
+	if (count < sizeof(u64))
+		return -EINVAL;
+
+	mutex_lock(&st->lock);
+	node = st->node;
+	if (node) {
+		spin_lock_irqsave(&node->dlog_streams_lock, flags);
+		v = st->notify_count;
+		st->notify_count = 0;
+		spin_unlock_irqrestore(&node->dlog_streams_lock, flags);
+	}
+	mutex_unlock(&st->lock);
+
+	if (!v)
+		return -EAGAIN;
+
+	/* On copy failure the count is lost; a later notify re-raises readiness. */
+	if (copy_to_user(buf, &v, sizeof(v)))
+		return -EFAULT;
+
+	return sizeof(v);
 }
 
 static const struct file_operations kfd_dlog_stream_fops = {
 	.owner		= THIS_MODULE,
 	.poll		= kfd_dlog_stream_poll,
+	.read		= kfd_dlog_stream_read,
 	.unlocked_ioctl	= kfd_dlog_stream_ioctl,
 	.compat_ioctl	= compat_ptr_ioctl,
 	.mmap		= kfd_dlog_stream_mmap,
@@ -915,7 +965,6 @@ static int kfd_dlog_stream_setup(struct kfd_dlog_stream *st)
 	struct kfd_dlog_bind_info bind;
 	struct kfd_process *target;
 	u32 gpu_id;
-	u32 i;
 	int ret;
 
 	if (!st->node)
@@ -926,16 +975,14 @@ static int kfd_dlog_stream_setup(struct kfd_dlog_stream *st)
 		return ret;
 
 	/*
-	 * Prime rptr[] to wptr[] and join the registry before arming, rechecking
-	 * torn_down first: membership must exist before the first firmware notify.
+	 * Join the registry before arming, rechecking torn_down first:
+	 * membership must exist before the first firmware notify.
 	 */
 	mutex_lock(&st->lock);
-	if (st->torn_down || !st->wptr || !st->rptr) {
+	if (st->torn_down || !st->wptr) {
 		mutex_unlock(&st->lock);
 		return -ENODEV;
 	}
-	for (i = 0; i < st->num_regions; i++)
-		WRITE_ONCE(st->rptr[i], READ_ONCE(st->wptr[i]));
 	kfd_dlog_stream_registry_add(st);
 
 	/*
@@ -949,8 +996,10 @@ static int kfd_dlog_stream_setup(struct kfd_dlog_stream *st)
 		kref_get(&target->ref);
 	bind.dev = st->node;
 	bind.base_va = st->gart_addr;
+	/* DW343/344 point firmware at the public wptr[] region directly. */
 	bind.wptr_va = st->gart_addr + st->wptr_offset;
 	bind.buffer_size = st->buffer_size;
+	bind.size_exponent = st->size_exponent;
 	mutex_unlock(&st->lock);
 
 	/* Caller's put -> destroy() -> terminate() unlinks the registry. */
@@ -1084,7 +1133,7 @@ int kfd_dlog_stream_create_file(struct kfd_ioctl_dlog_args *args,
 	 */
 	stream_file = anon_inode_create_getfile(KFD_DLOG_STREAM_NAME,
 						&kfd_dlog_stream_fops, st,
-						O_RDWR | O_CLOEXEC, NULL);
+						O_RDONLY | O_CLOEXEC, NULL);
 	if (IS_ERR(stream_file)) {
 		ret = PTR_ERR(stream_file);
 		goto err_fd;

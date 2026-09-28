@@ -636,7 +636,17 @@ struct queue_properties {
 	 */
 	uint64_t dispatch_record_buffer_addr;
 	uint32_t dispatch_record_buffer_size;
-	/* Per-region wptr array VA the firmware advances; 0 == not registered. */
+	/*
+	 * Per-pipe ring size exponent for the gfx12 CP-tracing contract (MQD
+	 * DW342): log2 of the per-pipe record count. 0 when unbound. Kept
+	 * distinct from @dispatch_record_buffer_size so the gfx950 (v9) producer,
+	 * which still consumes the total record count, is unaffected.
+	 */
+	uint32_t dispatch_record_pipe_size_exponent;
+	/*
+	 * GART VA of the per-pipe wptr[] region the firmware advances (gfx12: a
+	 * wrapping slot index in the low 32 bits); 0 == not registered.
+	 */
 	uint64_t dispatch_record_wptr_addr;
 	/* Notify interval, nonzero while armed to an active stream; 0 when unbound. */
 	uint32_t dispatch_record_notify_interval;
@@ -1057,8 +1067,21 @@ struct svm_range_list {
 /* Cap on the requested records-region size (bounds an unprivileged GTT pin). */
 #define KFD_DISPATCH_LOG_MAX_BUFFER_SIZE	(16U << 20)
 
-/* MQD notify interval: firmware raises a notify ~every N records; 0 disables. */
+/*
+ * Legacy raw-count notify interval used by the gfx950 (v9) producer: firmware
+ * raises a notify ~every N records; 0 disables.
+ */
 #define KFD_DISPATCH_LOG_NOTIFY_INTERVAL	50u
+
+/*
+ * The gfx12 CP-tracing notify interval (MQD DW345) is a power-of-two EXPONENT,
+ * not a raw count: firmware raises a notify once 2^exponent records have accrued
+ * on a pipe, and exponent 0 permanently disables the IRQ. KFD caps the armed
+ * exponent at 9 (=> every 512 records) for a tighter poll-wake cadence. Shared
+ * by gfx1200/gfx1201 and GC12.1.0.
+ */
+#define KFD_DISPATCH_LOG_NOTIFY_EXP_MAX		9u
+#define KFD_DISPATCH_LOG_NOTIFY_EXP_DISABLED	0u
 
 /*
  * Firmware tags the notify EOP with context_id0 == (CTX_TAG | pipe_id). The tag
@@ -1068,12 +1091,62 @@ struct svm_range_list {
 #define KFD_DISPATCH_LOG_NOTIFY_CTX_MASK	0xffff0000u
 #define KFD_DISPATCH_LOG_NOTIFY_PIPE_MASK	0x000000ffu
 
+/*
+ * True for the ASICs whose CP-tracing MQD contract uses the power-of-two size
+ * (DW342) and notify (DW345) exponents (gfx1200/gfx1201 and GC12.1.0). gfx950
+ * (v9) keeps the legacy raw-count notify and is excluded, so the exponent-form
+ * derivation and its liveness constraint apply only here.
+ */
+static inline bool kfd_dlog_uses_exponent_contract(struct kfd_node *dev)
+{
+	switch (KFD_GC_VERSION(dev)) {
+	case IP_VERSION(12, 0, 0):
+	case IP_VERSION(12, 0, 1):
+	case IP_VERSION(12, 1, 0):
+		return true;
+	default:
+		return false;
+	}
+}
+
+/*
+ * Smallest per-pipe size exponent that admits an armed notify exponent both >= 1
+ * and strictly below it (KFD policy: fire well within a wrap so a poller is woken
+ * before the ring laps). Below this a bound exponent-contract stream would have
+ * no non-starving notify config.
+ */
+#define KFD_DISPATCH_LOG_MIN_SIZE_EXP		2u
+
+/*
+ * Derive the MQD notify exponent (DW345) from a bound stream's per-pipe size
+ * exponent (DW342). Firmware fires an IRQ every 2^notify records, so choosing
+ * size_exponent - 1 makes it fire twice per wrap (once per half-ring), keeping
+ * notify_exponent < size_exponent for every size_exponent >= 2; clamping to
+ * KFD_DISPATCH_LOG_NOTIFY_EXP_MAX only makes the IRQ fire *more* often, so the
+ * constraint still holds. size_exponent < 2 cannot yield an armed exponent that
+ * is both >= 1 and strictly below size_exponent; the exponent-contract stream
+ * layout rejects such rings (KFD_DISPATCH_LOG_MIN_SIZE_EXP), so a bound stream
+ * always reaches this with size_exponent >= 2. size_exponent == 0 is the
+ * unbound case and maps to the disabled encoding, consistent with an all-zero
+ * unbind.
+ */
+static inline u32 kfd_dlog_notify_exponent(u32 size_exponent)
+{
+	if (size_exponent < KFD_DISPATCH_LOG_MIN_SIZE_EXP)
+		return KFD_DISPATCH_LOG_NOTIFY_EXP_DISABLED;
+
+	return min(size_exponent - 1, KFD_DISPATCH_LOG_NOTIFY_EXP_MAX);
+}
+
 /* VMID0/GART addresses + geometry the stream hands to PQM to arm queues. */
 struct kfd_dlog_bind_info {
 	struct kfd_node		*dev;
 	u64			base_va;
+	/* GART VA of the public per-pipe wptr[] region (firmware DW343/344). */
 	u64			wptr_va;
 	u32			buffer_size;
+	/* Per-pipe ring size exponent programmed into the MQD (DW342). */
+	u32			size_exponent;
 };
 
 /*
