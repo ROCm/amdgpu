@@ -1258,7 +1258,7 @@ svm_range_get_pte_flags(struct kfd_node *node, struct amdgpu_vm *vm,
 	bool coherent = flags & (KFD_IOCTL_SVM_FLAG_COHERENT | KFD_IOCTL_SVM_FLAG_EXT_COHERENT);
 	bool ext_coherent = flags & KFD_IOCTL_SVM_FLAG_EXT_COHERENT;
 	unsigned int mtype_local, mtype_remote;
-	bool is_aid_a1, is_local;
+	bool is_aid_a1, is_local, is_spx;
 
 	if (domain == SVM_RANGE_VRAM_DOMAIN)
 		bo_node = prange->svm_bo->node;
@@ -1361,10 +1361,19 @@ svm_range_get_pte_flags(struct kfd_node *node, struct amdgpu_vm *vm,
 				AMDGPU_VM_MTYPE_UC;
 		snoop = true;
 
-		if (is_local) /* local HBM  */ {
+		if (ext_coherent) {
+			is_spx = amdgpu_xcp_query_partition_mode(node->adev->xcp_mgr,
+								 AMDGPU_XCP_FL_NONE) ==
+				 AMDGPU_SPX_PARTITION_MODE;
+			/* AID A0 requires MTYPE_UC for extended-scope coherent
+			 * local memory in DPX/QPX/CPX modes.
+			 */
+			if (is_local && (is_aid_a1 || is_spx))
+				mapping_flags |= mtype_local;
+			else
+				mapping_flags |= AMDGPU_VM_MTYPE_UC;
+		} else if (is_local) /* local HBM  */ {
 			mapping_flags |= mtype_local;
-		} else if (ext_coherent) {
-			mapping_flags |= AMDGPU_VM_MTYPE_UC;
 		} else {
 			/* system memory or remote VRAM */
 			mapping_flags |= mtype_remote;
