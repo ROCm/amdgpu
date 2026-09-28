@@ -23,6 +23,7 @@
 #include "amdgpu.h"
 #include "gmc_v12_1.h"
 #include "soc15_common.h"
+#include "soc_v1_0.h"
 #include "soc_v1_0_enum.h"
 #include "oss/osssys_7_1_0_offset.h"
 #include "oss/osssys_7_1_0_sh_mask.h"
@@ -627,7 +628,7 @@ static void gmc_v12_1_get_mtypes(struct amdgpu_device *adev,
 				 unsigned int *mtype_local,
 				 unsigned int *mtype_remote)
 {
-	bool is_aid_a1 = (adev->rev_id & 0x10);
+	bool is_aid_a1 = SOC_V1_0_DIE_REV_AID(adev->rev_id) == 1;
 
 	/* Local memory: ASIC default depends on the AID stepping. */
 	*mtype_local = is_aid_a1 ? MTYPE_RW : MTYPE_NC;

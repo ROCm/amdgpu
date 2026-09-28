@@ -46,6 +46,8 @@ extern const struct amdgpu_ip_block_version soc_v1_0_common_ip_block;
 	 ((xcd) << SOC_V1_0_DIE_REV_XCD__SHIFT))
 #define SOC_V1_0_DIE_REV_XCD(rev_id)          \
 	(((rev_id) & SOC_V1_0_DIE_REV_XCD__MASK) >> SOC_V1_0_DIE_REV_XCD__SHIFT)
+#define SOC_V1_0_DIE_REV_AID(rev_id)          \
+	(((rev_id) & SOC_V1_0_DIE_REV_AID__MASK) >> SOC_V1_0_DIE_REV_AID__SHIFT)
 
 void soc_v1_0_grbm_select(struct amdgpu_device *adev,
 			  u32 me, u32 pipe,

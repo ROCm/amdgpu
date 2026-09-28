@@ -34,6 +34,7 @@
 #include "amdgpu.h"
 #include "amdgpu_xgmi.h"
 #include "amdgpu_reset.h"
+#include "soc_v1_0.h"
 #include "kfd_priv.h"
 #include "kfd_svm.h"
 #include "kfd_migrate.h"
@@ -1345,7 +1346,7 @@ svm_range_get_pte_flags(struct kfd_node *node, struct amdgpu_vm *vm,
 		mapping_flags |= AMDGPU_VM_MTYPE_NC;
 		break;
 	case IP_VERSION(12, 1, 0):
-		is_aid_a1 = (node->adev->rev_id & 0x10);
+		is_aid_a1 = SOC_V1_0_DIE_REV_AID(node->adev->rev_id) == 1;
 		is_local = (domain == SVM_RANGE_VRAM_DOMAIN) &&
 				(bo_node->adev == node->adev);
 
