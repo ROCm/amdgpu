@@ -765,13 +765,13 @@ static int amdgpu_discovery_init(struct amdgpu_device *adev)
 	/* Read from file if it is the preferred option */
 	fw_name = amdgpu_discovery_get_fw_name(adev);
 	if (fw_name != NULL) {
-		drm_dbg(&adev->ddev, "use ip discovery information from file");
+		drm_dbg(&adev->ddev, "use ip discovery information from file\n");
 		r = amdgpu_discovery_read_binary_from_file(adev, discovery_bin,
 							   fw_name);
 		if (r)
 			goto out;
 	} else {
-		drm_dbg(&adev->ddev, "use ip discovery information from memory");
+		drm_dbg(&adev->ddev, "use ip discovery information from memory\n");
 		r = amdgpu_discovery_read_binary_from_mem(adev, discovery_bin,
 							  is_tmr_in_sysmem);
 		if (r)
