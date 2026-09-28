@@ -36,6 +36,32 @@ static inline _type class_##_name##_constructor(_init_args)		\
 	for (CLASS(_name, scope)(args),					\
 	     *done = NULL; __guard_ptr(_name)(&scope) && !done; done = (void *)1)
 
+/*
+ * Conditional guards. The class object is the lock pointer itself and NULL
+ * means "not acquired", so the destructor's `if (_T)` already skips the
+ * unlock on failure. Upstream's ERR_PTR()/__is_cond_ptr() plumbing is not
+ * needed as long as nobody calls ACQUIRE_ERR() on these.
+ */
+#define EXTEND_CLASS(_name, ext, _init, _init_args...)			\
+	typedef class_##_name##_t class_##_name##ext##_t;		\
+	static inline void class_##_name##ext##_destructor(class_##_name##_t *p) \
+	{ class_##_name##_destructor(p); }				\
+	static inline class_##_name##_t class_##_name##ext##_constructor(_init_args) \
+	{ class_##_name##_t t = _init; return t; }
+
+#define DEFINE_GUARD_COND(_name, _ext, _condlock)			\
+	EXTEND_CLASS(_name, _ext,					\
+		     ({ void *_t = _T; if (_T && !(_condlock)) _t = NULL; _t; }), \
+		     class_##_name##_t _T)				\
+	static inline void * class_##_name##_ext##_lock_ptr(class_##_name##_t *_T) \
+	{ return class_##_name##_lock_ptr(_T); }
+
+#define scoped_cond_guard(_name, _fail, args...)			\
+	for (CLASS(_name, scope)(args),					\
+	     *done = NULL; !done; done = (void *)1)			\
+		if (!__guard_ptr(_name)(&scope)) _fail;			\
+		else
+
 #ifndef no_free_ptr
 #define __get_and_null(p, nullvalue)   \
 	({                                  \
