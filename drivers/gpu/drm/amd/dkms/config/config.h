@@ -1228,6 +1228,9 @@
 /* pm_hibernation_mode_is_suspend() is available */
 #define HAVE_PM_HIBERNATION_MODE_IS_SUSPEND 1
 
+/* PM_RUNTIME_ACQUIRE*() macros are available */
+#define HAVE_PM_RUNTIME_ACQUIRE 1
+
 /* pm_runtime_get_if_active() has one parameters */
 #define HAVE_PM_RUNTIME_GET_IF_ACTIVE_1ARGS 1
 
