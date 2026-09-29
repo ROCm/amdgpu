@@ -3305,16 +3305,35 @@ static void amdgpu_ualink_process_npa_revoke_msg(struct amdgpu_device *adev,
 		return;
 	}
 
-	WRITE_ONCE(imp_xa_node->node_state, AMDGPU_UALINK_NODE_TEARDOWN);
-	list_del_init(&imp_xa_node->list);
-	xa_unlock(&adev->ualink.imp_xa);
+	switch (READ_ONCE(imp_xa_node->node_state)) {
+	case AMDGPU_UALINK_NODE_READY:
+		WRITE_ONCE(imp_xa_node->node_state, AMDGPU_UALINK_NODE_TEARDOWN);
+		list_del_init(&imp_xa_node->list);
+		xa_unlock(&adev->ualink.imp_xa);
 
-	/* Invalidate the GPUVM mappings */
-	bo = gem_to_amdgpu_bo(imp_xa_node->dmabuf->priv);
-	amdgpu_ualink_invalidate_import_mappings(bo);
+		/* Invalidate the GPUVM mappings */
+		bo = gem_to_amdgpu_bo(imp_xa_node->dmabuf->priv);
+		amdgpu_ualink_invalidate_import_mappings(bo);
 
-	/* Drop the refcount for the node */
-	amdgpu_ualink_imp_xa_entry_put(imp_xa_node);
+		/* Drop the refcount for the node */
+		amdgpu_ualink_imp_xa_entry_put(imp_xa_node);
+		break;
+	case AMDGPU_UALINK_NODE_PENDING:
+		/* The import is still building the dma-buf and nothing has
+		 * been handed to user-space yet. The importing thread sees
+		 * the teardown state and unwinds.
+		 */
+		WRITE_ONCE(imp_xa_node->node_state, AMDGPU_UALINK_NODE_TEARDOWN);
+		xa_unlock(&adev->ualink.imp_xa);
+		break;
+	default:
+		/* NPA-REVOKE always follows NPA-RSP, so a NOT_READY node means
+		 * a stale revoke, and a node in teardown is already being
+		 * released by whoever moved it there.
+		 */
+		xa_unlock(&adev->ualink.imp_xa);
+		return;
+	}
 
 	r = amdgpu_ualink_send_npa_release_msg(adev, remote_acc_id, handle);
 	if (r)
@@ -3777,9 +3796,20 @@ static int amdgpu_ualink_do_import_handle(struct amdgpu_device *adev,
 		return r;
 	}
 
-	/* Add this node to the imported handles list for the remote GPU */
+	/* Add this node to the imported handles list for the remote GPU,
+	 * unless the exporter revoked the handle while the import was in
+	 * flight. The dmabuf is released with the last node reference.
+	 */
 	xa_lock(&adev->ualink.imp_xa);
+	if (READ_ONCE(imp_xa_node->node_state) == AMDGPU_UALINK_NODE_TEARDOWN) {
+		xa_unlock(&adev->ualink.imp_xa);
+		dev_dbg(adev->dev,
+			"IMPORT: handle:%llx:%llx revoked during import\n",
+			handle.handle_hi, handle.handle_lo);
+		return -EINVAL;
+	}
 	list_add(&imp_xa_node->list, &adev->ualink.imp_handles_list[remote_acc_id]);
+	WRITE_ONCE(imp_xa_node->node_state, AMDGPU_UALINK_NODE_READY);
 	xa_unlock(&adev->ualink.imp_xa);
 
 	return 0;
@@ -3955,9 +3985,6 @@ int amdgpu_ualink_import_handle(struct drm_device *dev,
 					"IMPORT: XA import failed for handle:%llx:%llx\n",
 					handle.handle_hi, handle.handle_lo);
 			goto cleanup;
-		} else {
-			WRITE_ONCE(imp_xa_node->node_state,
-				   AMDGPU_UALINK_NODE_READY);
 		}
 	}
 
