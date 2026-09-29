@@ -253,7 +253,7 @@ int amdgpu_userq_input_va_validate(struct amdgpu_device *adev,
 		return -EINVAL;
 
 	va_map = amdgpu_vm_bo_lookup_mapping(vm, start_addr);
-	if (!va_map)
+	if (!va_map || !va_map->bo_va->base.bo)
 		return -EINVAL;
 
 	/* Lookup guarantees start_addr is mapped; ensure full span is covered. */

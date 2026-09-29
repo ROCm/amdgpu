@@ -54,7 +54,7 @@ mes_userq_create_wptr_mapping(struct amdgpu_device *adev,
 			goto fail_lock;
 
 		wptr_mapping = amdgpu_vm_bo_lookup_mapping(vm, wptr);
-		if (!wptr_mapping) {
+		if (!wptr_mapping || !wptr_mapping->bo_va->base.bo) {
 			ret = -EINVAL;
 			goto fail_lock;
 		}
