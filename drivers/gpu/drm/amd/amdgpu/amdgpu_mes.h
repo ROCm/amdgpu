@@ -122,8 +122,6 @@ struct amdgpu_mes {
 	void                            *mqd_backup[AMDGPU_MAX_MES_INST_PIPES];
 	struct amdgpu_irq_src	        irq[AMDGPU_MAX_MES_INST_PIPES];
 
-	uint32_t                        vmid_mask_gfxhub;
-	uint32_t                        vmid_mask_mmhub;
 	uint32_t                        gfx_hqd_mask[AMDGPU_MES_MAX_GFX_PIPES];
 	uint32_t                        compute_hqd_mask[AMDGPU_MES_MAX_COMPUTE_PIPES];
 	uint32_t                        sdma_hqd_mask[AMDGPU_MES_MAX_SDMA_PIPES];

@@ -137,8 +137,8 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 	total_vmid_mask = (u32)((1UL << 16) - 1);
 	reserved_vmid_mask = (u32)((1UL << adev->vm_manager.first_kfd_vmid) - 1);
 
-	adev->mes.vmid_mask_mmhub = 0xFF00;
-	adev->mes.vmid_mask_gfxhub = total_vmid_mask & ~reserved_vmid_mask;
+	adev->vm_manager.vmid_uq_mask_mmhub = 0xFF00;
+	adev->vm_manager.vmid_uq_mask_gfxhub = total_vmid_mask & ~reserved_vmid_mask;
 
 	num_pipes = adev->gfx.me.num_pipe_per_me * adev->gfx.me.num_me;
 	if (num_pipes > AMDGPU_MES_MAX_GFX_PIPES)
@@ -183,9 +183,9 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 	}
 
 	dev_info(adev->dev,
-			 "MES: vmid_mask_mmhub 0x%08x, vmid_mask_gfxhub 0x%08x\n",
-			 adev->mes.vmid_mask_mmhub,
-			 adev->mes.vmid_mask_gfxhub);
+			 "MES: vmid_uq_mask_mmhub 0x%08x, vmid_uq_mask_gfxhub 0x%08x\n",
+			 adev->vm_manager.vmid_uq_mask_mmhub,
+			 adev->vm_manager.vmid_uq_mask_gfxhub);
 
 	dev_info(adev->dev,
 			 "MES: gfx_hqd_mask 0x%08x, compute_hqd_mask 0x%08x, sdma_hqd_mask 0x%08x\n",
