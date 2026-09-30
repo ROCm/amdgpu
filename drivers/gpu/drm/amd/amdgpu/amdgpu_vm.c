@@ -741,7 +741,7 @@ bool amdgpu_vm_need_pipeline_sync(struct amdgpu_ring *ring,
 {
 	struct amdgpu_device *adev = ring->adev;
 	unsigned vmhub = ring->vm_hub;
-	struct amdgpu_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
+	struct amdgpu_kq_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
 
 	if (job->vmid == 0)
 		return false;
@@ -778,7 +778,7 @@ void amdgpu_vm_flush(struct amdgpu_ring *ring, struct amdgpu_job *job,
 		&adev->isolation[ring->xcp_id == AMDGPU_XCP_NO_PARTITION ?
 				 0 : ring->xcp_id];
 	unsigned vmhub = ring->vm_hub;
-	struct amdgpu_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
+	struct amdgpu_kq_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
 	struct amdgpu_vmid *id = &id_mgr->ids[job->vmid];
 	bool spm_update_needed = adev->gfx.rlc.funcs->update_spm_vmid &&
 		job->spm_update_needed;

@@ -381,7 +381,7 @@ struct amdgpu_vm {
 
 struct amdgpu_vm_manager {
 	/* Handling of VMIDs */
-	struct amdgpu_vmid_mgr			id_mgr[AMDGPU_MAX_VMHUBS];
+	struct amdgpu_kq_vmid_mgr		id_mgr[AMDGPU_MAX_VMHUBS];
 	unsigned int				first_kfd_vmid;
 	bool					concurrent_flush;
 

@@ -278,7 +278,7 @@ static int amdgpu_vmid_grab_idle(struct amdgpu_ring *ring,
 {
 	struct amdgpu_device *adev = ring->adev;
 	unsigned vmhub = ring->vm_hub;
-	struct amdgpu_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
+	struct amdgpu_kq_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
 
 	/* If anybody is waiting for a VMID let everybody wait for fairness */
 	if (!dma_fence_is_signaled(ring->vmid_wait)) {
@@ -393,7 +393,7 @@ static int amdgpu_vmid_grab_used(struct amdgpu_vm *vm,
 {
 	struct amdgpu_device *adev = ring->adev;
 	unsigned vmhub = ring->vm_hub;
-	struct amdgpu_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
+	struct amdgpu_kq_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
 	uint64_t fence_context = adev->fence_context + ring->idx;
 	uint64_t updates = amdgpu_vm_tlb_seq(vm);
 	int r;
@@ -454,7 +454,7 @@ int amdgpu_vmid_grab(struct amdgpu_vm *vm, struct amdgpu_ring *ring,
 {
 	struct amdgpu_device *adev = ring->adev;
 	unsigned vmhub = ring->vm_hub;
-	struct amdgpu_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
+	struct amdgpu_kq_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
 	struct amdgpu_vmid *idle = NULL;
 	struct amdgpu_vmid *id = NULL;
 	int r = 0;
@@ -540,7 +540,7 @@ bool amdgpu_vmid_uses_reserved(struct amdgpu_vm *vm, unsigned int vmhub)
 int amdgpu_vmid_alloc_reserved(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 			       unsigned vmhub)
 {
-	struct amdgpu_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
+	struct amdgpu_kq_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
 	struct amdgpu_vmid *id;
 	int r = 0;
 
@@ -573,7 +573,7 @@ unlock:
 void amdgpu_vmid_free_reserved(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 			       unsigned vmhub)
 {
-	struct amdgpu_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
+	struct amdgpu_kq_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
 
 	mutex_lock(&id_mgr->lock);
 	if (vm->reserved_vmid[vmhub]) {
@@ -597,7 +597,7 @@ void amdgpu_vmid_free_reserved(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 void amdgpu_vmid_reset(struct amdgpu_device *adev, unsigned vmhub,
 		       unsigned vmid)
 {
-	struct amdgpu_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
+	struct amdgpu_kq_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
 	struct amdgpu_vmid *id = &id_mgr->ids[vmid];
 
 	mutex_lock(&id_mgr->lock);
@@ -623,7 +623,7 @@ void amdgpu_vmid_reset_all(struct amdgpu_device *adev)
 	unsigned i, j;
 
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; ++i) {
-		struct amdgpu_vmid_mgr *id_mgr =
+		struct amdgpu_kq_vmid_mgr *id_mgr =
 			&adev->vm_manager.id_mgr[i];
 		for_each_set_bit(j, id_mgr->vmid_mask, AMDGPU_NUM_VMID)
 			amdgpu_vmid_reset(adev, i, j);
@@ -658,7 +658,7 @@ void amdgpu_vmid_mgr_init(struct amdgpu_device *adev)
 	unsigned i, j;
 
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; ++i) {
-		struct amdgpu_vmid_mgr *id_mgr =
+		struct amdgpu_kq_vmid_mgr *id_mgr =
 			&adev->vm_manager.id_mgr[i];
 
 		mutex_init(&id_mgr->lock);
@@ -685,7 +685,7 @@ void amdgpu_vmid_mgr_fini(struct amdgpu_device *adev)
 	unsigned i, j;
 
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; ++i) {
-		struct amdgpu_vmid_mgr *id_mgr =
+		struct amdgpu_kq_vmid_mgr *id_mgr =
 			&adev->vm_manager.id_mgr[i];
 
 		mutex_destroy(&id_mgr->lock);
