@@ -1141,6 +1141,9 @@
 /* memalloc_noreclaim_save() is available */
 #define HAVE_MEMALLOC_NORECLAIM_SAVE 1
 
+/* MEMORY_DEVICE_GENERIC is available */
+#define HAVE_MEMORY_DEVICE_GENERIC 1
+
 /* mempool_alloc_preallocated() is available */
 #define HAVE_MEMPOOL_ALLOC_PREALLOCATED 1
 

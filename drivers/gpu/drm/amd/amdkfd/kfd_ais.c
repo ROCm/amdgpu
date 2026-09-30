@@ -348,7 +348,7 @@ static int kfd_ais_init_p2pdma(struct amdgpu_device *adev, unsigned long size)
  */
 static int kfd_ais_init_xgmi(struct amdgpu_device *adev, unsigned long size)
 {
-#if defined(CONFIG_ZONE_DEVICE)
+#if defined(CONFIG_ZONE_DEVICE) && defined(HAVE_MEMORY_DEVICE_GENERIC)
 	struct dev_pagemap *pgmap;
 	void *r;
 
@@ -385,7 +385,7 @@ static int kfd_ais_init_xgmi(struct amdgpu_device *adev, unsigned long size)
 	adev->kfd.ais_pgmap = pgmap;
 	return 0;
 #else
-	dev_dbg(adev->dev, "AIS: not supported. Check CONFIG_ZONE_DEVICE\n");
+	dev_dbg(adev->dev, "AIS: not supported. Check CONFIG_ZONE_DEVICE and MEMORY_DEVICE_GENERIC\n");
 	return -ENODEV;
 #endif
 }
