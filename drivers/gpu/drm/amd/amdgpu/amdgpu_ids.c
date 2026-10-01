@@ -625,7 +625,7 @@ void amdgpu_vmid_reset_all(struct amdgpu_device *adev)
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; ++i) {
 		struct amdgpu_vmid_mgr *id_mgr =
 			&adev->vm_manager.id_mgr[i];
-		for_each_set_bit(j, id_mgr->kernel_vmid_mask, AMDGPU_NUM_VMID)
+		for_each_set_bit(j, id_mgr->vmid_mask, AMDGPU_NUM_VMID)
 			amdgpu_vmid_reset(adev, i, j);
 	}
 }
@@ -641,7 +641,7 @@ void amdgpu_vmid_mgr_set_vmid_mask(struct amdgpu_device *adev,
 		bool is_mmhub = AMDGPU_IS_MMHUB0(i) || AMDGPU_IS_MMHUB1(i);
 
 		if (is_mmhub == for_mmhub)
-			bitmap_copy(adev->vm_manager.id_mgr[i].kernel_vmid_mask,
+			bitmap_copy(adev->vm_manager.id_mgr[i].vmid_mask,
 				    &vmid_mask, AMDGPU_NUM_VMID);
 	}
 }
@@ -665,7 +665,7 @@ void amdgpu_vmid_mgr_init(struct amdgpu_device *adev)
 		INIT_LIST_HEAD(&id_mgr->ids_lru);
 
 		/* skip over VMID 0, since it is the system VM */
-		for_each_set_bit(j, id_mgr->kernel_vmid_mask, AMDGPU_NUM_VMID) {
+		for_each_set_bit(j, id_mgr->vmid_mask, AMDGPU_NUM_VMID) {
 			amdgpu_vmid_reset(adev, i, j);
 			amdgpu_sync_create(&id_mgr->ids[j].active);
 			list_add_tail(&id_mgr->ids[j].list, &id_mgr->ids_lru);
