@@ -111,7 +111,6 @@ static void amdgpu_mes_userq_notify_unmap_work_handler(struct work_struct *work)
 int amdgpu_mes_init(struct amdgpu_device *adev)
 {
 	int i, r, num_pipes, num_queues = 0;
-	u32 total_vmid_mask, reserved_vmid_mask;
 	int num_xcc = adev->gfx.xcc_mask ? NUM_XCC(adev->gfx.xcc_mask) : 1;
 	u32 gfx_hqd_mask = amdgpu_mes_get_hqd_mask(adev->gfx.me.num_pipe_per_me,
 				adev->gfx.me.num_queue_per_pipe,
@@ -134,12 +133,6 @@ int amdgpu_mes_init(struct amdgpu_device *adev)
 	atomic_set(&adev->mes.userq_hw_queue_count, 0);
 	INIT_DELAYED_WORK(&adev->mes.userq_notify_unmap_work,
 			  amdgpu_mes_userq_notify_unmap_work_handler);
-	total_vmid_mask = (u32)((1UL << 16) - 1);
-	reserved_vmid_mask = (u32)((1UL << adev->vm_manager.first_kfd_vmid) - 1);
-
-	adev->vm_manager.vmid_uq_mask_mmhub = 0xFF00;
-	adev->vm_manager.vmid_uq_mask_gfxhub = total_vmid_mask & ~reserved_vmid_mask;
-
 	num_pipes = adev->gfx.me.num_pipe_per_me * adev->gfx.me.num_me;
 	if (num_pipes > AMDGPU_MES_MAX_GFX_PIPES)
 		dev_warn(adev->dev, "more gfx pipes than supported by MES! (%d vs %d)\n",

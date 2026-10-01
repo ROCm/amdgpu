@@ -179,9 +179,7 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 
 	if (adev->kfd.dev) {
 		struct kgd2kfd_shared_resources gpu_resources = {
-			.compute_vmid_bitmap =
-				((1 << AMDGPU_NUM_VMID) - 1) -
-				((1 << adev->vm_manager.first_kfd_vmid) - 1),
+			.compute_vmid_bitmap = adev->vm_manager.vmid_uq_mask_gfxhub,
 			.num_pipe_per_mec = adev->gfx.mec.num_pipe_per_mec,
 			.num_queue_per_pipe = adev->gfx.mec.num_queue_per_pipe,
 			.gpuvm_size = min(adev->vm_manager.max_pfn

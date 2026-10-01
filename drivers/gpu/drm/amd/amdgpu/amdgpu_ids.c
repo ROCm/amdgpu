@@ -647,6 +647,22 @@ void amdgpu_vmid_mgr_set_vmid_mask(struct amdgpu_device *adev,
 }
 
 /**
+ * amdgpu_vmid_uq_mask_init - init the user queue VMID masks
+ *
+ * @adev: amdgpu_device pointer
+ *
+ * Sets vmid_uq_mask_gfxhub/mmhub to the pool of VMIDs at or above
+ * first_kfd_vmid, shared by KFD and MES user queues.
+ */
+static void amdgpu_vmid_uq_mask_init(struct amdgpu_device *adev)
+{
+	adev->vm_manager.vmid_uq_mask_gfxhub =
+		((1U << AMDGPU_NUM_VMID) - 1) &
+		~((1U << adev->vm_manager.first_kfd_vmid) - 1);
+	adev->vm_manager.vmid_uq_mask_mmhub = 0xFF00;
+}
+
+/**
  * amdgpu_vmid_mgr_init - init the VMID manager
  *
  * @adev: amdgpu_device pointer
@@ -656,6 +672,8 @@ void amdgpu_vmid_mgr_set_vmid_mask(struct amdgpu_device *adev,
 void amdgpu_vmid_mgr_init(struct amdgpu_device *adev)
 {
 	unsigned i, j;
+
+	amdgpu_vmid_uq_mask_init(adev);
 
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; ++i) {
 		struct amdgpu_kq_vmid_mgr *id_mgr =
