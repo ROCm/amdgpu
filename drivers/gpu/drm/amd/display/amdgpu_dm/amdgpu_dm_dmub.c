@@ -411,7 +411,7 @@ dm_dmub_send_vbios_gpint_command(struct amdgpu_device *adev,
 	return DMUB_STATUS_TIMEOUT;
 }
 
-VISIBLE_IF_KUNIT void *dm_dmub_get_vbios_bounding_box(struct amdgpu_device *adev)
+STATIC_IFN_KUNIT void *dm_dmub_get_vbios_bounding_box(struct amdgpu_device *adev)
 {
 	void *bb;
 	long long addr;
@@ -493,7 +493,7 @@ enum dmub_ips_disable_type dm_get_default_ips_mode(
 }
 EXPORT_IF_KUNIT(dm_get_default_ips_mode);
 
-VISIBLE_IF_KUNIT uint32_t amdgpu_dm_dmub_reg_read(void *ctx, uint32_t address)
+STATIC_IFN_KUNIT uint32_t amdgpu_dm_dmub_reg_read(void *ctx, uint32_t address)
 {
 	struct amdgpu_device *adev = ctx;
 
@@ -501,7 +501,7 @@ VISIBLE_IF_KUNIT uint32_t amdgpu_dm_dmub_reg_read(void *ctx, uint32_t address)
 }
 EXPORT_IF_KUNIT(amdgpu_dm_dmub_reg_read);
 
-VISIBLE_IF_KUNIT void amdgpu_dm_dmub_reg_write(void *ctx, uint32_t address,
+STATIC_IFN_KUNIT void amdgpu_dm_dmub_reg_write(void *ctx, uint32_t address,
 					       uint32_t value)
 {
 	struct amdgpu_device *adev = ctx;
@@ -869,7 +869,7 @@ out:
 }
 EXPORT_IF_KUNIT(amdgpu_dm_process_dmub_aux_transfer_sync);
 
-VISIBLE_IF_KUNIT void abort_fused_io(
+STATIC_IFN_KUNIT void abort_fused_io(
 		struct dc_context *ctx,
 		const struct dmub_cmd_fused_request *request
 )

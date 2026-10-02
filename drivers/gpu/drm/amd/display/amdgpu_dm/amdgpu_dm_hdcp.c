@@ -38,8 +38,7 @@
  */
 #define PSP_SRM_VERSION_MAX 0xFFFF
 
-VISIBLE_IF_KUNIT
-bool lp_write_i2c(void *handle, uint32_t address, const uint8_t *data, uint32_t size)
+STATIC_IFN_KUNIT bool lp_write_i2c(void *handle, uint32_t address, const uint8_t *data, uint32_t size)
 {
 	struct dc_link *link = handle;
 	struct i2c_payload i2c_payloads[] = {{true, address, size, (void *)data} };
@@ -50,8 +49,7 @@ bool lp_write_i2c(void *handle, uint32_t address, const uint8_t *data, uint32_t 
 }
 EXPORT_IF_KUNIT(lp_write_i2c);
 
-VISIBLE_IF_KUNIT
-bool lp_read_i2c(void *handle, uint32_t address, uint8_t offset, uint8_t *data, uint32_t size)
+STATIC_IFN_KUNIT bool lp_read_i2c(void *handle, uint32_t address, uint8_t offset, uint8_t *data, uint32_t size)
 {
 	struct dc_link *link = handle;
 
@@ -64,8 +62,7 @@ bool lp_read_i2c(void *handle, uint32_t address, uint8_t offset, uint8_t *data, 
 }
 EXPORT_IF_KUNIT(lp_read_i2c);
 
-VISIBLE_IF_KUNIT
-bool lp_write_dpcd(void *handle, uint32_t address, const uint8_t *data, uint32_t size)
+STATIC_IFN_KUNIT bool lp_write_dpcd(void *handle, uint32_t address, const uint8_t *data, uint32_t size)
 {
 	struct dc_link *link = handle;
 
@@ -73,7 +70,7 @@ bool lp_write_dpcd(void *handle, uint32_t address, const uint8_t *data, uint32_t
 }
 EXPORT_IF_KUNIT(lp_write_dpcd);
 
-VISIBLE_IF_KUNIT bool lp_read_dpcd(void *handle, uint32_t address, uint8_t *data, uint32_t size)
+STATIC_IFN_KUNIT bool lp_read_dpcd(void *handle, uint32_t address, uint8_t *data, uint32_t size)
 {
 	struct dc_link *link = handle;
 
@@ -81,7 +78,7 @@ VISIBLE_IF_KUNIT bool lp_read_dpcd(void *handle, uint32_t address, uint8_t *data
 }
 EXPORT_IF_KUNIT(lp_read_dpcd);
 
-VISIBLE_IF_KUNIT bool lp_atomic_write_poll_read_i2c(
+STATIC_IFN_KUNIT bool lp_atomic_write_poll_read_i2c(
 						void *handle,
 						const struct mod_hdcp_atomic_op_i2c *write,
 						const struct mod_hdcp_atomic_op_i2c *poll,
@@ -96,7 +93,7 @@ VISIBLE_IF_KUNIT bool lp_atomic_write_poll_read_i2c(
 }
 EXPORT_IF_KUNIT(lp_atomic_write_poll_read_i2c);
 
-VISIBLE_IF_KUNIT bool lp_atomic_write_poll_read_aux(
+STATIC_IFN_KUNIT bool lp_atomic_write_poll_read_aux(
 						void *handle,
 						const struct mod_hdcp_atomic_op_aux *write,
 						const struct mod_hdcp_atomic_op_aux *poll,
@@ -111,7 +108,7 @@ VISIBLE_IF_KUNIT bool lp_atomic_write_poll_read_aux(
 }
 EXPORT_IF_KUNIT(lp_atomic_write_poll_read_aux);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 uint8_t *psp_get_srm(struct psp_context *psp, uint32_t *srm_version, uint32_t *srm_size)
 {
 	struct ta_hdcp_shared_memory *hdcp_cmd;
@@ -137,7 +134,7 @@ uint8_t *psp_get_srm(struct psp_context *psp, uint32_t *srm_version, uint32_t *s
 }
 EXPORT_IF_KUNIT(psp_get_srm);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 int psp_set_srm(struct psp_context *psp,
 		       u8 *srm, uint32_t srm_size, uint32_t *srm_version)
 {
@@ -167,7 +164,7 @@ int psp_set_srm(struct psp_context *psp,
 }
 EXPORT_IF_KUNIT(psp_set_srm);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void process_output(struct hdcp_workqueue *hdcp_work)
 {
 	struct mod_hdcp_output output = hdcp_work->output;
@@ -190,7 +187,7 @@ void process_output(struct hdcp_workqueue *hdcp_work)
 }
 EXPORT_IF_KUNIT(process_output);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 bool hdcp_get_content_protection_from_status(
 	unsigned int hdcp_content_type,
 	enum mod_hdcp_encryption_status encryption_status,
@@ -217,7 +214,7 @@ bool hdcp_get_content_protection_from_status(
 }
 EXPORT_IF_KUNIT(hdcp_get_content_protection_from_status);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void hdcp_get_link_display_adjustments(
 	bool enable_encryption,
 	u8 content_type,
@@ -254,7 +251,7 @@ void hdcp_get_link_display_adjustments(
 }
 EXPORT_IF_KUNIT(hdcp_get_link_display_adjustments);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void link_lock(struct hdcp_workqueue *work, bool lock)
 {
 	int i = 0;
@@ -268,7 +265,7 @@ void link_lock(struct hdcp_workqueue *work, bool lock)
 }
 EXPORT_IF_KUNIT(link_lock);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void hdcp_update_display_encryption_control(struct hdcp_workqueue *hdcp_work,
 					    struct hdcp_workqueue *hdcp_w,
 					    unsigned int conn_index,
@@ -324,7 +321,7 @@ void hdcp_update_display(struct hdcp_workqueue *hdcp_work,
 }
 EXPORT_IF_KUNIT(hdcp_update_display);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void hdcp_remove_display(struct hdcp_workqueue *hdcp_work,
 				unsigned int link_index,
 			 struct amdgpu_dm_connector *aconnector)
@@ -391,7 +388,7 @@ void hdcp_handle_cpirq(struct hdcp_workqueue *hdcp_work, unsigned int link_index
 }
 EXPORT_IF_KUNIT(hdcp_handle_cpirq);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void event_callback(struct work_struct *work)
 {
 	struct hdcp_workqueue *hdcp_work;
@@ -410,7 +407,7 @@ void event_callback(struct work_struct *work)
 }
 EXPORT_IF_KUNIT(event_callback);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void event_property_update(struct work_struct *work)
 {
 	struct hdcp_workqueue *hdcp_work = container_of(work, struct hdcp_workqueue,
@@ -472,7 +469,7 @@ void event_property_update(struct work_struct *work)
 }
 EXPORT_IF_KUNIT(event_property_update);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void event_property_validate(struct work_struct *work)
 {
 	struct hdcp_workqueue *hdcp_work =
@@ -524,7 +521,7 @@ void event_property_validate(struct work_struct *work)
 }
 EXPORT_IF_KUNIT(event_property_validate);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void event_watchdog_timer(struct work_struct *work)
 {
 	struct hdcp_workqueue *hdcp_work;
@@ -545,7 +542,7 @@ void event_watchdog_timer(struct work_struct *work)
 }
 EXPORT_IF_KUNIT(event_watchdog_timer);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void event_cpirq(struct work_struct *work)
 {
 	struct hdcp_workqueue *hdcp_work;
@@ -577,7 +574,7 @@ void hdcp_destroy(struct kobject *kobj, struct hdcp_workqueue *hdcp_work)
 }
 EXPORT_IF_KUNIT(hdcp_destroy);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 bool enable_assr(void *handle, struct dc_link *link)
 {
 	struct hdcp_workqueue *hdcp_work = handle;
@@ -613,7 +610,7 @@ bool enable_assr(void *handle, struct dc_link *link)
 }
 EXPORT_IF_KUNIT(enable_assr);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void update_config(void *handle, struct cp_psp_stream_config *config)
 {
 	struct hdcp_workqueue *hdcp_work = handle;
@@ -752,7 +749,7 @@ EXPORT_IF_KUNIT(update_config);
  *	-if we try to "1. SET" a newer version and PSP rejects it. That means the format is
  *	incorrect/corrupted and we should correct our SRM by getting it from PSP
  */
-VISIBLE_IF_KUNIT ssize_t srm_data_write(struct file *filp, struct kobject *kobj,
+STATIC_IFN_KUNIT ssize_t srm_data_write(struct file *filp, struct kobject *kobj,
 #ifdef HAVE_BIN_ATTR_CONST_ARGS
 			      const struct bin_attribute *bin_attr, char *buffer,
 #else
@@ -781,7 +778,7 @@ VISIBLE_IF_KUNIT ssize_t srm_data_write(struct file *filp, struct kobject *kobj,
 }
 EXPORT_IF_KUNIT(srm_data_write);
 
-VISIBLE_IF_KUNIT ssize_t srm_data_read(struct file *filp, struct kobject *kobj,
+STATIC_IFN_KUNIT ssize_t srm_data_read(struct file *filp, struct kobject *kobj,
 #ifdef HAVE_BIN_ATTR_CONST_ARGS
 			     const struct bin_attribute *bin_attr, char *buffer,
 #else

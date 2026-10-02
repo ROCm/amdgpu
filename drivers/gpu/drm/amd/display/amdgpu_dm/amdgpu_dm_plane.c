@@ -149,7 +149,7 @@ void amdgpu_dm_plane_fill_blending_from_plane_state(const struct drm_plane_state
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_fill_blending_from_plane_state);
 
-VISIBLE_IF_KUNIT void amdgpu_dm_plane_add_modifier(uint64_t **mods, uint64_t *size,
+STATIC_IFN_KUNIT void amdgpu_dm_plane_add_modifier(uint64_t **mods, uint64_t *size,
 						   uint64_t *cap, uint64_t mod)
 {
 	if (!*mods)
@@ -176,7 +176,7 @@ VISIBLE_IF_KUNIT void amdgpu_dm_plane_add_modifier(uint64_t **mods, uint64_t *si
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_add_modifier);
 
-VISIBLE_IF_KUNIT void amdgpu_dm_plane_add_modifier_dedup(uint64_t **mods, uint64_t *size,
+STATIC_IFN_KUNIT void amdgpu_dm_plane_add_modifier_dedup(uint64_t **mods, uint64_t *size,
 							 uint64_t *cap, uint64_t mod)
 {
 	uint64_t i;
@@ -192,13 +192,13 @@ VISIBLE_IF_KUNIT void amdgpu_dm_plane_add_modifier_dedup(uint64_t **mods, uint64
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_add_modifier_dedup);
 
-VISIBLE_IF_KUNIT bool amdgpu_dm_plane_modifier_has_dcc(uint64_t modifier)
+STATIC_IFN_KUNIT bool amdgpu_dm_plane_modifier_has_dcc(uint64_t modifier)
 {
 	return IS_AMD_FMT_MOD(modifier) && AMD_FMT_MOD_GET(DCC, modifier);
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_modifier_has_dcc);
 
-VISIBLE_IF_KUNIT unsigned int amdgpu_dm_plane_modifier_gfx9_swizzle_mode(uint64_t modifier)
+STATIC_IFN_KUNIT unsigned int amdgpu_dm_plane_modifier_gfx9_swizzle_mode(uint64_t modifier)
 {
 	if (modifier == DRM_FORMAT_MOD_LINEAR)
 		return 0;
@@ -207,7 +207,7 @@ VISIBLE_IF_KUNIT unsigned int amdgpu_dm_plane_modifier_gfx9_swizzle_mode(uint64_
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_modifier_gfx9_swizzle_mode);
 
-VISIBLE_IF_KUNIT int amdgpu_dm_plane_fill_gfx6_tiling_info_from_modifier(
+STATIC_IFN_KUNIT int amdgpu_dm_plane_fill_gfx6_tiling_info_from_modifier(
 						struct dc_tiling_info *tiling_info,
 						uint64_t modifier)
 {
@@ -242,9 +242,8 @@ VISIBLE_IF_KUNIT int amdgpu_dm_plane_fill_gfx6_tiling_info_from_modifier(
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_fill_gfx6_tiling_info_from_modifier);
 
-VISIBLE_IF_KUNIT
-void amdgpu_dm_plane_fill_gfx9_tiling_info_from_device(const struct amdgpu_device *adev,
-						       struct dc_tiling_info *tiling_info)
+STATIC_IFN_KUNIT void amdgpu_dm_plane_fill_gfx9_tiling_info_from_device(const struct amdgpu_device *adev,
+									struct dc_tiling_info *tiling_info)
 {
 	/* Fill GFX9 params */
 	tiling_info->gfx9.num_pipes =
@@ -265,10 +264,9 @@ void amdgpu_dm_plane_fill_gfx9_tiling_info_from_device(const struct amdgpu_devic
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_fill_gfx9_tiling_info_from_device);
 
-VISIBLE_IF_KUNIT
-void amdgpu_dm_plane_fill_gfx9_tiling_info_from_modifier(const struct amdgpu_device *adev,
-							 struct dc_tiling_info *tiling_info,
-							 uint64_t modifier)
+STATIC_IFN_KUNIT void amdgpu_dm_plane_fill_gfx9_tiling_info_from_modifier(const struct amdgpu_device *adev,
+									  struct dc_tiling_info *tiling_info,
+									  uint64_t modifier)
 {
 	unsigned int mod_bank_xor_bits = AMD_FMT_MOD_GET(BANK_XOR_BITS, modifier);
 	unsigned int mod_pipe_xor_bits = AMD_FMT_MOD_GET(PIPE_XOR_BITS, modifier);
@@ -295,7 +293,7 @@ void amdgpu_dm_plane_fill_gfx9_tiling_info_from_modifier(const struct amdgpu_dev
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_fill_gfx9_tiling_info_from_modifier);
 
-VISIBLE_IF_KUNIT int amdgpu_dm_plane_validate_dcc(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT int amdgpu_dm_plane_validate_dcc(struct amdgpu_device *adev,
 						  const enum surface_pixel_format format,
 						  const enum dc_rotation_angle rotation,
 						  const struct dc_tiling_info *tiling_info,
@@ -346,7 +344,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_plane_validate_dcc(struct amdgpu_device *adev,
 EXPORT_IF_KUNIT(amdgpu_dm_plane_validate_dcc);
 
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
-VISIBLE_IF_KUNIT int amdgpu_dm_plane_fill_gfx9_attrs_from_modifiers(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT int amdgpu_dm_plane_fill_gfx9_attrs_from_modifiers(struct amdgpu_device *adev,
 									       const struct amdgpu_framebuffer *afb,
 									       const enum surface_pixel_format format,
 									       const enum dc_rotation_angle rotation,
@@ -399,7 +397,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_plane_fill_gfx9_attrs_from_modifiers(struct amdgp
 EXPORT_IF_KUNIT(amdgpu_dm_plane_fill_gfx9_attrs_from_modifiers);
 #endif
 
-VISIBLE_IF_KUNIT int amdgpu_dm_plane_fill_gfx12_attrs_from_modifiers(struct amdgpu_device *adev,
+STATIC_IFN_KUNIT int amdgpu_dm_plane_fill_gfx12_attrs_from_modifiers(struct amdgpu_device *adev,
 										const struct amdgpu_framebuffer *afb,
 										const enum surface_pixel_format format,
 										const enum dc_rotation_angle rotation,
@@ -503,7 +501,7 @@ static void amdgpu_dm_plane_add_gfx10_1_modifiers(const struct amdgpu_device *ad
  * present at specific indices.
  * See SiLib::HwlSetupTileInfo() and CiLib::HwlSetupTileInfo() in addrlib.
  */
-VISIBLE_IF_KUNIT u32 amdgpu_dm_plane_get_gfx6_tile_idx(const struct amdgpu_device *adev,
+STATIC_IFN_KUNIT u32 amdgpu_dm_plane_get_gfx6_tile_idx(const struct amdgpu_device *adev,
 						       const u32 bpp,
 						       const enum array_mode_values arr)
 {
@@ -542,7 +540,7 @@ EXPORT_IF_KUNIT(amdgpu_dm_plane_get_gfx6_tile_idx);
  * can be calculated. The TILE_SPLIT field is only used for the depth micro tile mode.
  * See CiLib::HwlComputeMacroModeIndex() in addrlib.
  */
-VISIBLE_IF_KUNIT u32 amdgpu_dm_plane_calc_gfx7_tile_split(const struct amdgpu_device *adev,
+STATIC_IFN_KUNIT u32 amdgpu_dm_plane_calc_gfx7_tile_split(const struct amdgpu_device *adev,
 							  const u32 bpp,
 							  const u32 gb_tile_mode)
 {
@@ -571,7 +569,7 @@ EXPORT_IF_KUNIT(amdgpu_dm_plane_calc_gfx7_tile_split);
  * present at specific indices.
  * See CiLib::HwlComputeMacroModeIndex() in addrlib.
  */
-VISIBLE_IF_KUNIT u32 amdgpu_dm_plane_get_gfx7_macro_tile_idx(const u32 bpp,
+STATIC_IFN_KUNIT u32 amdgpu_dm_plane_get_gfx7_macro_tile_idx(const u32 bpp,
 							     const u32 tile_split_bytes)
 {
 	const u32 thickness = 1;
@@ -596,7 +594,7 @@ EXPORT_IF_KUNIT(amdgpu_dm_plane_get_gfx7_macro_tile_idx);
  * Select suitable micro and macro tile modes for the given bits per pixel,
  * and calculate the corresponding DRM format modifier.
  */
-VISIBLE_IF_KUNIT u64 amdgpu_dm_plane_calc_gfx6_mod(const struct amdgpu_device *adev,
+STATIC_IFN_KUNIT u64 amdgpu_dm_plane_calc_gfx6_mod(const struct amdgpu_device *adev,
 						   const u32 bpp,
 						   const enum array_mode_values arr)
 {
@@ -660,7 +658,7 @@ EXPORT_IF_KUNIT(amdgpu_dm_plane_calc_gfx6_mod);
  * On GFX6-8, not all DRM format modifier can be used with all image formats.
  * Check whether the specified modifier is supported with the given bits per pixel value.
  */
-VISIBLE_IF_KUNIT bool amdgpu_dm_plane_gfx6_format_mod_supported(const struct amdgpu_device *adev,
+STATIC_IFN_KUNIT bool amdgpu_dm_plane_gfx6_format_mod_supported(const struct amdgpu_device *adev,
 								const u32 bpp,
 								const u64 modifier)
 {
@@ -1014,9 +1012,7 @@ static void amdgpu_dm_plane_add_gfx12_modifiers(struct amdgpu_device *adev,
 
 }
 
-VISIBLE_IF_KUNIT
-int amdgpu_dm_plane_get_plane_modifiers(struct amdgpu_device *adev, unsigned int plane_type,
-										uint64_t **mods)
+STATIC_IFN_KUNIT int amdgpu_dm_plane_get_plane_modifiers(struct amdgpu_device *adev, unsigned int plane_type, uint64_t **mods)
 {
 	uint64_t size = 0, capacity = 128;
 	*mods = kmalloc_array(capacity, sizeof(uint64_t), GFP_KERNEL);
@@ -1074,7 +1070,7 @@ int amdgpu_dm_plane_get_plane_modifiers(struct amdgpu_device *adev, unsigned int
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_get_plane_modifiers);
 
-VISIBLE_IF_KUNIT int amdgpu_dm_plane_get_plane_formats(const struct drm_plane *plane,
+STATIC_IFN_KUNIT int amdgpu_dm_plane_get_plane_formats(const struct drm_plane *plane,
 						       const struct dc_plane_cap *plane_cap,
 						       uint32_t *formats, int max_formats)
 {
@@ -1228,7 +1224,7 @@ int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_fill_plane_buffer_attributes);
 
-VISIBLE_IF_KUNIT int amdgpu_dm_plane_helper_prepare_fb(struct drm_plane *plane,
+STATIC_IFN_KUNIT int amdgpu_dm_plane_helper_prepare_fb(struct drm_plane *plane,
 						       struct drm_plane_state *new_state)
 {
 	struct amdgpu_framebuffer *afb;
@@ -1330,7 +1326,7 @@ error_unlock:
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_helper_prepare_fb);
 
-VISIBLE_IF_KUNIT void amdgpu_dm_plane_helper_cleanup_fb(struct drm_plane *plane,
+STATIC_IFN_KUNIT void amdgpu_dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 							struct drm_plane_state *old_state)
 {
 	struct amdgpu_bo *rbo;
@@ -1352,7 +1348,7 @@ VISIBLE_IF_KUNIT void amdgpu_dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_helper_cleanup_fb);
 
-VISIBLE_IF_KUNIT void amdgpu_dm_plane_get_min_max_dc_plane_scaling(struct drm_device *dev,
+STATIC_IFN_KUNIT void amdgpu_dm_plane_get_min_max_dc_plane_scaling(struct drm_device *dev,
 								   struct drm_framebuffer *fb,
 								   int *min_downscale, int *max_upscale)
 {
@@ -1541,7 +1537,7 @@ int amdgpu_dm_plane_fill_dc_scaling_info(struct amdgpu_device *adev,
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_fill_dc_scaling_info);
 
-VISIBLE_IF_KUNIT int amdgpu_dm_plane_atomic_check(struct drm_plane *plane,
+STATIC_IFN_KUNIT int amdgpu_dm_plane_atomic_check(struct drm_plane *plane,
 #ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
 					struct drm_atomic_commit *state)
 #else
@@ -1603,7 +1599,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_plane_atomic_check(struct drm_plane *plane,
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_atomic_check);
 
-VISIBLE_IF_KUNIT int amdgpu_dm_plane_atomic_async_check(struct drm_plane *plane,
+STATIC_IFN_KUNIT int amdgpu_dm_plane_atomic_async_check(struct drm_plane *plane,
 #ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK_THREE_ARGUMENTS
 						struct drm_atomic_commit *state, bool flip)
 #elif HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
@@ -1783,7 +1779,7 @@ void amdgpu_dm_plane_handle_cursor_update(struct drm_plane *plane,
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_handle_cursor_update);
 
-VISIBLE_IF_KUNIT void amdgpu_dm_plane_atomic_async_update(struct drm_plane *plane,
+STATIC_IFN_KUNIT void amdgpu_dm_plane_atomic_async_update(struct drm_plane *plane,
 #ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
 						struct drm_atomic_commit *state)
 #else
@@ -1818,7 +1814,7 @@ VISIBLE_IF_KUNIT void amdgpu_dm_plane_atomic_async_update(struct drm_plane *plan
 EXPORT_IF_KUNIT(amdgpu_dm_plane_atomic_async_update);
 
 #ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER
-VISIBLE_IF_KUNIT void amdgpu_dm_plane_panic_flush(struct drm_plane *plane)
+STATIC_IFN_KUNIT void amdgpu_dm_plane_panic_flush(struct drm_plane *plane)
 {
 	struct dm_plane_state *dm_plane_state = to_dm_plane_state(plane->state);
 	struct drm_framebuffer *fb = plane->state->fb;
@@ -1854,7 +1850,7 @@ static const struct drm_plane_helper_funcs dm_primary_plane_helper_funcs = {
 #endif
 };
 
-VISIBLE_IF_KUNIT void amdgpu_dm_plane_drm_plane_reset(struct drm_plane *plane)
+STATIC_IFN_KUNIT void amdgpu_dm_plane_drm_plane_reset(struct drm_plane *plane)
 {
 	struct dm_plane_state *amdgpu_state;
 
@@ -1885,7 +1881,7 @@ VISIBLE_IF_KUNIT void amdgpu_dm_plane_drm_plane_reset(struct drm_plane *plane)
 }
 EXPORT_IF_KUNIT(amdgpu_dm_plane_drm_plane_reset);
 
-VISIBLE_IF_KUNIT struct drm_plane_state *
+STATIC_IFN_KUNIT struct drm_plane_state *
 amdgpu_dm_plane_drm_plane_duplicate_state(struct drm_plane *plane)
 {
 	struct dm_plane_state *dm_plane_state, *old_dm_plane_state;
@@ -1943,7 +1939,7 @@ amdgpu_dm_plane_drm_plane_duplicate_state(struct drm_plane *plane)
 EXPORT_IF_KUNIT(amdgpu_dm_plane_drm_plane_duplicate_state);
 
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
-VISIBLE_IF_KUNIT bool amdgpu_dm_plane_format_mod_supported(struct drm_plane *plane,
+STATIC_IFN_KUNIT bool amdgpu_dm_plane_format_mod_supported(struct drm_plane *plane,
 							   uint32_t format,
 							   uint64_t modifier)
 {
@@ -2015,7 +2011,7 @@ VISIBLE_IF_KUNIT bool amdgpu_dm_plane_format_mod_supported(struct drm_plane *pla
 EXPORT_IF_KUNIT(amdgpu_dm_plane_format_mod_supported);
 #endif
 
-VISIBLE_IF_KUNIT void amdgpu_dm_plane_drm_plane_destroy_state(struct drm_plane *plane,
+STATIC_IFN_KUNIT void amdgpu_dm_plane_drm_plane_destroy_state(struct drm_plane *plane,
 							      struct drm_plane_state *state)
 {
 	struct dm_plane_state *dm_plane_state = to_dm_plane_state(state);

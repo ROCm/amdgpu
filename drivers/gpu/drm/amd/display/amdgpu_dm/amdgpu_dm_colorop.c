@@ -108,7 +108,7 @@ EXPORT_IF_KUNIT(amdgpu_dm_colorop_kunit_set_ops);
 
 #endif
 
-VISIBLE_IF_KUNIT int
+STATIC_IFN_KUNIT int
 amdgpu_dm_build_default_pipeline(struct drm_device *dev, struct drm_plane *plane,
 				  bool hw_3d_lut, struct drm_prop_enum_list *list)
 {

@@ -174,7 +174,7 @@ void amdgpu_dm_init_color_mod(void)
 }
 EXPORT_IF_KUNIT(amdgpu_dm_init_color_mod);
 
-VISIBLE_IF_KUNIT INLINE_IFN_KUNIT
+STATIC_IFN_KUNIT INLINE_IFN_KUNIT
 struct fixed31_32 amdgpu_dm_fixpt_from_s3132(__u64 x)
 {
 	struct fixed31_32 val;
@@ -425,7 +425,7 @@ amdgpu_dm_create_color_properties(struct amdgpu_device *adev)
  * Returns:
  * DRM LUT or NULL
  */
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 const struct drm_color_lut *
 __extract_blob_lut(const struct drm_property_blob *blob, uint32_t *size)
 {
@@ -442,7 +442,7 @@ EXPORT_IF_KUNIT(__extract_blob_lut);
  * Returns:
  * DRM LUT or NULL
  */
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 const struct drm_color_lut32 *
 __extract_blob_lut32(const struct drm_property_blob *blob, uint32_t *size)
 {
@@ -464,7 +464,7 @@ EXPORT_IF_KUNIT(__extract_blob_lut32);
  * True if the given lut is a linear mapping of values, i.e. it acts like a
  * bypass LUT. Otherwise, false.
  */
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 bool __is_lut_linear(const struct drm_color_lut *lut, uint32_t size)
 {
 	int i;
@@ -501,7 +501,7 @@ EXPORT_IF_KUNIT(__is_lut_linear);
  *
  * The conversion depends on the size of the lut - whether or not it's legacy.
  */
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void __drm_lut_to_dc_gamma(const struct drm_color_lut *lut,
 				  struct dc_gamma *gamma, bool is_legacy)
 {
@@ -541,7 +541,7 @@ EXPORT_IF_KUNIT(__drm_lut_to_dc_gamma);
  *
  * The conversion depends on the size of the lut - whether or not it's legacy.
  */
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void __drm_lut32_to_dc_gamma(const struct drm_color_lut32 *lut, struct dc_gamma *gamma)
 {
 	int i;
@@ -561,7 +561,7 @@ EXPORT_IF_KUNIT(__drm_lut32_to_dc_gamma);
  *
  * The matrix needs to be a 3x4 (12 entry) matrix.
  */
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void __drm_ctm_to_dc_matrix(const struct drm_color_ctm *ctm,
 			   struct fixed31_32 *matrix)
 {
@@ -595,7 +595,7 @@ EXPORT_IF_KUNIT(__drm_ctm_to_dc_matrix);
  *
  * The matrix needs to be a 3x4 (12 entry) matrix.
  */
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void __drm_ctm_3x4_to_dc_matrix(const struct drm_color_ctm_3x4 *ctm,
 				struct fixed31_32 *matrix)
 {
@@ -624,7 +624,7 @@ EXPORT_IF_KUNIT(__drm_ctm_3x4_to_dc_matrix);
  * Returns:
  * 0 in case of success, -ENOMEM if fails
  */
-VISIBLE_IF_KUNIT int
+STATIC_IFN_KUNIT int
 __set_legacy_tf(struct dc_transfer_func *func,
 		const struct drm_color_lut *lut, uint32_t lut_size,
 		bool has_rom)
@@ -664,7 +664,7 @@ EXPORT_IF_KUNIT(__set_legacy_tf);
  * Returns:
  * 0 in case of success. -ENOMEM if fails.
  */
-VISIBLE_IF_KUNIT int
+STATIC_IFN_KUNIT int
 __set_output_tf(struct dc_transfer_func *func,
 		const struct drm_color_lut *lut, uint32_t lut_size,
 		bool has_rom)
@@ -724,7 +724,7 @@ EXPORT_IF_KUNIT(__set_output_tf);
  * Returns:
  * 0 in case of success. -ENOMEM if fails.
  */
-VISIBLE_IF_KUNIT int
+STATIC_IFN_KUNIT int
 __set_output_tf_32(struct dc_transfer_func *func,
 		   const struct drm_color_lut32 *lut, uint32_t lut_size,
 		   bool has_rom)
@@ -772,14 +772,14 @@ __set_output_tf_32(struct dc_transfer_func *func,
 }
 EXPORT_IF_KUNIT(__set_output_tf_32);
 
-VISIBLE_IF_KUNIT void __set_tf_bypass(struct dc_transfer_func *tf)
+STATIC_IFN_KUNIT void __set_tf_bypass(struct dc_transfer_func *tf)
 {
 	tf->type = TF_TYPE_BYPASS;
 	tf->tf = TRANSFER_FUNCTION_LINEAR;
 }
 EXPORT_IF_KUNIT(__set_tf_bypass);
 
-VISIBLE_IF_KUNIT void __set_tf_distributed_points(struct dc_transfer_func *tf,
+STATIC_IFN_KUNIT void __set_tf_distributed_points(struct dc_transfer_func *tf,
 					enum dc_transfer_func_predefined predefined_tf)
 {
 	tf->type = TF_TYPE_DISTRIBUTED_POINTS;
@@ -788,7 +788,7 @@ VISIBLE_IF_KUNIT void __set_tf_distributed_points(struct dc_transfer_func *tf,
 }
 EXPORT_IF_KUNIT(__set_tf_distributed_points);
 
-VISIBLE_IF_KUNIT int amdgpu_dm_set_atomic_regamma(struct dc_transfer_func *out_tf,
+STATIC_IFN_KUNIT int amdgpu_dm_set_atomic_regamma(struct dc_transfer_func *out_tf,
 					const struct drm_color_lut *regamma_lut,
 					uint32_t regamma_size, bool has_rom,
 					enum dc_transfer_func_predefined tf)
@@ -832,7 +832,7 @@ EXPORT_IF_KUNIT(amdgpu_dm_set_atomic_regamma);
  * Returns:
  * 0 in case of success. -ENOMEM if fails.
  */
-VISIBLE_IF_KUNIT int __set_input_tf(struct dc_color_caps *caps,
+STATIC_IFN_KUNIT int __set_input_tf(struct dc_color_caps *caps,
 				    struct dc_transfer_func *func,
 				    const struct drm_color_lut *lut, uint32_t lut_size)
 {
@@ -870,7 +870,7 @@ EXPORT_IF_KUNIT(__set_input_tf);
  * Returns:
  * 0 in case of success. -ENOMEM if fails.
  */
-VISIBLE_IF_KUNIT int __set_input_tf_32(struct dc_color_caps *caps,
+STATIC_IFN_KUNIT int __set_input_tf_32(struct dc_color_caps *caps,
 				       struct dc_transfer_func *func,
 				       const struct drm_color_lut32 *lut, uint32_t lut_size)
 {
@@ -897,7 +897,7 @@ VISIBLE_IF_KUNIT int __set_input_tf_32(struct dc_color_caps *caps,
 }
 EXPORT_IF_KUNIT(__set_input_tf_32);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 enum dc_transfer_func_predefined
 amdgpu_tf_to_dc_tf(enum amdgpu_transfer_function tf)
 {
@@ -929,7 +929,7 @@ amdgpu_tf_to_dc_tf(enum amdgpu_transfer_function tf)
 EXPORT_IF_KUNIT(amdgpu_tf_to_dc_tf);
 
 #ifdef HAVE_DRM_DRM_COLOROP_H
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 enum dc_transfer_func_predefined
 amdgpu_colorop_tf_to_dc_tf(enum drm_colorop_curve_1d_type tf)
 {
@@ -953,7 +953,7 @@ amdgpu_colorop_tf_to_dc_tf(enum drm_colorop_curve_1d_type tf)
 EXPORT_IF_KUNIT(amdgpu_colorop_tf_to_dc_tf);
 #endif
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void __to_dc_lut3d_color(struct dc_rgb *rgb,
 				const struct drm_color_lut lut,
 				int bit_precision)
@@ -964,7 +964,7 @@ void __to_dc_lut3d_color(struct dc_rgb *rgb,
 }
 EXPORT_IF_KUNIT(__to_dc_lut3d_color);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void __drm_3dlut_to_dc_3dlut(const struct drm_color_lut *lut,
 				    uint32_t lut3d_size,
 				    struct tetrahedral_params *params,
@@ -1010,7 +1010,7 @@ void __drm_3dlut_to_dc_3dlut(const struct drm_color_lut *lut,
 }
 EXPORT_IF_KUNIT(__drm_3dlut_to_dc_3dlut);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void __to_dc_lut3d_32_color(struct dc_rgb *rgb,
 				   const struct drm_color_lut32 lut,
 				   int bit_precision)
@@ -1021,7 +1021,7 @@ void __to_dc_lut3d_32_color(struct dc_rgb *rgb,
 }
 EXPORT_IF_KUNIT(__to_dc_lut3d_32_color);
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void __drm_3dlut32_to_dc_3dlut(const struct drm_color_lut32 *lut,
 				       uint32_t lut3d_size,
 				       struct tetrahedral_params *params,
@@ -1075,7 +1075,7 @@ EXPORT_IF_KUNIT(__drm_3dlut32_to_dc_3dlut);
  * Map user 3D LUT data to DC 3D LUT and all necessary bits to program it
  * on DCN accordingly.
  */
-VISIBLE_IF_KUNIT void amdgpu_dm_atomic_lut3d(const struct drm_color_lut *drm_lut3d,
+STATIC_IFN_KUNIT void amdgpu_dm_atomic_lut3d(const struct drm_color_lut *drm_lut3d,
 				     uint32_t drm_lut3d_size,
 				     struct dc_plane_cm *cm)
 {
@@ -1097,7 +1097,7 @@ VISIBLE_IF_KUNIT void amdgpu_dm_atomic_lut3d(const struct drm_color_lut *drm_lut
 }
 EXPORT_IF_KUNIT(amdgpu_dm_atomic_lut3d);
 
-VISIBLE_IF_KUNIT int amdgpu_dm_atomic_shaper_lut(const struct drm_color_lut *shaper_lut,
+STATIC_IFN_KUNIT int amdgpu_dm_atomic_shaper_lut(const struct drm_color_lut *shaper_lut,
 				       bool has_rom,
 				       enum dc_transfer_func_predefined tf,
 				       uint32_t shaper_size,
@@ -1123,7 +1123,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_atomic_shaper_lut(const struct drm_color_lut *sha
 }
 EXPORT_IF_KUNIT(amdgpu_dm_atomic_shaper_lut);
 
-VISIBLE_IF_KUNIT int amdgpu_dm_atomic_blend_lut(const struct drm_color_lut *blend_lut,
+STATIC_IFN_KUNIT int amdgpu_dm_atomic_blend_lut(const struct drm_color_lut *blend_lut,
 				       bool has_rom,
 				       enum dc_transfer_func_predefined tf,
 				       uint32_t blend_size,
@@ -1547,7 +1547,7 @@ __set_dm_plane_degamma(struct drm_plane_state *plane_state,
 }
 
 #ifdef HAVE_DRM_DRM_COLOROP_H
-VISIBLE_IF_KUNIT int
+STATIC_IFN_KUNIT int
 __set_colorop_in_tf_1d_curve(struct dc_plane_state *dc_plane_state,
 			     struct drm_colorop_state *colorop_state)
 {
@@ -1575,7 +1575,7 @@ __set_colorop_in_tf_1d_curve(struct dc_plane_state *dc_plane_state,
 }
 EXPORT_IF_KUNIT(__set_colorop_in_tf_1d_curve);
 
-VISIBLE_IF_KUNIT int
+STATIC_IFN_KUNIT int
 __set_dm_plane_colorop_degamma(struct drm_plane_state *plane_state,
 			       struct dc_plane_state *dc_plane_state,
 			       struct drm_colorop *colorop)
@@ -1603,7 +1603,7 @@ __set_dm_plane_colorop_degamma(struct drm_plane_state *plane_state,
 }
 EXPORT_IF_KUNIT(__set_dm_plane_colorop_degamma);
 
-VISIBLE_IF_KUNIT int
+STATIC_IFN_KUNIT int
 __set_dm_plane_colorop_3x4_matrix(struct drm_plane_state *plane_state,
 				  struct dc_plane_state *dc_plane_state,
 				  struct drm_colorop *colorop)
@@ -1645,7 +1645,7 @@ __set_dm_plane_colorop_3x4_matrix(struct drm_plane_state *plane_state,
 }
 EXPORT_IF_KUNIT(__set_dm_plane_colorop_3x4_matrix);
 
-VISIBLE_IF_KUNIT int
+STATIC_IFN_KUNIT int
 __set_dm_plane_colorop_multiplier(struct drm_plane_state *plane_state,
 				  struct dc_plane_state *dc_plane_state,
 				  struct drm_colorop *colorop)
@@ -1767,7 +1767,7 @@ __set_dm_plane_colorop_shaper(struct drm_plane_state *plane_state,
  * Returns:
  * 0 on success. -EINVAL if drm_lut3d_size is zero.
  */
-VISIBLE_IF_KUNIT int __set_colorop_3dlut(const struct drm_color_lut32 *drm_lut3d,
+STATIC_IFN_KUNIT int __set_colorop_3dlut(const struct drm_color_lut32 *drm_lut3d,
 					 uint32_t drm_lut3d_size,
 					 struct dc_3dlut *lut)
 {

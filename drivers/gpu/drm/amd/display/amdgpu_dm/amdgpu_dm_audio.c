@@ -88,7 +88,7 @@ static const struct drm_audio_component_ops amdgpu_dm_audio_component_ops = {
 	.get_eld = amdgpu_dm_audio_component_get_eld,
 };
 
-VISIBLE_IF_KUNIT int amdgpu_dm_audio_component_bind(struct device *kdev,
+STATIC_IFN_KUNIT int amdgpu_dm_audio_component_bind(struct device *kdev,
 				       struct device *hda_kdev, void *data)
 {
 	struct drm_device *dev = dev_get_drvdata(kdev);
@@ -103,7 +103,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_audio_component_bind(struct device *kdev,
 }
 EXPORT_IF_KUNIT(amdgpu_dm_audio_component_bind);
 
-VISIBLE_IF_KUNIT void amdgpu_dm_audio_component_unbind(struct device *kdev,
+STATIC_IFN_KUNIT void amdgpu_dm_audio_component_unbind(struct device *kdev,
 					  struct device *hda_kdev, void *data)
 {
 	struct amdgpu_device *adev = drm_to_adev(dev_get_drvdata(kdev));
@@ -120,7 +120,7 @@ static const struct component_ops amdgpu_dm_audio_component_bind_ops = {
 	.unbind	= amdgpu_dm_audio_component_unbind,
 };
 
-VISIBLE_IF_KUNIT
+STATIC_IFN_KUNIT
 void amdgpu_dm_audio_init_pins(struct amdgpu_device *adev, int audio_count,
 			       const unsigned int *inst_array)
 {
