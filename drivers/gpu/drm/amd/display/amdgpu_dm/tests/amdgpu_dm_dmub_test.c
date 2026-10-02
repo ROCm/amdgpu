@@ -1989,4 +1989,3 @@ kunit_test_suites(&amdgpu_dm_dmub_test_suite,
 MODULE_AUTHOR("AMD");
 MODULE_DESCRIPTION("KUnit tests for amdgpu_dm_dmub");
 MODULE_LICENSE("Dual MIT/GPL");
-MODULE_IMPORT_NS("EXPORTED_FOR_KUNIT_TESTING");

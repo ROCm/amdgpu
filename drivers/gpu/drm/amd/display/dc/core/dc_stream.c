@@ -206,7 +206,7 @@ void dc_stream_release(struct dc_stream_state *stream)
 		kref_put(&stream->refcount, dc_stream_free);
 	}
 }
-EXPORT_SYMBOL_IF_KUNIT(dc_stream_release);
+EXPORT_IF_KUNIT(dc_stream_release);
 
 struct dc_stream_state *dc_create_stream_for_sink(
 		struct dc_sink *sink)

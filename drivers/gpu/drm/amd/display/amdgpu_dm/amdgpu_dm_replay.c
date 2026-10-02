@@ -33,6 +33,7 @@
 #include "dc/inc/link_service.h"
 #include "dm_helpers.h"
 
+
 /*
  * amdgpu_dm_link_supports_replay() - check if the link supports replay
  * @link: link
@@ -69,7 +70,7 @@ bool amdgpu_dm_link_supports_replay(struct dc_link *link, struct amdgpu_dm_conne
 
 	return true;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_link_supports_replay);
+EXPORT_IF_KUNIT(amdgpu_dm_link_supports_replay);
 
 /*
  * amdgpu_dm_set_replay_caps() - setup Replay capabilities
@@ -127,7 +128,7 @@ bool amdgpu_dm_set_replay_caps(struct dc_link *link, struct amdgpu_dm_connector 
 
 	return true;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_replay_caps);
+EXPORT_IF_KUNIT(amdgpu_dm_set_replay_caps);
 
 /*
  * amdgpu_dm_link_setup_replay() - config replay settings
@@ -166,7 +167,7 @@ bool amdgpu_dm_link_setup_replay(struct dc_stream_state *stream,
 			static_coasting_vtotal);
 	return true;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_link_setup_replay);
+EXPORT_IF_KUNIT(amdgpu_dm_link_setup_replay);
 
 /*
  * amdgpu_dm_replay_set_event() - set or clear replay event for a stream
@@ -206,4 +207,4 @@ bool amdgpu_dm_replay_set_event(struct amdgpu_display_manager *dm,
 	return mod_power_set_replay_event(dm->power_module, stream,
 					 set_event, event, wait_for_disable);
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_replay_set_event);
+EXPORT_IF_KUNIT(amdgpu_dm_replay_set_event);

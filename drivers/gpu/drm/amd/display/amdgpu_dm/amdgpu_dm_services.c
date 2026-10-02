@@ -51,7 +51,7 @@ void amdgpu_dm_services_kunit_set_ops(const struct amdgpu_dm_services_kunit_ops 
 {
 	amdgpu_dm_services_ops = ops ? ops : &amdgpu_dm_services_default_ops;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_services_kunit_set_ops);
+EXPORT_IF_KUNIT(amdgpu_dm_services_kunit_set_ops);
 
 #define services_bo_create_kernel	amdgpu_dm_services_ops->bo_create_kernel
 #define services_bo_free_kernel		amdgpu_dm_services_ops->bo_free_kernel
@@ -70,7 +70,7 @@ EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_services_kunit_set_ops);
 {
 	return current_time_stamp - last_time_stamp;
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_get_elapse_time_in_ns);
+EXPORT_IF_KUNIT(dm_get_elapse_time_in_ns);
 
 void dm_perf_trace_timestamp(const char *func_name, unsigned int line, struct dc_context *ctx)
 {
@@ -80,17 +80,17 @@ void dm_perf_trace_timestamp(const char *func_name, unsigned int line, struct dc
 				    &ctx->perf_trace->last_entry_write,
 				    func_name, line);
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_perf_trace_timestamp);
+EXPORT_IF_KUNIT(dm_perf_trace_timestamp);
 
 void dm_trace_smu_enter(uint32_t msg_id, uint32_t param_in, unsigned int delay, struct dc_context *ctx)
 {
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_trace_smu_enter);
+EXPORT_IF_KUNIT(dm_trace_smu_enter);
 
 void dm_trace_smu_exit(bool success, uint32_t response, struct dc_context *ctx)
 {
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_trace_smu_exit);
+EXPORT_IF_KUNIT(dm_trace_smu_exit);
 
 /**** power component interfaces ****/
 
@@ -120,7 +120,7 @@ bool dm_query_extended_brightness_caps(struct dc_context *ctx,
 			sizeof(struct dm_bl_data_point) * pCaps->num_data_points);
 	return true;
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_query_extended_brightness_caps);
+EXPORT_IF_KUNIT(dm_query_extended_brightness_caps);
 
 void*
 dm_allocate_gpu_mem(
@@ -154,7 +154,7 @@ dm_allocate_gpu_mem(
 
 	return da->cpu_ptr;
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_allocate_gpu_mem);
+EXPORT_IF_KUNIT(dm_allocate_gpu_mem);
 
 void
 dm_free_gpu_mem(
@@ -175,4 +175,4 @@ dm_free_gpu_mem(
 	}
 
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_free_gpu_mem);
+EXPORT_IF_KUNIT(dm_free_gpu_mem);

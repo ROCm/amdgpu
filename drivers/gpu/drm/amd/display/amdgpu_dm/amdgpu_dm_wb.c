@@ -61,7 +61,7 @@ void amdgpu_dm_wb_kunit_set_ops(const struct amdgpu_dm_wb_kunit_ops *ops)
 {
 	amdgpu_dm_wb_ops = ops ? ops : &amdgpu_dm_wb_default_ops;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_wb_kunit_set_ops);
+EXPORT_IF_KUNIT(amdgpu_dm_wb_kunit_set_ops);
 
 #define wb_bo_reserve			amdgpu_dm_wb_ops->reserve
 #define wb_dma_resv_reserve_fences	amdgpu_dm_wb_ops->reserve_fences
@@ -121,7 +121,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_wb_encoder_atomic_check(struct drm_encoder *encod
 
 	return 0;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_wb_encoder_atomic_check);
+EXPORT_IF_KUNIT(amdgpu_dm_wb_encoder_atomic_check);
 
 
 VISIBLE_IF_KUNIT int amdgpu_dm_wb_connector_get_modes(struct drm_connector *connector)
@@ -129,7 +129,7 @@ VISIBLE_IF_KUNIT int amdgpu_dm_wb_connector_get_modes(struct drm_connector *conn
 	/* Maximum resolution supported by DWB */
 	return drm_add_modes_noedid(connector, 3840, 2160);
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_wb_connector_get_modes);
+EXPORT_IF_KUNIT(amdgpu_dm_wb_connector_get_modes);
 
 #ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_PREPARE_WRITEBACK_JOB
 VISIBLE_IF_KUNIT int amdgpu_dm_wb_prepare_job(struct drm_writeback_connector *wb_connector,
@@ -195,7 +195,7 @@ error_unlock:
 	wb_bo_unreserve(rbo);
 	return r;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_wb_prepare_job);
+EXPORT_IF_KUNIT(amdgpu_dm_wb_prepare_job);
 
 VISIBLE_IF_KUNIT void amdgpu_dm_wb_cleanup_job(struct drm_writeback_connector *connector,
 				struct drm_writeback_job *job)
@@ -217,7 +217,7 @@ VISIBLE_IF_KUNIT void amdgpu_dm_wb_cleanup_job(struct drm_writeback_connector *c
 	wb_bo_unreserve(rbo);
 	wb_bo_unref(&rbo);
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_wb_cleanup_job);
+EXPORT_IF_KUNIT(amdgpu_dm_wb_cleanup_job);
 #endif
 
 static const struct drm_encoder_helper_funcs amdgpu_dm_wb_encoder_helper_funcs = {
@@ -270,4 +270,4 @@ int amdgpu_dm_wb_connector_init(struct amdgpu_display_manager *dm,
 
 	return 0;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_wb_connector_init);
+EXPORT_IF_KUNIT(amdgpu_dm_wb_connector_init);

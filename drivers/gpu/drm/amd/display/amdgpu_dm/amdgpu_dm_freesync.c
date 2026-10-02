@@ -51,7 +51,7 @@ bool amdgpu_dm_is_dc_timing_adjust_needed(struct dm_crtc_state *old_state,
 	else
 		return false;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_is_dc_timing_adjust_needed);
+EXPORT_IF_KUNIT(amdgpu_dm_is_dc_timing_adjust_needed);
 
 bool
 amdgpu_dm_is_timing_unchanged_for_freesync(struct drm_crtc_state *old_crtc_state,
@@ -82,7 +82,7 @@ amdgpu_dm_is_timing_unchanged_for_freesync(struct drm_crtc_state *old_crtc_state
 
 	return false;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_is_timing_unchanged_for_freesync);
+EXPORT_IF_KUNIT(amdgpu_dm_is_timing_unchanged_for_freesync);
 
 void amdgpu_dm_set_freesync_fixed_config(struct dm_crtc_state *dm_new_crtc_state)
 {
@@ -98,7 +98,7 @@ void amdgpu_dm_set_freesync_fixed_config(struct dm_crtc_state *dm_new_crtc_state
 	res = div_u64(num, den);
 	dm_new_crtc_state->freesync_config.fixed_refresh_in_uhz = res;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_freesync_fixed_config);
+EXPORT_IF_KUNIT(amdgpu_dm_set_freesync_fixed_config);
 
 void amdgpu_dm_reset_freesync_config_for_crtc(
 	struct dm_crtc_state *new_crtc_state)
@@ -108,7 +108,7 @@ void amdgpu_dm_reset_freesync_config_for_crtc(
 	memset(&new_crtc_state->vrr_infopacket, 0,
 	       sizeof(new_crtc_state->vrr_infopacket));
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_reset_freesync_config_for_crtc);
+EXPORT_IF_KUNIT(amdgpu_dm_reset_freesync_config_for_crtc);
 
 void amdgpu_dm_get_freesync_config_for_crtc(
 	struct dm_crtc_state *new_crtc_state,
@@ -161,7 +161,7 @@ out:
 		       aconnector->min_vfreq, aconnector->max_vfreq,
 		       config.state);
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_get_freesync_config_for_crtc);
+EXPORT_IF_KUNIT(amdgpu_dm_get_freesync_config_for_crtc);
 
 void amdgpu_dm_update_freesync_state_on_stream(
 	struct amdgpu_display_manager *dm,
@@ -297,7 +297,7 @@ void amdgpu_dm_update_freesync_state_on_stream(
 
 	spin_unlock_irqrestore(&adev_to_drm(adev)->event_lock, flags);
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_update_freesync_state_on_stream);
+EXPORT_IF_KUNIT(amdgpu_dm_update_freesync_state_on_stream);
 
 void amdgpu_dm_update_stream_irq_parameters(
 	struct amdgpu_display_manager *dm,
@@ -357,7 +357,7 @@ void amdgpu_dm_update_stream_irq_parameters(
 	acrtc->dm_irq_params.vrr_params = vrr_params;
 	spin_unlock_irqrestore(&adev_to_drm(adev)->event_lock, flags);
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_update_stream_irq_parameters);
+EXPORT_IF_KUNIT(amdgpu_dm_update_stream_irq_parameters);
 
 void amdgpu_dm_handle_vrr_transition(struct amdgpu_display_manager *dm,
 				     struct dm_crtc_state *old_state,
@@ -411,4 +411,4 @@ void amdgpu_dm_handle_vrr_transition(struct amdgpu_display_manager *dm,
 		}
 	}
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_handle_vrr_transition);
+EXPORT_IF_KUNIT(amdgpu_dm_handle_vrr_transition);

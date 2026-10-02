@@ -66,7 +66,7 @@ void amdgpu_dm_validate_backlight_caps(struct amdgpu_display_manager *dm, int bl
 		caps->caps_valid = false;
 	}
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_validate_backlight_caps);
+EXPORT_IF_KUNIT(amdgpu_dm_validate_backlight_caps);
 #endif
 
 void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm,
@@ -94,7 +94,7 @@ void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm,
 		caps->caps_valid = true;
 	}
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_update_backlight_caps);
+EXPORT_IF_KUNIT(amdgpu_dm_update_backlight_caps);
 
 VISIBLE_IF_KUNIT
 int get_brightness_range(const struct amdgpu_dm_backlight_caps *caps,
@@ -114,7 +114,7 @@ int get_brightness_range(const struct amdgpu_dm_backlight_caps *caps,
 	}
 	return 1;
 }
-EXPORT_SYMBOL_IF_KUNIT(get_brightness_range);
+EXPORT_IF_KUNIT(get_brightness_range);
 
 /* Rescale userspace [0..max] to the firmware curve's [0..255]. */
 static inline u32 scale_input_to_fw(int max, u64 input)
@@ -254,7 +254,8 @@ scale:
 	*user_brightness = scale_fw_to_input(min, max,
 					     DIV_ROUND_CLOSEST(lum * brightness, 101));
 }
-EXPORT_SYMBOL_IF_KUNIT(convert_custom_brightness);
+
+EXPORT_IF_KUNIT(convert_custom_brightness);
 
 VISIBLE_IF_KUNIT
 u32 convert_brightness_from_user(const struct amdgpu_dm_backlight_caps *caps,
@@ -270,7 +271,8 @@ u32 convert_brightness_from_user(const struct amdgpu_dm_backlight_caps *caps,
 	/* Rescale 0..max to min..max */
 	return min + DIV_ROUND_CLOSEST_ULL((u64)(max - min) * brightness, max);
 }
-EXPORT_SYMBOL_IF_KUNIT(convert_brightness_from_user);
+
+EXPORT_IF_KUNIT(convert_brightness_from_user);
 
 VISIBLE_IF_KUNIT
 u32 convert_brightness_to_user(const struct amdgpu_dm_backlight_caps *caps,
@@ -287,7 +289,7 @@ u32 convert_brightness_to_user(const struct amdgpu_dm_backlight_caps *caps,
 	return DIV_ROUND_CLOSEST_ULL((u64)max * (brightness - min),
 				 max - min);
 }
-EXPORT_SYMBOL_IF_KUNIT(convert_brightness_to_user);
+EXPORT_IF_KUNIT(convert_brightness_to_user);
 
 VISIBLE_IF_KUNIT
 struct dc_stream_state *dm_find_stream_with_link(
@@ -306,7 +308,7 @@ struct dc_stream_state *dm_find_stream_with_link(
 
 	return NULL;
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_find_stream_with_link);
+EXPORT_IF_KUNIT(dm_find_stream_with_link);
 
 VISIBLE_IF_KUNIT
 int amdgpu_dm_backlight_get_device_index(struct amdgpu_display_manager *dm,
@@ -321,7 +323,7 @@ int amdgpu_dm_backlight_get_device_index(struct amdgpu_display_manager *dm,
 
 	return 0;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_backlight_get_device_index);
+EXPORT_IF_KUNIT(amdgpu_dm_backlight_get_device_index);
 
 void amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 				   int bl_idx,
@@ -421,7 +423,7 @@ void amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 	if (rc)
 		dm->actual_brightness[bl_idx] = user_brightness;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_backlight_set_level);
+EXPORT_IF_KUNIT(amdgpu_dm_backlight_set_level);
 
 VISIBLE_IF_KUNIT
 int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
@@ -433,7 +435,7 @@ int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 
 	return 0;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_backlight_update_status);
+EXPORT_IF_KUNIT(amdgpu_dm_backlight_update_status);
 
 VISIBLE_IF_KUNIT
 u32 amdgpu_dm_backlight_get_level(struct amdgpu_display_manager *dm, int bl_idx)
@@ -460,7 +462,7 @@ u32 amdgpu_dm_backlight_get_level(struct amdgpu_display_manager *dm, int bl_idx)
 
 	return convert_brightness_to_user(&caps, ret);
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_backlight_get_level);
+EXPORT_IF_KUNIT(amdgpu_dm_backlight_get_level);
 
 VISIBLE_IF_KUNIT
 int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
@@ -470,7 +472,7 @@ int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
 
 	return amdgpu_dm_backlight_get_level(dm, i);
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_backlight_get_brightness);
+EXPORT_IF_KUNIT(amdgpu_dm_backlight_get_brightness);
 
 static const struct backlight_ops amdgpu_dm_backlight_ops = {
 	.options = BL_CORE_SUSPENDRESUME,
@@ -505,7 +507,7 @@ void amdgpu_dm_backlight_fill_props(const struct amdgpu_dm_backlight_caps *caps,
 		props->scale = BACKLIGHT_SCALE_LINEAR;
 	props->type = BACKLIGHT_RAW;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_backlight_fill_props);
+EXPORT_IF_KUNIT(amdgpu_dm_backlight_fill_props);
 
 void
 amdgpu_dm_register_backlight_device(struct amdgpu_dm_connector *aconnector)
@@ -569,7 +571,7 @@ amdgpu_dm_register_backlight_device(struct amdgpu_dm_connector *aconnector)
 		drm_dbg_driver(drm, "DM: Registered Backlight device: %s\n", bl_name);
 	}
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_register_backlight_device);
+EXPORT_IF_KUNIT(amdgpu_dm_register_backlight_device);
 
 void amdgpu_dm_update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 {
@@ -659,7 +661,7 @@ void amdgpu_dm_update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 	}
 #endif
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_update_connector_ext_caps);
+EXPORT_IF_KUNIT(amdgpu_dm_update_connector_ext_caps);
 
 void amdgpu_dm_setup_backlight_device(struct amdgpu_display_manager *dm,
 			    struct amdgpu_dm_connector *aconnector)
@@ -693,7 +695,7 @@ void amdgpu_dm_setup_backlight_device(struct amdgpu_display_manager *dm,
 					   dm->adev->mode_info.abm_level_property,
 					   ABM_SYSFS_CONTROL);
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_setup_backlight_device);
+EXPORT_IF_KUNIT(amdgpu_dm_setup_backlight_device);
 
 /**
  * DOC: panel power savings
@@ -724,7 +726,7 @@ ssize_t panel_power_savings_show(struct device *device,
 
 	return sysfs_emit(buf, "%u\n", val);
 }
-EXPORT_SYMBOL_IF_KUNIT(panel_power_savings_show);
+EXPORT_IF_KUNIT(panel_power_savings_show);
 
 VISIBLE_IF_KUNIT
 ssize_t panel_power_savings_store(struct device *device,
@@ -759,7 +761,7 @@ ssize_t panel_power_savings_store(struct device *device,
 
 	return count;
 }
-EXPORT_SYMBOL_IF_KUNIT(panel_power_savings_store);
+EXPORT_IF_KUNIT(panel_power_savings_store);
 
 static DEVICE_ATTR_RW(panel_power_savings);
 
@@ -789,42 +791,42 @@ amdgpu_dm_should_create_sysfs(struct amdgpu_dm_connector *amdgpu_dm_connector)
 
 	return true;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_should_create_sysfs);
+EXPORT_IF_KUNIT(amdgpu_dm_should_create_sysfs);
 
 #if IS_ENABLED(CONFIG_DRM_AMD_DC_KUNIT_TEST)
 uint amdgpu_dm_get_dc_debug_mask(void)
 {
 	return amdgpu_dc_debug_mask;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_get_dc_debug_mask);
+EXPORT_IF_KUNIT(amdgpu_dm_get_dc_debug_mask);
 
 void amdgpu_dm_set_dc_debug_mask(uint val)
 {
 	amdgpu_dc_debug_mask = val;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_dc_debug_mask);
+EXPORT_IF_KUNIT(amdgpu_dm_set_dc_debug_mask);
 
 int amdgpu_dm_get_abm_level_param(void)
 {
 	return amdgpu_dm_abm_level;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_get_abm_level_param);
+EXPORT_IF_KUNIT(amdgpu_dm_get_abm_level_param);
 
 void amdgpu_dm_set_abm_level_param(int val)
 {
 	amdgpu_dm_abm_level = val;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_abm_level_param);
+EXPORT_IF_KUNIT(amdgpu_dm_set_abm_level_param);
 
 int amdgpu_dm_get_backlight_param(void)
 {
 	return amdgpu_backlight;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_get_backlight_param);
+EXPORT_IF_KUNIT(amdgpu_dm_get_backlight_param);
 
 void amdgpu_dm_set_backlight_param(int val)
 {
 	amdgpu_backlight = val;
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_set_backlight_param);
+EXPORT_IF_KUNIT(amdgpu_dm_set_backlight_param);
 #endif

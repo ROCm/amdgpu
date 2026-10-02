@@ -128,7 +128,7 @@ bool dm_ism_next_state(enum amdgpu_dm_ism_state current_state,
 	}
 	return true;
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_ism_next_state);
+EXPORT_IF_KUNIT(dm_ism_next_state);
 
 VISIBLE_IF_KUNIT
 uint64_t dm_ism_get_sso_delay(const struct amdgpu_dm_ism *ism,
@@ -153,7 +153,7 @@ uint64_t dm_ism_get_sso_delay(const struct amdgpu_dm_ism *ism,
 
 	return sso_delay_ns;
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_ism_get_sso_delay);
+EXPORT_IF_KUNIT(dm_ism_get_sso_delay);
 
 /**
  * dm_ism_get_idle_allow_delay - Calculate hysteresis-based idle allow delay
@@ -224,7 +224,7 @@ uint64_t dm_ism_get_idle_allow_delay(const struct amdgpu_dm_ism *ism,
 
 	return ret_ns;
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_ism_get_idle_allow_delay);
+EXPORT_IF_KUNIT(dm_ism_get_idle_allow_delay);
 
 /**
  * dm_ism_insert_record - Insert a record into the circular history buffer
@@ -246,7 +246,7 @@ void dm_ism_insert_record(struct amdgpu_dm_ism *ism)
 	record->duration_ns =
 		record->timestamp_ns - ism->last_idle_timestamp_ns;
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_ism_insert_record);
+EXPORT_IF_KUNIT(dm_ism_insert_record);
 
 
 VISIBLE_IF_KUNIT
@@ -254,7 +254,7 @@ void dm_ism_set_last_idle_ts(struct amdgpu_dm_ism *ism)
 {
 	ism->last_idle_timestamp_ns = ktime_get_ns();
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_ism_set_last_idle_ts);
+EXPORT_IF_KUNIT(dm_ism_set_last_idle_ts);
 
 
 VISIBLE_IF_KUNIT
@@ -273,7 +273,7 @@ bool dm_ism_trigger_event(struct amdgpu_dm_ism *ism,
 
 	return gotNextState;
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_ism_trigger_event);
+EXPORT_IF_KUNIT(dm_ism_trigger_event);
 
 
 static void dm_ism_commit_idle_optimization_state(struct amdgpu_dm_ism *ism,
@@ -354,7 +354,7 @@ enum amdgpu_dm_ism_event dm_ism_dispatch_next_event(
 	}
 	return DM_ISM_NUM_EVENTS;
 }
-EXPORT_SYMBOL_IF_KUNIT(dm_ism_dispatch_next_event);
+EXPORT_IF_KUNIT(dm_ism_dispatch_next_event);
 
 static enum amdgpu_dm_ism_event dm_ism_dispatch_power_state(
 	struct amdgpu_dm_ism *ism,
@@ -502,7 +502,7 @@ void amdgpu_dm_ism_commit_event(struct amdgpu_dm_ism *ism,
 
 	} while (next_event < DM_ISM_NUM_EVENTS);
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_ism_commit_event);
+EXPORT_IF_KUNIT(amdgpu_dm_ism_commit_event);
 
 
 static void dm_ism_delayed_work_func(struct work_struct *work)
@@ -575,7 +575,7 @@ void amdgpu_dm_ism_disable(struct amdgpu_display_manager *dm)
 #endif
 	}
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_ism_disable);
+EXPORT_IF_KUNIT(amdgpu_dm_ism_disable);
 
 /**
  * amdgpu_dm_ism_force_full_power - Force every CRTC's ISM FSM to FULL_POWER
@@ -611,7 +611,7 @@ void amdgpu_dm_ism_force_full_power(struct amdgpu_display_manager *dm)
 					   DM_ISM_EVENT_EXIT_IDLE_REQUESTED);
 	}
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_ism_force_full_power);
+EXPORT_IF_KUNIT(amdgpu_dm_ism_force_full_power);
 
 /**
  * amdgpu_dm_ism_enable - enable the ISM
@@ -637,7 +637,7 @@ void amdgpu_dm_ism_enable(struct amdgpu_display_manager *dm)
 #endif
 	}
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_ism_enable);
+EXPORT_IF_KUNIT(amdgpu_dm_ism_enable);
 
 void amdgpu_dm_ism_init(struct amdgpu_dm_ism *ism,
 			struct amdgpu_dm_ism_config *config)
@@ -652,7 +652,7 @@ void amdgpu_dm_ism_init(struct amdgpu_dm_ism *ism,
 	INIT_DELAYED_WORK(&ism->delayed_work, dm_ism_delayed_work_func);
 	INIT_DELAYED_WORK(&ism->sso_delayed_work, dm_ism_sso_delayed_work_func);
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_ism_init);
+EXPORT_IF_KUNIT(amdgpu_dm_ism_init);
 
 
 /**
@@ -677,4 +677,4 @@ void amdgpu_dm_ism_flush(struct amdgpu_dm_ism *ism)
 	cancel_delayed_work_sync(&ism->sso_delayed_work);
 	cancel_delayed_work_sync(&ism->delayed_work);
 }
-EXPORT_SYMBOL_IF_KUNIT(amdgpu_dm_ism_flush);
+EXPORT_IF_KUNIT(amdgpu_dm_ism_flush);

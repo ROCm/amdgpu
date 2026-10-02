@@ -2731,4 +2731,3 @@ kunit_test_suite(amdgpu_dm_crtc_test_suite);
 MODULE_AUTHOR("AMD");
 MODULE_DESCRIPTION("KUnit tests for amdgpu_dm_crtc");
 MODULE_LICENSE("Dual MIT/GPL");
-MODULE_IMPORT_NS("EXPORTED_FOR_KUNIT_TESTING");

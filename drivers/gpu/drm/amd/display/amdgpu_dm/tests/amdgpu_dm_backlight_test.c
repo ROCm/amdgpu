@@ -2012,6 +2012,5 @@ static struct kunit_suite dm_backlight_test_suite = {
 kunit_test_suite(dm_backlight_test_suite);
 
 MODULE_LICENSE("Dual MIT/GPL");
-MODULE_IMPORT_NS("EXPORTED_FOR_KUNIT_TESTING");
 MODULE_DESCRIPTION("KUnit tests for amdgpu_dm_backlight");
 MODULE_AUTHOR("AMD");
