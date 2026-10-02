@@ -154,6 +154,12 @@ static void dm_test_subconnector_type_default_unknown(struct kunit *test)
 
 /**
  * dm_test_content_type_no_data - Test Content type no data
+ * @test: The KUnit test context
+ */
+static void dm_test_content_type_no_data(struct kunit *test)
+{
+	struct drm_connector_state state = {};
+
 	state.content_type = DRM_MODE_CONTENT_TYPE_NO_DATA;
 	KUNIT_EXPECT_EQ(test, (int)get_output_content_type(&state), (int)DISPLAY_CONTENT_TYPE_NO_DATA);
 }
