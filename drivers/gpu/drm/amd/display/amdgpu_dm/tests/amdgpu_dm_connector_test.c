@@ -9359,14 +9359,14 @@ dm_test_fs_edid_displayid(struct kunit *test, u8 min_vfreq, u8 max_vfreq)
 	return dm_test_fs_edid_alloc(test, ext);
 }
 
-
 /*
  * A CTA-861 extension carrying a 15-byte AMD VSDB v3 payload, which
  * drm_parse_amd_vsdb() turns into connector->display_info.amd_vsdb and
  * get_amd_vsdb() then reads back.
  */
 static const struct drm_edid *
-dm_test_fs_edid_amd_vsdb(struct kunit *test, u8 feature_caps)
+dm_test_fs_edid_amd_vsdb(struct kunit *test, u8 feature_caps,
+			 u8 min_vfreq, u16 max_vfreq)
 {
 	u8 ext[EDID_LENGTH] = {0};
 
@@ -9377,6 +9377,9 @@ dm_test_fs_edid_amd_vsdb(struct kunit *test, u8 feature_caps)
 	ext[5] = 0x1a;			/* AMD IEEE OUI, LSB first */
 	ext[8] = 0x03;			/* AMD VSDB payload version */
 	ext[9] = feature_caps;
+	ext[10] = min_vfreq;
+	ext[18] = max_vfreq & 0xff;	/* v3 max refresh rate, low bits */
+	ext[19] = (max_vfreq >> 8) & 0x3; /* v3 max refresh rate, high bits */
 
 	return dm_test_fs_edid_alloc(test, ext);
 }
@@ -9394,8 +9397,7 @@ struct dm_test_fs_caps_ctx {
  * Build a connector that clears every guard at the top of
  * amdgpu_dm_update_freesync_caps(): a reset connector state, a dc_sink whose
  * dc_context reports a VRR capable DCE version, and a non-NULL freesync
- * module. The resource pool carries no DMCU, so tests that need the AMD VSDB
- * parser to succeed install one.
+ * module.
  */
 static struct dm_test_fs_caps_ctx *
 dm_test_fs_caps_ctx_alloc(struct kunit *test, enum signal_type sink_signal)
@@ -9539,7 +9541,7 @@ static void dm_test_fs_caps_edp_replay_mode(struct kunit *test)
 {
 	struct dm_test_fs_caps_ctx *ctx =
 		dm_test_fs_caps_ctx_alloc(test, SIGNAL_TYPE_EDP);
-	const struct drm_edid *drm_edid = dm_test_fs_edid_amd_vsdb(test, 0x40);
+	const struct drm_edid *drm_edid = dm_test_fs_edid_amd_vsdb(test, 0x40, 0, 0);
 
 	amdgpu_dm_update_freesync_caps(&ctx->aconnector->base, drm_edid, false);
 
@@ -9552,16 +9554,15 @@ static void dm_test_fs_caps_edp_replay_mode(struct kunit *test)
  * dm_test_fs_caps_hdmi_vsdb - Test the HDMI AMD VSDB refresh range
  * @test: The KUnit test context
  *
- * On HDMI the CEA extension is handed to the DMCU parser, whose reported
- * 24-60Hz range is copied to the connector and published as the monitor range.
- * The DMCU does not report an EDID FreeSync VCP code, so the connector is not
- * marked FreeSync-capable.
+ * On HDMI the 24-60Hz range of the AMD VSDB parsed by the common EDID code is
+ * copied to the connector and published as the monitor range. The VSDB carries
+ * no EDID FreeSync VCP code, so the connector is not marked FreeSync-capable.
  */
 static void dm_test_fs_caps_hdmi_vsdb(struct kunit *test)
 {
 	struct dm_test_fs_caps_ctx *ctx =
 		dm_test_fs_caps_ctx_alloc(test, SIGNAL_TYPE_HDMI_TYPE_A);
-	const struct drm_edid *drm_edid = dm_test_fs_edid_amd_vsdb(test, 0x40);
+	const struct drm_edid *drm_edid = dm_test_fs_edid_amd_vsdb(test, 0x1, 24, 60);
 	struct drm_connector *connector = &ctx->aconnector->base;
 
 	amdgpu_dm_update_freesync_caps(connector, drm_edid, false);
@@ -9575,16 +9576,16 @@ static void dm_test_fs_caps_hdmi_vsdb(struct kunit *test)
 }
 
 /**
- * dm_test_fs_caps_hdmi_no_vsdb - Test an HDMI sink with no AMD VSDB
+ * dm_test_fs_caps_hdmi_no_vsdb - Test an HDMI sink with no FreeSync VSDB
  * @test: The KUnit test context
  *
- * Without a DMCU the CEA parse fails, so no refresh range is recorded.
+ * An AMD VSDB without the FreeSync feature bit records no refresh range.
  */
 static void dm_test_fs_caps_hdmi_no_vsdb(struct kunit *test)
 {
 	struct dm_test_fs_caps_ctx *ctx =
 		dm_test_fs_caps_ctx_alloc(test, SIGNAL_TYPE_HDMI_TYPE_A);
-	const struct drm_edid *drm_edid = dm_test_fs_edid_amd_vsdb(test, 0x40);
+	const struct drm_edid *drm_edid = dm_test_fs_edid_amd_vsdb(test, 0x40, 0, 0);
 
 	amdgpu_dm_update_freesync_caps(&ctx->aconnector->base, drm_edid, false);
 
@@ -9605,8 +9606,9 @@ static void dm_test_fs_caps_pcon_whitelist(struct kunit *test)
 {
 	struct dm_test_fs_caps_ctx *ctx =
 		dm_test_fs_caps_ctx_alloc(test, SIGNAL_TYPE_DISPLAY_PORT);
-	const struct drm_edid *drm_edid = dm_test_fs_edid_amd_vsdb(test, 0x40);
+	const struct drm_edid *drm_edid = dm_test_fs_edid_amd_vsdb(test, 0x1, 24, 60);
 	struct dpcd_caps *dpcd;
+
 	dpcd = &ctx->link->dpcd_caps;
 	dpcd->dongle_type = DISPLAY_DONGLE_DP_HDMI_CONVERTER;
 	dpcd->adaptive_sync_caps.dp_adap_sync_caps.bits.ADAPTIVE_SYNC_SDP_SUPPORT = 1;
