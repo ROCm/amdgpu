@@ -708,7 +708,7 @@ TRACE_EVENT(dcn_fpu,
 	    ),
 	    TP_fast_assign(
 			   __entry->begin = begin;
-			   __assign_str(function);
+			   __amdkcl_assign_str(function, function);
 			   __entry->line = line;
 			   __entry->recursion_depth = recursion_depth;
 	    ),
@@ -743,7 +743,7 @@ TRACE_EVENT(dcn_optc_lock_unlock_state,
 			     __field(int, vready_offset)
 	    ),
 	    TP_fast_assign(
-			   __assign_str(function);
+			   __amdkcl_assign_str(function, function);
 			   __entry->instance = instance;
 			   __entry->lock = lock;
 			   __entry->line = line;
