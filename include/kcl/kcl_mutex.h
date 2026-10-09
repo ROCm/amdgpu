@@ -16,7 +16,6 @@
 
 #ifndef HAVE_LINUX_CLEANUP_H
 DEFINE_GUARD(mutex, struct mutex *, mutex_lock(_T), mutex_unlock(_T))
-DEFINE_GUARD_COND(mutex, _try, mutex_trylock(_T))
 #endif
 
 #endif /* __LINUX_MUTEX_H */
