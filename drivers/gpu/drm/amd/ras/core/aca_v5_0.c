@@ -30,6 +30,12 @@
 	{ACA_ECC_HWIP__##ip, hwid, acatypes, ARRAY_SIZE(acatypes)}
 
 #define ACA_GFX_XCD_HWID  0x2E2
+#define ACA_MP5_HWID      0x01
+#define ACA_MP5_ACATYPE   0x02
+#define ACA_MP5_ERRCODEEXT_FW_LOGGED   0x3E
+#define ACA_MP5_SYND_ERRINFO_CODE_MASK 0xFFFF
+#define ACA_MP5_SYND_ERRINFO_AGGR_ERR  0x0018
+
 struct ras_aca_hwip_v5 {
 	enum aca_ecc_hwip hwip;
 	const u32 hwid;
@@ -122,6 +128,28 @@ out:
 static bool aca_match_bank_default(struct aca_block *aca_blk, void *data)
 {
 	return aca_check_bank_hwip((struct aca_bank_reg *)data, aca_blk->blk_info->hwip);
+}
+
+/* MP5 FW copies a GFX MCA bank error into its own bank and tags SYND as an aggregated error */
+static bool aca_check_mp5_gfx_aggr_bank(struct aca_bank_reg *bank)
+{
+	u64 ipid = bank->regs[ACA_REG_IDX__IPID];
+	u64 status = bank->regs[ACA_REG_IDX__STATUS];
+	u32 errinfo = ACA_V5_REG_SYND_ERRORINFORMATION(bank->regs[ACA_REG_IDX__SYND]);
+
+	return (ACA_V5_REG_IPID_HARDWAREID(ipid) == ACA_MP5_HWID) &&
+	       (ACA_V5_REG_IPID_ACATYPE(ipid) == ACA_MP5_ACATYPE) &&
+	       (ACA_V5_REG_STATUS_ERRORCODEEXT(status) == ACA_MP5_ERRCODEEXT_FW_LOGGED) &&
+	       ACA_V5_REG_STATUS_SYNDV(status) &&
+	       ((errinfo & ACA_MP5_SYND_ERRINFO_CODE_MASK) == ACA_MP5_SYND_ERRINFO_AGGR_ERR);
+}
+
+static bool aca_match_gfx_bank(struct aca_block *aca_blk, void *data)
+{
+	struct aca_bank_reg *bank = (struct aca_bank_reg *)data;
+
+	return aca_match_bank_default(aca_blk, bank) ||
+	       aca_check_mp5_gfx_aggr_bank(bank);
 }
 
 static bool aca_check_umc_de(struct ras_core_context *ras_core, u64 mc_umc_status)
@@ -249,6 +277,33 @@ static int aca_parse_bank_default(struct ras_core_context *ras_core,
 	return 0;
 }
 
+static int aca_parse_gfx_bank(struct ras_core_context *ras_core,
+			      struct aca_block *aca_blk,
+			      void *data, void *buf)
+{
+	struct aca_bank_reg *bank = (struct aca_bank_reg *)data;
+	struct aca_bank_ecc *err = (struct aca_bank_ecc *)buf;
+	u64 status;
+	int ret;
+
+	ret = aca_parse_bank_default(ras_core, aca_blk, data, buf);
+	if (ret || bank->ecc_type != RAS_ERR_TYPE__MCE ||
+	    !aca_check_mp5_gfx_aggr_bank(bank) || err->de_count)
+		return ret;
+
+	/* The MP5 copy keeps the GFX bank's STATUS, but its copied ErrCnt can be 0 */
+	status = bank->regs[ACA_REG_IDX__STATUS];
+	if (ACA_V5_REG_STATUS_UC(status) || ACA_V5_REG_STATUS_PCC(status) ||
+	    ACA_V5_REG_STATUS_TCC(status)) {
+		err->ue_count = 1;
+		err->ce_count = 0;
+	} else {
+		err->ce_count = ACA_V5_REG_MISC0_ERRCNT(bank->regs[ACA_REG_IDX__MISC0]) ?: 1;
+	}
+
+	return 0;
+}
+
 static int aca_parse_xgmi_bank(struct ras_core_context *ras_core,
 			       struct aca_block *aca_blk,
 			       void *data, void *buf)
@@ -301,8 +356,8 @@ static const struct aca_block_info aca_v5_0_gfx = {
 	.hwip = ACA_ECC_HWIP__GFX,
 	.mask = ACA_ERROR__UE_MASK | ACA_ERROR__CE_MASK,
 	.bank_ops = {
-		.bank_match = aca_match_bank_default,
-		.bank_parse = aca_parse_bank_default,
+		.bank_match = aca_match_gfx_bank,
+		.bank_parse = aca_parse_gfx_bank,
 	},
 };
 
