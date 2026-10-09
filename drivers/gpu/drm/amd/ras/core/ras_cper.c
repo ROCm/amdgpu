@@ -222,18 +222,19 @@ static int fill_section_processor(struct cper_section_processor *processor,
 	fill_processor_error_info(&processor->error_info, status);
 	processor->context.reg_ctx_type = CPER_CTX_TYPE__CRASH;
 	processor->context.reg_arr_size = sizeof(processor->context.reg_dump);
-	processor->context.msr_addr = CPER_SMCA_MC0_STATUS_MSR +
+	processor->context.msr_addr = CPER_SMCA_MC0_CTL_MSR +
 		(mce->bank * CPER_SMCA_BANK_STRIDE);
-	/* The IA processor register array starts at MCA_STATUS. */
-	reg_dump[0] = mce->regs[ACA_REG_IDX__STATUS];
-	reg_dump[1] = mce->regs[ACA_REG_IDX__ADDR];
-	reg_dump[2] = mce->regs[ACA_REG_IDX__MISC0];
-	reg_dump[3] = mce->regs[ACA_REG_IDX__CONFG];
-	reg_dump[4] = mce->regs[ACA_REG_IDX__IPID];
-	reg_dump[5] = mce->regs[ACA_REG_IDX__SYND];
-	reg_dump[7] = mce->regs[ACA_REG_IDX__DESTAT];
-	reg_dump[8] = mce->regs[ACA_REG_IDX__DEADDR];
-	reg_dump[9] = mce->regs[ACA_REG_IDX__CTL_MASK];
+	/* AMD MCA bank dump: the register array starts at MCA_CTL. */
+	reg_dump[RAS_CPER_MCA_DUMP_CTL] = mce->regs[ACA_REG_IDX__CTL];
+	reg_dump[RAS_CPER_MCA_DUMP_STATUS] = mce->regs[ACA_REG_IDX__STATUS];
+	reg_dump[RAS_CPER_MCA_DUMP_ADDR] = mce->regs[ACA_REG_IDX__ADDR];
+	reg_dump[RAS_CPER_MCA_DUMP_MISC0] = mce->regs[ACA_REG_IDX__MISC0];
+	reg_dump[RAS_CPER_MCA_DUMP_CONFIG] = mce->regs[ACA_REG_IDX__CONFG];
+	reg_dump[RAS_CPER_MCA_DUMP_IPID] = mce->regs[ACA_REG_IDX__IPID];
+	reg_dump[RAS_CPER_MCA_DUMP_SYND] = mce->regs[ACA_REG_IDX__SYND];
+	reg_dump[RAS_CPER_MCA_DUMP_DESTAT] = mce->regs[ACA_REG_IDX__DESTAT];
+	reg_dump[RAS_CPER_MCA_DUMP_DEADDR] = mce->regs[ACA_REG_IDX__DEADDR];
+	reg_dump[RAS_CPER_MCA_DUMP_CTL_MASK] = mce->regs[ACA_REG_IDX__CTL_MASK];
 
 	return 0;
 }

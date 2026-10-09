@@ -41,7 +41,8 @@ struct ras_cper_guid {
 #define CPER_HDR__REV_AMD_CPU    (0x101)
 #define CPER_SEC__MINOR_REV_1    (0x01)
 #define CPER_SEC__MAJOR_REV_22   (0x22)
-#define CPER_SEC__REV_AMD_CPU    (0x0100)
+/* ADDC generation 3, program 1 (EPYC Venice), minor revision 0x0E */
+#define CPER_SEC__REV_AMD_CPU    (0x310E)
 #define CPER_OAM_MAX_COUNT      (8)
 
 #define CPER_CTX_TYPE__CRASH     (1)
@@ -105,6 +106,7 @@ struct ras_cper_guid {
 #define CPER_MCA_STATUS_PCC		BIT_ULL(57)
 #define CPER_MCA_STATUS_DEFERRED	BIT_ULL(44)
 
+#define CPER_SMCA_MC0_CTL_MSR		(0xc0002000U)
 #define CPER_SMCA_MC0_STATUS_MSR	(0xc0002001U)
 #define CPER_SMCA_BANK_STRIDE		(0x10U)
 
@@ -138,6 +140,20 @@ enum ras_cper_aca_reg {
 	RAS_CPER_ACA_REG_MASK	= 10,
 
 	RAS_CPER_ACA_REG_COUNT     = 16,
+};
+
+/* AMD MCA bank dump layout of the IA processor register array */
+enum ras_cper_mca_dump_reg {
+	RAS_CPER_MCA_DUMP_CTL      = 0,
+	RAS_CPER_MCA_DUMP_STATUS   = 1,
+	RAS_CPER_MCA_DUMP_ADDR     = 2,
+	RAS_CPER_MCA_DUMP_MISC0    = 3,
+	RAS_CPER_MCA_DUMP_CONFIG   = 4,
+	RAS_CPER_MCA_DUMP_IPID     = 5,
+	RAS_CPER_MCA_DUMP_SYND     = 6,
+	RAS_CPER_MCA_DUMP_DESTAT   = 7,
+	RAS_CPER_MCA_DUMP_DEADDR   = 8,
+	RAS_CPER_MCA_DUMP_CTL_MASK = 12,
 };
 
 #pragma pack(push, 1)
