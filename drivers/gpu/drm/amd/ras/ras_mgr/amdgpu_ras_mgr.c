@@ -865,6 +865,13 @@ int amdgpu_ras_mgr_early_init_service(struct amdgpu_device *adev)
 		return -EPERM;
 	}
 
+	/* Not supported, or the RAS EEPROM holding saved bad pages is not enabled */
+	if (!ras_core_early_init_service_enabled(ras_mgr->ras_core)) {
+		if (ras_mgr->ras_core->early_init_service_enabled)
+			RAS_DEV_INFO(adev, "RAS EEPROM not enabled, saved bad pages are not reserved\n");
+		return 0;
+	}
+
 	ret = ras_core_eeprom_early_init_service(ras_mgr->ras_core);
 	if (ret)
 		RAS_DEV_WARN(adev, "RAS early init service failure! ret:%d\n", ret);
