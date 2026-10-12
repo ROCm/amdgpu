@@ -21,6 +21,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
+#if IS_ENABLED(CONFIG_DRM_AMDGPU_RAS_KUNIT_TEST)
+#include <kunit/visibility.h>
+#endif
 #include "ras.h"
 #include "aca.h"
 #include "core_status.h"
@@ -501,3 +504,7 @@ const struct ras_aca_ip_func ras_aca_func_v5_0 = {
 	.aca_parse_ras_caps = aca_parse_ras_caps_v5_0,
 	.fill_rma_bank = aca_fill_rma_bank_v5_0,
 };
+
+#if IS_ENABLED(CONFIG_DRM_AMDGPU_RAS_KUNIT_TEST)
+EXPORT_SYMBOL_IF_KUNIT(ras_aca_func_v5_0);
+#endif

@@ -50,3 +50,4 @@ RAS_CORE_FILES = core.o \
 RAS_CORE = $(addprefix $(AMD_GPU_RAS_PATH)/core/,$(RAS_CORE_FILES))
 
 AMD_GPU_RAS_FILES += $(RAS_CORE)
+obj-$(CONFIG_DRM_AMDGPU_RAS_KUNIT_TEST) += $(AMD_GPU_RAS_PATH)/core/tests/

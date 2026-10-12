@@ -119,6 +119,19 @@ config GCOV_PROFILE_AMDGPU
 
 	  If unsure, say N.
 
+config DRM_AMDGPU_RAS_KUNIT_TEST
+	tristate "KUnit tests for the AMDGPU unified RAS code" if !KUNIT_ALL_TESTS
+	depends on DRM_AMDGPU && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  This option builds KUnit tests for the AMDGPU unified RAS code
+	  under drivers/gpu/drm/amd/ras.
+
+	  For more information on KUnit and unit tests in general, please
+	  refer to the KUnit documentation in Documentation/dev-tools/kunit/.
+
+	  If unsure, say N.
+
 source "drivers/gpu/drm/amd/acp/Kconfig"
 source "drivers/gpu/drm/amd/display/Kconfig"
 source "drivers/gpu/drm/amd/amdkfd/Kconfig"

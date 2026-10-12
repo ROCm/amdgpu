@@ -1,0 +1,16 @@
+# amdgpu does not link on UML in this tree, so run this suite on x86_64:
+#   ./tools/testing/kunit/kunit.py run --arch=x86_64 \
+#       --kunitconfig=drivers/gpu/drm/amd/ras/core/tests
+#
+# HSA_AMD: amdgpu does not link without it (amdgpu_amdkfd_rlc_spm_interrupt
+# has no !HSA_AMD stub).
+# NET, INET: built-in amdgpu with HSA_AMD needs them to link (kfd_ais.c uses
+# in4_pton() and ip_route_output_flow()).
+CONFIG_KUNIT=y
+CONFIG_PCI=y
+CONFIG_NET=y
+CONFIG_INET=y
+CONFIG_DRM=y
+CONFIG_DRM_AMDGPU=y
+CONFIG_HSA_AMD=y
+CONFIG_DRM_AMDGPU_RAS_KUNIT_TEST=y
