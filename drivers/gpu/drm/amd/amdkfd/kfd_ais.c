@@ -319,6 +319,21 @@ static int kfd_ais_init_p2pdma(struct amdgpu_device *adev, unsigned long size)
 		dev_dbg(adev->dev, "AIS: Failed to add PCI P2PDMA resource for VRAM %d\n", ret);
 		return ret;
 	}
+
+	/*
+	 * Since 6.15 an idle P2PDMA page has refcount 0 and an NFS put would
+	 * free it to a pool that never allocated it; hold one reference.
+	 */
+	if (!page_ref_count(pfn_to_page(pci_start_pfn))) {
+		unsigned long pfn, end_pfn = pci_start_pfn + PHYS_PFN(size);
+
+		for (pfn = pci_start_pfn; pfn < end_pfn; pfn++) {
+			set_page_count(pfn_to_page(pfn), 1);
+			if (IS_ALIGNED(pfn, PAGES_PER_SECTION))
+				cond_resched();
+		}
+	}
+
 	dev_dbg(adev->dev, "AIS: reserve %ldMB system memory for VRAM (P2P) pages struct\n",
 		 AIS_P2P_PAGE_STRUCT_SIZE(size) >> 20);
 
