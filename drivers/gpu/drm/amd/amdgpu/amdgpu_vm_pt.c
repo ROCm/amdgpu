@@ -673,12 +673,12 @@ static void amdgpu_vm_pte_update_noretry_flags(struct amdgpu_device *adev,
  *
  * Make sure to set the right flags for the PTEs at the desired level.
  */
-static void amdgpu_vm_pte_update_flags(struct amdgpu_vm_update_params *params,
-				       struct amdgpu_bo_vm *pt,
-				       unsigned int level,
-				       uint64_t pe, uint64_t addr,
-				       unsigned int count, uint32_t incr,
-				       uint64_t flags)
+static int amdgpu_vm_pte_update_flags(struct amdgpu_vm_update_params *params,
+				      struct amdgpu_bo_vm *pt,
+				      unsigned int level,
+				      uint64_t pe, uint64_t addr,
+				      unsigned int count, uint32_t incr,
+				      uint64_t flags)
 {
 	struct amdgpu_device *adev = params->adev;
 
@@ -707,8 +707,8 @@ static void amdgpu_vm_pte_update_flags(struct amdgpu_vm_update_params *params,
 	if (level == AMDGPU_VM_PTB)
 		amdgpu_vm_pte_update_noretry_flags(adev, &flags);
 
-	params->vm->update_funcs->update(params, pt, pe, addr, count, incr,
-					 flags);
+	return params->vm->update_funcs->update(params, pt, pe, addr, count, incr,
+					      flags);
 }
 
 /**
@@ -784,7 +784,7 @@ static void amdgpu_vm_pte_fragment(struct amdgpu_vm_update_params *params,
  * Update the page tables in the range @start - @end.
  *
  * Returns:
- * 0 for success, -EINVAL for failure.
+ * 0 for success, negative errno for failure.
  */
 int amdgpu_vm_ptes_update(struct amdgpu_vm_update_params *params,
 			  uint64_t start, uint64_t end,
@@ -894,9 +894,11 @@ int amdgpu_vm_ptes_update(struct amdgpu_vm_update_params *params,
 			trace_amdgpu_vm_update_ptes(params, frag_start, upd_end,
 						    min(nptes, 32u), dst, incr,
 						    upd_flags);
-			amdgpu_vm_pte_update_flags(params, to_amdgpu_bo_vm(pt),
-						   cursor.level, pe_start, dst,
-						   nptes, incr, upd_flags);
+			r = amdgpu_vm_pte_update_flags(params, to_amdgpu_bo_vm(pt),
+						       cursor.level, pe_start, dst,
+						       nptes, incr, upd_flags);
+			if (r)
+				return r;
 
 			pe_start += nptes * 8;
 			dst += nptes * incr;
