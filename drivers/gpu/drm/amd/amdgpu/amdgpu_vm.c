@@ -1136,7 +1136,7 @@ int amdgpu_vm_update_range(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	struct amdgpu_vm_tlb_seq_struct *tlb_cb;
 	struct amdgpu_vm_update_params params;
 	struct amdgpu_res_cursor cursor;
-	int r, idx;
+	int r, commit_r, idx;
 
 	if (!drm_dev_enter(adev_to_drm(adev), &idx))
 		return -ENODEV;
@@ -1234,14 +1234,17 @@ int amdgpu_vm_update_range(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		tmp = start + num_entries;
 		r = amdgpu_vm_ptes_update(&params, start, tmp, addr, flags);
 		if (r)
-			goto error_free;
+			break;
 
 		amdgpu_res_next(&cursor, num_entries * AMDGPU_GPU_PAGE_SIZE);
 		start = tmp;
 	}
 
-	r = vm->update_funcs->commit(&params, fence);
-	if (r)
+	/* Finalize partial updates while preserving the first error. */
+	commit_r = vm->update_funcs->commit(&params, fence);
+	if (!r)
+		r = commit_r;
+	if (commit_r)
 		goto error_free;
 
 	if (params.needs_flush) {
@@ -1606,16 +1609,16 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 	while (!list_empty(&vm->freed)) {
 		mapping = list_first_entry(&vm->freed,
 			struct amdgpu_bo_va_mapping, list);
-		list_del(&mapping->list);
 
 		r = amdgpu_vm_update_range(adev, vm, false, false, true, false,
 					   &sync, mapping->start, mapping->last,
 					   0, 0, 0, NULL, NULL, &f);
-		amdgpu_vm_free_mapping(adev, vm, mapping, f);
 		if (r) {
 			dma_fence_put(f);
 			goto error_free;
 		}
+		list_del(&mapping->list);
+		amdgpu_vm_free_mapping(adev, vm, mapping, f);
 	}
 
 	if (fence && f) {
