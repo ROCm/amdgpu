@@ -91,6 +91,7 @@ static int amdgpu_vm_sdma_prepare(struct amdgpu_vm_update_params *p,
 	if (r) {
 		p->num_dw_left = 0;
 		amdgpu_job_free(p->job);
+		p->job = NULL;
 	}
 	return r;
 }
@@ -107,14 +108,23 @@ static int amdgpu_vm_sdma_prepare(struct amdgpu_vm_update_params *p,
 static int amdgpu_vm_sdma_commit(struct amdgpu_vm_update_params *p,
 				 struct dma_fence **fence)
 {
-	struct drm_gpu_scheduler *sched =
-		container_of(p->vm->delayed.rq, typeof(*sched), rq);
-	struct amdgpu_ring *ring =
-		container_of(sched, struct amdgpu_ring, sched);
-	struct amdgpu_ib *ib = p->job->ibs;
+	struct drm_gpu_scheduler *sched;
+	struct amdgpu_ring *ring;
+	struct amdgpu_ib *ib;
 	struct dma_fence *f;
 
-	WARN_ON(ib->length_dw == 0);
+	if (!p->job)
+		return 0;
+
+	ib = p->job->ibs;
+	if (!ib->length_dw) {
+		amdgpu_job_free(p->job);
+		p->job = NULL;
+		return 0;
+	}
+
+	sched = container_of(p->vm->delayed.rq, typeof(*sched), rq);
+	ring = container_of(sched, struct amdgpu_ring, sched);
 	amdgpu_ring_pad_ib(ring, ib);
 
 	if (p->needs_flush)
@@ -122,6 +132,7 @@ static int amdgpu_vm_sdma_commit(struct amdgpu_vm_update_params *p,
 
 	WARN_ON(ib->length_dw > p->num_dw_left);
 	f = amdgpu_job_submit(p->job);
+	p->job = NULL;
 
 	if (p->unlocked) {
 		struct dma_fence *tmp = dma_fence_get(f);
